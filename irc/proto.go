@@ -1,9 +1,22 @@
 // Deals with irc protocol parsing
 package irc
 
-import "strings"
+import (
+	"strings"
+	"regexp"
+	"errors"
+)
 
+// Package variables
 var protoChains map[string]*protoToken = make(map[string]*protoToken)
+var protoIdRegex *regexp.Regexp = regexp.MustCompile(`^[\*#:]*\w+$`)
+
+const (
+	// An error message for when invalid tokens appear.
+	syntaxErrorMessage string = "irc: Invalid token in proto syntax."
+	// An error message for when bracket mismatches occur.
+	syntaxBracketMismatch string = "irc: Bracket mismatch in proto syntax."
+)
 
 // protoToken: represents a single step in a proto chain
 type protoToken struct {
@@ -22,29 +35,31 @@ type protoToken struct {
 }
 
 // parseProtoChain: parses an entire proto file entry.
-func parseProtoChain(protocol []string) *protoToken {
+func parseProtoChain(protocol []string) (*protoToken, error) {
 	var first, next, last *protoToken
+	var err error
 
 	for i := 0; i < len(protocol); i++ {
-
-		//Determine the amount of brackets on the left of the expression
 		lbs := 0
 		for k := 0; protocol[i][k] == '['; k, lbs = k+1, lbs+1 {}
 
 		if lbs > 0 {
-			i, next = parseOptionalChain(protocol, i, lbs)
+			i, next, err = parseOptionalChain(protocol, i, lbs)
 		} else {
-			next = parseProtoTok(protocol[i])
+			next, err = parseProtoTok(protocol[i])
 		}
+
+		if err != nil { return nil, err }
+
 		if first == nil { first = next }
 		if last != nil { last.next = next }
 		last = next
 	}
-	return first
+	return first, nil
 }
 
 // parseOptionalChain: Helper function for parseProtoChain
-func parseOptionalChain(protocol []string, i int, lbs int) (int, *protoToken) {
+func parseOptionalChain(protocol []string, i int, lbs int) (int, *protoToken, error) {
 	for j := i; j < len(protocol); j++ {
 		for k := len(protocol[j]) - 1; protocol[j][k] == ']' && lbs > 0; {
 			k, lbs = k-1, lbs-1
@@ -53,14 +68,20 @@ func parseOptionalChain(protocol []string, i int, lbs int) (int, *protoToken) {
 		if lbs == 0 {
 			protocol[i] = protocol[i][1:]
 			protocol[j] = protocol[j][:len(protocol[j]) - 1]
-			return j, &protoToken{optional: parseProtoChain(protocol[i:j + 1])}
+			protoChain, err := parseProtoChain(protocol[i:j+1])
+			if err != nil { return 0, nil, err }
+			return j, &protoToken{optional: protoChain}, nil
 		}
 	}
-	return 0, nil // This shouldn't happen.
+	return 0, nil, errors.New(syntaxBracketMismatch)
 }
 
 // parseProtoTok: parses a single token in a proto chain
-func parseProtoTok(tok string) *protoToken {
+func parseProtoTok(tok string) (*protoToken, error) {
+	if !protoIdRegex.MatchString(tok) {
+		return nil, errors.New(syntaxErrorMessage)
+	}
+
 	proto := new (protoToken)
 	for hadPrefix := true;; {
 		switch {
@@ -77,5 +98,5 @@ func parseProtoTok(tok string) *protoToken {
 		tok = tok[1:]
 	}
 	proto.id = tok
-	return proto
+	return proto, nil
 }
