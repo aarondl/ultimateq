@@ -2,24 +2,31 @@
 package irc
 
 import (
-	"strings"
-	"regexp"
 	"errors"
+	"regexp"
+	"strings"
 )
 
-// Package variables
-var protoChains map[string]*protoToken = make(map[string]*protoToken)
-var protoIdRegex *regexp.Regexp = regexp.MustCompile(`^[\*#:]*\w+$`)
-
-const (
-	// An error message for when invalid tokens appear.
-	syntaxErrorMessage string = "irc: Invalid token in proto syntax."
-	// An error message for when bracket mismatches occur.
-	syntaxBracketMismatch string = "irc: Bracket mismatch in proto syntax."
+var (
+	// syntaxErrorMessage: When invalid tokens occur in identifiers.
+	errIllegalIdentifiers = errors.New("irc: Invalid token in identifier")
+	// errBracketMismatch: When bracket mismatches occur.
+	errBracketMismatch = errors.New("irc: Bracket mismatch")
+	// errArgsAfterFinal: When the final syntax is given, and then more arguments.
+	errArgsAfterFinal = errors.New("irc: Arguments given after final marker")
+	// errRequiredAfterOptionalArg: A required argument comes after an optional.
+	errRequiredAfterOptionalArg = errors.New(
+		"irc: Required argument after optional argument")
+	// errFinalCannotBeChannel: Final arguments cannot be channels
+	errFinalCantBeChannel = errors.New("irc: Final arguments cannot be channels")
+	// errFinalCannotBeArgs: Final arguments cannot be args
+	errFinalCantBeArgs = errors.New("irc: Final arguments cannot be args")
+	// fragmentIdRegex: Regex to validate identifier tokens.
+	fragmentIdRegex *regexp.Regexp = regexp.MustCompile(`^[\*#:]*\w+$`)
 )
 
-// protoToken: represents a single step in a proto chain
-type protoToken struct {
+// fragment: represents a single step in a fragment chain
+type fragment struct {
 	// The named id of the parameter
 	id string
 	// Whether or not this should consume all following arguments
@@ -29,61 +36,77 @@ type protoToken struct {
 	// Whether or not the argument was a channel or not
 	channel bool
 	// The next chunk to parse in the chain
-	next *protoToken
+	next *fragment
 	// An optional piece of the chain
-	optional *protoToken
+	optional *fragment
 }
 
-// parseProtoChain: parses an entire proto file entry.
-func parseProtoChain(protocol []string) (*protoToken, error) {
-	var first, next, last *protoToken
+// createProtoChain: creates a parse tree from the protocol syntax
+func createFragmentChain(toks []string) (*fragment, error) {
+	var first, next, last *fragment
 	var err error
 
-	for i := 0; i < len(protocol); i++ {
+	for i := 0; i < len(toks); i++ {
 		lbs := 0
-		for k := 0; protocol[i][k] == '['; k, lbs = k+1, lbs+1 {}
-
-		if lbs > 0 {
-			i, next, err = parseOptionalChain(protocol, i, lbs)
-		} else {
-			next, err = parseProtoTok(protocol[i])
+		for k := 0; toks[i][k] == '['; k, lbs = k+1, lbs+1 {
+			//noop
 		}
 
-		if err != nil { return nil, err }
+		if lbs > 0 {
+			i, next, err = parseOptionalChain(toks, i, lbs)
+		} else {
+			next, err = parseFragment(toks[i])
+		}
 
-		if first == nil { first = next }
-		if last != nil { last.next = next }
+		if err != nil {
+			return nil, err
+		}
+
+		if first == nil {
+			first = next
+		}
+		if last != nil {
+			last.next = next
+		}
+		if next.final && i+1 != len(toks) {
+			return nil, errArgsAfterFinal
+		}
+		if last != nil && last.optional != nil && next.optional == nil {
+			return nil, errRequiredAfterOptionalArg
+		}
 		last = next
 	}
 	return first, nil
 }
 
-// parseOptionalChain: Helper function for parseProtoChain
-func parseOptionalChain(protocol []string, i int, lbs int) (int, *protoToken, error) {
-	for j := i; j < len(protocol); j++ {
-		for k := len(protocol[j]) - 1; protocol[j][k] == ']' && lbs > 0; {
+// parseOptionalChain: Helper function for createFragmentChain
+func parseOptionalChain(toks []string, i int, lbs int) (int, *fragment, error) {
+	for j := i; j < len(toks); j++ {
+		for k := len(toks[j]) - 1; toks[j][k] == ']' && lbs > 0; {
 			k, lbs = k-1, lbs-1
 		}
 
 		if lbs == 0 {
-			protocol[i] = protocol[i][1:]
-			protocol[j] = protocol[j][:len(protocol[j]) - 1]
-			protoChain, err := parseProtoChain(protocol[i:j+1])
-			if err != nil { return 0, nil, err }
-			return j, &protoToken{optional: protoChain}, nil
+			toks[i] = toks[i][1:]
+			toks[j] = toks[j][:len(toks[j])-1]
+			protoChain, err := createFragmentChain(toks[i : j+1])
+			if err != nil {
+				return 0, nil, err
+			}
+			return j, &fragment{optional: protoChain}, nil
 		}
 	}
-	return 0, nil, errors.New(syntaxBracketMismatch)
+	return 0, nil, errBracketMismatch
 }
 
-// parseProtoTok: parses a single token in a proto chain
-func parseProtoTok(tok string) (*protoToken, error) {
-	if !protoIdRegex.MatchString(tok) {
-		return nil, errors.New(syntaxErrorMessage)
+// parseFragment: parses a single token in the protocol descriptor chain
+func parseFragment(tok string) (*fragment, error) {
+	if !fragmentIdRegex.MatchString(tok) {
+		return nil, errIllegalIdentifiers
 	}
 
-	proto := new (protoToken)
-	for hadPrefix := true;; {
+	proto := new(fragment)
+	for hadPrefix := true; ; {
 		switch {
 		case strings.HasPrefix(tok, ":"):
 			proto.final = true
@@ -94,8 +117,16 @@ func parseProtoTok(tok string) (*protoToken, error) {
 		default:
 			hadPrefix = false
 		}
-		if !hadPrefix { break }
+		if !hadPrefix {
+			break
+		}
 		tok = tok[1:]
+	}
+	if proto.args && proto.final {
+		return nil, errFinalCantBeArgs
+	}
+	if proto.channel && proto.final {
+		return nil, errFinalCantBeChannel
 	}
 	proto.id = tok
 	return proto, nil

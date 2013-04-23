@@ -7,73 +7,83 @@ import (
 
 func Test(t *testing.T) { TestingT(t) } //Hook into testing package
 
-type testSuite struct {}
+type testSuite struct{}
+
 var _ = Suite(&testSuite{})
 
-func (s *testSuite) TestParseProtoTok_Basic(c *C) {
+func (s *testSuite) TestParseFragment_Basic(c *C) {
 	tokid := "id"
-	tok, _ := parseProtoTok(tokid)
+	tok, _ := parseFragment(tokid)
 	c.Assert(tok.id, Equals, tokid)
 }
 
-func (s *testSuite) TestParseProtoTok_Finality(c *C) {
-	tok, _ := parseProtoTok(":id")
+func (s *testSuite) TestParseFragment_Finality(c *C) {
+	tok, _ := parseFragment(":id")
 	c.Assert(tok.final, Equals, true)
 }
 
-func (s *testSuite) TestParseProtoTok_Args(c *C) {
-	tok, _ := parseProtoTok("*id")
+func (s *testSuite) TestParseFragment_Args(c *C) {
+	tok, _ := parseFragment("*id")
 	c.Assert(tok.args, Equals, true)
 }
 
-func (s *testSuite) TestParseProtoTok_Channel(c *C) {
-	tok, _ := parseProtoTok("#id")
+func (s *testSuite) TestParseFragment_Channel(c *C) {
+	tok, _ := parseFragment("#id")
 	c.Assert(tok.channel, Equals, true)
 }
 
-func (s *testSuite) TestParseProtoTok_None(c *C) {
-	tok, _ := parseProtoTok("id")
+func (s *testSuite) TestParseFragment_None(c *C) {
+	tok, _ := parseFragment("id")
 	c.Assert(tok.final, Equals, false)
 	c.Assert(tok.args, Equals, false)
 	c.Assert(tok.channel, Equals, false)
 }
 
-func (s *testSuite) TestParseProtoTok_All(c *C) {
-	tok, _ := parseProtoTok("#*:id")
-	c.Assert(tok.final, Equals, true)
-	c.Assert(tok.args, Equals, true)
-	c.Assert(tok.channel, Equals, true)
-
-	tok, _ = parseProtoTok(":*#id")
-	c.Assert(tok.final, Equals, true)
+func (s *testSuite) TestParseFragment_Both(c *C) {
+	tok, _ := parseFragment("#*id")
+	c.Assert(tok.final, Equals, false)
 	c.Assert(tok.args, Equals, true)
 	c.Assert(tok.channel, Equals, true)
 }
 
-func (s *testSuite) TestParseProtoTok_Error(c *C) {
-	_, err := parseProtoTok("&lol")
+func (s *testSuite) TestParseFragment_Error(c *C) {
+	_, err := parseFragment("&lol")
 	c.Assert(err, NotNil)
-	c.Assert(err.Error(), Equals, syntaxErrorMessage)
+	c.Assert(err, Equals, errIllegalIdentifiers)
 
-	_, err = parseProtoTok("lol*")
+	_, err = parseFragment("lol*")
 	c.Assert(err, NotNil)
-	c.Assert(err.Error(), Equals, syntaxErrorMessage)
+	c.Assert(err, Equals, errIllegalIdentifiers)
 }
 
-func (s *testSuite) TestParseProtoChain_Basic(c *C) {
-	chain, _ := parseProtoChain([]string {"id", "fun"})
+func (s *testSuite) TestParseFragment_FinalCannotBeChannel(c *C) {
+	chain, err := createFragmentChain([]string{":#id"})
+	c.Assert(chain, IsNil)
+	c.Assert(err, Equals, errFinalCantBeChannel)
+}
+
+func (s *testSuite) TestParseFragment_FinalCannotBeArgs(c *C) {
+	chain, err := createFragmentChain([]string{":*id"})
+	c.Assert(chain, IsNil)
+	c.Assert(err, Equals, errFinalCantBeArgs)
+}
+
+func (s *testSuite) TestParseFragmentChain_Basic(c *C) {
+	chain, _ := createFragmentChain([]string{"id", "fun"})
 	c.Assert(chain.id, Equals, "id")
 	c.Assert(chain.next.id, Equals, "fun")
 }
 
-func (s *testSuite) TestParseProtoChain_OptionalChain(c *C) {
-	chain, _ := parseProtoChain([]string {"[id", "more", "fun]"})
+func (s *testSuite) TestParseFragmentChain_OptionalChain(c *C) {
+	chain, err := createFragmentChain([]string{"[id", "more", "fun]"})
+	c.Assert(err, IsNil)
 	c.Assert(chain.optional, NotNil)
 	c.Assert(chain.optional.id, Equals, "id")
 	c.Assert(chain.optional.next.id, Equals, "more")
 	c.Assert(chain.optional.next.next.id, Equals, "fun")
 
-	chain, _ = parseProtoChain([]string {"[hello]", "[more]", "[there]"})
+	chain, err = createFragmentChain([]string{"[hello]", "[more]", "[there]"})
+	c.Assert(err, IsNil)
 	c.Assert(chain.optional, NotNil)
 	c.Assert(chain.optional.id, Equals, "hello")
 	c.Assert(chain.next.optional, NotNil)
@@ -81,28 +91,38 @@ func (s *testSuite) TestParseProtoChain_OptionalChain(c *C) {
 	c.Assert(chain.next.next.optional, NotNil)
 	c.Assert(chain.next.next.optional.id, Equals, "there")
 
-	chain, _ = parseProtoChain([]string {"[hello", "[more]]", "[there]"})
+	chain, err = createFragmentChain([]string{"[hello", "[more]]", "[there]"})
+	c.Assert(err, IsNil)
 	c.Assert(chain.optional, NotNil)
 	c.Assert(chain.optional.id, Equals, "hello")
 	c.Assert(chain.optional.next.optional, NotNil)
 	c.Assert(chain.optional.next.optional.id, Equals, "more")
 	c.Assert(chain.next.optional, NotNil)
 	c.Assert(chain.next.optional.id, Equals, "there")
-
-	chain, _ = parseProtoChain([]string {"hello", "[[more]", "there]"})
-	c.Assert(chain.id, Equals, "hello")
-	c.Assert(chain.next.optional.optional, NotNil)
-	c.Assert(chain.next.optional.optional.id, Equals, "more")
-	c.Assert(chain.next.optional.next, NotNil)
-	c.Assert(chain.next.optional.next.id, Equals, "there")
 }
 
-func (s *testSuite) TestParseProtoChain_Error(c *C) {
-	_, err := parseProtoChain([]string {"hello", "[[more]]", "there]"})
+func (s *testSuite) TestParseFragmentChain_IllegalIdentifiers(c *C) {
+	chain, err := createFragmentChain([]string{"hello", "[[more]]", "there]"})
+	c.Assert(chain, IsNil)
 	c.Assert(err, NotNil)
-	c.Assert(err.Error(), Equals, syntaxErrorMessage)
+	c.Assert(err, Equals, errIllegalIdentifiers)
+}
 
-	_, err = parseProtoChain([]string {"hello", "[[more]", "there"})
+func (s *testSuite) TestParseFragmentChain_BracketMismatch(c *C) {
+	chain, err := createFragmentChain([]string{"hello", "[[more]", "there"})
+	c.Assert(chain, IsNil)
 	c.Assert(err, NotNil)
-	c.Assert(err.Error(), Equals, syntaxBracketMismatch)
+	c.Assert(err, Equals, errBracketMismatch)
+}
+
+func (s *testSuite) TestParseFragmentChain_ArgsAfterFinal(c *C) {
+	chain, err := createFragmentChain([]string{":id", "fun"})
+	c.Assert(chain, IsNil)
+	c.Assert(err, Equals, errArgsAfterFinal)
+}
+
+func (s *testSuite) TestParseFragmentChain_RequiredAfterOptionalArg(c *C) {
+	chain, err := createFragmentChain([]string{"[id]", "fun"})
+	c.Assert(chain, IsNil)
+	c.Assert(err, Equals, errRequiredAfterOptionalArg)
 }

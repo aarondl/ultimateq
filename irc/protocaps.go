@@ -3,10 +3,11 @@ package irc
 // Used to record the server settings, aids in parsing.
 type ProtoCaps struct {
 	Chantypes string
-	Prefix string
+	Prefix    string
 	Statusmsg string
 	Chanmodes string
 }
+
 // Stores the capabilities of the server.
 var protoCaps *ProtoCaps = nil
 
