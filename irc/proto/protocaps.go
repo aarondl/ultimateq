@@ -7,16 +7,3 @@ type ProtoCaps struct {
 	Statusmsg string
 	Chanmodes string
 }
-
-// Stores the capabilities of the server.
-var protoCaps *ProtoCaps = nil
-
-// Sets the server capabilites.
-func SetCaps(caps *ProtoCaps) {
-	protoCaps = caps
-}
-
-// Gets the server capabilities.
-func GetCaps() *ProtoCaps {
-	return protoCaps
-}
