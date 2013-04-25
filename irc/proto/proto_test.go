@@ -1,4 +1,4 @@
-package irc
+package proto
 
 import (
 	. "launchpad.net/gocheck"
@@ -74,15 +74,17 @@ func (s *testSuite) TestParseFragmentChain_Basic(c *C) {
 	c.Assert(chain.next.id, Equals, "fun")
 }
 
-func (s *testSuite) TestParseFragmentChain_OptionalChain(c *C) {
+func (s *testSuite) TestParseFragmentChain_OptionalChainVariant1(c *C) {
 	chain, err := createFragmentChain([]string{"[id", "more", "fun]"})
 	c.Assert(err, IsNil)
 	c.Assert(chain.optional, NotNil)
 	c.Assert(chain.optional.id, Equals, "id")
 	c.Assert(chain.optional.next.id, Equals, "more")
 	c.Assert(chain.optional.next.next.id, Equals, "fun")
+}
 
-	chain, err = createFragmentChain([]string{"[hello]", "[more]", "[there]"})
+func (s *testSuite) TestParseFragmentChain_OptionalChainVariant2(c *C) {
+	chain, err := createFragmentChain([]string{"[hello]", "[more]", "[there]"})
 	c.Assert(err, IsNil)
 	c.Assert(chain.optional, NotNil)
 	c.Assert(chain.optional.id, Equals, "hello")
@@ -90,8 +92,10 @@ func (s *testSuite) TestParseFragmentChain_OptionalChain(c *C) {
 	c.Assert(chain.next.optional.id, Equals, "more")
 	c.Assert(chain.next.next.optional, NotNil)
 	c.Assert(chain.next.next.optional.id, Equals, "there")
+}
 
-	chain, err = createFragmentChain([]string{"[hello", "[more]]", "[there]"})
+func (s *testSuite) TestParseFragmentChain_OptionalChainVariant3(c *C) {
+	chain, err := createFragmentChain([]string{"[hello", "[more]]", "[there]"})
 	c.Assert(err, IsNil)
 	c.Assert(chain.optional, NotNil)
 	c.Assert(chain.optional.id, Equals, "hello")

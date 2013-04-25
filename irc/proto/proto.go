@@ -1,5 +1,4 @@
-// Deals with irc protocol parsing
-package irc
+package proto
 
 import (
 	"errors"
@@ -105,15 +104,15 @@ func parseFragment(tok string) (*fragment, error) {
 		return nil, errIllegalIdentifiers
 	}
 
-	proto := new(fragment)
+	frag := new(fragment)
 	for hadPrefix := true; ; {
 		switch {
 		case strings.HasPrefix(tok, ":"):
-			proto.final = true
+			frag.final = true
 		case strings.HasPrefix(tok, "*"):
-			proto.args = true
+			frag.args = true
 		case strings.HasPrefix(tok, "#"):
-			proto.channel = true
+			frag.channel = true
 		default:
 			hadPrefix = false
 		}
@@ -122,12 +121,12 @@ func parseFragment(tok string) (*fragment, error) {
 		}
 		tok = tok[1:]
 	}
-	if proto.args && proto.final {
+	if frag.args && frag.final {
 		return nil, errFinalCantBeArgs
 	}
-	if proto.channel && proto.final {
+	if frag.channel && frag.final {
 		return nil, errFinalCantBeChannel
 	}
-	proto.id = tok
-	return proto, nil
+	frag.id = tok
+	return frag, nil
 }

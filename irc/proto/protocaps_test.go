@@ -1,4 +1,4 @@
-package irc
+package proto
 
 import (
 	. "launchpad.net/gocheck"

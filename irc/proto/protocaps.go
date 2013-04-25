@@ -1,4 +1,4 @@
-package irc
+package proto
 
 // Used to record the server settings, aids in parsing.
 type ProtoCaps struct {
