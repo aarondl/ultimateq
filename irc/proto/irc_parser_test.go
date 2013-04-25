@@ -85,7 +85,7 @@ func (s *testSuite) TestWalkProto_Channels(c *C) {
 	chain, err := createFragmentChain([]string{"*#" + id, "#" + id2})
 	proto := []string{strs[0] + "," + strs[1], strs[2]}
 	result := createParseResult()
-	err = walkProto(chain, proto, result, &ProtoCaps{Chantypes:"#"})
+	err = walkProto(chain, proto, result, &ProtoCaps{Chantypes: "#"})
 	c.Assert(err, IsNil)
 	c.Assert(result.Channels[id][0], Equals, strs[0])
 	c.Assert(result.Channels[id][1], Equals, strs[1])

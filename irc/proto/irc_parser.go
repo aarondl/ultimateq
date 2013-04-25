@@ -76,12 +76,12 @@ func (p *IrcParser) RemoveIrcHandler(handler string) error {
 }
 
 // parse: Parses an irc protocol string
-func (p *IrcParser) Parse(ircproto string, caps *ProtoCaps) (*ParseResult, error) {
-	if len(ircproto) == 0 {
+func (p *IrcParser) Parse(proto string, caps *ProtoCaps) (*ParseResult, error) {
+	if len(proto) == 0 {
 		return nil, errNoProtocolGiven
 	}
 
-	splits := strings.Split(ircproto, " ")
+	splits := strings.Split(proto, " ")
 	result := createParseResult()
 	result.Name = strings.ToLower(splits[0])
 	chain, ok := p.handlers[result.Name]
