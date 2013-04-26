@@ -24,6 +24,8 @@ var (
 type ParseResult struct {
 	// The name of the event
 	Name string
+	// The fullhost of the sender.
+	Sender string
 	// args: arguments in plain form
 	Args map[string]string
 	// nargs: split arguments
@@ -83,12 +85,17 @@ func (p *IrcParser) Parse(proto string, caps *ProtoCaps) (*ParseResult, error) {
 
 	splits := strings.Split(proto, " ")
 	result := createParseResult()
-	result.Name = strings.ToLower(splits[0])
+	var nameIndex = 0
+	if strings.HasPrefix(splits[0], ":") {
+		result.Sender = splits[0][1:]
+		nameIndex++
+	}
+	result.Name = strings.ToLower(splits[nameIndex])
 	chain, ok := p.handlers[result.Name]
 	if !ok {
 		return nil, errHandlerNotRegistered
 	}
-	err := walkProto(chain, splits[1:], result, nil)
+	err := walkProto(chain, splits[nameIndex+1:], result, nil)
 	return result, err
 }
 

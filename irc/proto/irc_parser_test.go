@@ -54,6 +54,19 @@ func (s *testSuite) TestParseIrc(c *C) {
 	c.Assert(result.Args["id"], Equals, "arg1 arg2")
 }
 
+func (s *testSuite) TestParseIrc_User(c *C) {
+	parser := CreateIrcParser()
+	chain, err := createFragmentChain([]string{":id"})
+	c.Assert(err, IsNil)
+	err = parser.AddIrcHandler("PING", chain)
+	c.Assert(err, IsNil)
+	result, err := parser.Parse(":nick!user@host PING :arg1 arg2", nil)
+	c.Assert(err, IsNil)
+	c.Assert(result.Name, Equals, "ping")
+	c.Assert(result.Args["id"], Equals, "arg1 arg2")
+	c.Assert(result.Sender, Equals, "nick!user@host")
+}
+
 func (s *testSuite) TestWalkProto_Basic(c *C) {
 	id := "id"
 	chain, err := createFragmentChain([]string{id})
