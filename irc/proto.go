@@ -9,15 +9,15 @@ import (
 )
 
 const (
+	// nStringsAssumed is the number of channels assumed to be in each irc message
+	// if this number is too small, there could be memory thrashing due to append
+	nChannelsAssumed = 1
 	// errMsgParseFailure is given when the ircRegex fails to parse the protocol.
 	errMsgParseFailure = "irc: Unable to parse received irc protocol"
 )
 
 var (
 	// ircRegex is used to parse the parts of irc protocol.
-	// note that because Go doesn't appear to support proper multiple capture
-	// groups, the args have a space in front of them that must be trimmed,
-	// and they must then again be split.
 	ircRegex = regexp.MustCompile(
 		`^(?::(\S+) )?([A-Z0-9]+)((?: (?:[^:\s]+))*)(?: :(.*))?$`)
 )
@@ -31,6 +31,7 @@ type ParseError struct {
 	Irc string
 }
 
+// Error satisfies the Error interface for ParseError.
 func (p ParseError) Error() string {
 	return p.Msg
 }
@@ -43,6 +44,38 @@ type IrcMessage struct {
 	User string
 	// The args split by space delimiting.
 	Args []string
+	// The cached list of channels
+	channels []string
+}
+
+// Split splits string arguments. A convenience method to avoid having to call
+// splits and import strings.
+func (m *IrcMessage) Split(index int) []string {
+	return strings.Split(m.Args[index], ",")
+}
+
+// Channels retrieves all the channels in the object using the channel regex
+// created by ProtoCaps when SetChanTypes is called. It ensures only the first
+// batch of channels is returned, and it also caches per IrcMessage object.
+func (m *IrcMessage) Channels(caps *ProtoCaps) []string {
+	if m.channels != nil {
+		return m.channels
+	}
+	m.channels = make([]string, 0, nChannelsAssumed)
+
+	for _, arg := range m.Args {
+		if strings.Contains(arg, " ") {
+			continue
+		}
+
+		for _, channel := range caps.chantypesRegex.FindAllString(arg, -1) {
+			m.channels = append(m.channels, channel)
+		}
+		if len(m.channels) > 0 {
+			break
+		}
+	}
+	return m.channels
 }
 
 // Parse parses a byte slice and produces an IrcMessage.
