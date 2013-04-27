@@ -1,11 +1,10 @@
-package proto
+package irc
 
 import (
 	. "launchpad.net/gocheck"
 )
 
-// Tests that capabilites can be get and set.
-func (s *testSuite) TestSetServerCaps(c *C) {
+func (s *s) TestSetServerCaps(c *C) {
 	capabilites := []string{"#&~", "(ov)@+", "@+", "b,k,l,imnpstrDdRcC"}
 	caps := &ProtoCaps{
 		capabilites[0],
