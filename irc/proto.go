@@ -9,9 +9,6 @@ import (
 )
 
 const (
-	// nStringsAssumed is the number of channels assumed to be in each irc message
-	// if this number is too small, there could be memory thrashing due to append
-	nChannelsAssumed = 1
 	// errMsgParseFailure is given when the ircRegex fails to parse the protocol.
 	errMsgParseFailure = "irc: Unable to parse received irc protocol"
 )
@@ -44,8 +41,6 @@ type IrcMessage struct {
 	User string
 	// The args split by space delimiting.
 	Args []string
-	// The cached list of channels
-	channels []string
 }
 
 // Split splits string arguments. A convenience method to avoid having to call
@@ -54,32 +49,8 @@ func (m *IrcMessage) Split(index int) []string {
 	return strings.Split(m.Args[index], ",")
 }
 
-// Channels retrieves all the channels in the object using the channel regex
-// created by ProtoCaps when SetChanTypes is called. It ensures only the first
-// batch of channels is returned, and it also caches per IrcMessage object.
-func (m *IrcMessage) Channels(caps *ProtoCaps) []string {
-	if m.channels != nil {
-		return m.channels
-	}
-	m.channels = make([]string, 0, nChannelsAssumed)
-
-	for _, arg := range m.Args {
-		if strings.Contains(arg, " ") {
-			continue
-		}
-
-		for _, channel := range caps.chantypesRegex.FindAllString(arg, -1) {
-			m.channels = append(m.channels, channel)
-		}
-		if len(m.channels) > 0 {
-			break
-		}
-	}
-	return m.channels
-}
-
-// Parse parses a byte slice and produces an IrcMessage.
-// str: An irc protocol message, split by newlines, and newlines should not be
+// Parse produces an IrcMessage from a byte slice. The byte slice is an irc
+// protocol message, split by newlines, and newlines should not be
 // present.
 func Parse(bytes []byte) (*IrcMessage, error) {
 	msg := &IrcMessage{}

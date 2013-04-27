@@ -60,25 +60,3 @@ func (s *s) TestParse_Split(c *C) {
 		c.Assert(v, Equals, channelnames[i])
 	}
 }
-
-func (s *s) TestParse_Channels(c *C) {
-	msg, _ := Parse(convert(testargs))
-	caps := &ProtoCaps{}
-	caps.SetChantypes("#")
-	channelnames := msg.Channels(caps)
-	c.Assert(len(channelnames), Equals, 1)
-	c.Assert(channelnames[0], Equals, strings.Split(testargs[2], ",")[1])
-	for i, v := range channelnames {
-		c.Assert(v, Equals, msg.channels[i])
-	}
-}
-
-func (s *s) TestParse_ChannelsFirstOnly(c *C) {
-	msg, _ := Parse([]byte("PRIVMSG #chan1,#chan2 :#chan3"))
-	caps := &ProtoCaps{}
-	caps.SetChantypes("#")
-	channelnames := msg.Channels(caps)
-	c.Assert(len(channelnames), Equals, 2)
-	c.Assert(channelnames[0], Equals, "#chan1")
-	c.Assert(channelnames[1], Equals, "#chan2")
-}
