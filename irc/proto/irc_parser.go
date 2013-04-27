@@ -3,6 +3,7 @@ package proto
 
 import (
 	"errors"
+	"regexp"
 	"strings"
 )
 
@@ -18,6 +19,9 @@ var (
 		"irc: Colon not given, but arguments still followed")
 	// errExpectedMoreArguments: Protocol line ends abruptly
 	errExpectedMoreArguments = errors.New("irc: Expected more arguments")
+
+	// evNameRegex: Used to check identifiers of messages for validity.
+	evNameRegex = regexp.MustCompile(`^[A-Za-z0-9]+$`)
 )
 
 // ParseResult: The result of a pass through the parsing tree.
@@ -55,7 +59,10 @@ func createParseResult() *ParseResult {
 
 // addHandler: Adds a handler to the IrcParser.
 func (p *IrcParser) AddIrcHandler(handler string, tree *fragment) error {
-	handler = strings.ToLower(handler)
+	if !evNameRegex.MatchString(handler) {
+		return errIllegalIdentifiers
+	}
+	handler = strings.ToUpper(handler)
 	_, has := p.handlers[handler]
 	if has {
 		return errHandlerAlreadyRegistered
@@ -67,7 +74,7 @@ func (p *IrcParser) AddIrcHandler(handler string, tree *fragment) error {
 
 // removeHandler: Deletes a handler from the IrcParser
 func (p *IrcParser) RemoveIrcHandler(handler string) error {
-	handler = strings.ToLower(handler)
+	handler = strings.ToUpper(handler)
 	_, has := p.handlers[handler]
 	if !has {
 		return errHandlerNotRegistered
@@ -90,7 +97,7 @@ func (p *IrcParser) Parse(proto string, caps *ProtoCaps) (*ParseResult, error) {
 		result.Sender = splits[0][1:]
 		nameIndex++
 	}
-	result.Name = strings.ToLower(splits[nameIndex])
+	result.Name = strings.ToUpper(splits[nameIndex])
 	chain, ok := p.handlers[result.Name]
 	if !ok {
 		return nil, errHandlerNotRegistered

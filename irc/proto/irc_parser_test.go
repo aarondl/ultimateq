@@ -24,13 +24,13 @@ func (s *testSuite) TestCreateParseResult(c *C) {
 func (s *testSuite) TestAddAndRemoveParseTree(c *C) {
 	parser := CreateIrcParser()
 	upper, lower := "PING", "ping"
-	err := parser.AddIrcHandler(upper, nil)
+	err := parser.AddIrcHandler(lower, nil)
 	c.Assert(err, IsNil)
-	err = parser.AddIrcHandler(lower, nil)
+	err = parser.AddIrcHandler(upper, nil)
 	c.Assert(err, Equals, errHandlerAlreadyRegistered)
-	err = parser.RemoveIrcHandler(upper)
-	c.Assert(err, IsNil)
 	err = parser.RemoveIrcHandler(lower)
+	c.Assert(err, IsNil)
+	err = parser.RemoveIrcHandler(upper)
 	c.Assert(err, NotNil)
 	c.Assert(err, Equals, errHandlerNotRegistered)
 }
@@ -50,8 +50,23 @@ func (s *testSuite) TestParseIrc(c *C) {
 	c.Assert(err, IsNil)
 	result, err := parser.Parse("PING :arg1 arg2", nil)
 	c.Assert(err, IsNil)
-	c.Assert(result.Name, Equals, "ping")
+	c.Assert(result.Name, Equals, "PING")
 	c.Assert(result.Args["id"], Equals, "arg1 arg2")
+}
+
+func (s *testSuite) TestParseIrc_Empty(c *C) {
+	parser := CreateIrcParser()
+	err := parser.AddIrcHandler("NAMES", nil)
+	c.Assert(err, IsNil)
+	result, err := parser.Parse("NAMES", nil)
+	c.Assert(err, IsNil)
+	c.Assert(result.Name, Equals, "NAMES")
+}
+
+func (s *testSuite) TestParseIrc_IdentifierError(c *C) {
+	parser := CreateIrcParser()
+	err := parser.AddIrcHandler("PI*NG", nil)
+	c.Assert(err, Equals, errIllegalIdentifiers)
 }
 
 func (s *testSuite) TestParseIrc_User(c *C) {
@@ -62,7 +77,7 @@ func (s *testSuite) TestParseIrc_User(c *C) {
 	c.Assert(err, IsNil)
 	result, err := parser.Parse(":nick!user@host PING :arg1 arg2", nil)
 	c.Assert(err, IsNil)
-	c.Assert(result.Name, Equals, "ping")
+	c.Assert(result.Name, Equals, "PING")
 	c.Assert(result.Args["id"], Equals, "arg1 arg2")
 	c.Assert(result.Sender, Equals, "nick!user@host")
 }
