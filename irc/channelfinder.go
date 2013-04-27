@@ -37,4 +37,3 @@ func (c *ChannelFinder) FindChannels(msg string) []string {
 
 	return channels
 }
-
