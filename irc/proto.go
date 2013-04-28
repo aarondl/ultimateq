@@ -37,8 +37,8 @@ func (p ParseError) Error() string {
 type IrcMessage struct {
 	// Name of the message. Uppercase constant name or numeric.
 	Name string
-	// User that sent the message, a fullhost if one was supplied.
-	User string
+	// Sender that sent the message, a fullhost if one was supplied.
+	Sender string
 	// The args split by space delimiting.
 	Args []string
 }
@@ -61,7 +61,7 @@ func Parse(bytes []byte) (*IrcMessage, error) {
 		return nil, ParseError{Msg: errMsgParseFailure, Irc: str}
 	}
 
-	msg.User = parts[1]
+	msg.Sender = parts[1]
 	msg.Name = parts[2]
 	msg.Args = strings.Split(strings.TrimLeft(parts[3], " "), " ")
 	if parts[4] != "" {

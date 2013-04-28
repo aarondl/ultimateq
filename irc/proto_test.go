@@ -26,7 +26,7 @@ func convert(s []string) []byte {
 func (s *s) TestParse(c *C) {
 	msg, err := Parse(convert(testargs))
 	c.Assert(err, IsNil)
-	c.Assert(msg.User, Equals, strings.TrimLeft(testargs[0], ":"))
+	c.Assert(msg.Sender, Equals, strings.TrimLeft(testargs[0], ":"))
 	c.Assert(msg.Name, Equals, testargs[1])
 	c.Assert(len(msg.Args), Equals, 2)
 	c.Assert(msg.Args[0], Equals, testargs[2])
@@ -34,7 +34,7 @@ func (s *s) TestParse(c *C) {
 
 	msg, err = Parse(convert(testargs[1:]))
 	c.Assert(err, IsNil)
-	c.Assert(msg.User, Equals, "")
+	c.Assert(msg.Sender, Equals, "")
 
 	msg, err = Parse(convert(testargs[:len(testargs)-1]))
 	c.Assert(err, IsNil)

@@ -34,12 +34,19 @@ func CreateChannelFinder(types string) (*ChannelFinder, error) {
 // FindChannels retrieves all the channels in the string using a cached regex.
 // Calls to this will fail if the ChannelFinder was not initialized with
 // CreateChannelFinder
-func (c *ChannelFinder) FindChannels(msg string) []string {
+func (c *ChannelFinder) FindChannels(str string) []string {
 	channels := make([]string, 0, nChannelsAssumed)
 
-	for _, v := range c.channelRegexp.FindAllString(msg, -1) {
+	for _, v := range c.channelRegexp.FindAllString(str, -1) {
 		channels = append(channels, v)
 	}
 
 	return channels
+}
+
+// IsChannel tests a string with the cached regex to determine whether or not
+// it's a valid channel. The regex must first be created with
+// CreateChannelFinder
+func (c *ChannelFinder) IsChannel(msg string) bool {
+	return c.channelRegexp.MatchString(msg)
 }
