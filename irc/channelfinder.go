@@ -3,8 +3,9 @@ package irc
 import "regexp"
 
 const (
-	// nStringsAssumed is the number of channels assumed to be in each irc message
-	// if this number is too small, there could be memory thrashing due to append
+	// nStringsAssumed is the number of channels assumed to be in each irc
+	// message if this number is too small, there could be memory thrashing
+	// due to append
 	nChannelsAssumed = 1
 )
 

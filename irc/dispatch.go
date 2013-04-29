@@ -1,8 +1,16 @@
 package irc
 
 import (
+	"errors"
 	"math/rand"
 	"strings"
+)
+
+var (
+	// errProtoCapsMissing is returned by CreateRichDispatch if nil is provided
+	// instead of a ProtoCaps pointer.
+	errProtoCapsMissing = errors.New(
+		"irc: Protocaps missing in CreateRichDispatch")
 )
 
 // EventHandler is the basic interface that will deal with handling any message
@@ -23,6 +31,7 @@ type eventTableStore map[string]eventTable
 // events.
 type Dispatcher struct {
 	events eventTableStore
+	caps   *ProtoCaps
 	finder *ChannelFinder
 }
 
@@ -31,6 +40,24 @@ func CreateDispatcher() *Dispatcher {
 	return &Dispatcher{
 		events: make(eventTableStore),
 	}
+}
+
+// CreateRichDispatcher initializes empty dispatcher ready to register events
+// and additionally creates a channelfinder from a set of ProtoCaps in order to
+// properly send Privmsg(User|Channel)/Notice(User|Channel) events.
+func CreateRichDispatcher(caps *ProtoCaps) (*Dispatcher, error) {
+	if caps == nil {
+		return nil, errProtoCapsMissing
+	}
+	f, err := CreateChannelFinder(caps.Chantypes)
+	if err != nil {
+		return nil, err
+	}
+	return &Dispatcher{
+		events: make(eventTableStore),
+		caps:   caps,
+		finder: f,
+	}, nil
 }
 
 // Register registers an event handler to a particular event. In return a
@@ -78,63 +105,43 @@ func (d *Dispatcher) Dispatch(event string, msg *IrcMessage) bool {
 // dispatchHelper locates a handler and attempts to resolve it with
 // resolveHandler. It returns true if it was able to find an event table.
 func (d *Dispatcher) dispatchHelper(event string, msg *IrcMessage) bool {
-	var (
-		pmsg  []*Privmsg
-		pumsg []*PrivmsgTarget
-		pcmsg []*PrivmsgTarget
-		nmsg  []*Notice
-		numsg []*NoticeTarget
-		ncmsg []*NoticeTarget
-	)
-	initp := func() {
-		if pmsg == nil {
-			pmsg, pumsg, pcmsg = d.PrivmsgParse(msg)
-		}
-	}
-	initn := func() {
-		if nmsg == nil {
-			nmsg, numsg, ncmsg = d.NoticeParse(msg)
-		}
-	}
-
 	if evtable, ok := d.events[event]; ok {
 		for _, handler := range evtable {
-			switch t := handler.(type) {
-			case EventHandler:
-				t.HandleRaw(msg)
-			case PrivmsgHandler:
-				initp()
-				for _, v := range pmsg {
-					t.Privmsg(v)
-				}
-			case PrivmsgUserHandler:
-				initp()
-				for _, v := range pumsg {
-					t.PrivmsgUser(v)
-				}
-			case PrivmsgChannelHandler:
-				initp()
-				for _, v := range pcmsg {
-					t.PrivmsgChannel(v)
-				}
-			case NoticeHandler:
-				initn()
-				for _, v := range nmsg {
-					t.Notice(v)
-				}
-			case NoticeUserHandler:
-				initn()
-				for _, v := range numsg {
-					t.NoticeUser(v)
-				}
-			case NoticeChannelHandler:
-				initn()
-				for _, v := range ncmsg {
-					t.NoticeChannel(v)
-				}
-			}
+			d.resolveHandler(handler, event, msg)
 		}
 		return true
 	}
 	return false
+}
+
+// resolveHandler checks the type of the handler passed in, resolves it to a
+// real type, coerces the IrcMessage in whatever way necessary and then
+// calls that handlers primary dispatch method with the coerced message.
+func (d *Dispatcher) resolveHandler(
+	handler interface{}, event string, msg *IrcMessage) {
+
+	switch t := handler.(type) {
+	case PrivmsgUserHandler:
+		if d.finder != nil && !d.finder.IsChannel(msg.Args[0]) {
+			t.PrivmsgUser(&Message{msg})
+		}
+	case PrivmsgChannelHandler:
+		if d.finder != nil && d.finder.IsChannel(msg.Args[0]) {
+			t.PrivmsgChannel(&Message{msg})
+		}
+	case PrivmsgHandler:
+		t.Privmsg(&Message{msg})
+	case NoticeUserHandler:
+		if d.finder != nil && !d.finder.IsChannel(msg.Args[0]) {
+			t.NoticeUser(&Message{msg})
+		}
+	case NoticeChannelHandler:
+		if d.finder != nil && d.finder.IsChannel(msg.Args[0]) {
+			t.NoticeChannel(&Message{msg})
+		}
+	case NoticeHandler:
+		t.Notice(&Message{msg})
+	case EventHandler:
+		t.HandleRaw(msg)
+	}
 }

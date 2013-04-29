@@ -1,119 +1,48 @@
 package irc
 
-import "strings"
-
-const (
-	// nTargetsAssumed is the typical number of targets for notices and privmsgs
-	nTargetsAssumed = 1
-)
-
-// Privmsg type holds information about a privmsg event.
-type Privmsg struct {
-	Message string
-	User    string
-	Channel string
-	Sender  string
+// Message type provides a view around an IrcMessage to access it's parts in a
+// more convenient way.
+type Message struct {
+	// Raw is the underlying irc message.
+	Raw *IrcMessage
 }
 
-// PrivmsgHandler handles private messages of any form.
+// Target retrieves the channel or user this message was sent to.
+func (p *Message) Target() string {
+	return p.Raw.Args[0]
+}
+
+// Message retrieves the message sent to the user or channel.
+func (p *Message) Message() string {
+	return p.Raw.Args[1]
+}
+
+// PrivmsgHandler is for handling privmsgs going to channel or user targets.
 type PrivmsgHandler interface {
-	Privmsg(event *Privmsg)
+	Privmsg(*Message)
 }
 
-// Parses private messages into three separate arrays for caching. This function
-// is declared on Dispatcher because of it's need for a ChannelFinder object.
-func (d *Dispatcher) PrivmsgParse(msg *IrcMessage) (
-	[]*Privmsg, []*PrivmsgTarget, []*PrivmsgTarget) {
-
-	p := make([]*Privmsg, 0, nTargetsAssumed)
-	c := make([]*PrivmsgTarget, 0, nTargetsAssumed)
-	u := make([]*PrivmsgTarget, 0, nTargetsAssumed)
-
-	for _, v := range strings.Split(msg.Args[0], ",") {
-		if d.finder != nil && d.finder.IsChannel(v) {
-			pmsg := &Privmsg{Channel: v, Sender: msg.Sender, Message: msg.Args[1]}
-			trg := &PrivmsgTarget{Target: v, Sender: msg.Sender, Message: msg.Args[1]}
-			p = append(p, pmsg)
-			c = append(c, trg)
-		} else {
-			pmsg := &Privmsg{User: v, Sender: msg.Sender, Message: msg.Args[1]}
-			trg := &PrivmsgTarget{Target: v, Sender: msg.Sender, Message: msg.Args[1]}
-			p = append(p, pmsg)
-			u = append(u, trg)
-		}
-	}
-
-	return p, u, c
-}
-
-// PrivmsgTarget holds information about a privmsg to a specific target.
-type PrivmsgTarget struct {
-	Message string
-	Target  string
-	Sender  string
-}
-
-// PrivmsgChannelHandler handles channel messages only.
-type PrivmsgChannelHandler interface {
-	PrivmsgChannel(msg *PrivmsgTarget)
-}
-
-// PrivmsgUserHandler handles channel messages only.
+// PrivmsgUserHandler is for handling privmsgs going to user targets.
 type PrivmsgUserHandler interface {
-	PrivmsgUser(msg *PrivmsgTarget)
+	PrivmsgUser(*Message)
 }
 
-// Notice type holds information about a privmsg event.
-type Notice struct {
-	Message string
-	User    string
-	Channel string
-	Sender  string
+// PrivmsgChannelHandler is for handling privmsgs going to channel targets.
+type PrivmsgChannelHandler interface {
+	PrivmsgChannel(*Message)
 }
 
-// NoticeHandler handles private messages of any form.
+// NoticeHandler is for handling privmsgs going to channel or user targets.
 type NoticeHandler interface {
-	Notice(event *Notice)
+	Notice(*Message)
 }
 
-// NoticeTarget holds information about a privmsg to a specific target.
-type NoticeTarget struct {
-	Message string
-	Target  string
-	Sender  string
-}
-
-// NoticeChannelHandler handles channel messages only.
-type NoticeChannelHandler interface {
-	NoticeChannel(msg *NoticeTarget)
-}
-
-// NoticeUserHandler handles channel messages only.
+// NoticeUserHandler is for handling privmsgs going to user targets.
 type NoticeUserHandler interface {
-	NoticeUser(msg *NoticeTarget)
+	NoticeUser(*Message)
 }
 
-// Parses notices into three separate arrays for caching.
-func (d *Dispatcher) NoticeParse(msg *IrcMessage) (
-	[]*Notice, []*NoticeTarget, []*NoticeTarget) {
-
-	n := make([]*Notice, 0, nTargetsAssumed)
-	c := make([]*NoticeTarget, 0, nTargetsAssumed)
-	u := make([]*NoticeTarget, 0, nTargetsAssumed)
-
-	for _, v := range strings.Split(msg.Args[0], ",") {
-		if d.finder != nil && d.finder.IsChannel(v) {
-			nmsg := &Notice{Channel: v, Sender: msg.Sender, Message: msg.Args[1]}
-			trg := &NoticeTarget{Target: v, Sender: msg.Sender, Message: msg.Args[1]}
-			n = append(n, nmsg)
-			c = append(c, trg)
-		} else {
-			nmsg := &Notice{User: v, Sender: msg.Sender, Message: msg.Args[1]}
-			trg := &NoticeTarget{Target: v, Sender: msg.Sender, Message: msg.Args[1]}
-			n = append(n, nmsg)
-			u = append(u, trg)
-		}
-	}
-
-	return n, u, c
+// NoticeChannelHandler is for handling privmsgs going to channel targets.
+type NoticeChannelHandler interface {
+	NoticeChannel(*Message)
 }

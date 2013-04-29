@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	// errMsgParseFailure is given when the ircRegex fails to parse the protocol.
+	// errMsgParseFailure is given when the ircRegex fails to parse the protocol
 	errMsgParseFailure = "irc: Unable to parse received irc protocol"
 )
 
