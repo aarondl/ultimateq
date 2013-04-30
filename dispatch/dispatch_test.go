@@ -1,17 +1,25 @@
-package irc
+package dispatch
 
 import (
 	. "launchpad.net/gocheck"
 	"sync"
+	"testing"
+	"github.com/aarondl/ultimateq/irc"
 )
 
-type testingCallback func(msg *IrcMessage)
+func Test(t *testing.T) { TestingT(t) } //Hook into testing package
+
+type s struct{}
+
+var _ = Suite(&s{})
+
+type testingCallback func(msg *irc.IrcMessage)
 
 type testingHandler struct {
 	callback testingCallback
 }
 
-func (handler testingHandler) HandleRaw(msg *IrcMessage) {
+func (handler testingHandler) HandleRaw(msg *irc.IrcMessage) {
 	if handler.callback != nil {
 		handler.callback(msg)
 	}
@@ -23,7 +31,7 @@ func (s *s) TestDispatcher(c *C) {
 	c.Assert(d.events, NotNil)
 	d, err := CreateRichDispatcher(nil)
 	c.Assert(err, Equals, errProtoCapsMissing)
-	d, err = CreateRichDispatcher(&ProtoCaps{Chantypes: "H"})
+	d, err = CreateRichDispatcher(&irc.ProtoCaps{Chantypes: "H"})
 	c.Assert(err, NotNil)
 }
 
@@ -31,9 +39,9 @@ func (s *s) TestDispatcher_Registration(c *C) {
 	d := CreateDispatcher()
 	cb := testingHandler{}
 
-	id := d.Register(PRIVMSG, cb)
+	id := d.Register(irc.PRIVMSG, cb)
 	c.Assert(id, Not(Equals), 0)
-	id2 := d.Register(PRIVMSG, cb)
+	id2 := d.Register(irc.PRIVMSG, cb)
 	c.Assert(id2, Not(Equals), id)
 	ok := d.Unregister("privmsg", id)
 	c.Assert(ok, Equals, true)
@@ -42,60 +50,60 @@ func (s *s) TestDispatcher_Registration(c *C) {
 }
 
 func (s *s) TestDispatcher_Dispatching(c *C) {
-	var msg1, msg2, msg3 *IrcMessage
+	var msg1, msg2, msg3 *irc.IrcMessage
 	waiter := sync.WaitGroup{}
-	h1 := testingHandler{func(m *IrcMessage) {
+	h1 := testingHandler{func(m *irc.IrcMessage) {
 		msg1 = m
 		waiter.Done()
 	}}
-	h2 := testingHandler{func(m *IrcMessage) {
+	h2 := testingHandler{func(m *irc.IrcMessage) {
 		msg2 = m
 		waiter.Done()
 	}}
-	h3 := testingHandler{func(m *IrcMessage) {
+	h3 := testingHandler{func(m *irc.IrcMessage) {
 		msg3 = m
 		waiter.Done()
 	}}
 
 	d := CreateDispatcher()
 
-	d.Register(PRIVMSG, h1)
-	d.Register(PRIVMSG, h2)
-	d.Register(QUIT, h3)
+	d.Register(irc.PRIVMSG, h1)
+	d.Register(irc.PRIVMSG, h2)
+	d.Register(irc.QUIT, h3)
 
 	waiter.Add(2)
-	privmsg := &IrcMessage{Name: PRIVMSG}
-	quitmsg := &IrcMessage{Name: QUIT}
-	d.Dispatch(PRIVMSG, privmsg)
+	privmsg := &irc.IrcMessage{Name: irc.PRIVMSG}
+	quitmsg := &irc.IrcMessage{Name: irc.QUIT}
+	d.Dispatch(irc.PRIVMSG, privmsg)
 	waiter.Wait()
-	c.Assert(msg1.Name, Equals, PRIVMSG)
+	c.Assert(msg1.Name, Equals, irc.PRIVMSG)
 	c.Assert(msg1, Equals, msg2)
 	c.Assert(msg3, IsNil)
 	waiter.Add(1)
-	d.Dispatch(QUIT, quitmsg)
+	d.Dispatch(irc.QUIT, quitmsg)
 	waiter.Wait()
-	c.Assert(msg3.Name, Equals, QUIT)
+	c.Assert(msg3.Name, Equals, irc.QUIT)
 }
 
 func (s *s) TestDispatcher_RawDispatch(c *C) {
-	var msg1, msg2 *IrcMessage
+	var msg1, msg2 *irc.IrcMessage
 	waiter := sync.WaitGroup{}
-	h1 := testingHandler{func(m *IrcMessage) {
+	h1 := testingHandler{func(m *irc.IrcMessage) {
 		msg1 = m
 		waiter.Done()
 	}}
-	h2 := testingHandler{func(m *IrcMessage) {
+	h2 := testingHandler{func(m *irc.IrcMessage) {
 		msg2 = m
 		waiter.Done()
 	}}
 
 	d := CreateDispatcher()
-	d.Register(PRIVMSG, h1)
-	d.Register(RAW, h2)
+	d.Register(irc.PRIVMSG, h1)
+	d.Register(irc.RAW, h2)
 
-	privmsg := &IrcMessage{Name: PRIVMSG}
+	privmsg := &irc.IrcMessage{Name: irc.PRIVMSG}
 	waiter.Add(2)
-	d.Dispatch(PRIVMSG, privmsg)
+	d.Dispatch(irc.PRIVMSG, privmsg)
 	waiter.Wait()
 	c.Assert(msg1, Equals, privmsg)
 	c.Assert(msg1, Equals, msg2)
@@ -146,13 +154,13 @@ func (t testingNoticeChannelHandler) NoticeChannel(msg *Message) {
 }
 
 func (s *s) TestDispatcher_Privmsg(c *C) {
-	chanmsg := &IrcMessage{
-		Name:   PRIVMSG,
+	chanmsg := &irc.IrcMessage{
+		Name:   irc.PRIVMSG,
 		Args:   []string{"#chan", "msg"},
 		Sender: "nick!user@host.com",
 	}
-	usermsg := &IrcMessage{
-		Name:   PRIVMSG,
+	usermsg := &irc.IrcMessage{
+		Name:   irc.PRIVMSG,
 		Args:   []string{"user", "msg"},
 		Sender: "nick!user@host.com",
 	}
@@ -172,34 +180,34 @@ func (s *s) TestDispatcher_Privmsg(c *C) {
 		waiter.Done()
 	}}
 
-	d, err := CreateRichDispatcher(&ProtoCaps{Chantypes: "#"})
+	d, err := CreateRichDispatcher(&irc.ProtoCaps{Chantypes: "#"})
 	c.Assert(err, IsNil)
-	d.Register(PRIVMSG, ph)
-	d.Register(PRIVMSG, puh)
-	d.Register(PRIVMSG, pch)
+	d.Register(irc.PRIVMSG, ph)
+	d.Register(irc.PRIVMSG, puh)
+	d.Register(irc.PRIVMSG, pch)
 
 	waiter.Add(2)
-	d.Dispatch(PRIVMSG, usermsg)
+	d.Dispatch(irc.PRIVMSG, usermsg)
 	waiter.Wait()
 	c.Assert(p, NotNil)
 	c.Assert(pu.Raw, Equals, p.Raw)
 
 	p, pu, pc = nil, nil, nil
 	waiter.Add(2)
-	d.Dispatch(PRIVMSG, chanmsg)
+	d.Dispatch(irc.PRIVMSG, chanmsg)
 	waiter.Wait()
 	c.Assert(p, NotNil)
 	c.Assert(pc.Raw, Equals, p.Raw)
 }
 
 func (s *s) TestDispatcher_Notice(c *C) {
-	chanmsg := &IrcMessage{
-		Name:   NOTICE,
+	chanmsg := &irc.IrcMessage{
+		Name:   irc.NOTICE,
 		Args:   []string{"#chan", "msg"},
 		Sender: "nick!user@host.com",
 	}
-	usermsg := &IrcMessage{
-		Name:   NOTICE,
+	usermsg := &irc.IrcMessage{
+		Name:   irc.NOTICE,
 		Args:   []string{"user", "msg"},
 		Sender: "nick!user@host.com",
 	}
@@ -219,21 +227,21 @@ func (s *s) TestDispatcher_Notice(c *C) {
 		waiter.Done()
 	}}
 
-	d, err := CreateRichDispatcher(&ProtoCaps{Chantypes: "#"})
+	d, err := CreateRichDispatcher(&irc.ProtoCaps{Chantypes: "#"})
 	c.Assert(err, IsNil)
-	d.Register(NOTICE, nh)
-	d.Register(NOTICE, nuh)
-	d.Register(NOTICE, nch)
+	d.Register(irc.NOTICE, nh)
+	d.Register(irc.NOTICE, nuh)
+	d.Register(irc.NOTICE, nch)
 
 	waiter.Add(2)
-	d.Dispatch(NOTICE, usermsg)
+	d.Dispatch(irc.NOTICE, usermsg)
 	waiter.Wait()
 	c.Assert(n, NotNil)
 	c.Assert(nu.Raw, Equals, n.Raw)
 
 	n, nu, nc = nil, nil, nil
 	waiter.Add(2)
-	d.Dispatch(NOTICE, chanmsg)
+	d.Dispatch(irc.NOTICE, chanmsg)
 	waiter.Wait()
 	c.Assert(n, NotNil)
 	c.Assert(nc.Raw, Equals, n.Raw)

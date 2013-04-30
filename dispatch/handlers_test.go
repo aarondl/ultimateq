@@ -1,13 +1,14 @@
-package irc
+package dispatch
 
 import (
 	. "launchpad.net/gocheck"
+	"github.com/aarondl/ultimateq/irc"
 )
 
 func (s *s) TestMsgTypes_Privmsg(c *C) {
 	args := []string{"#chan", "msg arg"}
-	pmsg := &Message{Raw: &IrcMessage{
-		Name:   PRIVMSG,
+	pmsg := &Message{Raw: &irc.IrcMessage{
+		Name:   irc.PRIVMSG,
 		Args:   args,
 		Sender: "user@host.com",
 	}}
@@ -18,8 +19,8 @@ func (s *s) TestMsgTypes_Privmsg(c *C) {
 
 func (s *s) TestMsgTypes_Notice(c *C) {
 	args := []string{"#chan", "msg arg"}
-	notice := &Message{Raw: &IrcMessage{
-		Name:   NOTICE,
+	notice := &Message{Raw: &irc.IrcMessage{
+		Name:   irc.NOTICE,
 		Args:   args,
 		Sender: "user@host.com",
 	}}

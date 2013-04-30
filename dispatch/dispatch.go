@@ -1,23 +1,27 @@
-package irc
+// dispatch package is used to dispatch irc messages to event handlers in an
+// asynchronous fashion. It supports various event handling types to easily
+// extract information from events, as well as define more succint handlers.
+package dispatch
 
 import (
 	"errors"
 	"math/rand"
 	"strings"
+	"github.com/aarondl/ultimateq/irc"
 )
 
 var (
 	// errProtoCapsMissing is returned by CreateRichDispatch if nil is provided
-	// instead of a ProtoCaps pointer.
+	// instead of a irc.ProtoCaps pointer.
 	errProtoCapsMissing = errors.New(
-		"irc: Protocaps missing in CreateRichDispatch")
+		"dispatch: Protocaps missing in CreateRichDispatch")
 )
 
 // EventHandler is the basic interface that will deal with handling any message
 // as a raw IrcMessage event. However there are other message types are specific
 // to very common irc events that are more helpful than this interface.
 type EventHandler interface {
-	HandleRaw(event *IrcMessage)
+	HandleRaw(event *irc.IrcMessage)
 }
 
 // eventTable is the storage used to keep id -> interface{} mappings in the
@@ -31,8 +35,8 @@ type eventTableStore map[string]eventTable
 // events.
 type Dispatcher struct {
 	events eventTableStore
-	caps   *ProtoCaps
-	finder *ChannelFinder
+	caps   *irc.ProtoCaps
+	finder *irc.ChannelFinder
 }
 
 // CreateDispatcher initializes an empty dispatcher ready to register events.
@@ -43,13 +47,13 @@ func CreateDispatcher() *Dispatcher {
 }
 
 // CreateRichDispatcher initializes empty dispatcher ready to register events
-// and additionally creates a channelfinder from a set of ProtoCaps in order to
+// and additionally creates a channelfinder from a set of irc.ProtoCaps in order to
 // properly send Privmsg(User|Channel)/Notice(User|Channel) events.
-func CreateRichDispatcher(caps *ProtoCaps) (*Dispatcher, error) {
+func CreateRichDispatcher(caps *irc.ProtoCaps) (*Dispatcher, error) {
 	if caps == nil {
 		return nil, errProtoCapsMissing
 	}
-	f, err := CreateChannelFinder(caps.Chantypes)
+	f, err := irc.CreateChannelFinder(caps.Chantypes)
 	if err != nil {
 		return nil, err
 	}
@@ -94,17 +98,17 @@ func (d *Dispatcher) Unregister(event string, id int) bool {
 // Dispatch an IrcMessage to event handlers handling event also ensures all raw
 // handlers receive all messages. Returns false if no eventtable was found for
 // the primary sent event.
-func (d *Dispatcher) Dispatch(event string, msg *IrcMessage) bool {
+func (d *Dispatcher) Dispatch(event string, msg *irc.IrcMessage) bool {
 	event = strings.ToUpper(event)
 	handled := d.dispatchHelper(event, msg)
-	d.dispatchHelper(RAW, msg)
+	d.dispatchHelper(irc.RAW, msg)
 
 	return handled
 }
 
 // dispatchHelper locates a handler and attempts to resolve it with
 // resolveHandler. It returns true if it was able to find an event table.
-func (d *Dispatcher) dispatchHelper(event string, msg *IrcMessage) bool {
+func (d *Dispatcher) dispatchHelper(event string, msg *irc.IrcMessage) bool {
 	if evtable, ok := d.events[event]; ok {
 		for _, handler := range evtable {
 			go d.resolveHandler(handler, event, msg)
@@ -118,7 +122,7 @@ func (d *Dispatcher) dispatchHelper(event string, msg *IrcMessage) bool {
 // real type, coerces the IrcMessage in whatever way necessary and then
 // calls that handlers primary dispatch method with the coerced message.
 func (d *Dispatcher) resolveHandler(
-	handler interface{}, event string, msg *IrcMessage) {
+	handler interface{}, event string, msg *irc.IrcMessage) {
 
 	switch t := handler.(type) {
 	case PrivmsgUserHandler:

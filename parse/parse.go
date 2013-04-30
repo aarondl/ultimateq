@@ -1,16 +1,17 @@
 /*
-irc package deals with the irc protocol from parsing, building to validating.
+parse package deals with parsing the irc protocol
 */
-package irc
+package parse
 
 import (
 	"regexp"
 	"strings"
+	"github.com/aarondl/ultimateq/irc"
 )
 
 const (
 	// errMsgParseFailure is given when the ircRegex fails to parse the protocol
-	errMsgParseFailure = "irc: Unable to parse received irc protocol"
+	errMsgParseFailure = "parse: Unable to parse received irc protocol"
 )
 
 var (
@@ -33,27 +34,11 @@ func (p ParseError) Error() string {
 	return p.Msg
 }
 
-// IrcMessage contains all the information broken out of an irc message.
-type IrcMessage struct {
-	// Name of the message. Uppercase constant name or numeric.
-	Name string
-	// Sender that sent the message, a fullhost if one was supplied.
-	Sender string
-	// The args split by space delimiting.
-	Args []string
-}
-
-// Split splits string arguments. A convenience method to avoid having to call
-// splits and import strings.
-func (m *IrcMessage) Split(index int) []string {
-	return strings.Split(m.Args[index], ",")
-}
-
 // Parse produces an IrcMessage from a byte slice. The byte slice is an irc
 // protocol message, split by newlines, and newlines should not be
 // present.
-func Parse(bytes []byte) (*IrcMessage, error) {
-	msg := &IrcMessage{}
+func Parse(bytes []byte) (*irc.IrcMessage, error) {
+	msg := &irc.IrcMessage{}
 	str := string(bytes)
 
 	parts := ircRegex.FindStringSubmatch(str)

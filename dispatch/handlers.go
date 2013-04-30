@@ -1,10 +1,12 @@
-package irc
+package dispatch
+
+import "github.com/aarondl/ultimateq/irc"
 
 // Message type provides a view around an IrcMessage to access it's parts in a
 // more convenient way.
 type Message struct {
 	// Raw is the underlying irc message.
-	Raw *IrcMessage
+	Raw *irc.IrcMessage
 }
 
 // Target retrieves the channel or user this message was sent to.

@@ -1,4 +1,4 @@
-package irc
+package parse
 
 import (
 	. "launchpad.net/gocheck"
@@ -51,12 +51,4 @@ func (s *s) TestParse_Error(c *C) {
 	e, ok := err.(ParseError)
 	c.Assert(ok, Equals, true)
 	c.Assert(e.Irc, Equals, irc)
-}
-
-func (s *s) TestParse_Split(c *C) {
-	msg, _ := Parse(convert(testargs))
-	channelnames := msg.Split(0)
-	for i, v := range strings.Split(testargs[2], ",") {
-		c.Assert(v, Equals, channelnames[i])
-	}
 }
