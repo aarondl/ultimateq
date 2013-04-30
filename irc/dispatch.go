@@ -107,7 +107,7 @@ func (d *Dispatcher) Dispatch(event string, msg *IrcMessage) bool {
 func (d *Dispatcher) dispatchHelper(event string, msg *IrcMessage) bool {
 	if evtable, ok := d.events[event]; ok {
 		for _, handler := range evtable {
-			d.resolveHandler(handler, event, msg)
+			go d.resolveHandler(handler, event, msg)
 		}
 		return true
 	}
