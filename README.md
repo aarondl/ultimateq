@@ -45,6 +45,11 @@ This package deals with parsing irc protocols. It is able to consume irc
 protocol messages using the Parse method, returning the common formatted
 IrcMessage type from the irc package.
 
+###dispatch
+Dispatch package is meant to register callbacks and dispatch IrcMessages onto
+them in an asynchronous method. It also presents many handler types that will
+be easy to use for bot-writers.
+
 ###inet
 Implements the actual connection to the irc server, handles buffering, and
 logarithmic write-speed throttling.
