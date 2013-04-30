@@ -29,11 +29,13 @@ const (
     MAX_NAME_LENGTH = 30
 )
 
+// Configuration interface for IRC bots
 type BotConfig struct {
-    name string
-    channels []string // Assuming the bot can be in multiple channels.
+    name string       // Name of the IRC bot
+    channels []string // List of channels this bot will join
 }
 
+// TODO: Ditch this, and stack errors on the config struct instead.
 // Disables some warnings during testing
 var testing_mode bool = false;
 
