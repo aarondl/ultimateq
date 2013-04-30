@@ -2,7 +2,7 @@ package irc
 
 import . "launchpad.net/gocheck"
 
-func (s *s) TestSetServerCaps(c *C) {
+func (s *s) TestProtoCaps(c *C) {
 	capabilities := []string{"#&~", "(ov)@+", "@+", "b,k,l,imnpstrDdRcC"}
 	caps := &ProtoCaps{
 		capabilities[0],

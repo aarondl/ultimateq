@@ -12,7 +12,7 @@ type s struct{}
 
 var _ = Suite(&s{})
 
-func (s *s) TestParse_Split(c *C) {
+func (s *s) TestIrcMessage_Test(c *C) {
 	args := []string{"#chan1", "#chan2"}
 	msg := IrcMessage{
 		Args: []string{strings.Join(args, ",")},
