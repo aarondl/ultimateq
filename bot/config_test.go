@@ -53,66 +53,88 @@ func (s *s) TestValidNames(c *C) {
     testing_mode = true
 
     // Cannot contain spaces
-    c.Assert(check_valid_nick("My Name"), Equals, false)
+    c.Assert(checkValidNickName("My Name"), Equals, false)
 
     // Can contain numbers after at least one character
-    c.Assert(check_valid_nick("1abc"), Equals, false)
-    c.Assert(check_valid_nick("5abc"), Equals, false)
-    c.Assert(check_valid_nick("9abc"), Equals, false)
-    c.Assert(check_valid_nick("a1bc"), Equals, true)
-    c.Assert(check_valid_nick("a5bc"), Equals, true)
-    c.Assert(check_valid_nick("a9bc"), Equals, true)
+    c.Assert(checkValidNickName("1abc"), Equals, false)
+    c.Assert(checkValidNickName("5abc"), Equals, false)
+    c.Assert(checkValidNickName("9abc"), Equals, false)
+    c.Assert(checkValidNickName("a1bc"), Equals, true)
+    c.Assert(checkValidNickName("a5bc"), Equals, true)
+    c.Assert(checkValidNickName("a9bc"), Equals, true)
 
     // Check that our test is otherwise ok
-    c.Assert(check_valid_nick("MyNick"), Equals, true);
+    c.Assert(checkValidNickName("MyNick"), Equals, true);
 
     // Cannot contain the following characters:
-    c.Assert(check_valid_nick("My!Nick"), Equals, false);
-    c.Assert(check_valid_nick("My\"Nick"), Equals, false);
-    c.Assert(check_valid_nick("My#Nick"), Equals, false);
-    c.Assert(check_valid_nick("My$Nick"), Equals, false);
-    c.Assert(check_valid_nick("My%Nick"), Equals, false);
-    c.Assert(check_valid_nick("My&Nick"), Equals, false);
-    c.Assert(check_valid_nick("My'Nick"), Equals, false);
-    c.Assert(check_valid_nick("My/Nick"), Equals, false);
-    c.Assert(check_valid_nick("My(Nick"), Equals, false);
-    c.Assert(check_valid_nick("My)Nick"), Equals, false);
-    c.Assert(check_valid_nick("My*Nick"), Equals, false);
-    c.Assert(check_valid_nick("My+Nick"), Equals, false);
-    c.Assert(check_valid_nick("My,Nick"), Equals, false);
-    c.Assert(check_valid_nick("My-Nick"), Equals, false);
-    c.Assert(check_valid_nick("My.Nick"), Equals, false);
-    c.Assert(check_valid_nick("My/Nick"), Equals, false);
-    c.Assert(check_valid_nick("My;Nick"), Equals, false);
-    c.Assert(check_valid_nick("My:Nick"), Equals, false);
-    c.Assert(check_valid_nick("My<Nick"), Equals, false);
-    c.Assert(check_valid_nick("My=Nick"), Equals, false);
-    c.Assert(check_valid_nick("My>Nick"), Equals, false);
-    c.Assert(check_valid_nick("My?Nick"), Equals, false);
-    c.Assert(check_valid_nick("My@Nick"), Equals, false);
+    c.Assert(checkValidNickName("My!Nick"), Equals, false);
+    c.Assert(checkValidNickName("My\"Nick"), Equals, false);
+    c.Assert(checkValidNickName("My#Nick"), Equals, false);
+    c.Assert(checkValidNickName("My$Nick"), Equals, false);
+    c.Assert(checkValidNickName("My%Nick"), Equals, false);
+    c.Assert(checkValidNickName("My&Nick"), Equals, false);
+    c.Assert(checkValidNickName("My'Nick"), Equals, false);
+    c.Assert(checkValidNickName("My/Nick"), Equals, false);
+    c.Assert(checkValidNickName("My(Nick"), Equals, false);
+    c.Assert(checkValidNickName("My)Nick"), Equals, false);
+    c.Assert(checkValidNickName("My*Nick"), Equals, false);
+    c.Assert(checkValidNickName("My+Nick"), Equals, false);
+    c.Assert(checkValidNickName("My,Nick"), Equals, false);
+    c.Assert(checkValidNickName("My-Nick"), Equals, false);
+    c.Assert(checkValidNickName("My.Nick"), Equals, false);
+    c.Assert(checkValidNickName("My/Nick"), Equals, false);
+    c.Assert(checkValidNickName("My;Nick"), Equals, false);
+    c.Assert(checkValidNickName("My:Nick"), Equals, false);
+    c.Assert(checkValidNickName("My<Nick"), Equals, false);
+    c.Assert(checkValidNickName("My=Nick"), Equals, false);
+    c.Assert(checkValidNickName("My>Nick"), Equals, false);
+    c.Assert(checkValidNickName("My?Nick"), Equals, false);
+    c.Assert(checkValidNickName("My@Nick"), Equals, false);
 
     // Can contain the following in any position
-    c.Assert(check_valid_nick("[MyNick"), Equals, true);
-    c.Assert(check_valid_nick("My[Nick"), Equals, true);
-    c.Assert(check_valid_nick("]MyNick"), Equals, true);
-    c.Assert(check_valid_nick("My]Nick"), Equals, true);
-    c.Assert(check_valid_nick("\\MyNick"), Equals, true);
-    c.Assert(check_valid_nick("My\\Nick"), Equals, true);
-    c.Assert(check_valid_nick("`MyNick"), Equals, true);
-    c.Assert(check_valid_nick("My`Nick"), Equals, true);
-    c.Assert(check_valid_nick("_MyNick"), Equals, true);
-    c.Assert(check_valid_nick("My_Nick"), Equals, true);
-    c.Assert(check_valid_nick("^MyNick"), Equals, true);
-    c.Assert(check_valid_nick("My^Nick"), Equals, true);
-    c.Assert(check_valid_nick("{MyNick"), Equals, true);
-    c.Assert(check_valid_nick("My{Nick"), Equals, true);
-    c.Assert(check_valid_nick("|MyNick"), Equals, true);
-    c.Assert(check_valid_nick("My|Nick"), Equals, true);
-    c.Assert(check_valid_nick("}MyNick"), Equals, true);
-    c.Assert(check_valid_nick("My}Nick"), Equals, true);
+    c.Assert(checkValidNickName("[MyNick"), Equals, true);
+    c.Assert(checkValidNickName("My[Nick"), Equals, true);
+    c.Assert(checkValidNickName("]MyNick"), Equals, true);
+    c.Assert(checkValidNickName("My]Nick"), Equals, true);
+    c.Assert(checkValidNickName("\\MyNick"), Equals, true);
+    c.Assert(checkValidNickName("My\\Nick"), Equals, true);
+    c.Assert(checkValidNickName("`MyNick"), Equals, true);
+    c.Assert(checkValidNickName("My`Nick"), Equals, true);
+    c.Assert(checkValidNickName("_MyNick"), Equals, true);
+    c.Assert(checkValidNickName("My_Nick"), Equals, true);
+    c.Assert(checkValidNickName("^MyNick"), Equals, true);
+    c.Assert(checkValidNickName("My^Nick"), Equals, true);
+    c.Assert(checkValidNickName("{MyNick"), Equals, true);
+    c.Assert(checkValidNickName("My{Nick"), Equals, true);
+    c.Assert(checkValidNickName("|MyNick"), Equals, true);
+    c.Assert(checkValidNickName("My|Nick"), Equals, true);
+    c.Assert(checkValidNickName("}MyNick"), Equals, true);
+    c.Assert(checkValidNickName("My}Nick"), Equals, true);
 
     // Various sanity tests
-    c.Assert(check_valid_nick("@ChanServ"), Equals, false);
+    c.Assert(checkValidNickName("@ChanServ"), Equals, false);
 
     testing_mode = false
+}
+
+func (s *s) TestValidChannels(c *C) {
+    // Check that the first letter must be {#+!&}
+    c.Assert(checkValidChannelName("InvalidChannel"), Equals, false);
+
+    c.Assert(checkValidChannelName("#"), Equals, false);
+    c.Assert(checkValidChannelName("+"), Equals, false);
+    c.Assert(checkValidChannelName("&"), Equals, false);
+
+    c.Assert(checkValidChannelName("#ValidChannel"), Equals, true);
+    c.Assert(checkValidChannelName("+ValidChannel"), Equals, true);
+    c.Assert(checkValidChannelName("&ValidChannel"), Equals, true);
+
+    c.Assert(checkValidChannelName("!12345"), Equals, true);
+
+    c.Assert(checkValidChannelName("#Invalid Channel"), Equals, false);
+    c.Assert(checkValidChannelName("#Invalid,Channel"), Equals, false);
+    c.Assert(checkValidChannelName("#Invalid\aChannel"), Equals, false);
+
+    c.Assert(checkValidChannelName("#c++"), Equals, true)
+
 }
