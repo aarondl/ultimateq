@@ -4,9 +4,9 @@ parse package deals with parsing the irc protocol
 package parse
 
 import (
+	"github.com/aarondl/ultimateq/irc"
 	"regexp"
 	"strings"
-	"github.com/aarondl/ultimateq/irc"
 )
 
 const (
@@ -34,23 +34,28 @@ func (p ParseError) Error() string {
 	return p.Msg
 }
 
-// Parse produces an IrcMessage from a byte slice. The byte slice is an irc
-// protocol message, split by newlines, and newlines should not be
-// present.
-func Parse(bytes []byte) (*irc.IrcMessage, error) {
-	msg := &irc.IrcMessage{}
-	str := string(bytes)
-
+// Parse produces an IrcMessage from a string. The string is an irc
+// protocol message, split by \r\n, and \r\n should not be
+// present at the end of the string.
+func Parse(str string) (*irc.IrcMessage, error) {
 	parts := ircRegex.FindStringSubmatch(str)
 	if parts == nil {
 		return nil, ParseError{Msg: errMsgParseFailure, Irc: str}
 	}
 
+	msg := &irc.IrcMessage{}
 	msg.Sender = parts[1]
 	msg.Name = parts[2]
-	msg.Args = strings.Split(strings.TrimLeft(parts[3], " "), " ")
+	if parts[3] != "" {
+		msg.Args = strings.Split(strings.TrimLeft(parts[3], " "), " ")
+	}
+
 	if parts[4] != "" {
-		msg.Args = append(msg.Args, parts[4])
+		if msg.Args != nil {
+			msg.Args = append(msg.Args, parts[4])
+		} else {
+			msg.Args = []string{parts[4]}
+		}
 	}
 
 	return msg, nil
