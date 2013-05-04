@@ -47,8 +47,8 @@ func CreateDispatcher() *Dispatcher {
 }
 
 // CreateRichDispatcher initializes empty dispatcher ready to register events
-// and additionally creates a channelfinder from a set of irc.ProtoCaps in order to
-// properly send Privmsg(User|Channel)/Notice(User|Channel) events.
+// and additionally creates a channelfinder from a set of irc.ProtoCaps in order
+// to properly send Privmsg(User|Channel)/Notice(User|Channel) events.
 func CreateRichDispatcher(caps *irc.ProtoCaps) (*Dispatcher, error) {
 	if caps == nil {
 		return nil, errProtoCapsMissing
