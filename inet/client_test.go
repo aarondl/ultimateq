@@ -216,16 +216,21 @@ func (s *s) TestIrcClient_Read(c *C) {
 
 func (s *s) TestIrcClient_Write(c *C) {
 	client := CreateIrcClient(nil)
-	write := []byte("PRIVMSG #chan :msg")
+	test1 := []byte("PRIVMSG #chan :msg\r\n")
+	test2 := []byte("PRIVMSG #chan :msg2")
 	go func() {
-		n, err := client.Write(write)
+		arg := append(test1, test2...)
+		n, err := client.Write(arg)
 		c.Assert(err, IsNil)
-		c.Assert(n, Equals, len(write))
+		c.Assert(n, Equals, len(arg))
 	}()
 	nMessages := <-client.writechan
-	c.Assert(client.queue.length, Equals, 1)
-	c.Assert(nMessages, Equals, 1)
-	c.Assert(bytes.Compare(*client.queue.dequeue(), write), Equals, 0)
+	c.Assert(client.queue.length, Equals, 2)
+	c.Assert(nMessages, Equals, 2)
+	dq := *client.queue.dequeue()
+	c.Assert(bytes.Compare(dq, test1), Equals, 0)
+	dq = *client.queue.dequeue()
+	c.Assert(bytes.Compare(dq, append(test2, []byte{'\r', '\n'}...)), Equals, 0)
 }
 
 func (s *s) TestIrcClient_calcSleepTime(c *C) {
@@ -238,4 +243,26 @@ func (s *s) TestIrcClient_calcSleepTime(c *C) {
 	c.Assert(sleep, Not(Equals), time.Duration(0))
 	sleep2 := client.calcSleepTime(time.Now())
 	c.Assert(sleep2 > sleep, Equals, true)
+}
+
+func (s *s) TestfindChunks(c *C) {
+	test1 := []byte("PRIVMSG #chan :msg\r\n")
+	test2 := []byte("NOTICE #chan :msg2\r\n")
+	test3 := []byte("PRIV")
+
+	log.SetOutput(os.Stderr)
+	args := append(append(test1, test2...), test3...)
+	expected := [][]byte{test1, test2, test3}
+	start, remaining := findChunks(args, func(result []byte) {
+		c.Assert(bytes.Compare(result, expected[0]), Equals, 0)
+		expected = expected[1:]
+	})
+
+	c.Assert(bytes.Compare(args[start:], test3), Equals, 0)
+
+	start, remaining = findChunks(test1, func(result []byte) {
+		c.Assert(bytes.Compare(test1, result), Equals, 0)
+	})
+	c.Assert(start, Equals, 0)
+	c.Assert(remaining, Equals, false)
 }

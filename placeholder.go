@@ -51,8 +51,8 @@ func main() {
 	// Create goroutines to read/write
 	client.SpawnWorkers()
 	// Write our initial nicks
-	client.Write([]byte("NICK :nobody_\r\n"))
-	client.Write([]byte("USER nobody bitforge.ca 0 :nobody\r\n"))
+	client.Write([]byte("NICK :nobody_"))
+	client.Write([]byte("USER nobody bitforge.ca 0 :nobody"))
 
 	// Set up the parsing/dispatching goroutine
 	var waiter sync.WaitGroup
@@ -87,10 +87,10 @@ func main() {
 		str = str[:len(str)-1]
 
 		if 0 == bytes.Compare(str, []byte("QUIT")) {
-			client.Write([]byte("QUIT :Quitting\r\n"))
+			client.Write([]byte("QUIT :Quitting"))
 			break
 		} else {
-			client.Write(append(str, []byte{'\r', '\n'}...))
+			client.Write(str)
 		}
 	}
 

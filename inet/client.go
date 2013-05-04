@@ -154,22 +154,17 @@ func (c *IrcClient) Siphon() {
 // by the slice should be immediately filled with new information once this
 // function returns and therefore a copy must be made for thread safety.
 func (c *IrcClient) extractMessages(buf []byte) int {
-	var i int
-	start := 0
-	for i = 1; i < len(buf); i++ {
-		if buf[i-1] == '\r' && buf[i] == '\n' {
 
-			cpy := make([]byte, i-start-2+1)
-			copy(cpy, buf[start:i-2+1])
-			log.Println("->", string(cpy))
-			c.readchan <- cpy
-
-			i++ // skip over checking [\n] + [first byte]
-			start = i
-		}
+	send := func(chunk []byte) {
+		cpy := make([]byte, len(chunk)-2)
+		copy(cpy, chunk[:len(chunk)-2])
+		log.Printf("-> %s\n", cpy)
+		c.readchan <- cpy
 	}
 
-	if start < len(buf) {
+	start, remaining := findChunks(buf, send)
+
+	if remaining {
 		copy(buf[:len(buf)-start], buf[start:])
 		return len(buf) - start
 	}
@@ -223,12 +218,48 @@ func (c *IrcClient) Read(buf []byte) (int, error) {
 }
 
 // Write implements the io.Writer interface and is the preferred way to write
-// directly to the socket. Returns EOF if the client has been closed.
+// directly to the socket. Returns EOF if the client has been closed. The buffer
+// is split based on \r\n and each message is queued, then the Pump is signaled
+// through the channel with the number of messages found.
 func (c *IrcClient) Write(buf []byte) (int, error) {
 	if c.shutdown {
 		return 0, io.EOF
 	}
-	c.queue.Enqueue(buf)
-	c.writechan <- 1
+
+	if len(buf) == 0 {
+		return 0, nil
+	}
+
+	nMessages := 0
+	queue := func(msg []byte) {
+		c.queue.Enqueue(msg)
+		nMessages++
+	}
+
+	start, remaining := findChunks(buf, queue)
+	if remaining {
+		queue(append(buf[start:], []byte{'\r', '\n'}...))
+	}
+
+	c.writechan <- nMessages
 	return len(buf), nil
+}
+
+// findChunks calls a callback for each \r\n encountered.
+// if there is still a remaining chunk to be dealt with that did not end with
+// \r\n the bool return value will be true.
+func findChunks(buf []byte, block func([]byte)) (int, bool) {
+	var start, i int
+	for start, i = 0, 1; i < len(buf); i++ {
+		if buf[i-1] == '\r' && buf[i] == '\n' {
+			i++
+			block(buf[start:i])
+			if i == len(buf) {
+				return start, false
+			}
+			start = i
+		}
+	}
+
+	return start, true
 }
