@@ -2,14 +2,7 @@ package bot
 
 import (
 	. "launchpad.net/gocheck"
-	"testing"
 )
-
-func Test(t *testing.T) { TestingT(t) } //Hook into testing package
-
-type s struct{}
-
-var _ = Suite(&s{})
 
 // Test the conditions on an initially created bot.
 func (s *s) TestInitialState(c *C) {
