@@ -1,10 +1,10 @@
 package dispatch
 
 import (
+	"github.com/aarondl/ultimateq/irc"
 	. "launchpad.net/gocheck"
 	"sync"
 	"testing"
-	"github.com/aarondl/ultimateq/irc"
 )
 
 func Test(t *testing.T) { TestingT(t) } //Hook into testing package

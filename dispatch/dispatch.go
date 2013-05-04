@@ -5,9 +5,9 @@ package dispatch
 
 import (
 	"errors"
+	"github.com/aarondl/ultimateq/irc"
 	"math/rand"
 	"strings"
-	"github.com/aarondl/ultimateq/irc"
 )
 
 var (

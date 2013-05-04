@@ -1,8 +1,8 @@
 package dispatch
 
 import (
-	. "launchpad.net/gocheck"
 	"github.com/aarondl/ultimateq/irc"
+	. "launchpad.net/gocheck"
 )
 
 func (s *s) TestMsgTypes_Privmsg(c *C) {

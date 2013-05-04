@@ -40,4 +40,3 @@ type IrcMessage struct {
 func (m *IrcMessage) Split(index int) []string {
 	return strings.Split(m.Args[index], ",")
 }
-

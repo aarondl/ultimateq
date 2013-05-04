@@ -2,8 +2,8 @@ package irc
 
 import (
 	. "launchpad.net/gocheck"
-	"testing"
 	"strings"
+	"testing"
 )
 
 func Test(t *testing.T) { TestingT(t) } //Hook into testing package
