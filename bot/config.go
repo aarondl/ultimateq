@@ -1,17 +1,17 @@
 package bot
 
 import (
-    "regexp"
-    "fmt"
+	"fmt"
+	"regexp"
 )
 
 // Reference: tools.ietf.org/html/rfc2812
 
-// TODO: 
-// Some other way of handling attempts at bad configurations apart from 
+// TODO:
+// Some other way of handling attempts at bad configurations apart from
 // returning nil?
-// 
-// Servers specify [MAX]NICKLEN/[MAX]CHANNELLEN and various other limits, 
+//
+// Servers specify [MAX]NICKLEN/[MAX]CHANNELLEN and various other limits,
 // how should this be handled?
 //
 // Option 1:
@@ -26,68 +26,68 @@ import (
 
 // Settings mostly inspired by GameSurge
 const (
-    MAX_NAME_LENGTH = 30
+	MAX_NAME_LENGTH = 30
 )
 
 // Configuration interface for IRC bots
 type BotConfig struct {
-    name string       // Name of the IRC bot
-    channels []string // List of channels this bot will join
+	name     string   // Name of the IRC bot
+	channels []string // List of channels this bot will join
 }
 
 // TODO: Ditch this, and stack errors on the config struct instead.
 // Disables some warnings during testing
-var testing_mode bool = false;
+var testing_mode bool = false
 
 // Returns a bot configuration interface
 func Create() *BotConfig {
-    return &BotConfig{}
+	return &BotConfig{}
 }
 
 // Check that the bot name is a valid IRC nickname
 // TODO: camelCase
 func checkValidNickName(name string) bool {
-    // Cannot have a bot with no name
-    if len(name) == 0 {
-        return false
-    }
+	// Cannot have a bot with no name
+	if len(name) == 0 {
+		return false
+	}
 
-    // Cannot have a bot with a too long name
-    if len(name) > MAX_NAME_LENGTH {
-        return false
-    }
+	// Cannot have a bot with a too long name
+	if len(name) > MAX_NAME_LENGTH {
+		return false
+	}
 
-    name_regex := "^[a-zA-Z\\[\\]\\\\`_\\^\\{\\}\\|][a-zA-Z\\d\\[\\]\\\\`_\\^\\{\\}\\|]*$"
-    match, err := regexp.MatchString(name_regex, name)
+	name_regex := "^[a-zA-Z\\[\\]\\\\`_\\^\\{\\}\\|][a-zA-Z\\d\\[\\]\\\\`_\\^\\{\\}\\|]*$"
+	match, err := regexp.MatchString(name_regex, name)
 
-    if err != nil {
-        fmt.Printf("Unable to verify if %v is a valid nickname\n", name)
-        fmt.Println(err)
-        return false
-    }
+	if err != nil {
+		fmt.Printf("Unable to verify if %v is a valid nickname\n", name)
+		fmt.Println(err)
+		return false
+	}
 
-    if !match {
-        // TODO: Print a list of rules?
-        if !testing_mode {
-            fmt.Printf("%v is not a valid nickname for a bot!\n", name)
-        }
+	if !match {
+		// TODO: Print a list of rules?
+		if !testing_mode {
+			fmt.Printf("%v is not a valid nickname for a bot!\n", name)
+		}
 
-        return false
-    }
+		return false
+	}
 
-    return true
+	return true
 }
 
 // Set the name of the bot
 func (bot *BotConfig) Name(name string) *BotConfig {
-    // Check if it's a valid nickname
-    if !checkValidNickName(name) {
-        return nil
-    }
+	// Check if it's a valid nickname
+	if !checkValidNickName(name) {
+		return nil
+	}
 
-    // Name was valid
-    bot.name = name
-    return bot
+	// Name was valid
+	bot.name = name
+	return bot
 }
 
 /*
@@ -108,31 +108,31 @@ channel    =  ( "#" / "+" / ( "!" channelid ) / "&" ) chanstring
                 [ ":" chanstring ]
 */
 func checkValidChannelName(channel string) bool {
-    if len(channel) <= 1 {
-        return false
-    }
+	if len(channel) <= 1 {
+		return false
+	}
 
-    if len(channel) > 50 {
-        return false
-    }
+	if len(channel) > 50 {
+		return false
+	}
 
-    //name_regex := "^[a-zA-Z\\[\\]\\\\`_\\^\\{\\}\\|][a-zA-Z\\d\\[\\]\\\\`_\\^\\{\\}\\|]*$"
-    channel_regex := `^([#&+]|![a-zA-Z\d]{5})[^ ,\a\n\r\001]*$`
-    match, err := regexp.MatchString(channel_regex, channel)
+	//name_regex := "^[a-zA-Z\\[\\]\\\\`_\\^\\{\\}\\|][a-zA-Z\\d\\[\\]\\\\`_\\^\\{\\}\\|]*$"
+	channel_regex := `^([#&+]|![a-zA-Z\d]{5})[^ ,\a\n\r\001]*$`
+	match, err := regexp.MatchString(channel_regex, channel)
 
-    if err != nil {
-        fmt.Println("Regex failure:", err)
-        return false
-    }
+	if err != nil {
+		fmt.Println("Regex failure:", err)
+		return false
+	}
 
-    if !match {
-        return false
-    }
+	if !match {
+		return false
+	}
 
-    return true
+	return true
 }
 
 // TODO: Add the bot to a channel
 func (bot *BotConfig) Channels(channel_name string) *BotConfig {
-    return nil
+	return nil
 }
