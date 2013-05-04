@@ -66,29 +66,32 @@ func (s *s) TestIrcClient_Pump(c *C) {
 	defer mockCtrl.Finish()
 
 	test := []byte("PRIVMSG :arg1 arg2\r\n")
+	test2 := []byte("NOTICE :arg1\r\n")
 	split := 2
 
 	conn := mocks.NewMockConn(mockCtrl)
 	conn.EXPECT().Write(test).Return(split, nil)
 	conn.EXPECT().Write(test[split:]).Return(len(test[split:]), nil)
-	conn.EXPECT().Close().Return(nil)
+	conn.EXPECT().Write(test2).Return(0, io.EOF)
 
 	client := CreateIrcClient(conn)
 
 	waiter := sync.WaitGroup{}
 	waiter.Add(1)
+	client.waiter.Add(2)
 
 	go func() {
 		client.Write(test)
-		err := client.Close()
-		c.Assert(err, IsNil)
+		client.Write(test2)
+		close(client.writechan)
+		client.Pump()
+		waiter.Done()
 	}()
 
-	client.waiter.Add(1)
 	fakelast := time.Now().Truncate(5 * time.Hour)
 	client.Pump()
 	c.Assert(client.lastwrite.Equal(fakelast), Equals, false)
-	client.Wait()
+	waiter.Wait()
 }
 
 /* WARNING:
@@ -145,19 +148,28 @@ func (s *s) TestIrcClient_ExtractMessages(c *C) {
 
 	client := CreateIrcClient(nil)
 	ret := 0
-	go func() {
+	run := func() {
 		ret = client.extractMessages(buf)
 		waiter.Done()
-	}()
+	}
 
+	go run()
 	msg1 := <-client.readchan
 	c.Assert(bytes.Compare(msg1, test1[:len(test1)-2]), Equals, 0)
 	msg2 := <-client.readchan
 	c.Assert(bytes.Compare(msg2, test2[:len(test2)-2]), Equals, 0)
 
 	waiter.Wait()
-	c.Assert(ret, Equals, 8)
+	c.Assert(ret, Equals, len(test3))
 	c.Assert(bytes.Compare(buf[:ret], test3), Equals, 0)
+
+	buf = append(buf[:ret], []byte{'\r', '\n'}...)
+	waiter.Add(1)
+	go run()
+	msg3 := <-client.readchan
+	c.Assert(ret, Equals, 0)
+	c.Assert(bytes.Compare(msg3, test3), Equals, 0)
+	waiter.Wait()
 }
 
 func (s *s) TestIrcClient_Close(c *C) {
@@ -231,16 +243,34 @@ func (s *s) TestIrcClient_Write(c *C) {
 	c.Assert(bytes.Compare(dq, test1), Equals, 0)
 	dq = *client.queue.dequeue()
 	c.Assert(bytes.Compare(dq, append(test2, []byte{'\r', '\n'}...)), Equals, 0)
+
+	//Check errors
+	n, err := client.Write([]byte{})
+	c.Assert(err, IsNil)
+	c.Assert(n, Equals, 0)
+	client.shutdown = true
+	n, err = client.Write([]byte{})
+	c.Assert(err, Equals, io.EOF)
 }
 
 func (s *s) TestIrcClient_calcSleepTime(c *C) {
 	client := CreateIrcClient(nil)
-	sleep := client.calcSleepTime(time.Now().Truncate(5 * time.Second))
+
+	sleep := client.calcSleepTime(time.Now().Truncate(5 * time.Hour))
 	c.Assert(sleep, Equals, time.Duration(0))
+	sleep = client.calcSleepTime(time.Now().Add(5 * time.Second))
+	c.Assert(sleep, Equals, time.Duration(0))
+
+	// It takes a messages to ramp up the log function
+	sleep = client.calcSleepTime(time.Now().Truncate(5 * time.Second))
+	c.Assert(sleep, Equals, time.Duration(0))
+
 	sleep = client.calcSleepTime(time.Now())
 	c.Assert(sleep, Equals, time.Duration(0))
+
 	sleep = client.calcSleepTime(time.Now())
 	c.Assert(sleep, Not(Equals), time.Duration(0))
+
 	sleep2 := client.calcSleepTime(time.Now())
 	c.Assert(sleep2 > sleep, Equals, true)
 }

@@ -10,42 +10,47 @@ import (
 	"log"
 	"net"
 	"os"
-	"sync"
 	"strconv"
+	"sync"
 )
 
-var (
-	defaultProtoCaps = &irc.ProtoCaps{Chantypes: "#&~"}
+const (
+	// defaultChanTypes is used to create a barebones ProtoCaps until
+	// the real values can be filled in by the handler.
+	defaultChanTypes = "#&~"
 )
 
 // Bot is used as an interface into the packages under ultimateq
 type Bot struct {
 	dispatcher *dispatch.Dispatcher
-	client *inet.IrcClient
-	caps *irc.ProtoCaps
-	config *fakeBotConfig
+	client     *inet.IrcClient
+	caps       *irc.ProtoCaps
+	config     *fakeBotConfig
 }
 
 type Handler struct {
 }
+
 func (h Handler) HandleRaw(msg *irc.IrcMessage) {
 	if msg.Name == "PING" {
 	}
 }
 
-
 // ConnProvider transforms a server:port string into a // net.Conn
-type ConnProvider func(string) net.Conn
+type ConnProvider func(string) (net.Conn, error)
 
 // TODO: Remove this in favor of config.go's configuration.
 type fakeBotConfig struct {
 	server, nick, username, host, fullname string
-	port uint
+	port                                   uint
 }
 
 // CreateBot initializes all the package helper types for use within the bot.
 func CreateBot(config fakeBotConfig, prov ConnProvider) (*Bot, error) {
-	b := Bot{caps: defaultProtoCaps, config: &config}
+	b := Bot{
+		caps:   &irc.ProtoCaps{Chantypes: defaultChanTypes},
+		config: &config,
+	}
 
 	var err error
 	if err = b.createDispatcher(); err != nil {
@@ -58,7 +63,7 @@ func CreateBot(config fakeBotConfig, prov ConnProvider) (*Bot, error) {
 	return &b, nil
 }
 
-// createDispatcher uses the defaultProtoCaps to create a dispatcher.
+// createDispatcher uses the bot's current ProtoCaps to create a dispatcher.
 func (b *Bot) createDispatcher() error {
 	var err error
 	b.dispatcher, err = dispatch.CreateRichDispatcher(b.caps)
@@ -82,7 +87,9 @@ func (b *Bot) createIrcClient(provider ConnProvider) error {
 			return err
 		}
 	} else {
-		conn = provider(server)
+		if conn, err = provider(server); err != nil {
+			return err
+		}
 	}
 
 	b.client = inet.CreateIrcClient(conn)

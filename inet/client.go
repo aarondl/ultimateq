@@ -103,10 +103,10 @@ func (c *IrcClient) Pump() {
 			for written := 0; written < len(msg); written += n {
 				log.Println("<-", string(msg[written:len(msg)-2]))
 				n, err = c.conn.Write(msg[written:])
-				c.lastwrite = time.Now()
 				if err != nil {
 					break
 				}
+				c.lastwrite = time.Now()
 			}
 
 			if err != nil {

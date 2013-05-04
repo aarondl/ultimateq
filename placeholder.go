@@ -1,8 +1,7 @@
 // The ultimateq bot framework.
 package main
 
-import (
-)
+import ()
 
 var dispatcher dispatch.Dispatcher
 var client *inet.IrcClient
