@@ -37,6 +37,7 @@ type Dispatcher struct {
 	events eventTableStore
 	caps   *irc.ProtoCaps
 	finder *irc.ChannelFinder
+	chans  []string
 }
 
 // CreateDispatcher initializes an empty dispatcher ready to register events.
@@ -48,8 +49,12 @@ func CreateDispatcher() *Dispatcher {
 
 // CreateRichDispatcher initializes empty dispatcher ready to register events
 // and additionally creates a channelfinder from a set of irc.ProtoCaps in order
-// to properly send Privmsg(User|Channel)/Notice(User|Channel) events.
-func CreateRichDispatcher(caps *irc.ProtoCaps) (*Dispatcher, error) {
+// to properly send Privmsg(User|Channel)/Notice(User|Channel) events. If
+// activeChannels is not nil, (Privmsg|Notice)Channel events are filtered on
+// the list of channels.
+func CreateRichDispatcher(caps *irc.ProtoCaps,
+	activeChannels []string) (*Dispatcher, error) {
+
 	if caps == nil {
 		return nil, errProtoCapsMissing
 	}
@@ -57,10 +62,21 @@ func CreateRichDispatcher(caps *irc.ProtoCaps) (*Dispatcher, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	var chans []string = nil
+	length := len(activeChannels)
+	if length > 0 {
+		chans = make([]string, length)
+		for i := 0; i < length; i++ {
+			chans[i] = strings.ToLower(activeChannels[i])
+		}
+	}
+
 	return &Dispatcher{
 		events: make(eventTableStore),
 		caps:   caps,
 		finder: f,
+		chans:  chans,
 	}, nil
 }
 
@@ -126,21 +142,21 @@ func (d *Dispatcher) resolveHandler(
 
 	switch t := handler.(type) {
 	case PrivmsgUserHandler:
-		if d.finder != nil && !d.finder.IsChannel(msg.Args[0]) {
+		if d.shouldDispatch(false, msg) {
 			t.PrivmsgUser(&Message{msg})
 		}
 	case PrivmsgChannelHandler:
-		if d.finder != nil && d.finder.IsChannel(msg.Args[0]) {
+		if d.shouldDispatch(true, msg) {
 			t.PrivmsgChannel(&Message{msg})
 		}
 	case PrivmsgHandler:
 		t.Privmsg(&Message{msg})
 	case NoticeUserHandler:
-		if d.finder != nil && !d.finder.IsChannel(msg.Args[0]) {
+		if d.shouldDispatch(false, msg) {
 			t.NoticeUser(&Message{msg})
 		}
 	case NoticeChannelHandler:
-		if d.finder != nil && d.finder.IsChannel(msg.Args[0]) {
+		if d.shouldDispatch(true, msg) {
 			t.NoticeChannel(&Message{msg})
 		}
 	case NoticeHandler:
@@ -148,4 +164,28 @@ func (d *Dispatcher) resolveHandler(
 	case EventHandler:
 		t.HandleRaw(msg)
 	}
+}
+
+// shouldDispatch checks if we should dispatch this event. Works for user and
+// channel based messages.
+func (d *Dispatcher) shouldDispatch(channel bool, msg *irc.IrcMessage) bool {
+	return d.finder != nil && channel == d.finder.IsChannel(msg.Args[0]) &&
+		(!channel || d.checkChannels(msg))
+}
+
+// filterChannelDispatch is used for any channel-specific message handlers
+// that exist. It scans the list of targets given to CreateRichDispatch to
+// check if this event should be dispatched.
+func (d *Dispatcher) checkChannels(msg *irc.IrcMessage) bool {
+	if d.chans == nil {
+		return true
+	}
+
+	targ := strings.ToLower(msg.Args[0])
+	for i := 0; i < len(d.chans); i++ {
+		if targ == d.chans[i] {
+			return true
+		}
+	}
+	return false
 }

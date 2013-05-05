@@ -29,9 +29,9 @@ func (s *s) TestDispatcher(c *C) {
 	d := CreateDispatcher()
 	c.Assert(d, NotNil)
 	c.Assert(d.events, NotNil)
-	d, err := CreateRichDispatcher(nil)
+	d, err := CreateRichDispatcher(nil, nil)
 	c.Assert(err, Equals, errProtoCapsMissing)
-	d, err = CreateRichDispatcher(&irc.ProtoCaps{Chantypes: "H"})
+	d, err = CreateRichDispatcher(&irc.ProtoCaps{Chantypes: "H"}, nil)
 	c.Assert(err, NotNil)
 }
 
@@ -180,7 +180,7 @@ func (s *s) TestDispatcher_Privmsg(c *C) {
 		waiter.Done()
 	}}
 
-	d, err := CreateRichDispatcher(&irc.ProtoCaps{Chantypes: "#"})
+	d, err := CreateRichDispatcher(&irc.ProtoCaps{Chantypes: "#"}, nil)
 	c.Assert(err, IsNil)
 	d.Register(irc.PRIVMSG, ph)
 	d.Register(irc.PRIVMSG, puh)
@@ -227,7 +227,7 @@ func (s *s) TestDispatcher_Notice(c *C) {
 		waiter.Done()
 	}}
 
-	d, err := CreateRichDispatcher(&irc.ProtoCaps{Chantypes: "#"})
+	d, err := CreateRichDispatcher(&irc.ProtoCaps{Chantypes: "#"}, nil)
 	c.Assert(err, IsNil)
 	d.Register(irc.NOTICE, nh)
 	d.Register(irc.NOTICE, nuh)
@@ -245,4 +245,119 @@ func (s *s) TestDispatcher_Notice(c *C) {
 	waiter.Wait()
 	c.Assert(n, NotNil)
 	c.Assert(nc.Raw, Equals, n.Raw)
+}
+
+func (s *s) TestDispatcher_FilterPrivmsgChannels(c *C) {
+	chanmsg := &irc.IrcMessage{
+		Name:   irc.PRIVMSG,
+		Args:   []string{"#chan", "msg"},
+		Sender: "nick!user@host.com",
+	}
+	chanmsg2 := &irc.IrcMessage{
+		Name:   irc.PRIVMSG,
+		Args:   []string{"#chan2", "msg"},
+		Sender: "nick!user@host.com",
+	}
+
+	var p, pc *Message
+	waiter := sync.WaitGroup{}
+	ph := testingPrivmsgHandler{func(m *Message) {
+		p = m
+		waiter.Done()
+	}}
+	pch := testingPrivmsgChannelHandler{func(m *Message) {
+		pc = m
+		waiter.Done()
+	}}
+
+	d, err := CreateRichDispatcher(
+		&irc.ProtoCaps{Chantypes: "#"}, []string{"#CHAN"})
+	c.Assert(err, IsNil)
+	d.Register(irc.PRIVMSG, ph)
+	d.Register(irc.PRIVMSG, pch)
+
+	waiter.Add(2)
+	d.Dispatch(irc.PRIVMSG, chanmsg)
+	waiter.Wait()
+	c.Assert(p, NotNil)
+	c.Assert(pc.Raw, Equals, p.Raw)
+
+	p, pc = nil, nil
+	waiter.Add(1)
+	d.Dispatch(irc.PRIVMSG, chanmsg2)
+	waiter.Wait()
+	c.Assert(p, NotNil)
+	c.Assert(pc, IsNil)
+}
+
+func (s *s) TestDispatcher_FilterNoticeChannels(c *C) {
+	chanmsg := &irc.IrcMessage{
+		Name:   irc.NOTICE,
+		Args:   []string{"#chan", "msg"},
+		Sender: "nick!user@host.com",
+	}
+	chanmsg2 := &irc.IrcMessage{
+		Name:   irc.NOTICE,
+		Args:   []string{"#chan2", "msg"},
+		Sender: "nick!user@host.com",
+	}
+
+	var u, uc *Message
+	waiter := sync.WaitGroup{}
+	uh := testingNoticeHandler{func(m *Message) {
+		u = m
+		waiter.Done()
+	}}
+	uch := testingNoticeChannelHandler{func(m *Message) {
+		uc = m
+		waiter.Done()
+	}}
+
+	d, err := CreateRichDispatcher(
+		&irc.ProtoCaps{Chantypes: "#"}, []string{"#CHAN"})
+	c.Assert(err, IsNil)
+	d.Register(irc.NOTICE, uh)
+	d.Register(irc.NOTICE, uch)
+
+	waiter.Add(2)
+	d.Dispatch(irc.NOTICE, chanmsg)
+	waiter.Wait()
+	c.Assert(u, NotNil)
+	c.Assert(uc.Raw, Equals, u.Raw)
+
+	u, uc = nil, nil
+	waiter.Add(1)
+	d.Dispatch(irc.NOTICE, chanmsg2)
+	waiter.Wait()
+	c.Assert(u, NotNil)
+	c.Assert(uc, IsNil)
+}
+
+func (s *s) TestDispatcher_shouldDispatch(c *C) {
+	d, err := CreateRichDispatcher(&irc.ProtoCaps{Chantypes: "#"}, nil)
+	c.Assert(err, IsNil)
+
+	var should bool
+	should = d.shouldDispatch(true, &irc.IrcMessage{Args: []string{"#chan"}})
+	c.Assert(should, Equals, true)
+	should = d.shouldDispatch(false, &irc.IrcMessage{Args: []string{"#chan"}})
+	c.Assert(should, Equals, false)
+
+	should = d.shouldDispatch(true, &irc.IrcMessage{Args: []string{"chan"}})
+	c.Assert(should, Equals, false)
+	should = d.shouldDispatch(false, &irc.IrcMessage{Args: []string{"chan"}})
+	c.Assert(should, Equals, true)
+}
+
+func (s *s) TestDispatcher_filterChannelDispatch(c *C) {
+	d, err := CreateRichDispatcher(
+		&irc.ProtoCaps{Chantypes: "#"}, []string{"#CHAN"})
+	c.Assert(err, IsNil)
+	c.Assert(d.chans, NotNil)
+
+	var should bool
+	should = d.checkChannels(&irc.IrcMessage{Args: []string{"#chan"}})
+	c.Assert(should, Equals, true)
+	should = d.checkChannels(&irc.IrcMessage{Args: []string{"#chan2"}})
+	c.Assert(should, Equals, false)
 }
