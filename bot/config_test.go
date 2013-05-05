@@ -6,128 +6,53 @@ import (
 
 // Test the conditions on an initially created bot.
 func (s *s) TestInitialState(c *C) {
-	bot := Create()
+	config := Configure()
 
-	c.Assert(bot.name, Equals, "")
-	c.Assert(len(bot.channels), Equals, 0)
+	c.Assert(config.name, Equals, "")
 }
 
-// Test that the name satisfies various conditions
-func (s *s) TestName(c *C) {
-	// Not permissible to have an empty name
-	bot := Create().Name("")
-	c.Assert(bot, Equals, (*BotConfig)(nil))
-
-	// A bot should have the name passed as param
-	bot = Create().Name("Foo")
-	c.Assert(bot.name, Equals, "Foo")
-
-	long_name := ""
-
-	for i := 0; i < MAX_NAME_LENGTH+1; i++ {
-		long_name += "a"
+func (s *s) TestValidNames(c *C) {
+	goodNicks := []string{`a1bc`, `a5bc`, `a9bc`, `MyNick`, `[MyNick`,
+		`My[Nick`, `]MyNick`, `My]Nick`, `\MyNick`, `My\Nick`, "MyNick",
+		"My`Nick", `_MyNick`, `My_Nick`, `^MyNick`, `My^Nick`, `{MyNick`,
+		`My{Nick`, `|MyNick`, `My|Nick`, `}MyNick`, `My}Nick`,
 	}
 
-	// A bot should not have an excessively long name
-	bot = Create().Name(long_name)
-	c.Assert(bot, Equals, (*BotConfig)(nil))
-}
+	badNicks := []string{`My Name`, `My!Nick`, `My"Nick`, `My#Nick`, `My$Nick`,
+		`My%Nick`, `My&Nick`, `My'Nick`, `My/Nick`, `My(Nick`, `My)Nick`,
+		`My*Nick`, `My+Nick`, `My,Nick`, `My-Nick`, `My.Nick`, `My/Nick`,
+		`My;Nick`, `My:Nick`, `My<Nick`, `My=Nick`, `My>Nick`, `My?Nick`,
+		`My@Nick`, `1abc`, `5abc`, `9abc`, `@ChanServ`,
+	}
 
-// From the RFC:
-// nickname   =  ( letter / special ) *8( letter / digit / special / "-" )
-// letter     =  %x41-5A / %x61-7A       ; A-Z / a-z
-// digit      =  %x30-39                 ; 0-9
-// special    =  %x5B-60 / %x7B-7D; "[", "]", "\", "`", "_", "^", "{", "|", "}"
-// We make an excemption to the 9 char limit since few servers today enforce it,
-// and the RFC also states that clients should handle longer names.
-//
-// Test that the name is a valid IRC nickname
-func (s *s) TestValidNames(c *C) {
-	testing_mode = true
-
-	// Cannot contain spaces
-	c.Assert(checkValidNickName("My Name"), Equals, false)
-
-	// Can contain numbers after at least one character
-	c.Assert(checkValidNickName("1abc"), Equals, false)
-	c.Assert(checkValidNickName("5abc"), Equals, false)
-	c.Assert(checkValidNickName("9abc"), Equals, false)
-	c.Assert(checkValidNickName("a1bc"), Equals, true)
-	c.Assert(checkValidNickName("a5bc"), Equals, true)
-	c.Assert(checkValidNickName("a9bc"), Equals, true)
-
-	// Check that our test is otherwise ok
-	c.Assert(checkValidNickName("MyNick"), Equals, true)
-
-	// Cannot contain the following characters:
-	c.Assert(checkValidNickName("My!Nick"), Equals, false)
-	c.Assert(checkValidNickName("My\"Nick"), Equals, false)
-	c.Assert(checkValidNickName("My#Nick"), Equals, false)
-	c.Assert(checkValidNickName("My$Nick"), Equals, false)
-	c.Assert(checkValidNickName("My%Nick"), Equals, false)
-	c.Assert(checkValidNickName("My&Nick"), Equals, false)
-	c.Assert(checkValidNickName("My'Nick"), Equals, false)
-	c.Assert(checkValidNickName("My/Nick"), Equals, false)
-	c.Assert(checkValidNickName("My(Nick"), Equals, false)
-	c.Assert(checkValidNickName("My)Nick"), Equals, false)
-	c.Assert(checkValidNickName("My*Nick"), Equals, false)
-	c.Assert(checkValidNickName("My+Nick"), Equals, false)
-	c.Assert(checkValidNickName("My,Nick"), Equals, false)
-	c.Assert(checkValidNickName("My-Nick"), Equals, false)
-	c.Assert(checkValidNickName("My.Nick"), Equals, false)
-	c.Assert(checkValidNickName("My/Nick"), Equals, false)
-	c.Assert(checkValidNickName("My;Nick"), Equals, false)
-	c.Assert(checkValidNickName("My:Nick"), Equals, false)
-	c.Assert(checkValidNickName("My<Nick"), Equals, false)
-	c.Assert(checkValidNickName("My=Nick"), Equals, false)
-	c.Assert(checkValidNickName("My>Nick"), Equals, false)
-	c.Assert(checkValidNickName("My?Nick"), Equals, false)
-	c.Assert(checkValidNickName("My@Nick"), Equals, false)
-
-	// Can contain the following in any position
-	c.Assert(checkValidNickName("[MyNick"), Equals, true)
-	c.Assert(checkValidNickName("My[Nick"), Equals, true)
-	c.Assert(checkValidNickName("]MyNick"), Equals, true)
-	c.Assert(checkValidNickName("My]Nick"), Equals, true)
-	c.Assert(checkValidNickName("\\MyNick"), Equals, true)
-	c.Assert(checkValidNickName("My\\Nick"), Equals, true)
-	c.Assert(checkValidNickName("`MyNick"), Equals, true)
-	c.Assert(checkValidNickName("My`Nick"), Equals, true)
-	c.Assert(checkValidNickName("_MyNick"), Equals, true)
-	c.Assert(checkValidNickName("My_Nick"), Equals, true)
-	c.Assert(checkValidNickName("^MyNick"), Equals, true)
-	c.Assert(checkValidNickName("My^Nick"), Equals, true)
-	c.Assert(checkValidNickName("{MyNick"), Equals, true)
-	c.Assert(checkValidNickName("My{Nick"), Equals, true)
-	c.Assert(checkValidNickName("|MyNick"), Equals, true)
-	c.Assert(checkValidNickName("My|Nick"), Equals, true)
-	c.Assert(checkValidNickName("}MyNick"), Equals, true)
-	c.Assert(checkValidNickName("My}Nick"), Equals, true)
-
-	// Various sanity tests
-	c.Assert(checkValidNickName("@ChanServ"), Equals, false)
-
-	testing_mode = false
+	for i := 0; i < len(goodNicks); i++ {
+		if !nicknameRegex.MatchString(goodNicks[i]) {
+			c.Errorf("Good nick failed regex: %v\n", goodNicks[i])
+		}
+	}
+	for i := 0; i < len(badNicks); i++ {
+		if nicknameRegex.MatchString(badNicks[i]) {
+			c.Errorf("Bad nick passed regex: %v\n", badNicks[i])
+		}
+	}
 }
 
 func (s *s) TestValidChannels(c *C) {
 	// Check that the first letter must be {#+!&}
-	c.Assert(checkValidChannelName("InvalidChannel"), Equals, false)
+	goodChannels := []string{"#ValidChannel", "+ValidChannel", "&ValidChannel",
+		"!12345", "#c++"}
 
-	c.Assert(checkValidChannelName("#"), Equals, false)
-	c.Assert(checkValidChannelName("+"), Equals, false)
-	c.Assert(checkValidChannelName("&"), Equals, false)
+	badChannels := []string{"#Invalid Channel", "#Invalid,Channel",
+		"#Invalid\aChannel", "#", "+", "&", "InvalidChannel"}
 
-	c.Assert(checkValidChannelName("#ValidChannel"), Equals, true)
-	c.Assert(checkValidChannelName("+ValidChannel"), Equals, true)
-	c.Assert(checkValidChannelName("&ValidChannel"), Equals, true)
-
-	c.Assert(checkValidChannelName("!12345"), Equals, true)
-
-	c.Assert(checkValidChannelName("#Invalid Channel"), Equals, false)
-	c.Assert(checkValidChannelName("#Invalid,Channel"), Equals, false)
-	c.Assert(checkValidChannelName("#Invalid\aChannel"), Equals, false)
-
-	c.Assert(checkValidChannelName("#c++"), Equals, true)
-
+	for i := 0; i < len(goodChannels); i++ {
+		if !channelRegex.MatchString(goodChannels[i]) {
+			c.Errorf("Good chan failed regex: %v\n", goodChannels[i])
+		}
+	}
+	for i := 0; i < len(badChannels); i++ {
+		if channelRegex.MatchString(badChannels[i]) {
+			c.Errorf("Bad chan passed regex: %v\n", badChannels[i])
+		}
+	}
 }
