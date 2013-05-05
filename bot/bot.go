@@ -38,6 +38,7 @@ func (h Handler) HandleRaw(msg *irc.IrcMessage) {
 
 // ConnProvider transforms a server:port string into a // net.Conn
 type ConnProvider func(string) (net.Conn, error)
+type CapsProvider func() (*irc.ProtoCaps)
 
 // TODO: Remove this in favor of config.go's configuration.
 type fakeBotConfig struct {
@@ -45,18 +46,30 @@ type fakeBotConfig struct {
 	port                                   uint
 }
 
-// CreateBot initializes all the package helper types for use within the bot.
-func CreateBot(config fakeBotConfig, prov ConnProvider) (*Bot, error) {
+// CreateBot simplifies the call to createBotFull by using appropriate
+// caps and conn provider functions.
+func CreateBot(config fakeBotConfig) (*Bot, error) {
+	return createBotFull(config, nil, nil)
+}
+
+// createBotFull initializes all the package helper types for use within the bot
+func createBotFull(config fakeBotConfig,
+	capsProv CapsProvider, connProv ConnProvider) (*Bot, error) {
 	b := Bot{
-		caps:   &irc.ProtoCaps{Chantypes: defaultChanTypes},
 		config: &config,
 	}
 
 	var err error
+	if capsProv == nil {
+		b.caps = &irc.ProtoCaps{Chantypes: defaultChanTypes}
+	} else {
+		b.caps = capsProv()
+	}
+
 	if err = b.createDispatcher(); err != nil {
 		return nil, err
 	}
-	if err = b.createIrcClient(prov); err != nil {
+	if err = b.createIrcClient(connProv); err != nil {
 		return nil, err
 	}
 
@@ -66,7 +79,7 @@ func CreateBot(config fakeBotConfig, prov ConnProvider) (*Bot, error) {
 // createDispatcher uses the bot's current ProtoCaps to create a dispatcher.
 func (b *Bot) createDispatcher() error {
 	var err error
-	b.dispatcher, err = dispatch.CreateRichDispatcher(b.caps)
+	b.dispatcher, err = dispatch.CreateRichDispatcher(b.caps, nil)
 	if err != nil {
 		return err
 	}

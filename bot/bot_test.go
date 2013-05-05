@@ -23,22 +23,33 @@ var fakeConfig = fakeBotConfig{
 	fullname: "nobody",
 }
 
-func (s *s) TestBot(c *C) {
+func (s *s) TestCreateBot(c *C) {
+	c.SucceedNow()
+	CreateBot(fakeConfig) // This function cannot be tested due to the socket
+}
+
+func (s *s) TestCreateBotFull(c *C) {
 	mockCtrl := gomock.NewController(c)
 	defer mockCtrl.Finish()
 
 	conn := mocks.NewMockConn(mockCtrl)
-	b, err := CreateBot(fakeConfig, func(s string) (net.Conn, error) {
+	b, err := createBotFull(fakeConfig, nil, func(s string) (net.Conn, error) {
 		return conn, nil
 	})
 	c.Assert(b, NotNil)
 	c.Assert(err, IsNil)
 
-	fn := func(s string) (net.Conn, error) {
+	capsProv := func() *irc.ProtoCaps {
+		return &irc.ProtoCaps{Chantypes: "H"}
+	}
+	connProv := func(s string) (net.Conn, error) {
 		return nil, net.ErrWriteToConnected
 	}
-	_, err = CreateBot(fakeConfig, fn)
+	_, err = createBotFull(fakeConfig, nil, connProv)
 	c.Assert(err, Equals, net.ErrWriteToConnected)
+	_, err = createBotFull(fakeConfig, capsProv, connProv)
+	c.Assert(err, NotNil)
+	c.Assert(err, Not(Equals), net.ErrWriteToConnected)
 }
 
 func (s *s) TestBot_createDispatcher(c *C) {
