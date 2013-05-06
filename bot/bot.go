@@ -38,7 +38,7 @@ func (h Handler) HandleRaw(msg *irc.IrcMessage) {
 
 // ConnProvider transforms a server:port string into a // net.Conn
 type ConnProvider func(string) (net.Conn, error)
-type CapsProvider func() (*irc.ProtoCaps)
+type CapsProvider func() *irc.ProtoCaps
 
 // TODO: Remove this in favor of config.go's configuration.
 type fakeBotConfig struct {
