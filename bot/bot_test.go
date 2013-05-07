@@ -10,10 +10,10 @@ import (
 )
 
 func Test(t *testing.T) { TestingT(t) } //Hook into testing package
-
 type s struct{}
 
 var _ = Suite(&s{})
+
 var fakeConfig = fakeBotConfig{
 	server:   "irc.gamesurge.net",
 	port:     6667,
