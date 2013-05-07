@@ -1,8 +1,8 @@
 package bot
 
 import (
-	"regexp"
 	"log"
+	"regexp"
 )
 
 var (
@@ -11,9 +11,9 @@ var (
 	// letter     =  %x41-5A / %x61-7A  ; A-Z / a-z
 	// digit      =  %x30-39            ; 0-9
 	// special    =  %x5B-60 / %x7B-7D  ; [ ] \ ` _ ^ { | }
-	// We make an excemption to the 9 char limit since few servers today enforce it,
-	// and the RFC also states that clients should handle longer names.
-	//
+	// We make an excemption to the 9 char limit since few servers today
+	// enforce it, and the RFC also states that clients should handle longer
+	// names.
 	// Test that the name is a valid IRC nickname
 	nicknameRegex = regexp.MustCompile(`^(?i)[a-z\[\]{}|^_\\` + "`]" +
 		`[a-z0-9\[\]{}|^_\\` + "`" + `]{0,30}$`)
@@ -41,9 +41,22 @@ type Config struct {
 	name string
 }
 
+type ServerConfig struct {
+	host string
+	port uint
+
+	nick string
+	altnick string
+	realname string
+	hostname string
+}
+
 // Returns a bot configuration interface
 func Configure() *Config {
 	return &Config{}
+}
+
+func (c *Config) Server(string host) *ServerConfig {
 }
 
 // Set the name of the bot

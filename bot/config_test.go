@@ -6,7 +6,9 @@ import (
 
 // Test the conditions on an initially created bot.
 func (s *s) TestInitialState(c *C) {
-	config := Configure()
+	config := Configure().
+		Server("irc.gamesurge.net").
+		Port(6667)
 
 	c.Assert(config.name, Equals, "")
 }
