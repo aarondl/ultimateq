@@ -20,12 +20,12 @@ func (s *s) TestConfig_Fallbacks(c *C) {
 	config := CreateConfig()
 	parent, host, ssl, verifyCert := config, "irc.com", true, true
 	var port uint = 10
-	nick, altnick, realname, userhost := "a", "b", "c", "d"
+	nick, altnick, realname, userhost, prefix := "a", "b", "c", "d", "e"
 	chans := []string{"#chan1", "#chan2"}
 
 	config.defaults = &irc{
 		port, ssl, true, verifyCert, true,
-		nick, altnick, realname, userhost, chans,
+		nick, altnick, realname, userhost, prefix, chans,
 	}
 
 	irc := &irc{}
@@ -38,6 +38,7 @@ func (s *s) TestConfig_Fallbacks(c *C) {
 	c.Assert(irc.altnick, Equals, "")
 	c.Assert(irc.realname, Equals, "")
 	c.Assert(irc.userhost, Equals, "")
+	c.Assert(irc.prefix, Equals, "")
 	c.Assert(irc.channels, IsNil)
 
 	server := &Server{parent, host, irc}
@@ -51,6 +52,7 @@ func (s *s) TestConfig_Fallbacks(c *C) {
 	c.Assert(server.GetAltnick(), Equals, config.defaults.altnick)
 	c.Assert(server.GetRealname(), Equals, config.defaults.realname)
 	c.Assert(server.GetUserhost(), Equals, config.defaults.userhost)
+	c.Assert(server.GetPrefix(), Equals, config.defaults.prefix)
 	c.Assert(len(server.GetChannels()), Equals, len(config.defaults.channels))
 	for i, v := range server.GetChannels() {
 		c.Assert(v, Equals, config.defaults.channels[i])
@@ -78,14 +80,14 @@ func (s *s) TestConfig_Fluent(c *C) {
 	srv1 := Server{
 		nil, "irc.gamesurge.net",
 		&irc{
-			5555, true, true, false, true, "n1", "a1", "r1", "h1",
+			5555, true, true, false, true, "n1", "a1", "r1", "h1", "p1",
 			[]string{"#chan", "#chan2"},
 		},
 	}
 	defs := Server{
 		nil, "nuclearfallout.gamesurge.net",
 		&irc{
-			7777, false, false, true, false, "n2", "a2", "r2", "h2",
+			7777, false, false, true, false, "n2", "a2", "r2", "h2", "p2",
 			[]string{"#chan2"},
 		},
 	}
@@ -97,6 +99,7 @@ func (s *s) TestConfig_Fluent(c *C) {
 		Altnick(defs.irc.altnick).
 		Realname(defs.irc.realname).
 		Userhost(defs.irc.userhost).
+		Prefix(defs.irc.prefix).
 		Channels(defs.irc.channels...).
 		Server(srv1.host).
 		Port(srv1.irc.port).
@@ -106,6 +109,7 @@ func (s *s) TestConfig_Fluent(c *C) {
 		Altnick(srv1.irc.altnick).
 		Realname(srv1.irc.realname).
 		Userhost(srv1.irc.userhost).
+		Prefix(srv1.irc.prefix).
 		Channels(srv1.irc.channels...).
 		Server(srv2)
 
@@ -119,6 +123,7 @@ func (s *s) TestConfig_Fluent(c *C) {
 	c.Assert(server.GetAltnick(), Equals, srv1.GetAltnick())
 	c.Assert(server.GetRealname(), Equals, srv1.GetRealname())
 	c.Assert(server.GetUserhost(), Equals, srv1.GetUserhost())
+	c.Assert(server.GetPrefix(), Equals, srv1.GetPrefix())
 	c.Assert(len(server.GetChannels()), Equals, len(srv1.GetChannels()))
 	for i, v := range server.GetChannels() {
 		c.Assert(v, Equals, srv1.irc.channels[i])
@@ -132,6 +137,7 @@ func (s *s) TestConfig_Fluent(c *C) {
 	c.Assert(server2.GetAltnick(), Equals, defs.GetAltnick())
 	c.Assert(server2.GetRealname(), Equals, defs.GetRealname())
 	c.Assert(server2.GetUserhost(), Equals, defs.GetUserhost())
+	c.Assert(server2.GetPrefix(), Equals, defs.GetPrefix())
 	c.Assert(len(server2.GetChannels()), Equals, len(defs.GetChannels()))
 	for i, v := range server2.GetChannels() {
 		c.Assert(v, Equals, defs.irc.channels[i])

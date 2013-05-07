@@ -122,9 +122,15 @@ func (c *Config) Realname(realname string) *Config {
 	return c
 }
 
-// userhost fluently sets the userhost for the current config context
+// Userhost fluently sets the userhost for the current config context
 func (c *Config) Userhost(userhost string) *Config {
 	c.GetContext().userhost = userhost
+	return c
+}
+
+// Prefix fluently sets the prefix for the current config context
+func (c *Config) Prefix(prefix string) *Config {
+	c.GetContext().prefix = prefix
 	return c
 }
 
@@ -148,17 +154,24 @@ type Server struct {
 }
 
 // irc config contains the options surrounding an irc server connection. But not
-// anything about the location, this is for a sane default setup.
+// the location of the server, there cannot be a default host and so we have
+// this division between the Server and irc structs.
 type irc struct {
-	port                        uint
-	ssl, isSslSet               bool
-	verifyCert, isVerifyCertSet bool
+	// Irc Server connection info
+	port            uint
+	ssl             bool
+	isSslSet        bool
+	verifyCert      bool
+	isVerifyCertSet bool
 
+	// Irc User data
 	nick     string
 	altnick  string
 	realname string
 	userhost string
 
+	// Dispatching options
+	prefix   string
 	channels []string
 }
 
@@ -244,6 +257,17 @@ func (s *Server) GetUserhost() string {
 		return s.parent.defaults.userhost
 	}
 	return s.irc.userhost
+}
+
+// GetPrefix returns the prefix of the irc config, if it's empty, it returns
+// the value of the default configuration.
+func (s *Server) GetPrefix() string {
+	if len(s.irc.prefix) == 0 &&
+		s.parent != nil && s.parent.defaults != nil {
+
+		return s.parent.defaults.prefix
+	}
+	return s.irc.prefix
 }
 
 // GetChannels returns the channels of the irc config, if it's empty, it returns
