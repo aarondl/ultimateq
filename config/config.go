@@ -1,3 +1,7 @@
+/*
+config package provides inline fluent configuration, validation, file
+input/output, as well as configuration diffs.
+*/
 package config
 
 import (
