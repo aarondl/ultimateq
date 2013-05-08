@@ -2,6 +2,8 @@ package config
 
 import (
 	"regexp"
+	"errors"
+	"fmt"
 )
 
 const (
@@ -9,6 +11,21 @@ const (
 	nAssumedServers = 1
 	// ircDefaultPort is IRC Server's default tcp port.
 	ircDefaultPort = 6667
+	// botDefaultPrefix
+	defaultPrefix = "."
+	// maxHostSize is the biggest hostname possible
+	maxHostSize = 255
+
+	errInvalidFormatString = "config(%v): Invalid %v, given: %v"
+	errMissingFormatString = "config(%v): Requires %v, but nothing was given."
+	errHost = "port"
+	errPort = "port"
+	errNick = "nickname"
+	errAltnick = "alternate nickname"
+	errRealname = "realname"
+	errUserhost = "userhost"
+	errPrefix = "prefix"
+	errChannel = "channel"
 )
 
 var (
@@ -40,6 +57,11 @@ var (
 					[ ":" chanstring ] */
 	channelRegex = regexp.MustCompile(
 		`^(?i)[#&+!][^\s\000\007,]{1,49}$`)
+
+	// hostRegex matches hostnames
+	hostRegex = regexp.MustCompile(
+		`(?i)^[0-9a-z](?:(?:[0-9a-z]|-){0,61}[0-9a-z])?` +
+		`(?:\.[0-9a-z](?:(?:[0-9a-z]|-){0,61}[0-9a-z])?)*\.?$`)
 )
 
 // Config holds all the information related to the bot including global settings
@@ -47,6 +69,7 @@ var (
 type Config struct {
 	defaults *irc
 	context  *Server
+	Errors   []error
 
 	Servers map[string]*Server
 }
@@ -62,6 +85,33 @@ func CreateConfig() *Config {
 	return &Config{
 		defaults: &irc{},
 		Servers:  make(map[string]*Server, nAssumedServers),
+		Errors: make([]error, 0),
+	}
+}
+
+// addError builds an error object and returns it using Sprintf.
+func (c *Config) addError(format string, args ...interface{}) {
+	c.Errors = append(c.Errors,
+		errors.New(fmt.Sprintf(format, args...)),
+	)
+}
+
+// Validates the required fields in the configuration and ensures that they're
+// set to something.
+func (c *Config) ValidateRequired() {
+	for srv, s := range c.Servers {
+		if s.GetHost() == "" {
+			c.addError(errMissingFormatString, srv, errHost)
+		}
+		if s.GetNick() == "" {
+			c.addError(errMissingFormatString, srv, errNick)
+		}
+		if s.GetRealname() == "" {
+			c.addError(errMissingFormatString, srv, errRealname)
+		}
+		if s.GetUserhost() == "" {
+			c.addError(errMissingFormatString, srv, errUserhost)
+		}
 	}
 }
 
@@ -74,17 +124,32 @@ func (c *Config) GetContext() *irc {
 	return c.defaults
 }
 
+func (c *Config) GetContextName() string {
+	if c.context != nil {
+		return c.context.host
+	}
+	return "defaults"
+}
+
 // Server fluently creates a server object and sets the context on the Config to
 // the current instance.
 func (c *Config) Server(host string) *Config {
-	c.context = &Server{c, host, &irc{}}
-	c.Servers[host] = c.context
+	if !hostRegex.MatchString(host) && len(host) <= maxHostSize {
+		c.addError(errInvalidFormatString)
+	} else {
+		c.context = &Server{c, host, &irc{}}
+		c.Servers[host] = c.context
+	}
 	return c
 }
 
 // Port fluently sets the port for the current config context
-func (c *Config) Port(port uint) *Config {
-	c.GetContext().port = port
+func (c *Config) Port(port uint16) *Config {
+	if port != 0 {
+		c.GetContext().port = port
+	} else {
+		c.addError(errInvalidFormatString, c.GetContextName(), errPort, port)
+	}
 	return c
 }
 
@@ -106,13 +171,22 @@ func (c *Config) VerifyCert(verifyCert bool) *Config {
 
 // Nick fluently sets the nick for the current config context
 func (c *Config) Nick(nick string) *Config {
-	c.GetContext().nick = nick
+	if nicknameRegex.MatchString(nick) {
+		c.GetContext().nick = nick
+	} else {
+		c.addError(errInvalidFormatString, c.GetContextName(), errNick, nick)
+	}
 	return c
 }
 
 // Altnick fluently sets the altnick for the current config context
 func (c *Config) Altnick(altnick string) *Config {
-	c.GetContext().altnick = altnick
+	if nicknameRegex.MatchString(altnick) {
+		c.GetContext().altnick = altnick
+	} else {
+		c.addError(errInvalidFormatString, c.GetContextName(),
+			errAltnick, altnick)
+	}
 	return c
 }
 
@@ -139,7 +213,12 @@ func (c *Config) Channels(channels ...string) *Config {
 	irc := c.GetContext()
 	irc.channels = make([]string, len(channels))
 	for i := 0; i < len(channels); i++ {
-		irc.channels[i] = channels[i]
+		if channelRegex.MatchString(channels[i]) {
+			irc.channels[i] = channels[i]
+		} else {
+			c.addError(errInvalidFormatString, c.GetContextName(),
+				errChannel, channels[i])
+		}
 	}
 	return c
 }
@@ -158,7 +237,7 @@ type Server struct {
 // this division between the Server and irc structs.
 type irc struct {
 	// Irc Server connection info
-	port            uint
+	port            uint16
 	ssl             bool
 	isSslSet        bool
 	verifyCert      bool
@@ -182,7 +261,7 @@ func (s *Server) GetHost() string {
 
 // GetPort returns port of the irc config, if it hasn't been set, returns the
 // value of the default, if that hasn't been set returns ircDefaultPort.
-func (s *Server) GetPort() uint {
+func (s *Server) GetPort() uint16 {
 	if s.irc.port != 0 {
 		return s.irc.port
 	} else if s.parent != nil && s.parent.defaults != nil &&
@@ -262,12 +341,14 @@ func (s *Server) GetUserhost() string {
 // GetPrefix returns the prefix of the irc config, if it's empty, it returns
 // the value of the default configuration.
 func (s *Server) GetPrefix() string {
-	if len(s.irc.prefix) == 0 &&
-		s.parent != nil && s.parent.defaults != nil {
+	if len(s.irc.prefix) == 0 && s.parent != nil &&
+		s.parent.defaults != nil && s.parent.defaults.prefix != "" {
 
 		return s.parent.defaults.prefix
+	} else {
+		return s.irc.prefix
 	}
-	return s.irc.prefix
+	return defaultPrefix
 }
 
 // GetChannels returns the channels of the irc config, if it's empty, it returns

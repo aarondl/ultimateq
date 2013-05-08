@@ -19,7 +19,7 @@ func (s *s) TestConfig(c *C) {
 func (s *s) TestConfig_Fallbacks(c *C) {
 	config := CreateConfig()
 	parent, host, ssl, verifyCert := config, "irc.com", true, true
-	var port uint = 10
+	var port uint16 = 10
 	nick, altnick, realname, userhost, prefix := "a", "b", "c", "d", "e"
 	chans := []string{"#chan1", "#chan2"}
 
@@ -29,7 +29,7 @@ func (s *s) TestConfig_Fallbacks(c *C) {
 	}
 
 	irc := &irc{}
-	c.Assert(irc.port, Equals, uint(0))
+	c.Assert(irc.port, Equals, uint16(0))
 	c.Assert(irc.ssl, Equals, false)
 	c.Assert(irc.isSslSet, Equals, false)
 	c.Assert(irc.verifyCert, Equals, false)
@@ -73,7 +73,7 @@ func (s *s) TestConfig_Fallbacks(c *C) {
 
 	//Check default port more thoroughly
 	config.defaults.port = 0
-	c.Assert(server.GetPort(), Equals, uint(ircDefaultPort))
+	c.Assert(server.GetPort(), Equals, uint16(ircDefaultPort))
 }
 
 func (s *s) TestConfig_Fluent(c *C) {
@@ -142,6 +142,35 @@ func (s *s) TestConfig_Fluent(c *C) {
 	for i, v := range server2.GetChannels() {
 		c.Assert(v, Equals, defs.irc.channels[i])
 	}
+}
+
+func (s *s) TestConfig_Validation(c *C) {
+	srv1 := Server{
+		nil, "irc.gamesurge.net",
+		&irc{
+			5555, true, true, false, true, "n1", "a1", "r1", "h1", "p1",
+			[]string{"#chan", "#chan2"},
+		},
+	}
+
+	conf := Configure().
+		Server("").
+		Port(srv1.irc.port)
+	c.Assert(len(conf.Servers), Equals, 0)
+	c.Assert(conf.defaults.port, Equals, uint16(srv1.irc.port))
+	c.Assert(len(conf.Errors), Equals, 1)
+
+	conf = Configure().
+		Server("%")
+	c.Assert(len(conf.Servers), Equals, 0)
+	c.Assert(len(conf.Errors), Equals, 1)
+
+	conf = Configure().
+		Server(srv1.host).
+		Nick(`@Nick`). // error
+		Channels(`chan`) // error
+	conf.ValidateRequired() // Missing 3 required fields
+	c.Assert(len(conf.Errors), Equals, 5)
 }
 
 func (s *s) TestValidNames(c *C) {
