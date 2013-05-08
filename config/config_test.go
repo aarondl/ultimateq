@@ -1,7 +1,10 @@
 package config
 
 import (
+	"bytes"
 	. "launchpad.net/gocheck"
+	"log"
+	"os"
 	"testing"
 )
 
@@ -10,10 +13,23 @@ type s struct{}
 
 var _ = Suite(&s{})
 
+func init() {
+	setLogger() // This had to be done for DisplayErrors' test
+}
+
+func setLogger() {
+	f, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+	if err != nil {
+		log.Println("Could not set logger:", err)
+	} else {
+		log.SetOutput(f)
+	}
+}
+
 func (s *s) TestConfig(c *C) {
 	config := CreateConfig()
 	c.Assert(config.Servers, NotNil)
-	c.Assert(config.defaults, NotNil)
+	c.Assert(config.Defaults, NotNil)
 }
 
 func (s *s) TestConfig_Fallbacks(c *C) {
@@ -23,7 +39,7 @@ func (s *s) TestConfig_Fallbacks(c *C) {
 	nick, altnick, realname, userhost, prefix := "a", "b", "c", "d", "e"
 	chans := []string{"#chan1", "#chan2"}
 
-	config.defaults = &irc{
+	config.Defaults = &irc{
 		port, ssl, true, verifyCert, true,
 		nick, altnick, realname, userhost, prefix, chans,
 	}
@@ -46,16 +62,16 @@ func (s *s) TestConfig_Fallbacks(c *C) {
 
 	c.Assert(server.GetHost(), Equals, host)
 	c.Assert(server.GetPort(), Equals, port)
-	c.Assert(server.GetSsl(), Equals, config.defaults.ssl)
-	c.Assert(server.GetVerifyCert(), Equals, config.defaults.verifyCert)
-	c.Assert(server.GetNick(), Equals, config.defaults.nick)
-	c.Assert(server.GetAltnick(), Equals, config.defaults.altnick)
-	c.Assert(server.GetRealname(), Equals, config.defaults.realname)
-	c.Assert(server.GetUserhost(), Equals, config.defaults.userhost)
-	c.Assert(server.GetPrefix(), Equals, config.defaults.prefix)
-	c.Assert(len(server.GetChannels()), Equals, len(config.defaults.channels))
+	c.Assert(server.GetSsl(), Equals, config.Defaults.ssl)
+	c.Assert(server.GetVerifyCert(), Equals, config.Defaults.verifyCert)
+	c.Assert(server.GetNick(), Equals, config.Defaults.nick)
+	c.Assert(server.GetAltnick(), Equals, config.Defaults.altnick)
+	c.Assert(server.GetRealname(), Equals, config.Defaults.realname)
+	c.Assert(server.GetUserhost(), Equals, config.Defaults.userhost)
+	c.Assert(server.GetPrefix(), Equals, config.Defaults.prefix)
+	c.Assert(len(server.GetChannels()), Equals, len(config.Defaults.channels))
 	for i, v := range server.GetChannels() {
-		c.Assert(v, Equals, config.defaults.channels[i])
+		c.Assert(v, Equals, config.Defaults.channels[i])
 	}
 
 	//Check default bools more throughly
@@ -66,13 +82,13 @@ func (s *s) TestConfig_Fallbacks(c *C) {
 
 	server.irc.isSslSet = false
 	server.irc.isVerifyCertSet = false
-	config.defaults.ssl = false
-	config.defaults.verifyCert = false
+	config.Defaults.ssl = false
+	config.Defaults.verifyCert = false
 	c.Assert(server.GetSsl(), Equals, false)
 	c.Assert(server.GetVerifyCert(), Equals, false)
 
 	//Check default port more thoroughly
-	config.defaults.port = 0
+	config.Defaults.port = 0
 	c.Assert(server.GetPort(), Equals, uint16(ircDefaultPort))
 }
 
@@ -153,24 +169,45 @@ func (s *s) TestConfig_Validation(c *C) {
 		},
 	}
 
-	conf := Configure().
+	conf := Configure()
+	c.Assert(conf.IsValid(), Equals, false)
+	c.Assert(len(conf.Errors), Not(Equals), 0)
+
+	conf = Configure().
 		Server("").
 		Port(srv1.irc.port)
 	c.Assert(len(conf.Servers), Equals, 0)
-	c.Assert(conf.defaults.port, Equals, uint16(srv1.irc.port))
-	c.Assert(len(conf.Errors), Equals, 1)
+	c.Assert(conf.Defaults.port, Equals, uint16(srv1.irc.port))
+	c.Assert(conf.IsValid(), Equals, false)
+	c.Assert(len(conf.Errors), Equals, 2)
 
 	conf = Configure().
 		Server("%")
 	c.Assert(len(conf.Servers), Equals, 0)
-	c.Assert(len(conf.Errors), Equals, 1)
+	c.Assert(conf.IsValid(), Equals, false)
+	c.Assert(len(conf.Errors), Equals, 2)
 
 	conf = Configure().
 		Server(srv1.host).
-		Nick(`@Nick`). // error
-		Channels(`chan`) // error
-	conf.ValidateRequired() // Missing 3 required fields
-	c.Assert(len(conf.Errors), Equals, 5)
+		Nick(`@Nick`).    // error
+		Channels(`chan`). // error
+		Realname(srv1.irc.realname).
+		Userhost(srv1.irc.userhost)
+	c.Assert(conf.IsValid(), Equals, false)
+	c.Assert(len(conf.Errors), Equals, 2)
+}
+
+func (s *s) TestConfig_DisplayErrors(c *C) {
+	buf := &bytes.Buffer{}
+	log.SetOutput(buf)
+	c.Assert(buf.Len(), Equals, 0)
+	conf := Configure().
+		Server("localhost")
+	c.Assert(conf.IsValid(), Equals, false)
+	c.Assert(len(conf.Errors), Equals, 3)
+	conf.DisplayErrors()
+	c.Assert(buf.Len(), Not(Equals), 0)
+	setLogger() // Reset the logger
 }
 
 func (s *s) TestValidNames(c *C) {
