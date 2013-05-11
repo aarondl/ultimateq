@@ -25,6 +25,7 @@ const (
 	errInvalidFormatString = "config(%v): Invalid %v, given: %v"
 	errMissingFormatString = "config(%v): Requires %v, but nothing was given."
 	errServersRequired     = "config: At least one server is required."
+	errDefaultChannels     = "config: Channels may not be set at a global level"
 
 	// The following is for mapping config setting names to strings
 	errHost     = "host"
@@ -32,6 +33,7 @@ const (
 	errNick     = "nickname"
 	errAltnick  = "alternate nickname"
 	errRealname = "realname"
+	errUsername = "username"
 	errUserhost = "userhost"
 	errPrefix   = "prefix"
 	errChannel  = "channel"
@@ -47,7 +49,7 @@ var (
 	// enforce it, and the RFC also states that clients should handle longer
 	// names.
 	// Test that the name is a valid IRC nickname
-	nicknameRegex = regexp.MustCompile(`^(?i)[a-z\[\]{}|^_\\` + "`]" +
+	rgxNickname = regexp.MustCompile(`^(?i)[a-z\[\]{}|^_\\` + "`]" +
 		`[a-z0-9\[\]{}|^_\\` + "`" + `]{0,30}$`)
 
 	/* Channels names are strings (beginning with a '&', '#', '+' or '!'
@@ -64,29 +66,27 @@ var (
 	chanstring = any octet except NUL, BELL, CR, LF, " ", "," and ":"
 	channel    =  ( "#" / "+" / ( "!" channelid ) / "&" ) chanstring
 					[ ":" chanstring ] */
-	channelRegex = regexp.MustCompile(
+	rgxChannel = regexp.MustCompile(
 		`^(?i)[#&+!][^\s\000\007,]{1,49}$`)
 
-	// hostRegex matches hostnames
-	hostRegex = regexp.MustCompile(
+	// rgxHost matches hostnames
+	rgxHost = regexp.MustCompile(
 		`(?i)^[0-9a-z](?:(?:[0-9a-z]|-){0,61}[0-9a-z])?` +
 			`(?:\.[0-9a-z](?:(?:[0-9a-z]|-){0,61}[0-9a-z])?)*\.?$`)
+
+	// rgxUsername matches usernames, insensitive all chars without spaces.
+	rgxUsername = regexp.MustCompile(`^[A-Za-z0-9]+$`)
+	// rgxRealname matches real names, insensitive all chars with spaces.
+	rgxRealname = regexp.MustCompile(`^[A-Za-z0-9 ]+$`)
 )
 
 // Config holds all the information related to the bot including global settings
 // default settings, and server specific settings.
 type Config struct {
+	Servers  map[string]*Server
 	Defaults *irc
 	context  *Server
 	Errors   []error
-
-	Servers map[string]*Server
-}
-
-// Configure starts a configuration by calling CreateConfig. Alias for
-// CreateConfig
-func Configure() *Config {
-	return CreateConfig()
 }
 
 // CreateConfig initializes a Config object.
@@ -115,34 +115,44 @@ func (c *Config) IsValid() bool {
 		c.addError(errServersRequired)
 		return false
 	}
+	if len(c.Defaults.channels) > 0 {
+		c.addError(errDefaultChannels)
+		return false
+	}
 
 	for srv, s := range c.Servers {
-		if host := s.GetHost(); host == "" {
+		if host := s.GetHost(); len(host) == 0 {
 			c.addError(errMissingFormatString, srv, errHost)
-		} else if !hostRegex.MatchString(host) {
+		} else if !rgxHost.MatchString(host) {
 			c.addError(errInvalidFormatString, srv, errHost, host)
 		}
 
-		if port := s.GetPort(); port == 0 {
-			c.addError("%v", port)
-			c.addError(errInvalidFormatString, srv, errPort, port)
-		}
-
-		if nick := s.GetNick(); nick == "" {
+		if nick := s.GetNick(); len(nick) == 0 {
 			c.addError(errMissingFormatString, srv, errNick)
-		} else if !nicknameRegex.MatchString(nick) {
+		} else if !rgxNickname.MatchString(nick) {
 			c.addError(errInvalidFormatString, srv, errNick, nick)
 		}
 
-		if s.GetRealname() == "" {
-			c.addError(errMissingFormatString, srv, errRealname)
+		if username := s.GetUsername(); len(username) == 0 {
+			c.addError(errMissingFormatString, srv, errUsername)
+		} else if !rgxUsername.MatchString(username) {
+			c.addError(errInvalidFormatString, srv, errUsername, username)
 		}
-		if s.GetUserhost() == "" {
+
+		if userhost := s.GetUserhost(); len(userhost) == 0 {
 			c.addError(errMissingFormatString, srv, errUserhost)
+		} else if !rgxHost.MatchString(userhost) {
+			c.addError(errInvalidFormatString, srv, errUserhost, userhost)
+		}
+
+		if realname := s.GetRealname(); len(realname) == 0 {
+			c.addError(errMissingFormatString, srv, errRealname)
+		} else if !rgxRealname.MatchString(realname) {
+			c.addError(errInvalidFormatString, srv, errRealname, realname)
 		}
 
 		for _, channel := range s.irc.channels {
-			if !channelRegex.MatchString(channel) {
+			if !rgxChannel.MatchString(channel) {
 				c.addError(errInvalidFormatString, srv, errChannel, channel)
 			}
 		}
@@ -167,19 +177,12 @@ func (c *Config) GetContext() *irc {
 	return c.Defaults
 }
 
-func (c *Config) GetContextName() string {
-	if c.context != nil {
-		return c.context.host
-	}
-	return "Defaults"
-}
-
 // Server fluently creates a server object and sets the context on the Config to
 // the current instance.
 func (c *Config) Server(host string) *Config {
 	if host == "" {
 		c.addError(errMissingFormatString, "none", errHost)
-	} else if !hostRegex.MatchString(host) || len(host) > maxHostSize {
+	} else if !rgxHost.MatchString(host) || len(host) > maxHostSize {
 		c.addError(errInvalidFormatString, "none", errHost, host)
 	} else {
 		c.context = &Server{c, host, &irc{}}
@@ -222,15 +225,21 @@ func (c *Config) Altnick(altnick string) *Config {
 	return c
 }
 
-// Realname fluently sets the realname for the current config context
-func (c *Config) Realname(realname string) *Config {
-	c.GetContext().realname = realname
+// Username fluently sets the username for the current config context
+func (c *Config) Username(username string) *Config {
+	c.GetContext().username = username
 	return c
 }
 
 // Userhost fluently sets the userhost for the current config context
 func (c *Config) Userhost(userhost string) *Config {
 	c.GetContext().userhost = userhost
+	return c
+}
+
+// Realname fluently sets the realname for the current config context
+func (c *Config) Realname(realname string) *Config {
+	c.GetContext().realname = realname
 	return c
 }
 
@@ -273,8 +282,9 @@ type irc struct {
 	// Irc User data
 	nick     string
 	altnick  string
-	realname string
+	username string
 	userhost string
+	realname string
 
 	// Dispatching options
 	prefix   string
@@ -343,15 +353,15 @@ func (s *Server) GetAltnick() string {
 	return s.irc.altnick
 }
 
-// GetRealname returns the realname of the irc config, if it's empty, it returns
+// GetUsername returns the username of the irc config, if it's empty, it returns
 // the value of the default configuration.
-func (s *Server) GetRealname() string {
-	if len(s.irc.realname) == 0 &&
+func (s *Server) GetUsername() string {
+	if len(s.irc.username) == 0 &&
 		s.parent != nil && s.parent.Defaults != nil {
 
-		return s.parent.Defaults.realname
+		return s.parent.Defaults.username
 	}
-	return s.irc.realname
+	return s.irc.username
 }
 
 // GetUserhost returns the userhost of the irc config, if it's empty, it returns
@@ -365,15 +375,26 @@ func (s *Server) GetUserhost() string {
 	return s.irc.userhost
 }
 
+// GetRealname returns the realname of the irc config, if it's empty, it returns
+// the value of the default configuration.
+func (s *Server) GetRealname() string {
+	if len(s.irc.realname) == 0 &&
+		s.parent != nil && s.parent.Defaults != nil {
+
+		return s.parent.Defaults.realname
+	}
+	return s.irc.realname
+}
+
 // GetPrefix returns the prefix of the irc config, if it's empty, it returns
 // the value of the default configuration.
 func (s *Server) GetPrefix() string {
-	if len(s.irc.prefix) == 0 && s.parent != nil &&
-		s.parent.Defaults != nil && s.parent.Defaults.prefix != "" {
+	if len(s.irc.prefix) > 0 {
+		return s.irc.prefix
+	} else if s.parent != nil && s.parent.Defaults != nil &&
+		len(s.parent.Defaults.prefix) > 0 {
 
 		return s.parent.Defaults.prefix
-	} else {
-		return s.irc.prefix
 	}
 	return defaultPrefix
 }
