@@ -30,7 +30,7 @@ func main() {
 
 ##Packages
 
-###ultimateq
+###bot
 This package ties all the low level plumbing together, using this package's
 helpers it should be easy to create a bot and deploy him into the dying world
 of irc.
@@ -39,6 +39,10 @@ of irc.
 This package houses the common irc constants and types necessary throughout
 the bot. It's supposed to remain a small and dependency-less package that all
 packages can utilize.
+
+###config
+Config package is used to present a fluent style configuration builder for an
+irc bot. It also provides some validation.
 
 ###parse
 This package deals with parsing irc protocols. It is able to consume irc

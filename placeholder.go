@@ -1,25 +1,45 @@
 // The ultimateq bot framework.
 package main
 
-import ()
+import (
+	"github.com/aarondl/ultimateq/bot"
+	"github.com/aarondl/ultimateq/irc"
+	"log"
+	"os"
+	"strings"
+)
 
-var dispatcher dispatch.Dispatcher
-var client *inet.IrcClient
+type Handler struct {
+}
+
+func (h Handler) HandleRaw(m *irc.IrcMessage, sender irc.Sender) {
+	if strings.Split(m.Sender, "!")[0] == "Aaron" {
+		sender.Writeln(m.Args[1])
+	}
+}
 
 func main() {
 	log.SetOutput(os.Stdout)
 
-	// Create a dispatcher
+	b, err := bot.CreateBot(
+		bot.Configure().
+			Nick("nobody__").
+			Altnick("nobody_").
+			Realname("there").
+			Username("guy").
+			Userhost("friend").
+			Server("irc.gamesurge.net"),
+	)
+	if err != nil {
+		log.Println(err)
+	}
 
-	// Connect to the server
+	b.Register(irc.PRIVMSG, Handler{})
 
-	// Create an IRC Client on top of the connection
-	client = inet.CreateIrcClient(conn)
-	// Create goroutines to read/write
-	client.SpawnWorkers()
-	// Write our initial nicks
-	client.Write([]byte("NICK :nobody_"))
-	client.Write([]byte("USER nobody bitforge.ca 0 :nobody"))
-
-	// Set up the parsing/dispatching goroutine
+	ers := b.Connect()
+	if len(ers) != 0 {
+		log.Println(ers)
+	}
+	b.Start()
+	b.WaitForShutdown()
 }
