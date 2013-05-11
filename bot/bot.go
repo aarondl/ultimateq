@@ -31,6 +31,8 @@ var (
 	// errInvalidServerId occurs when the user passes in an unknown
 	// server id to a method requiring a server id.
 	errUnknownServerId = errors.New("bot: Unknown Server id.")
+	// temporary error until ssl is fixed.
+	errSslNotImplemented = errors.New("bot: Ssl not implemented")
 
 	// errMsgParsingIrcMessage is when the bot fails to parse a message
 	// during it's dispatch loop.
@@ -190,7 +192,7 @@ func (b *Bot) dispatchMessages(s *Server) {
 			break
 		}
 		ircMsg, err := parse.Parse(string(msg))
-		if err != err {
+		if err != nil {
 			log.Println(errMsgParsingIrcMessage, err)
 		} else {
 			b.dispatchMessage(s, ircMsg)
@@ -291,7 +293,7 @@ func (s *Server) createIrcClient() error {
 	if s.bot.connProvider == nil {
 		if s.conf.GetSsl() {
 			//TODO: Implement SSL
-			return errors.New("bot: Ssl functionality not yet implemented.")
+			return errSslNotImplemented
 		} else {
 			if conn, err = net.Dial("tcp", server); err != nil {
 				return err
