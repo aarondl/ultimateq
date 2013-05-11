@@ -1,6 +1,8 @@
-// dispatch package is used to dispatch irc messages to event handlers in an
-// asynchronous fashion. It supports various event handling types to easily
-// extract information from events, as well as define more succint handlers.
+/*
+dispatch package is used to dispatch irc messages to event handlers in an
+asynchronous fashion. It supports various event handling types to easily
+extract information from events, as well as define more succint handlers.
+*/
 package dispatch
 
 import (
@@ -21,15 +23,16 @@ var (
 // as a raw IrcMessage event. However there are other message types are specific
 // to very common irc events that are more helpful than this interface.
 type EventHandler interface {
-	HandleRaw(event *irc.IrcMessage)
+	HandleRaw(event *irc.IrcMessage, sender irc.Sender)
 }
 
-// eventTable is the storage used to keep id -> interface{} mappings in the
-// eventTableStore map.
-type eventTable map[int]interface{}
-
-// eventTableStore is the map used to hold the event handlers for an event
-type eventTableStore map[string]eventTable
+type (
+	// eventTable is the storage used to keep id -> interface{} mappings in the
+	// eventTableStore map.
+	eventTable map[int]interface{}
+	// eventTableStore is the map used to hold the event handlers for an event
+	eventTableStore map[string]eventTable
+)
 
 // Dispatcher is made for handling bot-local dispatching of irc
 // events.
@@ -114,20 +117,22 @@ func (d *Dispatcher) Unregister(event string, id int) bool {
 // Dispatch an IrcMessage to event handlers handling event also ensures all raw
 // handlers receive all messages. Returns false if no eventtable was found for
 // the primary sent event.
-func (d *Dispatcher) Dispatch(event string, msg *irc.IrcMessage) bool {
-	event = strings.ToUpper(event)
-	handled := d.dispatchHelper(event, msg)
-	d.dispatchHelper(irc.RAW, msg)
+func (d *Dispatcher) Dispatch(msg *irc.IrcMessage, sender irc.Sender) bool {
+	event := strings.ToUpper(msg.Name)
+	handled := d.dispatchHelper(event, msg, sender)
+	d.dispatchHelper(irc.RAW, msg, sender)
 
 	return handled
 }
 
 // dispatchHelper locates a handler and attempts to resolve it with
 // resolveHandler. It returns true if it was able to find an event table.
-func (d *Dispatcher) dispatchHelper(event string, msg *irc.IrcMessage) bool {
+func (d *Dispatcher) dispatchHelper(event string,
+	msg *irc.IrcMessage, sender irc.Sender) bool {
+
 	if evtable, ok := d.events[event]; ok {
 		for _, handler := range evtable {
-			go d.resolveHandler(handler, event, msg)
+			go d.resolveHandler(handler, event, msg, sender)
 		}
 		return true
 	}
@@ -138,31 +143,31 @@ func (d *Dispatcher) dispatchHelper(event string, msg *irc.IrcMessage) bool {
 // real type, coerces the IrcMessage in whatever way necessary and then
 // calls that handlers primary dispatch method with the coerced message.
 func (d *Dispatcher) resolveHandler(
-	handler interface{}, event string, msg *irc.IrcMessage) {
+	handler interface{}, event string, msg *irc.IrcMessage, sender irc.Sender) {
 
 	switch t := handler.(type) {
 	case PrivmsgUserHandler:
 		if d.shouldDispatch(false, msg) {
-			t.PrivmsgUser(&Message{msg})
+			t.PrivmsgUser(&Message{msg}, sender)
 		}
 	case PrivmsgChannelHandler:
 		if d.shouldDispatch(true, msg) {
-			t.PrivmsgChannel(&Message{msg})
+			t.PrivmsgChannel(&Message{msg}, sender)
 		}
 	case PrivmsgHandler:
-		t.Privmsg(&Message{msg})
+		t.Privmsg(&Message{msg}, sender)
 	case NoticeUserHandler:
 		if d.shouldDispatch(false, msg) {
-			t.NoticeUser(&Message{msg})
+			t.NoticeUser(&Message{msg}, sender)
 		}
 	case NoticeChannelHandler:
 		if d.shouldDispatch(true, msg) {
-			t.NoticeChannel(&Message{msg})
+			t.NoticeChannel(&Message{msg}, sender)
 		}
 	case NoticeHandler:
-		t.Notice(&Message{msg})
+		t.Notice(&Message{msg}, sender)
 	case EventHandler:
-		t.HandleRaw(msg)
+		t.HandleRaw(msg, sender)
 	}
 }
 

@@ -21,30 +21,30 @@ func (p *Message) Message() string {
 
 // PrivmsgHandler is for handling privmsgs going to channel or user targets.
 type PrivmsgHandler interface {
-	Privmsg(*Message)
+	Privmsg(*Message, irc.Sender)
 }
 
 // PrivmsgUserHandler is for handling privmsgs going to user targets.
 type PrivmsgUserHandler interface {
-	PrivmsgUser(*Message)
+	PrivmsgUser(*Message, irc.Sender)
 }
 
 // PrivmsgChannelHandler is for handling privmsgs going to channel targets.
 type PrivmsgChannelHandler interface {
-	PrivmsgChannel(*Message)
+	PrivmsgChannel(*Message, irc.Sender)
 }
 
 // NoticeHandler is for handling privmsgs going to channel or user targets.
 type NoticeHandler interface {
-	Notice(*Message)
+	Notice(*Message, irc.Sender)
 }
 
 // NoticeUserHandler is for handling privmsgs going to user targets.
 type NoticeUserHandler interface {
-	NoticeUser(*Message)
+	NoticeUser(*Message, irc.Sender)
 }
 
 // NoticeChannelHandler is for handling privmsgs going to channel targets.
 type NoticeChannelHandler interface {
-	NoticeChannel(*Message)
+	NoticeChannel(*Message, irc.Sender)
 }

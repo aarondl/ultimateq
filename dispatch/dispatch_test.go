@@ -8,23 +8,42 @@ import (
 )
 
 func Test(t *testing.T) { TestingT(t) } //Hook into testing package
-
 type s struct{}
 
 var _ = Suite(&s{})
 
-type testingCallback func(msg *irc.IrcMessage)
-
-type testingHandler struct {
-	callback testingCallback
+//===========================================================
+// Set up a type that can be used to mock irc.Sender
+//===========================================================
+type testSender struct {
 }
 
-func (handler testingHandler) HandleRaw(msg *irc.IrcMessage) {
+func (tsender testSender) Writeln(s string) error {
+	return nil
+}
+
+func (tsender testSender) GetKey() string {
+	return ""
+}
+
+//===========================================================
+// Set up a type that can be used to mock a callback for raw.
+//===========================================================
+type testCallback func(msg *irc.IrcMessage, sender irc.Sender)
+
+type testHandler struct {
+	callback testCallback
+}
+
+func (handler testHandler) HandleRaw(msg *irc.IrcMessage, sender irc.Sender) {
 	if handler.callback != nil {
-		handler.callback(msg)
+		handler.callback(msg, sender)
 	}
 }
 
+//===========================================================
+// Tests
+//===========================================================
 func (s *s) TestDispatcher(c *C) {
 	d := CreateDispatcher()
 	c.Assert(d, NotNil)
@@ -37,7 +56,7 @@ func (s *s) TestDispatcher(c *C) {
 
 func (s *s) TestDispatcher_Registration(c *C) {
 	d := CreateDispatcher()
-	cb := testingHandler{}
+	cb := testHandler{}
 
 	id := d.Register(irc.PRIVMSG, cb)
 	c.Assert(id, Not(Equals), 0)
@@ -51,21 +70,26 @@ func (s *s) TestDispatcher_Registration(c *C) {
 
 func (s *s) TestDispatcher_Dispatching(c *C) {
 	var msg1, msg2, msg3 *irc.IrcMessage
+	var s1, s2, s3 irc.Sender
 	waiter := sync.WaitGroup{}
-	h1 := testingHandler{func(m *irc.IrcMessage) {
+	h1 := testHandler{func(m *irc.IrcMessage, s irc.Sender) {
 		msg1 = m
+		s1 = s
 		waiter.Done()
 	}}
-	h2 := testingHandler{func(m *irc.IrcMessage) {
+	h2 := testHandler{func(m *irc.IrcMessage, s irc.Sender) {
 		msg2 = m
+		s2 = s
 		waiter.Done()
 	}}
-	h3 := testingHandler{func(m *irc.IrcMessage) {
+	h3 := testHandler{func(m *irc.IrcMessage, s irc.Sender) {
 		msg3 = m
+		s3 = s
 		waiter.Done()
 	}}
 
 	d := CreateDispatcher()
+	send := testSender{}
 
 	d.Register(irc.PRIVMSG, h1)
 	d.Register(irc.PRIVMSG, h2)
@@ -74,13 +98,15 @@ func (s *s) TestDispatcher_Dispatching(c *C) {
 	waiter.Add(2)
 	privmsg := &irc.IrcMessage{Name: irc.PRIVMSG}
 	quitmsg := &irc.IrcMessage{Name: irc.QUIT}
-	d.Dispatch(irc.PRIVMSG, privmsg)
+	d.Dispatch(privmsg, send)
 	waiter.Wait()
 	c.Assert(msg1.Name, Equals, irc.PRIVMSG)
 	c.Assert(msg1, Equals, msg2)
+	c.Assert(s1, NotNil)
+	c.Assert(s1, Equals, s2)
 	c.Assert(msg3, IsNil)
 	waiter.Add(1)
-	d.Dispatch(irc.QUIT, quitmsg)
+	d.Dispatch(quitmsg, send)
 	waiter.Wait()
 	c.Assert(msg3.Name, Equals, irc.QUIT)
 }
@@ -88,22 +114,23 @@ func (s *s) TestDispatcher_Dispatching(c *C) {
 func (s *s) TestDispatcher_RawDispatch(c *C) {
 	var msg1, msg2 *irc.IrcMessage
 	waiter := sync.WaitGroup{}
-	h1 := testingHandler{func(m *irc.IrcMessage) {
+	h1 := testHandler{func(m *irc.IrcMessage, send irc.Sender) {
 		msg1 = m
 		waiter.Done()
 	}}
-	h2 := testingHandler{func(m *irc.IrcMessage) {
+	h2 := testHandler{func(m *irc.IrcMessage, send irc.Sender) {
 		msg2 = m
 		waiter.Done()
 	}}
 
 	d := CreateDispatcher()
+	send := testSender{}
 	d.Register(irc.PRIVMSG, h1)
 	d.Register(irc.RAW, h2)
 
 	privmsg := &irc.IrcMessage{Name: irc.PRIVMSG}
 	waiter.Add(2)
-	d.Dispatch(irc.PRIVMSG, privmsg)
+	d.Dispatch(privmsg, send)
 	waiter.Wait()
 	c.Assert(msg1, Equals, privmsg)
 	c.Assert(msg1, Equals, msg2)
@@ -112,45 +139,45 @@ func (s *s) TestDispatcher_RawDispatch(c *C) {
 // ================================
 // Testing types
 // ================================
-type testingPrivmsgHandler struct {
-	callback func(*Message)
+type testPrivmsgHandler struct {
+	callback func(*Message, irc.Sender)
 }
-type testingPrivmsgUserHandler struct {
-	callback func(*Message)
+type testPrivmsgUserHandler struct {
+	callback func(*Message, irc.Sender)
 }
-type testingPrivmsgChannelHandler struct {
-	callback func(*Message)
+type testPrivmsgChannelHandler struct {
+	callback func(*Message, irc.Sender)
 }
-type testingNoticeHandler struct {
-	callback func(*Message)
+type testNoticeHandler struct {
+	callback func(*Message, irc.Sender)
 }
-type testingNoticeUserHandler struct {
-	callback func(*Message)
+type testNoticeUserHandler struct {
+	callback func(*Message, irc.Sender)
 }
-type testingNoticeChannelHandler struct {
-	callback func(*Message)
+type testNoticeChannelHandler struct {
+	callback func(*Message, irc.Sender)
 }
 
 // ================================
 // Testing Callbacks
 // ================================
-func (t testingPrivmsgHandler) Privmsg(msg *Message) {
-	t.callback(msg)
+func (t testPrivmsgHandler) Privmsg(msg *Message, sender irc.Sender) {
+	t.callback(msg, sender)
 }
-func (t testingPrivmsgUserHandler) PrivmsgUser(msg *Message) {
-	t.callback(msg)
+func (t testPrivmsgUserHandler) PrivmsgUser(msg *Message, sender irc.Sender) {
+	t.callback(msg, sender)
 }
-func (t testingPrivmsgChannelHandler) PrivmsgChannel(msg *Message) {
-	t.callback(msg)
+func (t testPrivmsgChannelHandler) PrivmsgChannel(msg *Message, sender irc.Sender) {
+	t.callback(msg, sender)
 }
-func (t testingNoticeHandler) Notice(msg *Message) {
-	t.callback(msg)
+func (t testNoticeHandler) Notice(msg *Message, sender irc.Sender) {
+	t.callback(msg, sender)
 }
-func (t testingNoticeUserHandler) NoticeUser(msg *Message) {
-	t.callback(msg)
+func (t testNoticeUserHandler) NoticeUser(msg *Message, sender irc.Sender) {
+	t.callback(msg, sender)
 }
-func (t testingNoticeChannelHandler) NoticeChannel(msg *Message) {
-	t.callback(msg)
+func (t testNoticeChannelHandler) NoticeChannel(msg *Message, sender irc.Sender) {
+	t.callback(msg, sender)
 }
 
 func (s *s) TestDispatcher_Privmsg(c *C) {
@@ -167,15 +194,15 @@ func (s *s) TestDispatcher_Privmsg(c *C) {
 
 	var p, pu, pc *Message
 	waiter := sync.WaitGroup{}
-	ph := testingPrivmsgHandler{func(m *Message) {
+	ph := testPrivmsgHandler{func(m *Message, _ irc.Sender) {
 		p = m
 		waiter.Done()
 	}}
-	puh := testingPrivmsgUserHandler{func(m *Message) {
+	puh := testPrivmsgUserHandler{func(m *Message, _ irc.Sender) {
 		pu = m
 		waiter.Done()
 	}}
-	pch := testingPrivmsgChannelHandler{func(m *Message) {
+	pch := testPrivmsgChannelHandler{func(m *Message, _ irc.Sender) {
 		pc = m
 		waiter.Done()
 	}}
@@ -187,14 +214,14 @@ func (s *s) TestDispatcher_Privmsg(c *C) {
 	d.Register(irc.PRIVMSG, pch)
 
 	waiter.Add(2)
-	d.Dispatch(irc.PRIVMSG, usermsg)
+	d.Dispatch(usermsg, nil)
 	waiter.Wait()
 	c.Assert(p, NotNil)
 	c.Assert(pu.Raw, Equals, p.Raw)
 
 	p, pu, pc = nil, nil, nil
 	waiter.Add(2)
-	d.Dispatch(irc.PRIVMSG, chanmsg)
+	d.Dispatch(chanmsg, nil)
 	waiter.Wait()
 	c.Assert(p, NotNil)
 	c.Assert(pc.Raw, Equals, p.Raw)
@@ -214,15 +241,15 @@ func (s *s) TestDispatcher_Notice(c *C) {
 
 	var n, nu, nc *Message
 	waiter := sync.WaitGroup{}
-	nh := testingNoticeHandler{func(m *Message) {
+	nh := testNoticeHandler{func(m *Message, _ irc.Sender) {
 		n = m
 		waiter.Done()
 	}}
-	nuh := testingNoticeUserHandler{func(m *Message) {
+	nuh := testNoticeUserHandler{func(m *Message, _ irc.Sender) {
 		nu = m
 		waiter.Done()
 	}}
-	nch := testingNoticeChannelHandler{func(m *Message) {
+	nch := testNoticeChannelHandler{func(m *Message, _ irc.Sender) {
 		nc = m
 		waiter.Done()
 	}}
@@ -234,17 +261,34 @@ func (s *s) TestDispatcher_Notice(c *C) {
 	d.Register(irc.NOTICE, nch)
 
 	waiter.Add(2)
-	d.Dispatch(irc.NOTICE, usermsg)
+	d.Dispatch(usermsg, nil)
 	waiter.Wait()
 	c.Assert(n, NotNil)
 	c.Assert(nu.Raw, Equals, n.Raw)
 
 	n, nu, nc = nil, nil, nil
 	waiter.Add(2)
-	d.Dispatch(irc.NOTICE, chanmsg)
+	d.Dispatch(chanmsg, nil)
 	waiter.Wait()
 	c.Assert(n, NotNil)
 	c.Assert(nc.Raw, Equals, n.Raw)
+}
+
+func (s *s) TestDispatcher_Sender(c *C) {
+	d := CreateDispatcher()
+	send := testSender{}
+
+	msg := &irc.IrcMessage{
+		Name:   irc.PRIVMSG,
+		Args:   []string{"#chan", "msg"},
+		Sender: "nick!user@host.com",
+	}
+
+	d.Register(irc.PRIVMSG, func(msg *irc.IrcMessage, sender irc.Sender) {
+		c.Assert(sender.GetKey(), NotNil)
+		c.Assert(sender.Writeln(""), IsNil)
+	})
+	d.Dispatch(msg, send)
 }
 
 func (s *s) TestDispatcher_FilterPrivmsgChannels(c *C) {
@@ -261,11 +305,11 @@ func (s *s) TestDispatcher_FilterPrivmsgChannels(c *C) {
 
 	var p, pc *Message
 	waiter := sync.WaitGroup{}
-	ph := testingPrivmsgHandler{func(m *Message) {
+	ph := testPrivmsgHandler{func(m *Message, _ irc.Sender) {
 		p = m
 		waiter.Done()
 	}}
-	pch := testingPrivmsgChannelHandler{func(m *Message) {
+	pch := testPrivmsgChannelHandler{func(m *Message, _ irc.Sender) {
 		pc = m
 		waiter.Done()
 	}}
@@ -277,14 +321,14 @@ func (s *s) TestDispatcher_FilterPrivmsgChannels(c *C) {
 	d.Register(irc.PRIVMSG, pch)
 
 	waiter.Add(2)
-	d.Dispatch(irc.PRIVMSG, chanmsg)
+	d.Dispatch(chanmsg, nil)
 	waiter.Wait()
 	c.Assert(p, NotNil)
 	c.Assert(pc.Raw, Equals, p.Raw)
 
 	p, pc = nil, nil
 	waiter.Add(1)
-	d.Dispatch(irc.PRIVMSG, chanmsg2)
+	d.Dispatch(chanmsg2, nil)
 	waiter.Wait()
 	c.Assert(p, NotNil)
 	c.Assert(pc, IsNil)
@@ -304,11 +348,11 @@ func (s *s) TestDispatcher_FilterNoticeChannels(c *C) {
 
 	var u, uc *Message
 	waiter := sync.WaitGroup{}
-	uh := testingNoticeHandler{func(m *Message) {
+	uh := testNoticeHandler{func(m *Message, _ irc.Sender) {
 		u = m
 		waiter.Done()
 	}}
-	uch := testingNoticeChannelHandler{func(m *Message) {
+	uch := testNoticeChannelHandler{func(m *Message, _ irc.Sender) {
 		uc = m
 		waiter.Done()
 	}}
@@ -320,14 +364,14 @@ func (s *s) TestDispatcher_FilterNoticeChannels(c *C) {
 	d.Register(irc.NOTICE, uch)
 
 	waiter.Add(2)
-	d.Dispatch(irc.NOTICE, chanmsg)
+	d.Dispatch(chanmsg, nil)
 	waiter.Wait()
 	c.Assert(u, NotNil)
 	c.Assert(uc.Raw, Equals, u.Raw)
 
 	u, uc = nil, nil
 	waiter.Add(1)
-	d.Dispatch(irc.NOTICE, chanmsg2)
+	d.Dispatch(chanmsg2, nil)
 	waiter.Wait()
 	c.Assert(u, NotNil)
 	c.Assert(uc, IsNil)
