@@ -1,6 +1,8 @@
-// irc package defines types and classes to be used by most other packages in
-// the ultimateq system. It is small and comprised mostly of helper like types
-// and constants.
+/*
+irc package defines types and classes to be used by most other packages in
+the ultimateq system. It is small and comprised mostly of helper like types
+and constants.
+*/
 package irc
 
 import "strings"
@@ -25,11 +27,20 @@ const (
 	DISCONNECT = "DISCONNECT"
 )
 
+// Sender is the sender of an event, and should allow replies on a writing
+// interface as well as a way to identify itself.
+type Sender interface {
+	// Writes a string to an endpoint that makes sense for the given event.
+	Writeln(string) error
+	// Retrieves a key to retrieve where this event was generated from.
+	GetKey() string
+}
+
 // IrcMessage contains all the information broken out of an irc message.
 type IrcMessage struct {
 	// Name of the message. Uppercase constant name or numeric.
 	Name string
-	// Sender that sent the message, a fullhost if one was supplied.
+	// The server or user that sent the message, a fullhost if one was supplied.
 	Sender string
 	// The args split by space delimiting.
 	Args []string
