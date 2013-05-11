@@ -1,5 +1,7 @@
-// inet package handles connecting to an irc server and reading and writing to
-// the connection
+/*
+inet package handles connecting to an irc server and reading and writing to
+the connection
+*/
 package inet
 
 import (
@@ -57,7 +59,7 @@ func (c *IrcClient) SpawnWorkers() {
 	go c.Siphon()
 }
 
-// Wait blocks until the workers in SpawnWorker have returned.
+// Wait blocks until the workers from SpawnWorkers have returned.
 func (c *IrcClient) Wait() {
 	c.waiter.Wait()
 }
@@ -70,7 +72,7 @@ func (c *IrcClient) calcSleepTime(t time.Time) time.Duration {
 		dur = 0
 	}
 
-	if dur > (3 * time.Second) {
+	if dur > resetDuration {
 		c.nThrottled = 0
 		return time.Duration(0)
 	} else {
@@ -218,7 +220,7 @@ func (c *IrcClient) Read(buf []byte) (int, error) {
 }
 
 // Write implements the io.Writer interface and is the preferred way to write
-// directly to the socket. Returns EOF if the client has been closed. The buffer
+// to the socket. Returns EOF if the client has been closed. The buffer
 // is split based on \r\n and each message is queued, then the Pump is signaled
 // through the channel with the number of messages found.
 func (c *IrcClient) Write(buf []byte) (int, error) {
