@@ -4,8 +4,11 @@ import (
 	"code.google.com/p/gomock/gomock"
 	mocks "github.com/aarondl/ultimateq/inet/test"
 	"github.com/aarondl/ultimateq/irc"
+	"io"
 	. "launchpad.net/gocheck"
+	"log"
 	"net"
+	"os"
 	"testing"
 )
 
@@ -14,67 +17,143 @@ type s struct{}
 
 var _ = Suite(&s{})
 
-var fakeConfig = fakeBotConfig{
-	server:   "irc.gamesurge.net",
-	port:     6667,
-	nick:     "nobody_",
-	username: "username",
-	host:     "bitforge.ca",
-	fullname: "nobody",
+func init() {
+	f, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+	if err != nil {
+		log.Println("Could not set logger:", err)
+	} else {
+		log.SetOutput(f)
+	}
 }
+
+var serverId = "irc.gamesurge.net"
+
+var fakeConfig = Configure().
+	Nick("nobody").
+	Altnick("nobody_").
+	Username("nobody").
+	Userhost("bitforge.ca").
+	Realname("ultimateq").
+	Server(serverId)
 
 func (s *s) TestCreateBot(c *C) {
-	c.SucceedNow()
-	CreateBot(fakeConfig) // This function cannot be tested due to the socket
+	bot, err := CreateBot(fakeConfig)
+	c.Assert(bot, NotNil)
+	c.Assert(err, IsNil)
 }
 
-func (s *s) TestCreateBotFull(c *C) {
+func (s *s) TestBot_StartShutdown(c *C) {
 	mockCtrl := gomock.NewController(c)
 	defer mockCtrl.Finish()
 
 	conn := mocks.NewMockConn(mockCtrl)
-	b, err := createBotFull(fakeConfig, nil, func(s string) (net.Conn, error) {
+	conn.EXPECT().Close()
+
+	connProvider := func(srv string) (net.Conn, error) {
 		return conn, nil
-	})
-	c.Assert(b, NotNil)
+	}
+
+	b, err := createBot(fakeConfig, nil, connProvider)
+	c.Assert(err, IsNil)
+	ers := b.Connect()
+	c.Assert(len(ers), Equals, 0)
+	b.Shutdown()
+	b.Start()
+	b.WaitForShutdown()
+}
+
+func (s *s) TestBot_Register(c *C) {
+	mockCtrl := gomock.NewController(c)
+	defer mockCtrl.Finish()
+
+	conn := mocks.NewMockConn(mockCtrl)
+
+	connProvider := func(srv string) (net.Conn, error) {
+		return conn, nil
+	}
+
+	b, err := createBot(fakeConfig, nil, connProvider)
+	gid := b.Register(irc.PRIVMSG, coreHandler{})
+	id, err := b.RegisterServer(serverId, irc.PRIVMSG, coreHandler{})
 	c.Assert(err, IsNil)
 
+	c.Assert(b.Unregister(irc.PRIVMSG, id), Equals, false)
+	c.Assert(b.Unregister(irc.PRIVMSG, gid), Equals, true)
+
+	ok, err := b.UnregisterServer(serverId, irc.PRIVMSG, gid)
+	c.Assert(ok, Equals, false)
+	ok, err = b.UnregisterServer(serverId, irc.PRIVMSG, id)
+	c.Assert(ok, Equals, true)
+}
+
+func (s *s) TestcreateBot(c *C) {
+	mockCtrl := gomock.NewController(c)
+	defer mockCtrl.Finish()
+
+	capsProvider := func() *irc.ProtoCaps {
+		return &irc.ProtoCaps{Chantypes: "#"}
+	}
+	connProvider := func(srv string) (net.Conn, error) {
+		return mocks.NewMockConn(mockCtrl), nil
+	}
+
+	b, err := createBot(fakeConfig, capsProvider, connProvider)
+	c.Assert(b, NotNil)
+	c.Assert(err, IsNil)
+	c.Assert(len(b.servers), Equals, 1)
+	c.Assert(b.caps, NotNil)
+	c.Assert(b.capsProvider, NotNil)
+	c.Assert(b.connProvider, NotNil)
+}
+
+func (s *s) TestBot_Providers(c *C) {
 	capsProv := func() *irc.ProtoCaps {
 		return &irc.ProtoCaps{Chantypes: "H"}
 	}
 	connProv := func(s string) (net.Conn, error) {
 		return nil, net.ErrWriteToConnected
 	}
-	_, err = createBotFull(fakeConfig, nil, connProv)
-	c.Assert(err, Equals, net.ErrWriteToConnected)
-	_, err = createBotFull(fakeConfig, capsProv, connProv)
+
+	b, err := createBot(fakeConfig, capsProv, connProv)
 	c.Assert(err, NotNil)
 	c.Assert(err, Not(Equals), net.ErrWriteToConnected)
+	b, err = createBot(fakeConfig, nil, connProv)
+	ers := b.Connect()
+	c.Assert(ers[0], Equals, net.ErrWriteToConnected)
 }
 
-func (s *s) TestBot_createDispatcher(c *C) {
-	b := &Bot{caps: nil}
-	err := b.createDispatcher()
-	c.Assert(err, NotNil)
-	b = &Bot{caps: &irc.ProtoCaps{Chantypes: defaultChanTypes}}
-	err = b.createDispatcher()
-	c.Assert(err, IsNil)
-	c.Assert(b.dispatcher, NotNil)
+type testHandler struct {
+	callback func(*irc.IrcMessage, irc.Sender)
 }
 
-func (s *s) TestBot_createIrcClient(c *C) {
+func (h testHandler) HandleRaw(m *irc.IrcMessage, send irc.Sender) {
+	if h.callback != nil {
+		h.callback(m, send)
+	}
+}
+
+func (s *s) TestServerSender(c *C) {
 	mockCtrl := gomock.NewController(c)
 	defer mockCtrl.Finish()
 
-	conn := mocks.NewMockConn(mockCtrl)
-	b := &Bot{config: &fakeConfig}
-	b.createIrcClient(func(s string) (net.Conn, error) {
-		return conn, nil
-	})
-	c.Assert(b.client, NotNil)
+	str := "PRIVMSG user :msg\r\n"
 
-	err := b.createIrcClient(func(s string) (net.Conn, error) {
-		return nil, net.ErrWriteToConnected
-	})
-	c.Assert(err, Equals, net.ErrWriteToConnected)
+	conn := mocks.NewMockConn(mockCtrl)
+	conn.EXPECT().Read(gomock.Any()).Return(0, net.ErrWriteToConnected)
+	conn.EXPECT().Write([]byte(str)).Return(len(str), io.EOF)
+
+	connProvider := func(srv string) (net.Conn, error) {
+		return conn, nil
+	}
+
+	b, err := createBot(fakeConfig, nil, connProvider)
+	c.Assert(err, IsNil)
+	srvsender := ServerSender{serverId, b.servers[serverId]}
+
+	ers := b.Connect()
+	c.Assert(len(ers), Equals, 0)
+	b.Start()
+	srvsender.Writeln(str)
+	//b.Shutdown()
+	b.WaitForShutdown()
 }
