@@ -28,7 +28,12 @@ func main() {
 			Realname("there").
 			Username("guy").
 			Userhost("friend").
-			Server("irc.gamesurge.net"),
+			Server("irc.gamesurge.net1").
+			Host("irc.gamesurge.net").
+			Nick("nobody1").
+			Server("irc.gamesurge.net2").
+			Host("irc.gamesurge.net").
+			Nick("nobody2"),
 	)
 	if err != nil {
 		log.Println(err)

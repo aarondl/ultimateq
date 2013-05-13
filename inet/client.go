@@ -22,11 +22,11 @@ const (
 
 // Format strings for errors and logging output
 const (
-	fmtDiscarded          = "<- (DISCARDED) %s\n"
-	fmtWrite              = "<- %s\n"
-	fmtWriteErr           = "<- (%v) %s\n"
-	fmtRead               = "-> %s\n"
-	fmtErrSiphonReadError = "inet: Socket closed (%s)\n"
+	fmtDiscarded          = "(%v) <- (DISCARDED) %s\n"
+	fmtWrite              = "(%v) <- %s\n"
+	fmtWriteErr           = "(%v) <- (%v) %s\n"
+	fmtRead               = "(%v) -> %s\n"
+	fmtErrSiphonReadError = "inet: (%v) socket closed (%s)\n"
 )
 
 // IrcClient represents a connection to an irc server. It uses a queueing system
@@ -38,6 +38,9 @@ type IrcClient struct {
 	writechan chan int
 	queue     Queue
 	waiter    sync.WaitGroup
+
+	// The name of the connection for logging
+	name string
 
 	// the write channel may be closed at any time by any thread
 	// so we have to protect it until all writing threads have finished sending
@@ -54,12 +57,13 @@ type IrcClient struct {
 }
 
 // CreateIrcClient initializes the required fields in the IrcClient
-func CreateIrcClient(conn net.Conn) *IrcClient {
+func CreateIrcClient(conn net.Conn, name string) *IrcClient {
 	return &IrcClient{
 		conn:      conn,
 		readchan:  make(chan []byte),
 		writechan: make(chan int),
 		lastwrite: time.Now().Truncate(resetDuration),
+		name:      name,
 	}
 }
 
@@ -115,7 +119,7 @@ func (c *IrcClient) Pump() {
 		}
 		toWrite := c.queue.Dequeue(nMessages)
 		if c.shutdown {
-			discardMessages(toWrite)
+			c.discardMessages(toWrite)
 			break
 		}
 
@@ -141,7 +145,7 @@ func (c *IrcClient) writeMessages(messages [][]byte) error {
 		}
 
 		if c.shutdown {
-			discardMessages(messages[i:])
+			c.discardMessages(messages[i:])
 			return nil
 		}
 
@@ -149,10 +153,10 @@ func (c *IrcClient) writeMessages(messages [][]byte) error {
 			n, err = c.conn.Write(msg[written:])
 			wrote := msg[written : len(msg)-2]
 			if err != nil {
-				log.Printf(fmtWriteErr, err, wrote)
+				log.Printf(fmtWriteErr, c.name, err, wrote)
 				break
 			}
-			log.Printf(fmtWrite, wrote)
+			log.Printf(fmtWrite, c.name, wrote)
 			c.lastwrite = time.Now()
 		}
 
@@ -165,9 +169,9 @@ func (c *IrcClient) writeMessages(messages [][]byte) error {
 
 // discardMessages is used to log when messages are not able to be handled by
 // a the write queue due to shutdown.
-func discardMessages(messages [][]byte) {
+func (c *IrcClient) discardMessages(messages [][]byte) {
 	for _, msg := range messages {
-		log.Printf(fmtDiscarded, msg)
+		log.Printf(fmtDiscarded, c.name, msg)
 	}
 }
 
@@ -186,7 +190,7 @@ func (c *IrcClient) Siphon() {
 		}
 
 		if err != nil {
-			log.Printf(fmtErrSiphonReadError, err)
+			log.Printf(fmtErrSiphonReadError, c.name, err)
 			break
 		}
 	}
@@ -210,7 +214,7 @@ func (c *IrcClient) extractMessages(buf []byte) int {
 	send := func(chunk []byte) {
 		cpy := make([]byte, len(chunk)-2)
 		copy(cpy, chunk[:len(chunk)-2])
-		log.Printf(fmtRead, cpy)
+		log.Printf(fmtRead, c.name, cpy)
 		c.readchan <- cpy
 	}
 
@@ -240,7 +244,7 @@ func (c *IrcClient) Close() error {
 	go func() {
 		for n := range c.writechan {
 			msgs := c.queue.Dequeue(n)
-			discardMessages(msgs)
+			c.discardMessages(msgs)
 		}
 		wait.Done()
 	}()

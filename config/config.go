@@ -22,10 +22,11 @@ const (
 	maxHostSize = 255
 
 	// The following format strings are for formatting various config errors.
-	errInvalidFormatString = "config(%v): Invalid %v, given: %v"
-	errMissingFormatString = "config(%v): Requires %v, but nothing was given."
-	errServersRequired     = "config: At least one server is required."
-	errDefaultChannels     = "config: Channels may not be set at a global level"
+	fmtErrInvalid         = "config(%v): Invalid %v, given: %v"
+	fmtErrMissing         = "config(%v): Requires %v, but nothing was given."
+	errMsgServersRequired = "config: At least one server is required."
+	errMsgDuplicateServer = "config: Server names must be unique, use .Host()"
+	errMsgDefaultChannels = "config: Channels may not be set at a global level"
 
 	// The following is for mapping config setting names to strings
 	errHost     = "host"
@@ -112,48 +113,49 @@ func (c *Config) addError(format string, args ...interface{}) {
 // helper.
 func (c *Config) IsValid() bool {
 	if len(c.Servers) == 0 {
-		c.addError(errServersRequired)
+		c.addError(errMsgServersRequired)
 		return false
 	}
 	if len(c.Defaults.channels) > 0 {
-		c.addError(errDefaultChannels)
+		c.addError(errMsgDefaultChannels)
 		return false
 	}
 
-	for srv, s := range c.Servers {
+	for _, s := range c.Servers {
+		name := s.GetName()
 		if host := s.GetHost(); len(host) == 0 {
-			c.addError(errMissingFormatString, srv, errHost)
-		} else if !rgxHost.MatchString(host) {
-			c.addError(errInvalidFormatString, srv, errHost, host)
+			c.addError(fmtErrMissing, name, errHost)
+		} else if !rgxHost.MatchString(host) || len(host) > maxHostSize {
+			c.addError(fmtErrInvalid, name, errHost, host)
 		}
 
 		if nick := s.GetNick(); len(nick) == 0 {
-			c.addError(errMissingFormatString, srv, errNick)
+			c.addError(fmtErrMissing, name, errNick)
 		} else if !rgxNickname.MatchString(nick) {
-			c.addError(errInvalidFormatString, srv, errNick, nick)
+			c.addError(fmtErrInvalid, name, errNick, nick)
 		}
 
 		if username := s.GetUsername(); len(username) == 0 {
-			c.addError(errMissingFormatString, srv, errUsername)
+			c.addError(fmtErrMissing, name, errUsername)
 		} else if !rgxUsername.MatchString(username) {
-			c.addError(errInvalidFormatString, srv, errUsername, username)
+			c.addError(fmtErrInvalid, name, errUsername, username)
 		}
 
 		if userhost := s.GetUserhost(); len(userhost) == 0 {
-			c.addError(errMissingFormatString, srv, errUserhost)
+			c.addError(fmtErrMissing, name, errUserhost)
 		} else if !rgxHost.MatchString(userhost) {
-			c.addError(errInvalidFormatString, srv, errUserhost, userhost)
+			c.addError(fmtErrInvalid, name, errUserhost, userhost)
 		}
 
 		if realname := s.GetRealname(); len(realname) == 0 {
-			c.addError(errMissingFormatString, srv, errRealname)
+			c.addError(fmtErrMissing, name, errRealname)
 		} else if !rgxRealname.MatchString(realname) {
-			c.addError(errInvalidFormatString, srv, errRealname, realname)
+			c.addError(fmtErrInvalid, name, errRealname, realname)
 		}
 
 		for _, channel := range s.irc.channels {
 			if !rgxChannel.MatchString(channel) {
-				c.addError(errInvalidFormatString, srv, errChannel, channel)
+				c.addError(fmtErrInvalid, name, errChannel, channel)
 			}
 		}
 	}
@@ -178,15 +180,27 @@ func (c *Config) GetContext() *irc {
 }
 
 // Server fluently creates a server object and sets the context on the Config to
-// the current instance.
-func (c *Config) Server(host string) *Config {
-	if host == "" {
-		c.addError(errMissingFormatString, "none", errHost)
-	} else if !rgxHost.MatchString(host) || len(host) > maxHostSize {
-		c.addError(errInvalidFormatString, "none", errHost, host)
+// the current instance. This automatically sets the Host() parameter to the
+// same thing. If you have multiple servers connecting to the same host, you
+// will have to use this to name the server, and Host() to set the host.
+func (c *Config) Server(name string) *Config {
+	if len(name) != 0 {
+		if _, ok := c.Servers[name]; !ok {
+			c.context = &Server{c, name, name, &irc{}}
+			c.Servers[name] = c.context
+		} else {
+			c.addError(errMsgDuplicateServer)
+		}
 	} else {
-		c.context = &Server{c, host, &irc{}}
-		c.Servers[host] = c.context
+		c.addError(fmtErrMissing, "<NONE>", errHost)
+	}
+	return c
+}
+
+// Host fluently sets the host for the current config context
+func (c *Config) Host(host string) *Config {
+	if c.context != nil {
+		c.context.host = host
 	}
 	return c
 }
@@ -263,6 +277,7 @@ func (c *Config) Channels(channels ...string) *Config {
 type Server struct {
 	parent *Config
 
+	name string
 	host string
 
 	irc *irc
@@ -294,6 +309,11 @@ type irc struct {
 // GetHost gets s.host
 func (s *Server) GetHost() string {
 	return s.host
+}
+
+// GetName gets s.name
+func (s *Server) GetName() string {
+	return s.name
 }
 
 // GetPort returns port of the irc config, if it hasn't been set, returns the

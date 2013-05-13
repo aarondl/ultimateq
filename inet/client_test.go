@@ -32,7 +32,7 @@ func (s *s) TestCreateIrcClient(c *C) {
 	defer mockCtrl.Finish()
 
 	conn := mocks.NewMockConn(mockCtrl)
-	client := CreateIrcClient(conn)
+	client := CreateIrcClient(conn, "")
 	c.Assert(client.shutdown, Equals, false)
 	c.Assert(client.conn, Equals, conn)
 	c.Assert(client.readchan, NotNil)
@@ -43,7 +43,7 @@ func (s *s) TestCreateIrcClient(c *C) {
 }
 
 func (s *s) TestIrcClient_ImplementsReadWriteCloser(c *C) {
-	client := CreateIrcClient(nil)
+	client := CreateIrcClient(nil, "")
 	c.Assert(client, FitsTypeOf, io.ReadWriteCloser(client))
 }
 
@@ -54,7 +54,7 @@ func (s *s) TestIrcClient_SpawnWorkers(c *C) {
 	conn := mocks.NewMockConn(mockCtrl)
 	conn.EXPECT().Close()
 
-	client := CreateIrcClient(conn)
+	client := CreateIrcClient(conn, "")
 	client.Close()
 	client.SpawnWorkers(true, true)
 	client.Wait()
@@ -73,7 +73,7 @@ func (s *s) TestIrcClient_Pump(c *C) {
 	conn.EXPECT().Write(test[split:]).Return(len(test[split:]), nil)
 	conn.EXPECT().Write(test2).Return(0, io.EOF)
 
-	client := CreateIrcClient(conn)
+	client := CreateIrcClient(conn, "")
 
 	waiter := sync.WaitGroup{}
 	waiter.Add(1)
@@ -121,7 +121,7 @@ func (s *s) TestIrcClient_Siphon(c *C) {
 	conn.EXPECT().Read(gomock.Any()).Return(len(mocks.ByteFiller), nil)
 	conn.EXPECT().Read(gomock.Any()).Return(0, io.EOF)
 
-	client := CreateIrcClient(conn)
+	client := CreateIrcClient(conn, "")
 	client.waiter.Add(1)
 	go func() {
 		client.Siphon()
@@ -145,7 +145,7 @@ func (s *s) TestIrcClient_ExtractMessages(c *C) {
 	waiter := sync.WaitGroup{}
 	waiter.Add(1)
 
-	client := CreateIrcClient(nil)
+	client := CreateIrcClient(nil, "")
 	ret := 0
 	run := func() {
 		ret = client.extractMessages(buf)
@@ -178,7 +178,7 @@ func (s *s) TestIrcClient_Close(c *C) {
 	conn := mocks.NewMockConn(mockCtrl)
 	conn.EXPECT().Close().Return(nil)
 
-	client := CreateIrcClient(conn)
+	client := CreateIrcClient(conn, "")
 
 	err := client.Close()
 	c.Assert(err, IsNil)
@@ -190,7 +190,7 @@ func (s *s) TestIrcClient_Close(c *C) {
 }
 
 func (s *s) TestIrcClient_ReadMessage(c *C) {
-	client := CreateIrcClient(nil)
+	client := CreateIrcClient(nil, "")
 	read := []byte("PRIVMSG #chan :msg")
 	go func() {
 		client.readchan <- read
@@ -204,7 +204,7 @@ func (s *s) TestIrcClient_ReadMessage(c *C) {
 }
 
 func (s *s) TestIrcClient_Read(c *C) {
-	client := CreateIrcClient(nil)
+	client := CreateIrcClient(nil, "")
 	read := []byte("PRIVMSG #chan :msg")
 	go func() {
 		client.readchan <- read
@@ -229,7 +229,7 @@ func (s *s) TestIrcClient_Read(c *C) {
 }
 
 func (s *s) TestIrcClient_Write(c *C) {
-	client := CreateIrcClient(nil)
+	client := CreateIrcClient(nil, "")
 	test1 := []byte("PRIVMSG #chan :msg\r\n")
 	test2 := []byte("PRIVMSG #chan :msg2")
 	go func() {
@@ -256,7 +256,7 @@ func (s *s) TestIrcClient_Write(c *C) {
 }
 
 func (s *s) TestIrcClient_calcSleepTime(c *C) {
-	client := CreateIrcClient(nil)
+	client := CreateIrcClient(nil, "")
 
 	// Check no-sleep and negative cases
 	sleep := client.calcSleepTime(time.Now().Truncate(5 * time.Hour))

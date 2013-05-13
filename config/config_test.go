@@ -34,7 +34,7 @@ func (s *s) TestConfig(c *C) {
 
 func (s *s) TestConfig_Fallbacks(c *C) {
 	config := CreateConfig()
-	parent, host, ssl, verifyCert := config, "irc.com", true, true
+	parent, name, host, ssl, verifyCert := config, "irc", "irc.com", true, true
 	var port uint16 = 10
 	nick, altnick, username, userhost, realname, prefix :=
 		"a", "b", "c", "d", "e", "f"
@@ -59,10 +59,11 @@ func (s *s) TestConfig_Fallbacks(c *C) {
 	c.Assert(irc.prefix, Equals, "")
 	c.Assert(irc.channels, IsNil)
 
-	server := &Server{parent, host, irc}
-	config.Servers[host] = server
+	server := &Server{parent, name, host, irc}
+	config.Servers[name] = server
 
 	c.Assert(server.GetHost(), Equals, host)
+	c.Assert(server.GetName(), Equals, name)
 	c.Assert(server.GetPort(), Equals, port)
 	c.Assert(server.GetSsl(), Equals, config.Defaults.ssl)
 	c.Assert(server.GetVerifyCert(), Equals, config.Defaults.verifyCert)
@@ -99,14 +100,14 @@ func (s *s) TestConfig_Fallbacks(c *C) {
 
 func (s *s) TestConfig_Fluent(c *C) {
 	srv1 := Server{
-		nil, "irc.gamesurge.net",
+		nil, "irc", "irc.gamesurge.net",
 		&irc{
 			5555, true, true, false, true, "n1", "a1", "u1", "h1", "r1", "p1",
 			[]string{"#chan", "#chan2"},
 		},
 	}
 	defs := Server{
-		nil, "nuclearfallout.gamesurge.net",
+		nil, "irc2", "nuclearfallout.gamesurge.net",
 		&irc{
 			7777, false, false, true, false, "n2", "a2", "u2", "h2", "r2", "p2",
 			[]string{"#chan2"},
@@ -115,6 +116,7 @@ func (s *s) TestConfig_Fluent(c *C) {
 	srv2 := "znc.gamesurge.net"
 
 	conf := CreateConfig().
+		Host(""). // Should not break anything
 		Port(defs.irc.port).
 		Nick(defs.irc.nick).
 		Altnick(defs.irc.altnick).
@@ -123,7 +125,8 @@ func (s *s) TestConfig_Fluent(c *C) {
 		Realname(defs.irc.realname).
 		Prefix(defs.irc.prefix).
 		Channels(defs.irc.channels...).
-		Server(srv1.host).
+		Server(srv1.name).
+		Host(srv1.host).
 		Port(srv1.irc.port).
 		Ssl(srv1.irc.ssl).
 		VerifyCert(srv1.irc.verifyCert).
@@ -136,9 +139,10 @@ func (s *s) TestConfig_Fluent(c *C) {
 		Channels(srv1.irc.channels...).
 		Server(srv2)
 
-	server := conf.Servers[srv1.host]
+	server := conf.Servers[srv1.name]
 	server2 := conf.Servers[srv2]
 	c.Assert(server.GetHost(), Equals, srv1.GetHost())
+	c.Assert(server.GetName(), Equals, srv1.GetName())
 	c.Assert(server.GetPort(), Equals, srv1.GetPort())
 	c.Assert(server.GetSsl(), Equals, srv1.GetSsl())
 	c.Assert(server.GetVerifyCert(), Equals, srv1.GetVerifyCert())
@@ -171,7 +175,7 @@ func (s *s) TestConfig_Fluent(c *C) {
 
 func (s *s) TestConfig_Validation(c *C) {
 	srv1 := Server{
-		nil, "irc.gamesurge.net",
+		nil, "irc", "irc.gamesurge.net",
 		&irc{
 			5555, true, true, false, true, "n1", "a1", "u1", "h1", "r1", "p1",
 			[]string{"#chan", "#chan2"},
@@ -191,10 +195,25 @@ func (s *s) TestConfig_Validation(c *C) {
 	c.Assert(len(conf.Errors), Equals, 2)
 
 	conf = CreateConfig().
-		Server("%")
-	c.Assert(len(conf.Servers), Equals, 0)
+		Nick(srv1.irc.nick).
+		Realname(srv1.irc.realname).
+		Username(srv1.irc.username).
+		Userhost(srv1.irc.userhost).
+		Server("a.com").
+		Server("a.com")
+	c.Assert(len(conf.Servers), Equals, 1)
 	c.Assert(conf.IsValid(), Equals, false)
-	c.Assert(len(conf.Errors), Equals, 2)
+	c.Assert(len(conf.Errors), Equals, 1)
+
+	conf = CreateConfig().
+		Nick(srv1.irc.nick).
+		Realname(srv1.irc.realname).
+		Username(srv1.irc.username).
+		Userhost(srv1.irc.userhost).
+		Server("%")
+	c.Assert(conf.IsValid(), Equals, false)
+	// Invalid: Host
+	c.Assert(len(conf.Errors), Equals, 1)
 
 	conf = CreateConfig().
 		Server(srv1.host)

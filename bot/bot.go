@@ -39,7 +39,7 @@ var (
 	errFmtParsingIrcMessage = "bot: Failed to parse irc message (%v)\n"
 	// errFmtReaderClosed is when a write fails due to a closed socket or
 	// a shutdown on the client.
-	errFmtReaderClosed = "bot: %v Reader closed\n"
+	errFmtReaderClosed = "bot: %v reader closed\n"
 )
 
 type (
@@ -196,7 +196,7 @@ func (b *Bot) dispatchMessages(s *Server) {
 	for {
 		msg, ok := s.client.ReadMessage()
 		if !ok {
-			log.Printf(errFmtReaderClosed, s.conf.GetHost())
+			log.Printf(errFmtReaderClosed, s.conf.GetName())
 			b.dispatchMessage(s, &irc.IrcMessage{Name: irc.DISCONNECT})
 			break
 		}
@@ -212,7 +212,7 @@ func (b *Bot) dispatchMessages(s *Server) {
 
 // dispatch sends a message to both the bot's dispatcher and the given servers
 func (b *Bot) dispatchMessage(s *Server, msg *irc.IrcMessage) {
-	sender := ServerSender{s.conf.GetHost(), s}
+	sender := ServerSender{s.conf.GetName(), s}
 	b.dispatcher.Dispatch(msg, sender)
 	s.dispatcher.Dispatch(msg, sender)
 }
@@ -242,12 +242,12 @@ func createBot(conf *config.Config,
 	b.handler = coreHandler{b}
 	b.handlerId = b.dispatcher.Register(irc.RAW, b.handler)
 
-	for host, srv := range conf.Servers {
+	for name, srv := range conf.Servers {
 		server, err := b.createServer(srv)
 		if err != nil {
 			return nil, err
 		}
-		b.servers[host] = server
+		b.servers[name] = server
 	}
 
 	return b, nil
@@ -314,6 +314,6 @@ func (s *Server) createIrcClient() error {
 		}
 	}
 
-	s.client = inet.CreateIrcClient(conn)
+	s.client = inet.CreateIrcClient(conn, s.conf.GetName())
 	return nil
 }
