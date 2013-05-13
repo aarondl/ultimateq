@@ -12,9 +12,9 @@ import (
 type Handler struct {
 }
 
-func (h Handler) HandleRaw(m *irc.IrcMessage, sender irc.Sender) {
-	if strings.Split(m.Sender, "!")[0] == "Aaron" {
-		sender.Writeln(m.Args[1])
+func (h Handler) PrivmsgUser(m *irc.Message, sender irc.Sender) {
+	if strings.Split(m.Raw.Sender, "!")[0] == "Aaron" {
+		sender.Writeln(m.Message())
 	}
 }
 
@@ -39,6 +39,7 @@ func main() {
 	ers := b.Connect()
 	if len(ers) != 0 {
 		log.Println(ers)
+		return
 	}
 	b.Start()
 	b.WaitForShutdown()

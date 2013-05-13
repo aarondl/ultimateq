@@ -148,24 +148,25 @@ func (d *Dispatcher) resolveHandler(
 	switch t := handler.(type) {
 	case PrivmsgUserHandler:
 		if d.shouldDispatch(false, msg) {
-			t.PrivmsgUser(&Message{msg}, sender)
+			t.PrivmsgUser(&irc.Message{msg}, sender)
 		}
 	case PrivmsgChannelHandler:
 		if d.shouldDispatch(true, msg) {
-			t.PrivmsgChannel(&Message{msg}, sender)
+			t.PrivmsgChannel(&irc.Message{msg}, sender)
 		}
 	case PrivmsgHandler:
-		t.Privmsg(&Message{msg}, sender)
+		t.Privmsg(&irc.Message{msg}, sender)
+
 	case NoticeUserHandler:
 		if d.shouldDispatch(false, msg) {
-			t.NoticeUser(&Message{msg}, sender)
+			t.NoticeUser(&irc.Message{msg}, sender)
 		}
 	case NoticeChannelHandler:
 		if d.shouldDispatch(true, msg) {
-			t.NoticeChannel(&Message{msg}, sender)
+			t.NoticeChannel(&irc.Message{msg}, sender)
 		}
 	case NoticeHandler:
-		t.Notice(&Message{msg}, sender)
+		t.Notice(&irc.Message{msg}, sender)
 	case EventHandler:
 		t.HandleRaw(msg, sender)
 	}
