@@ -20,6 +20,15 @@ const (
 	resetDuration = 3 * time.Second
 )
 
+// Format strings for errors and logging output
+const (
+	fmtDiscarded          = "<- (DISCARDED) %s\n"
+	fmtWrite              = "<- %s\n"
+	fmtWriteErr           = "<- (%v) %s\n"
+	fmtRead               = "-> %s\n"
+	fmtErrSiphonReadError = "inet: Socket closed (%s)\n"
+)
+
 // IrcClient represents a connection to an irc server. It uses a queueing system
 // to throttle writes to the server. And it implements ReadWriteCloser interface
 type IrcClient struct {
@@ -29,6 +38,11 @@ type IrcClient struct {
 	writechan chan int
 	queue     Queue
 	waiter    sync.WaitGroup
+
+	// the write channel may be closed at any time by any thread
+	// so we have to protect it until all writing threads have finished sending
+	// to the channel
+	writeProtect sync.RWMutex
 
 	// write throttling
 	lastwrite  time.Time
@@ -53,10 +67,15 @@ func CreateIrcClient(conn net.Conn) *IrcClient {
 // Siphon, and one that is constantly working on eliminating the write queue by
 // writing. Also sets up the instances waiter, and a subsequent call to Wait()
 // will block until the workers have returned.
-func (c *IrcClient) SpawnWorkers() {
-	c.waiter.Add(2)
-	go c.Pump()
-	go c.Siphon()
+func (c *IrcClient) SpawnWorkers(pump, siphon bool) {
+	if pump {
+		c.waiter.Add(1)
+		go c.Pump()
+	}
+	if siphon {
+		c.waiter.Add(1)
+		go c.Siphon()
+	}
 }
 
 // Wait blocks until the workers from SpawnWorkers have returned.
@@ -77,7 +96,7 @@ func (c *IrcClient) calcSleepTime(t time.Time) time.Duration {
 		return time.Duration(0)
 	} else {
 		sleep := time.Second * time.Duration(
-			0.5+math.Max(0, math.Log2(float64(c.nThrottled))),
+			0.5+math.Max(0, math.Log2(float64(c.nThrottled)-3.0)),
 		)
 		c.nThrottled += 1
 		return sleep
@@ -85,9 +104,9 @@ func (c *IrcClient) calcSleepTime(t time.Time) time.Duration {
 }
 
 // Pump is meant to be run off the main thread and dequeues the messages and
-// writes them to the connection.
+// writes them to the connection. This function blocks often (reading from
+// channels, or sleeping) and therefore checks for shutdown just as often.
 func (c *IrcClient) Pump() {
-	var n int
 	var err error
 	for !c.shutdown && err == nil {
 		nMessages, ok := <-c.writechan
@@ -95,29 +114,61 @@ func (c *IrcClient) Pump() {
 			break
 		}
 		toWrite := c.queue.Dequeue(nMessages)
+		if c.shutdown {
+			discardMessages(toWrite)
+			break
+		}
 
-		for _, msg := range toWrite {
-			sleepTime := c.calcSleepTime(time.Now())
-			if sleepTime > 0 {
-				time.Sleep(sleepTime)
-			}
-
-			for written := 0; written < len(msg); written += n {
-				log.Println("<-", string(msg[written:len(msg)-2]))
-				n, err = c.conn.Write(msg[written:])
-				if err != nil {
-					break
-				}
-				c.lastwrite = time.Now()
-			}
-
-			if err != nil {
-				break
-			}
+		err = c.writeMessages(toWrite)
+		if err != nil {
+			break
 		}
 	}
 
 	c.waiter.Done()
+}
+
+// writeMessages writes each byte array in messages out to the socket, sleeping
+// for an appropriate amount of time in between. May discard messages if
+// shutdown is set.
+func (c *IrcClient) writeMessages(messages [][]byte) error {
+	var n int
+	var err error
+	for i, msg := range messages {
+		sleepTime := c.calcSleepTime(time.Now())
+		if sleepTime > 0 {
+			time.Sleep(sleepTime)
+		}
+
+		if c.shutdown {
+			discardMessages(messages[i:])
+			return nil
+		}
+
+		for written := 0; written < len(msg); written += n {
+			n, err = c.conn.Write(msg[written:])
+			wrote := msg[written : len(msg)-2]
+			if err != nil {
+				log.Printf(fmtWriteErr, err, wrote)
+				break
+			}
+			log.Printf(fmtWrite, wrote)
+			c.lastwrite = time.Now()
+		}
+
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// discardMessages is used to log when messages are not able to be handled by
+// a the write queue due to shutdown.
+func discardMessages(messages [][]byte) {
+	for _, msg := range messages {
+		log.Printf(fmtDiscarded, msg)
+	}
 }
 
 // Siphon takes messages from the connection given to the IrcClient and then
@@ -135,8 +186,7 @@ func (c *IrcClient) Siphon() {
 		}
 
 		if err != nil {
-			// Do something useful.
-			// Log/Reconnect etc.
+			log.Printf(fmtErrSiphonReadError, err)
 			break
 		}
 	}
@@ -160,7 +210,7 @@ func (c *IrcClient) extractMessages(buf []byte) int {
 	send := func(chunk []byte) {
 		cpy := make([]byte, len(chunk)-2)
 		copy(cpy, chunk[:len(chunk)-2])
-		log.Printf("-> %s\n", cpy)
+		log.Printf(fmtRead, cpy)
 		c.readchan <- cpy
 	}
 
@@ -174,13 +224,38 @@ func (c *IrcClient) extractMessages(buf []byte) int {
 	return 0
 }
 
-// Close sets the shutdown variable, closes the writer channel, and closes
-// the underlying socket. All of these measures should ensure the worker
-// routines shutdown quickly.
+// Close sets the shutdown variable, sets an all-consuming dequeuer routine to
+// eat all the waiting-to-write goroutines, and then waits to acquire a mutex
+// that will allow it to safely close the writer channel. It then closes the
+// socket and returns any errors from that.
 func (c *IrcClient) Close() error {
+	if c.shutdown {
+		return nil
+	}
+
 	c.shutdown = true
+
+	wait := sync.WaitGroup{}
+	wait.Add(1)
+	go func() {
+		for n := range c.writechan {
+			msgs := c.queue.Dequeue(n)
+			discardMessages(msgs)
+		}
+		wait.Done()
+	}()
+
+	c.writeProtect.Lock()
 	close(c.writechan)
+	c.writeProtect.Unlock()
+	wait.Wait()
+
 	return c.conn.Close()
+}
+
+// IsClosed returns true if the IrcClient has been closed.
+func (c *IrcClient) IsClosed() bool {
+	return c.shutdown
 }
 
 // Reads a message from the read channel in it's entirety. More efficient than
@@ -222,7 +297,9 @@ func (c *IrcClient) Read(buf []byte) (int, error) {
 // Write implements the io.Writer interface and is the preferred way to write
 // to the socket. Returns EOF if the client has been closed. The buffer
 // is split based on \r\n and each message is queued, then the Pump is signaled
-// through the channel with the number of messages found.
+// through the channel with the number of messages queued. A read lock on a
+// mutex is required to write to the channel to ensure any other thread
+// cannot close the channel while someone is attempting to write to it.
 func (c *IrcClient) Write(buf []byte) (int, error) {
 	if c.shutdown {
 		return 0, io.EOF
@@ -243,7 +320,13 @@ func (c *IrcClient) Write(buf []byte) (int, error) {
 		queue(append(buf[start:], []byte{'\r', '\n'}...))
 	}
 
+	c.writeProtect.RLock()
+	if c.shutdown {
+		c.writeProtect.RUnlock()
+		return 0, io.EOF
+	}
 	c.writechan <- nMessages
+	c.writeProtect.RUnlock()
 	return len(buf), nil
 }
 

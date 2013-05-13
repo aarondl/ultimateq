@@ -34,12 +34,12 @@ var (
 	// temporary error until ssl is fixed.
 	errSslNotImplemented = errors.New("bot: Ssl not implemented")
 
-	// errMsgParsingIrcMessage is when the bot fails to parse a message
+	// errFmtParsingIrcMessage is when the bot fails to parse a message
 	// during it's dispatch loop.
-	errMsgParsingIrcMessage = "bot: Failed to parse irc message"
-	// errMsgReaderClosed is when a write fails due to a closed socket or
+	errFmtParsingIrcMessage = "bot: Failed to parse irc message (%v)\n"
+	// errFmtReaderClosed is when a write fails due to a closed socket or
 	// a shutdown on the client.
-	errMsgReaderClosed = "bot: %v Reader closed"
+	errFmtReaderClosed = "bot: %v Reader closed\n"
 )
 
 type (
@@ -57,6 +57,7 @@ type Bot struct {
 	servers        map[string]*Server
 	capsProvider   CapsProvider
 	connProvider   ConnProvider
+	handlerId      int
 	handler        coreHandler
 	msgDispatchers sync.WaitGroup
 }
@@ -124,15 +125,22 @@ func (b *Bot) Connect() []error {
 
 // Start begins message pumps on all defined and connected servers.
 func (b *Bot) Start() {
+	b.start(true, true)
+}
+
+// start begins the called for routines on all servers
+func (b *Bot) start(writing, reading bool) {
 	b.msgDispatchers = sync.WaitGroup{}
 	for _, srv := range b.servers {
 		if srv.client != nil {
-			srv.client.SpawnWorkers()
+			srv.client.SpawnWorkers(writing, reading)
 
 			b.dispatchMessage(srv, &irc.IrcMessage{Name: irc.CONNECT})
 
-			b.msgDispatchers.Add(1)
-			go b.dispatchMessages(srv)
+			if reading {
+				b.msgDispatchers.Add(1)
+				go b.dispatchMessages(srv)
+			}
 		}
 	}
 }
@@ -153,13 +161,13 @@ func (b *Bot) WaitForShutdown() {
 }
 
 // Register adds an event handler to the bot's global dispatcher.
-func (b *Bot) Register(event string, handler dispatch.EventHandler) int {
+func (b *Bot) Register(event string, handler interface{}) int {
 	return b.dispatcher.Register(event, handler)
 }
 
 // Register adds an event handler to a server specific dispatcher.
 func (b *Bot) RegisterServer(
-	server string, event string, handler dispatch.EventHandler) (int, error) {
+	server string, event string, handler interface{}) (int, error) {
 
 	if s, ok := b.servers[server]; ok {
 		return s.dispatcher.Register(event, handler), nil
@@ -188,12 +196,13 @@ func (b *Bot) dispatchMessages(s *Server) {
 	for {
 		msg, ok := s.client.ReadMessage()
 		if !ok {
-			log.Printf(errMsgReaderClosed, s.conf.GetHost())
+			log.Printf(errFmtReaderClosed, s.conf.GetHost())
+			b.dispatchMessage(s, &irc.IrcMessage{Name: irc.DISCONNECT})
 			break
 		}
 		ircMsg, err := parse.Parse(string(msg))
 		if err != nil {
-			log.Println(errMsgParsingIrcMessage, err)
+			log.Printf(errFmtParsingIrcMessage, err)
 		} else {
 			b.dispatchMessage(s, ircMsg)
 		}
@@ -231,7 +240,7 @@ func createBot(conf *config.Config,
 	}
 
 	b.handler = coreHandler{b}
-	b.dispatcher.Register(irc.RAW, b.handler)
+	b.handlerId = b.dispatcher.Register(irc.RAW, b.handler)
 
 	for host, srv := range conf.Servers {
 		server, err := b.createServer(srv)

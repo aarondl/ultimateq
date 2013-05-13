@@ -56,7 +56,7 @@ func (s *s) TestIrcClient_SpawnWorkers(c *C) {
 
 	client := CreateIrcClient(conn)
 	client.Close()
-	client.SpawnWorkers()
+	client.SpawnWorkers(true, true)
 	client.Wait()
 }
 
@@ -180,10 +180,13 @@ func (s *s) TestIrcClient_Close(c *C) {
 
 	client := CreateIrcClient(conn)
 
-	client.Close()
+	err := client.Close()
+	c.Assert(err, IsNil)
 	c.Assert(client.shutdown, Equals, true)
 	_, ok := <-client.writechan
 	c.Assert(ok, Equals, false)
+
+	c.Assert(client.IsClosed(), Equals, true)
 }
 
 func (s *s) TestIrcClient_ReadMessage(c *C) {
@@ -255,17 +258,20 @@ func (s *s) TestIrcClient_Write(c *C) {
 func (s *s) TestIrcClient_calcSleepTime(c *C) {
 	client := CreateIrcClient(nil)
 
+	// Check no-sleep and negative cases
 	sleep := client.calcSleepTime(time.Now().Truncate(5 * time.Hour))
 	c.Assert(sleep, Equals, time.Duration(0))
 	sleep = client.calcSleepTime(time.Now().Add(5 * time.Second))
 	c.Assert(sleep, Equals, time.Duration(0))
 
-	// It takes a messages to ramp up the log function
+	// It should take a few messages to get it to delay.
 	sleep = client.calcSleepTime(time.Now().Truncate(5 * time.Second))
 	c.Assert(sleep, Equals, time.Duration(0))
 
-	sleep = client.calcSleepTime(time.Now())
-	c.Assert(sleep, Equals, time.Duration(0))
+	for i := 1; i <= 4; i++ {
+		sleep = client.calcSleepTime(time.Now())
+		c.Assert(sleep, Equals, time.Duration(0))
+	}
 
 	sleep = client.calcSleepTime(time.Now())
 	c.Assert(sleep, Not(Equals), time.Duration(0))

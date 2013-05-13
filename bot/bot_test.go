@@ -71,6 +71,7 @@ func (s *s) TestBot_StartShutdown(c *C) {
 	}
 
 	b, err := createBot(fakeConfig, nil, connProvider)
+	b.dispatcher.Unregister(irc.RAW, b.handlerId)
 	c.Assert(err, IsNil)
 	ers := b.Connect()
 	c.Assert(len(ers), Equals, 0)
@@ -88,7 +89,6 @@ func (s *s) TestBot_Dispatching(c *C) {
 	conn := mocks.NewMockConn(mockCtrl)
 	mocks.ByteFiller = str
 	conn.EXPECT().Read(gomock.Any()).Return(len(str), io.EOF)
-	conn.EXPECT().Write(gomock.Any()).Return(len(str), io.EOF)
 
 	connProvider := func(srv string) (net.Conn, error) {
 		return conn, nil
@@ -97,6 +97,7 @@ func (s *s) TestBot_Dispatching(c *C) {
 	waiter := sync.WaitGroup{}
 	waiter.Add(1)
 	b, err := createBot(fakeConfig, nil, connProvider)
+	b.dispatcher.Unregister(irc.RAW, b.handlerId)
 
 	b.Register(irc.PRIVMSG, testHandler{
 		func(m *irc.IrcMessage, send irc.Sender) {
@@ -107,8 +108,7 @@ func (s *s) TestBot_Dispatching(c *C) {
 	c.Assert(err, IsNil)
 	ers := b.Connect()
 	c.Assert(len(ers), Equals, 0)
-	b.Start()
-	b.servers[serverId].client.Write([]byte("w")) // Stop waiting on write
+	b.start(false, true)
 	b.WaitForShutdown()
 	waiter.Wait()
 }
@@ -199,8 +199,11 @@ func (s *s) TestServerSender(c *C) {
 	str := "PRIVMSG user :msg\r\n"
 
 	conn := mocks.NewMockConn(mockCtrl)
-	conn.EXPECT().Read(gomock.Any()).Return(0, net.ErrWriteToConnected)
-	conn.EXPECT().Write([]byte(str)).Return(len(str), io.EOF)
+	gomock.InOrder(
+		conn.EXPECT().Write([]byte(str)).Return(len(str), nil),
+		conn.EXPECT().Write(gomock.Any()).Return(14, nil),
+		conn.EXPECT().Write(gomock.Any()).Return(28, io.EOF),
+	)
 
 	connProvider := func(srv string) (net.Conn, error) {
 		return conn, nil
@@ -212,8 +215,7 @@ func (s *s) TestServerSender(c *C) {
 
 	ers := b.Connect()
 	c.Assert(len(ers), Equals, 0)
-	b.Start()
+	b.start(true, false)
 	srvsender.Writeln(str)
-	//b.Shutdown()
 	b.WaitForShutdown()
 }

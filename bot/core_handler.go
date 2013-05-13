@@ -27,5 +27,9 @@ func (c coreHandler) HandleRaw(msg *irc.IrcMessage, sender irc.Sender) {
 			server.conf.GetUsername(),
 			server.conf.GetRealname(),
 		))
+
+	case msg.Name == irc.DISCONNECT:
+		server := c.bot.servers[sender.GetKey()]
+		server.client.Close()
 	}
 }
