@@ -7,6 +7,7 @@ import (
 	"io"
 	. "launchpad.net/gocheck"
 	"log"
+	"net"
 	"os"
 	"sync"
 	"testing"
@@ -52,6 +53,7 @@ func (s *s) TestIrcClient_SpawnWorkers(c *C) {
 	defer mockCtrl.Finish()
 
 	conn := mocks.NewMockConn(mockCtrl)
+	conn.EXPECT().Read(gomock.Any()).Return(0, net.ErrWriteToConnected)
 	conn.EXPECT().Close()
 
 	client := CreateIrcClient(conn, "")
@@ -147,26 +149,27 @@ func (s *s) TestIrcClient_ExtractMessages(c *C) {
 
 	client := CreateIrcClient(nil, "")
 	ret := 0
-	run := func() {
-		ret = client.extractMessages(buf)
-		waiter.Done()
-	}
 
-	go run()
+	go func() {
+		ret = client.extractMessages(buf)
+		c.Assert(ret, Equals, len(test3))
+		c.Assert(bytes.Compare(buf[:ret], test3), Equals, 0)
+		waiter.Done()
+	}()
 	msg1 := <-client.readchan
 	c.Assert(bytes.Compare(msg1, test1[:len(test1)-2]), Equals, 0)
 	msg2 := <-client.readchan
 	c.Assert(bytes.Compare(msg2, test2[:len(test2)-2]), Equals, 0)
-
 	waiter.Wait()
-	c.Assert(ret, Equals, len(test3))
-	c.Assert(bytes.Compare(buf[:ret], test3), Equals, 0)
 
 	buf = append(buf[:ret], []byte{'\r', '\n'}...)
 	waiter.Add(1)
-	go run()
+	go func() {
+		ret := client.extractMessages(buf)
+		c.Assert(ret, Equals, 0)
+		waiter.Done()
+	}()
 	msg3 := <-client.readchan
-	c.Assert(ret, Equals, 0)
 	c.Assert(bytes.Compare(msg3, test3), Equals, 0)
 	waiter.Wait()
 }
@@ -252,7 +255,8 @@ func (s *s) TestIrcClient_Write(c *C) {
 	c.Assert(n, Equals, 0)
 	client.shutdown = true
 	n, err = client.Write([]byte{})
-	c.Assert(err, Equals, io.EOF)
+	c.Assert(err, IsNil)
+	c.Assert(n, Equals, 0)
 }
 
 func (s *s) TestIrcClient_calcSleepTime(c *C) {

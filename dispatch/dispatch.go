@@ -10,6 +10,7 @@ import (
 	"github.com/aarondl/ultimateq/irc"
 	"math/rand"
 	"strings"
+	"sync"
 )
 
 var (
@@ -41,6 +42,7 @@ type Dispatcher struct {
 	caps   *irc.ProtoCaps
 	finder *irc.ChannelFinder
 	chans  []string
+	waiter sync.WaitGroup
 }
 
 // CreateDispatcher initializes an empty dispatcher ready to register events.
@@ -125,6 +127,12 @@ func (d *Dispatcher) Dispatch(msg *irc.IrcMessage, sender irc.Sender) bool {
 	return handled
 }
 
+// WaitForCompletion waits on all active event handlers to return. Bad event
+// handlers may never return.
+func (d *Dispatcher) WaitForCompletion() {
+	d.waiter.Wait()
+}
+
 // dispatchHelper locates a handler and attempts to resolve it with
 // resolveHandler. It returns true if it was able to find an event table.
 func (d *Dispatcher) dispatchHelper(event string,
@@ -132,6 +140,7 @@ func (d *Dispatcher) dispatchHelper(event string,
 
 	if evtable, ok := d.events[event]; ok {
 		for _, handler := range evtable {
+			d.waiter.Add(1)
 			go d.resolveHandler(handler, event, msg, sender)
 		}
 		return true
@@ -170,6 +179,8 @@ func (d *Dispatcher) resolveHandler(
 	case EventHandler:
 		t.HandleRaw(msg, sender)
 	}
+
+	d.waiter.Done()
 }
 
 // shouldDispatch checks if we should dispatch this event. Works for user and

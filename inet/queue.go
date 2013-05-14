@@ -67,19 +67,20 @@ func (q *Queue) enqueue(slice *[]byte) {
 }
 
 // Dequeue takes a number of elements to dequeue and returns them in a slice of
-// byte slices. For efficiency all allocation is done outside mutex lock and
-// they are batch dequeued during one lock.
+// byte slices.
 func (q *Queue) Dequeue(n int) [][]byte {
+	q.mutex.Lock()
 	if n > q.length {
 		n = q.length
 	}
 
 	if 0 == n {
+		q.mutex.Unlock()
 		return nil
 	}
 
 	data := make([][]byte, n)
-	q.mutex.Lock()
+
 	for i := 0; i < n; i++ {
 		data[i] = *q.dequeue()
 	}

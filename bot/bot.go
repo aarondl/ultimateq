@@ -156,8 +156,10 @@ func (b *Bot) Shutdown() {
 func (b *Bot) WaitForShutdown() {
 	for _, srv := range b.servers {
 		srv.client.Wait()
+		srv.dispatcher.WaitForCompletion()
 	}
 	b.msgDispatchers.Wait()
+	b.dispatcher.WaitForCompletion()
 }
 
 // Register adds an event handler to the bot's global dispatcher.

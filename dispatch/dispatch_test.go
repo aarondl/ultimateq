@@ -3,7 +3,6 @@ package dispatch
 import (
 	"github.com/aarondl/ultimateq/irc"
 	. "launchpad.net/gocheck"
-	"sync"
 	"testing"
 )
 
@@ -71,21 +70,17 @@ func (s *s) TestDispatcher_Registration(c *C) {
 func (s *s) TestDispatcher_Dispatching(c *C) {
 	var msg1, msg2, msg3 *irc.IrcMessage
 	var s1, s2, s3 irc.Sender
-	waiter := sync.WaitGroup{}
 	h1 := testHandler{func(m *irc.IrcMessage, s irc.Sender) {
 		msg1 = m
 		s1 = s
-		waiter.Done()
 	}}
 	h2 := testHandler{func(m *irc.IrcMessage, s irc.Sender) {
 		msg2 = m
 		s2 = s
-		waiter.Done()
 	}}
 	h3 := testHandler{func(m *irc.IrcMessage, s irc.Sender) {
 		msg3 = m
 		s3 = s
-		waiter.Done()
 	}}
 
 	d := CreateDispatcher()
@@ -95,32 +90,27 @@ func (s *s) TestDispatcher_Dispatching(c *C) {
 	d.Register(irc.PRIVMSG, h2)
 	d.Register(irc.QUIT, h3)
 
-	waiter.Add(2)
 	privmsg := &irc.IrcMessage{Name: irc.PRIVMSG}
 	quitmsg := &irc.IrcMessage{Name: irc.QUIT}
 	d.Dispatch(privmsg, send)
-	waiter.Wait()
+	d.WaitForCompletion()
 	c.Assert(msg1.Name, Equals, irc.PRIVMSG)
 	c.Assert(msg1, Equals, msg2)
 	c.Assert(s1, NotNil)
 	c.Assert(s1, Equals, s2)
 	c.Assert(msg3, IsNil)
-	waiter.Add(1)
 	d.Dispatch(quitmsg, send)
-	waiter.Wait()
+	d.WaitForCompletion()
 	c.Assert(msg3.Name, Equals, irc.QUIT)
 }
 
 func (s *s) TestDispatcher_RawDispatch(c *C) {
 	var msg1, msg2 *irc.IrcMessage
-	waiter := sync.WaitGroup{}
 	h1 := testHandler{func(m *irc.IrcMessage, send irc.Sender) {
 		msg1 = m
-		waiter.Done()
 	}}
 	h2 := testHandler{func(m *irc.IrcMessage, send irc.Sender) {
 		msg2 = m
-		waiter.Done()
 	}}
 
 	d := CreateDispatcher()
@@ -129,9 +119,8 @@ func (s *s) TestDispatcher_RawDispatch(c *C) {
 	d.Register(irc.RAW, h2)
 
 	privmsg := &irc.IrcMessage{Name: irc.PRIVMSG}
-	waiter.Add(2)
 	d.Dispatch(privmsg, send)
-	waiter.Wait()
+	d.WaitForCompletion()
 	c.Assert(msg1, Equals, privmsg)
 	c.Assert(msg1, Equals, msg2)
 }
@@ -201,18 +190,14 @@ func (s *s) TestDispatcher_Privmsg(c *C) {
 	}
 
 	var p, pu, pc *irc.Message
-	waiter := sync.WaitGroup{}
 	ph := testPrivmsgHandler{func(m *irc.Message, _ irc.Sender) {
 		p = m
-		waiter.Done()
 	}}
 	puh := testPrivmsgUserHandler{func(m *irc.Message, _ irc.Sender) {
 		pu = m
-		waiter.Done()
 	}}
 	pch := testPrivmsgChannelHandler{func(m *irc.Message, _ irc.Sender) {
 		pc = m
-		waiter.Done()
 	}}
 
 	d, err := CreateRichDispatcher(&irc.ProtoCaps{Chantypes: "#"}, nil)
@@ -221,16 +206,14 @@ func (s *s) TestDispatcher_Privmsg(c *C) {
 	d.Register(irc.PRIVMSG, puh)
 	d.Register(irc.PRIVMSG, pch)
 
-	waiter.Add(2)
 	d.Dispatch(usermsg, nil)
-	waiter.Wait()
+	d.WaitForCompletion()
 	c.Assert(p, NotNil)
 	c.Assert(pu.Raw, Equals, p.Raw)
 
 	p, pu, pc = nil, nil, nil
-	waiter.Add(2)
 	d.Dispatch(chanmsg, nil)
-	waiter.Wait()
+	d.WaitForCompletion()
 	c.Assert(p, NotNil)
 	c.Assert(pc.Raw, Equals, p.Raw)
 }
@@ -248,18 +231,14 @@ func (s *s) TestDispatcher_Notice(c *C) {
 	}
 
 	var n, nu, nc *irc.Message
-	waiter := sync.WaitGroup{}
 	nh := testNoticeHandler{func(m *irc.Message, _ irc.Sender) {
 		n = m
-		waiter.Done()
 	}}
 	nuh := testNoticeUserHandler{func(m *irc.Message, _ irc.Sender) {
 		nu = m
-		waiter.Done()
 	}}
 	nch := testNoticeChannelHandler{func(m *irc.Message, _ irc.Sender) {
 		nc = m
-		waiter.Done()
 	}}
 
 	d, err := CreateRichDispatcher(&irc.ProtoCaps{Chantypes: "#"}, nil)
@@ -268,16 +247,14 @@ func (s *s) TestDispatcher_Notice(c *C) {
 	d.Register(irc.NOTICE, nuh)
 	d.Register(irc.NOTICE, nch)
 
-	waiter.Add(2)
 	d.Dispatch(usermsg, nil)
-	waiter.Wait()
+	d.WaitForCompletion()
 	c.Assert(n, NotNil)
 	c.Assert(nu.Raw, Equals, n.Raw)
 
 	n, nu, nc = nil, nil, nil
-	waiter.Add(2)
 	d.Dispatch(chanmsg, nil)
-	waiter.Wait()
+	d.WaitForCompletion()
 	c.Assert(n, NotNil)
 	c.Assert(nc.Raw, Equals, n.Raw)
 }
@@ -312,14 +289,11 @@ func (s *s) TestDispatcher_FilterPrivmsgChannels(c *C) {
 	}
 
 	var p, pc *irc.Message
-	waiter := sync.WaitGroup{}
 	ph := testPrivmsgHandler{func(m *irc.Message, _ irc.Sender) {
 		p = m
-		waiter.Done()
 	}}
 	pch := testPrivmsgChannelHandler{func(m *irc.Message, _ irc.Sender) {
 		pc = m
-		waiter.Done()
 	}}
 
 	d, err := CreateRichDispatcher(
@@ -328,16 +302,14 @@ func (s *s) TestDispatcher_FilterPrivmsgChannels(c *C) {
 	d.Register(irc.PRIVMSG, ph)
 	d.Register(irc.PRIVMSG, pch)
 
-	waiter.Add(2)
 	d.Dispatch(chanmsg, nil)
-	waiter.Wait()
+	d.WaitForCompletion()
 	c.Assert(p, NotNil)
 	c.Assert(pc.Raw, Equals, p.Raw)
 
 	p, pc = nil, nil
-	waiter.Add(1)
 	d.Dispatch(chanmsg2, nil)
-	waiter.Wait()
+	d.WaitForCompletion()
 	c.Assert(p, NotNil)
 	c.Assert(pc, IsNil)
 }
@@ -355,14 +327,11 @@ func (s *s) TestDispatcher_FilterNoticeChannels(c *C) {
 	}
 
 	var u, uc *irc.Message
-	waiter := sync.WaitGroup{}
 	uh := testNoticeHandler{func(m *irc.Message, _ irc.Sender) {
 		u = m
-		waiter.Done()
 	}}
 	uch := testNoticeChannelHandler{func(m *irc.Message, _ irc.Sender) {
 		uc = m
-		waiter.Done()
 	}}
 
 	d, err := CreateRichDispatcher(
@@ -371,16 +340,14 @@ func (s *s) TestDispatcher_FilterNoticeChannels(c *C) {
 	d.Register(irc.NOTICE, uh)
 	d.Register(irc.NOTICE, uch)
 
-	waiter.Add(2)
 	d.Dispatch(chanmsg, nil)
-	waiter.Wait()
+	d.WaitForCompletion()
 	c.Assert(u, NotNil)
 	c.Assert(uc.Raw, Equals, u.Raw)
 
 	u, uc = nil, nil
-	waiter.Add(1)
 	d.Dispatch(chanmsg2, nil)
-	waiter.Wait()
+	d.WaitForCompletion()
 	c.Assert(u, NotNil)
 	c.Assert(uc, IsNil)
 }

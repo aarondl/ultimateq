@@ -64,6 +64,7 @@ func (s *s) TestBot_StartShutdown(c *C) {
 	defer mockCtrl.Finish()
 
 	conn := mocks.NewMockConn(mockCtrl)
+	conn.EXPECT().Read(gomock.Any()).Return(0, net.ErrWriteToConnected)
 	conn.EXPECT().Close()
 
 	connProvider := func(srv string) (net.Conn, error) {
@@ -75,8 +76,8 @@ func (s *s) TestBot_StartShutdown(c *C) {
 	c.Assert(err, IsNil)
 	ers := b.Connect()
 	c.Assert(len(ers), Equals, 0)
-	b.Shutdown()
 	b.Start()
+	b.Shutdown()
 	b.WaitForShutdown()
 }
 
