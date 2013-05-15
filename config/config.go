@@ -85,7 +85,7 @@ var (
 // default settings, and server specific settings.
 type Config struct {
 	Servers  map[string]*Server
-	Defaults *irc
+	Defaults *Server
 	context  *Server
 	Errors   []error
 }
@@ -93,7 +93,7 @@ type Config struct {
 // CreateConfig initializes a Config object.
 func CreateConfig() *Config {
 	return &Config{
-		Defaults: &irc{},
+		Defaults: &Server{},
 		Servers:  make(map[string]*Server, nAssumedServers),
 		Errors:   make([]error, 0),
 	}
@@ -116,7 +116,7 @@ func (c *Config) IsValid() bool {
 		c.addError(errMsgServersRequired)
 		return false
 	}
-	if len(c.Defaults.channels) > 0 {
+	if len(c.Defaults.Channels) > 0 {
 		c.addError(errMsgDefaultChannels)
 		return false
 	}
@@ -153,7 +153,7 @@ func (c *Config) IsValid() bool {
 			c.addError(fmtErrInvalid, name, errRealname, realname)
 		}
 
-		for _, channel := range s.irc.channels {
+		for _, channel := range s.GetChannels() {
 			if !rgxChannel.MatchString(channel) {
 				c.addError(fmtErrInvalid, name, errChannel, channel)
 			}
@@ -172,9 +172,9 @@ func (c *Config) DisplayErrors() {
 
 // Gets the current configuration context, if no context has been set, returns
 // the default instance.
-func (c *Config) GetContext() *irc {
+func (c *Config) GetContext() *Server {
 	if c.context != nil {
-		return c.context.irc
+		return c.context
 	}
 	return c.Defaults
 }
@@ -186,7 +186,7 @@ func (c *Config) GetContext() *irc {
 func (c *Config) Server(name string) *Config {
 	if len(name) != 0 {
 		if _, ok := c.Servers[name]; !ok {
-			c.context = &Server{c, name, name, &irc{}}
+			c.context = &Server{parent: c, Name: name, Host: name}
 			c.Servers[name] = c.context
 		} else {
 			c.addError(errMsgDuplicateServer)
@@ -200,75 +200,75 @@ func (c *Config) Server(name string) *Config {
 // Host fluently sets the host for the current config context
 func (c *Config) Host(host string) *Config {
 	if c.context != nil {
-		c.context.host = host
+		c.context.Host = host
 	}
 	return c
 }
 
 // Port fluently sets the port for the current config context
 func (c *Config) Port(port uint16) *Config {
-	c.GetContext().port = port
+	c.GetContext().Port = port
 	return c
 }
 
 // Ssl fluently sets the ssl for the current config context
 func (c *Config) Ssl(ssl bool) *Config {
-	irc := c.GetContext()
-	irc.ssl = ssl
-	irc.isSslSet = true
+	context := c.GetContext()
+	context.Ssl = ssl
+	context.IsSslSet = true
 	return c
 }
 
 // VerifyCert fluently sets the verifyCert for the current config context
 func (c *Config) VerifyCert(verifyCert bool) *Config {
 	i := c.GetContext()
-	i.verifyCert = verifyCert
-	i.isVerifyCertSet = true
+	i.VerifyCert = verifyCert
+	i.IsVerifyCertSet = true
 	return c
 }
 
 // Nick fluently sets the nick for the current config context
 func (c *Config) Nick(nick string) *Config {
-	c.GetContext().nick = nick
+	c.GetContext().Nick = nick
 	return c
 }
 
 // Altnick fluently sets the altnick for the current config context
 func (c *Config) Altnick(altnick string) *Config {
-	c.GetContext().altnick = altnick
+	c.GetContext().Altnick = altnick
 	return c
 }
 
 // Username fluently sets the username for the current config context
 func (c *Config) Username(username string) *Config {
-	c.GetContext().username = username
+	c.GetContext().Username = username
 	return c
 }
 
 // Userhost fluently sets the userhost for the current config context
 func (c *Config) Userhost(userhost string) *Config {
-	c.GetContext().userhost = userhost
+	c.GetContext().Userhost = userhost
 	return c
 }
 
 // Realname fluently sets the realname for the current config context
 func (c *Config) Realname(realname string) *Config {
-	c.GetContext().realname = realname
+	c.GetContext().Realname = realname
 	return c
 }
 
 // Prefix fluently sets the prefix for the current config context
 func (c *Config) Prefix(prefix string) *Config {
-	c.GetContext().prefix = prefix
+	c.GetContext().Prefix = prefix
 	return c
 }
 
 // Channels fluently sets the channels for the current config context
 func (c *Config) Channels(channels ...string) *Config {
 	if len(channels) > 0 {
-		irc := c.GetContext()
-		irc.channels = make([]string, len(channels))
-		copy(irc.channels, channels)
+		context := c.GetContext()
+		context.Channels = make([]string, len(channels))
+		copy(context.Channels, channels)
 	}
 	return c
 }
@@ -277,54 +277,48 @@ func (c *Config) Channels(channels ...string) *Config {
 type Server struct {
 	parent *Config
 
-	name string
-	host string
+	// Name of this connection
+	Name string
 
-	irc *irc
-}
-
-// irc config contains the options surrounding an irc server connection. But not
-// the location of the server, there cannot be a default host and so we have
-// this division between the Server and irc structs.
-type irc struct {
 	// Irc Server connection info
-	port            uint16
-	ssl             bool
-	isSslSet        bool
-	verifyCert      bool
-	isVerifyCertSet bool
+	Host            string
+	Port            uint16
+	Ssl             bool
+	IsSslSet        bool
+	VerifyCert      bool
+	IsVerifyCertSet bool
 
 	// Irc User data
-	nick     string
-	altnick  string
-	username string
-	userhost string
-	realname string
+	Nick     string
+	Altnick  string
+	Username string
+	Userhost string
+	Realname string
 
 	// Dispatching options
-	prefix   string
-	channels []string
+	Prefix   string
+	Channels []string
 }
 
 // GetHost gets s.host
 func (s *Server) GetHost() string {
-	return s.host
+	return s.Host
 }
 
 // GetName gets s.name
 func (s *Server) GetName() string {
-	return s.name
+	return s.Name
 }
 
 // GetPort returns port of the irc config, if it hasn't been set, returns the
 // value of the default, if that hasn't been set returns ircDefaultPort.
 func (s *Server) GetPort() uint16 {
-	if s.irc.port != 0 {
-		return s.irc.port
+	if s.Port != 0 {
+		return s.Port
 	} else if s.parent != nil && s.parent.Defaults != nil &&
-		s.parent.Defaults.port != 0 {
+		s.parent.Defaults.Port != 0 {
 
-		return s.parent.Defaults.port
+		return s.parent.Defaults.Port
 	}
 	return ircDefaultPort
 }
@@ -332,10 +326,10 @@ func (s *Server) GetPort() uint16 {
 // GetSsl returns ssl of the irc config, if it hasn't been set, returns the
 // value of the default, if that hasn't been set returns false.
 func (s *Server) GetSsl() bool {
-	if s.irc.isSslSet {
-		return s.irc.ssl
+	if s.IsSslSet {
+		return s.Ssl
 	} else if s.parent != nil && s.parent.Defaults != nil {
-		return s.parent.Defaults.isSslSet && s.parent.Defaults.ssl
+		return s.parent.Defaults.IsSslSet && s.parent.Defaults.Ssl
 	}
 	return false
 }
@@ -343,10 +337,10 @@ func (s *Server) GetSsl() bool {
 // GetSsl returns verifyCert of the irc config, if it hasn't been set, returns
 // the value of the default, if that hasn't been set returns false.
 func (s *Server) GetVerifyCert() bool {
-	if s.irc.isVerifyCertSet {
-		return s.irc.verifyCert
+	if s.IsVerifyCertSet {
+		return s.VerifyCert
 	} else if s.parent != nil && s.parent.Defaults != nil {
-		return s.parent.Defaults.isVerifyCertSet && s.parent.Defaults.verifyCert
+		return s.parent.Defaults.IsVerifyCertSet && s.parent.Defaults.VerifyCert
 	}
 	return false
 }
@@ -354,67 +348,67 @@ func (s *Server) GetVerifyCert() bool {
 // GetNick returns the nickname of the irc config, if it's empty, it returns the
 // value of the default configuration.
 func (s *Server) GetNick() string {
-	if len(s.irc.nick) == 0 &&
+	if len(s.Nick) == 0 &&
 		s.parent != nil && s.parent.Defaults != nil {
 
-		return s.parent.Defaults.nick
+		return s.parent.Defaults.Nick
 	}
-	return s.irc.nick
+	return s.Nick
 }
 
 // GetAltnick returns the altnick of the irc config, if it's empty, it returns
 // the value of the default configuration.
 func (s *Server) GetAltnick() string {
-	if len(s.irc.altnick) == 0 &&
+	if len(s.Altnick) == 0 &&
 		s.parent != nil && s.parent.Defaults != nil {
 
-		return s.parent.Defaults.altnick
+		return s.parent.Defaults.Altnick
 	}
-	return s.irc.altnick
+	return s.Altnick
 }
 
 // GetUsername returns the username of the irc config, if it's empty, it returns
 // the value of the default configuration.
 func (s *Server) GetUsername() string {
-	if len(s.irc.username) == 0 &&
+	if len(s.Username) == 0 &&
 		s.parent != nil && s.parent.Defaults != nil {
 
-		return s.parent.Defaults.username
+		return s.parent.Defaults.Username
 	}
-	return s.irc.username
+	return s.Username
 }
 
 // GetUserhost returns the userhost of the irc config, if it's empty, it returns
 // the value of the default configuration.
 func (s *Server) GetUserhost() string {
-	if len(s.irc.userhost) == 0 &&
+	if len(s.Userhost) == 0 &&
 		s.parent != nil && s.parent.Defaults != nil {
 
-		return s.parent.Defaults.userhost
+		return s.parent.Defaults.Userhost
 	}
-	return s.irc.userhost
+	return s.Userhost
 }
 
 // GetRealname returns the realname of the irc config, if it's empty, it returns
 // the value of the default configuration.
 func (s *Server) GetRealname() string {
-	if len(s.irc.realname) == 0 &&
+	if len(s.Realname) == 0 &&
 		s.parent != nil && s.parent.Defaults != nil {
 
-		return s.parent.Defaults.realname
+		return s.parent.Defaults.Realname
 	}
-	return s.irc.realname
+	return s.Realname
 }
 
 // GetPrefix returns the prefix of the irc config, if it's empty, it returns
 // the value of the default configuration.
 func (s *Server) GetPrefix() string {
-	if len(s.irc.prefix) > 0 {
-		return s.irc.prefix
+	if len(s.Prefix) > 0 {
+		return s.Prefix
 	} else if s.parent != nil && s.parent.Defaults != nil &&
-		len(s.parent.Defaults.prefix) > 0 {
+		len(s.parent.Defaults.Prefix) > 0 {
 
-		return s.parent.Defaults.prefix
+		return s.parent.Defaults.Prefix
 	}
 	return defaultPrefix
 }
@@ -422,10 +416,10 @@ func (s *Server) GetPrefix() string {
 // GetChannels returns the channels of the irc config, if it's empty, it returns
 // the value of the default configuration.
 func (s *Server) GetChannels() []string {
-	if len(s.irc.channels) == 0 &&
+	if len(s.Channels) == 0 &&
 		s.parent != nil && s.parent.Defaults != nil {
 
-		return s.parent.Defaults.channels
+		return s.parent.Defaults.Channels
 	}
-	return s.irc.channels
+	return s.Channels
 }

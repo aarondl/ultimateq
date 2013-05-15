@@ -40,106 +40,103 @@ func (s *s) TestConfig_Fallbacks(c *C) {
 		"a", "b", "c", "d", "e", "f"
 	chans := []string{"#chan1", "#chan2"}
 
-	config.Defaults = &irc{
+	config.Defaults = &Server{
+		parent, name, host,
 		port, ssl, true, verifyCert, true,
 		nick, altnick, username, userhost, realname, prefix, chans,
 	}
 
-	irc := &irc{}
-	c.Assert(irc.port, Equals, uint16(0))
-	c.Assert(irc.ssl, Equals, false)
-	c.Assert(irc.isSslSet, Equals, false)
-	c.Assert(irc.verifyCert, Equals, false)
-	c.Assert(irc.isVerifyCertSet, Equals, false)
-	c.Assert(irc.nick, Equals, "")
-	c.Assert(irc.altnick, Equals, "")
-	c.Assert(irc.username, Equals, "")
-	c.Assert(irc.userhost, Equals, "")
-	c.Assert(irc.realname, Equals, "")
-	c.Assert(irc.prefix, Equals, "")
-	c.Assert(irc.channels, IsNil)
+	blank := &Server{}
+	c.Assert(blank.Port, Equals, uint16(0))
+	c.Assert(blank.Ssl, Equals, false)
+	c.Assert(blank.IsSslSet, Equals, false)
+	c.Assert(blank.VerifyCert, Equals, false)
+	c.Assert(blank.IsVerifyCertSet, Equals, false)
+	c.Assert(blank.Nick, Equals, "")
+	c.Assert(blank.Altnick, Equals, "")
+	c.Assert(blank.Username, Equals, "")
+	c.Assert(blank.Userhost, Equals, "")
+	c.Assert(blank.Realname, Equals, "")
+	c.Assert(blank.Prefix, Equals, "")
+	c.Assert(blank.Channels, IsNil)
 
-	server := &Server{parent, name, host, irc}
+	server := &Server{parent: parent, Name: name, Host: host}
 	config.Servers[name] = server
 
 	c.Assert(server.GetHost(), Equals, host)
 	c.Assert(server.GetName(), Equals, name)
 	c.Assert(server.GetPort(), Equals, port)
-	c.Assert(server.GetSsl(), Equals, config.Defaults.ssl)
-	c.Assert(server.GetVerifyCert(), Equals, config.Defaults.verifyCert)
-	c.Assert(server.GetNick(), Equals, config.Defaults.nick)
-	c.Assert(server.GetAltnick(), Equals, config.Defaults.altnick)
-	c.Assert(server.GetUsername(), Equals, config.Defaults.username)
-	c.Assert(server.GetUserhost(), Equals, config.Defaults.userhost)
-	c.Assert(server.GetRealname(), Equals, config.Defaults.realname)
-	c.Assert(server.GetPrefix(), Equals, config.Defaults.prefix)
-	c.Assert(len(server.GetChannels()), Equals, len(config.Defaults.channels))
+	c.Assert(server.GetSsl(), Equals, config.Defaults.Ssl)
+	c.Assert(server.GetVerifyCert(), Equals, config.Defaults.VerifyCert)
+	c.Assert(server.GetNick(), Equals, config.Defaults.Nick)
+	c.Assert(server.GetAltnick(), Equals, config.Defaults.Altnick)
+	c.Assert(server.GetUsername(), Equals, config.Defaults.Username)
+	c.Assert(server.GetUserhost(), Equals, config.Defaults.Userhost)
+	c.Assert(server.GetRealname(), Equals, config.Defaults.Realname)
+	c.Assert(server.GetPrefix(), Equals, config.Defaults.Prefix)
+	c.Assert(len(server.GetChannels()), Equals, len(config.Defaults.Channels))
 	for i, v := range server.GetChannels() {
-		c.Assert(v, Equals, config.Defaults.channels[i])
+		c.Assert(v, Equals, config.Defaults.Channels[i])
 	}
 
 	//Check default bools more throughly
-	server.irc.isSslSet = true
-	server.irc.isVerifyCertSet = true
+	server.IsSslSet = true
+	server.IsVerifyCertSet = true
 	c.Assert(server.GetSsl(), Equals, false)
 	c.Assert(server.GetVerifyCert(), Equals, false)
 
-	server.irc.isSslSet = false
-	server.irc.isVerifyCertSet = false
-	config.Defaults.ssl = false
-	config.Defaults.verifyCert = false
+	server.IsSslSet = false
+	server.IsVerifyCertSet = false
+	config.Defaults.Ssl = false
+	config.Defaults.VerifyCert = false
 	c.Assert(server.GetSsl(), Equals, false)
 	c.Assert(server.GetVerifyCert(), Equals, false)
 
 	//Check default values more thoroughly
-	config.Defaults.port = 0
+	config.Defaults.Port = 0
 	c.Assert(server.GetPort(), Equals, uint16(ircDefaultPort))
-	config.Defaults.prefix = ""
+	config.Defaults.Prefix = ""
 	c.Assert(server.GetPrefix(), Equals, ".")
 }
 
 func (s *s) TestConfig_Fluent(c *C) {
 	srv1 := Server{
 		nil, "irc", "irc.gamesurge.net",
-		&irc{
-			5555, true, true, false, true, "n1", "a1", "u1", "h1", "r1", "p1",
-			[]string{"#chan", "#chan2"},
-		},
+		5555, true, true, false, true, "n1", "a1", "u1", "h1", "r1", "p1",
+		[]string{"#chan", "#chan2"},
 	}
 	defs := Server{
 		nil, "irc2", "nuclearfallout.gamesurge.net",
-		&irc{
-			7777, false, false, true, false, "n2", "a2", "u2", "h2", "r2", "p2",
-			[]string{"#chan2"},
-		},
+		7777, false, false, true, false, "n2", "a2", "u2", "h2", "r2", "p2",
+		[]string{"#chan2"},
 	}
 	srv2 := "znc.gamesurge.net"
 
 	conf := CreateConfig().
 		Host(""). // Should not break anything
-		Port(defs.irc.port).
-		Nick(defs.irc.nick).
-		Altnick(defs.irc.altnick).
-		Username(defs.irc.username).
-		Userhost(defs.irc.userhost).
-		Realname(defs.irc.realname).
-		Prefix(defs.irc.prefix).
-		Channels(defs.irc.channels...).
-		Server(srv1.name).
-		Host(srv1.host).
-		Port(srv1.irc.port).
-		Ssl(srv1.irc.ssl).
-		VerifyCert(srv1.irc.verifyCert).
-		Nick(srv1.irc.nick).
-		Altnick(srv1.irc.altnick).
-		Username(srv1.irc.username).
-		Userhost(srv1.irc.userhost).
-		Realname(srv1.irc.realname).
-		Prefix(srv1.irc.prefix).
-		Channels(srv1.irc.channels...).
+		Port(defs.Port).
+		Nick(defs.Nick).
+		Altnick(defs.Altnick).
+		Username(defs.Username).
+		Userhost(defs.Userhost).
+		Realname(defs.Realname).
+		Prefix(defs.Prefix).
+		Channels(defs.Channels...).
+		Server(srv1.Name).
+		Host(srv1.Host).
+		Port(srv1.Port).
+		Ssl(srv1.Ssl).
+		VerifyCert(srv1.VerifyCert).
+		Nick(srv1.Nick).
+		Altnick(srv1.Altnick).
+		Username(srv1.Username).
+		Userhost(srv1.Userhost).
+		Realname(srv1.Realname).
+		Prefix(srv1.Prefix).
+		Channels(srv1.Channels...).
 		Server(srv2)
 
-	server := conf.Servers[srv1.name]
+	server := conf.Servers[srv1.Name]
 	server2 := conf.Servers[srv2]
 	c.Assert(server.GetHost(), Equals, srv1.GetHost())
 	c.Assert(server.GetName(), Equals, srv1.GetName())
@@ -154,7 +151,7 @@ func (s *s) TestConfig_Fluent(c *C) {
 	c.Assert(server.GetPrefix(), Equals, srv1.GetPrefix())
 	c.Assert(len(server.GetChannels()), Equals, len(srv1.GetChannels()))
 	for i, v := range server.GetChannels() {
-		c.Assert(v, Equals, srv1.irc.channels[i])
+		c.Assert(v, Equals, srv1.Channels[i])
 	}
 
 	c.Assert(server2.GetHost(), Equals, srv2)
@@ -169,17 +166,15 @@ func (s *s) TestConfig_Fluent(c *C) {
 	c.Assert(server2.GetPrefix(), Equals, defs.GetPrefix())
 	c.Assert(len(server2.GetChannels()), Equals, len(defs.GetChannels()))
 	for i, v := range server2.GetChannels() {
-		c.Assert(v, Equals, defs.irc.channels[i])
+		c.Assert(v, Equals, defs.Channels[i])
 	}
 }
 
 func (s *s) TestConfig_Validation(c *C) {
 	srv1 := Server{
 		nil, "irc", "irc.gamesurge.net",
-		&irc{
-			5555, true, true, false, true, "n1", "a1", "u1", "h1", "r1", "p1",
-			[]string{"#chan", "#chan2"},
-		},
+		5555, true, true, false, true, "n1", "a1", "u1", "h1", "r1", "p1",
+		[]string{"#chan", "#chan2"},
 	}
 
 	conf := CreateConfig()
@@ -188,17 +183,17 @@ func (s *s) TestConfig_Validation(c *C) {
 
 	conf = CreateConfig().
 		Server("").
-		Port(srv1.irc.port)
+		Port(srv1.Port)
 	c.Assert(len(conf.Servers), Equals, 0)
-	c.Assert(conf.Defaults.port, Equals, uint16(srv1.irc.port))
+	c.Assert(conf.Defaults.Port, Equals, uint16(srv1.Port))
 	c.Assert(conf.IsValid(), Equals, false)
 	c.Assert(len(conf.Errors), Equals, 2)
 
 	conf = CreateConfig().
-		Nick(srv1.irc.nick).
-		Realname(srv1.irc.realname).
-		Username(srv1.irc.username).
-		Userhost(srv1.irc.userhost).
+		Nick(srv1.Nick).
+		Realname(srv1.Realname).
+		Username(srv1.Username).
+		Userhost(srv1.Userhost).
 		Server("a.com").
 		Server("a.com")
 	c.Assert(len(conf.Servers), Equals, 1)
@@ -206,23 +201,23 @@ func (s *s) TestConfig_Validation(c *C) {
 	c.Assert(len(conf.Errors), Equals, 1)
 
 	conf = CreateConfig().
-		Nick(srv1.irc.nick).
-		Realname(srv1.irc.realname).
-		Username(srv1.irc.username).
-		Userhost(srv1.irc.userhost).
+		Nick(srv1.Nick).
+		Realname(srv1.Realname).
+		Username(srv1.Username).
+		Userhost(srv1.Userhost).
 		Server("%")
 	c.Assert(conf.IsValid(), Equals, false)
 	// Invalid: Host
 	c.Assert(len(conf.Errors), Equals, 1)
 
 	conf = CreateConfig().
-		Server(srv1.host)
+		Server(srv1.Host)
 	c.Assert(conf.IsValid(), Equals, false)
 	// Missing: Nick, Realname, Username, Userhost
 	c.Assert(len(conf.Errors), Equals, 4)
 
 	conf = CreateConfig().
-		Server(srv1.host).
+		Server(srv1.Host).
 		Nick(`@Nick`).              // no special chars
 		Channels(`chan`).           // must start with valid prefix
 		Username(`spaces in here`). // no spaces
@@ -232,26 +227,26 @@ func (s *s) TestConfig_Validation(c *C) {
 	c.Assert(len(conf.Errors), Equals, 5)
 
 	conf = CreateConfig().
-		Nick(srv1.irc.nick).
+		Nick(srv1.Nick).
 		Channels(`#chan`). // error, default channels
-		Realname(srv1.irc.realname).
-		Userhost(srv1.irc.userhost).
-		Server(srv1.host)
+		Realname(srv1.Realname).
+		Userhost(srv1.Userhost).
+		Server(srv1.Host)
 	c.Assert(conf.IsValid(), Equals, false)
 	c.Assert(len(conf.Errors), Equals, 1) // default chan
 
 	conf = CreateConfig().
-		Server(srv1.host).
-		Nick(srv1.irc.nick).
-		Channels(srv1.irc.channels...).
-		Username(srv1.irc.username).
-		Userhost(srv1.irc.userhost).
-		Realname(srv1.irc.realname)
-	conf.Servers[srv1.host].host = ""
+		Server(srv1.Host).
+		Nick(srv1.Nick).
+		Channels(srv1.Channels...).
+		Username(srv1.Username).
+		Userhost(srv1.Userhost).
+		Realname(srv1.Realname)
+	conf.Servers[srv1.Host].Host = ""
 	c.Assert(conf.IsValid(), Equals, false)
 	c.Assert(len(conf.Errors), Equals, 1) // No host
 	conf.Errors = nil
-	conf.Servers[srv1.host].host = "@@@"
+	conf.Servers[srv1.Host].Host = "@@@"
 	c.Assert(conf.IsValid(), Equals, false)
 	c.Assert(len(conf.Errors), Equals, 1) // Bad host
 }
