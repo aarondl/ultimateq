@@ -96,6 +96,12 @@ func Configure() *config.Config {
 	return config.CreateConfig()
 }
 
+// ConfigureFile starts a configuration by reading in a file. Alias for
+// config.CreateConfigFromFile
+func ConfigureFile(filename string) *config.Config {
+	return config.CreateConfigFromFile(filename)
+}
+
 // CreateBot simplifies the call to createBotFull by using default
 // caps and conn provider functions.
 func CreateBot(conf *config.Config) (*Bot, error) {
