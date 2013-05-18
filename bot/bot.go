@@ -102,6 +102,11 @@ func ConfigureFile(filename string) *config.Config {
 	return config.CreateConfigFromFile(filename)
 }
 
+// ConfigureFunction creates a blank configuration and passes it into a function
+func ConfigureFunction(cnf func(*config.Config) *config.Config) *config.Config {
+	return cnf(config.CreateConfig())
+}
+
 // CreateBot simplifies the call to createBotFull by using default
 // caps and conn provider functions.
 func CreateBot(conf *config.Config) (*Bot, error) {

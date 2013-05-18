@@ -3,6 +3,7 @@ package main
 
 import (
 	"github.com/aarondl/ultimateq/bot"
+	"github.com/aarondl/ultimateq/config"
 	"github.com/aarondl/ultimateq/irc"
 	"log"
 	"os"
@@ -18,23 +19,37 @@ func (h Handler) PrivmsgUser(m *irc.Message, sender irc.Sender) {
 	}
 }
 
+func (h Handler) PrivmsgChannel(m *irc.Message, sender irc.Sender) {
+	if m.Message() == "hello" {
+		sender.Writeln("PRIVMSG " + m.Target() + " :Hello to you too!")
+	}
+}
+
+func conf(c *config.Config) *config.Config {
+	c. // Defaults
+		Nick("nobody__").
+		Altnick("nobody_").
+		Realname("there").
+		Username("guy").
+		Userhost("friend")
+
+	c. // First server
+		Server("irc.gamesurge.net1").
+		Host("irc.gamesurge.net").
+		Nick("nobody1")
+
+	c. // Second Server
+		Server("irc.gamesurge.net2").
+		Host("irc.gamesurge.net").
+		Nick("nobody2")
+
+	return c
+}
+
 func main() {
 	log.SetOutput(os.Stdout)
 
-	b, err := bot.CreateBot(
-		bot.Configure().
-			Nick("nobody__").
-			Altnick("nobody_").
-			Realname("there").
-			Username("guy").
-			Userhost("friend").
-			Server("irc.gamesurge.net1").
-			Host("irc.gamesurge.net").
-			Nick("nobody1").
-			Server("irc.gamesurge.net2").
-			Host("irc.gamesurge.net").
-			Nick("nobody2"),
-	)
+	b, err := bot.CreateBot(bot.ConfigureFunction(conf))
 	if err != nil {
 		log.Println(err)
 	}

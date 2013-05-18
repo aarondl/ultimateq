@@ -2,6 +2,7 @@ package bot
 
 import (
 	"code.google.com/p/gomock/gomock"
+	"github.com/aarondl/ultimateq/config"
 	mocks "github.com/aarondl/ultimateq/inet/test"
 	"github.com/aarondl/ultimateq/irc"
 	"io"
@@ -57,6 +58,12 @@ func (s *s) TestCreateBot(c *C) {
 	c.Assert(err, IsNil)
 	_, err = CreateBot(Configure())
 	c.Assert(err, Equals, errInvalidConfig)
+	_, err = CreateBot(ConfigureFunction(
+		func(conf *config.Config) *config.Config {
+			return fakeConfig
+		}),
+	)
+	c.Assert(err, IsNil)
 }
 
 func (s *s) TestBot_StartShutdown(c *C) {
