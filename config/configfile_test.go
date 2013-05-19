@@ -2,6 +2,7 @@ package config
 
 import (
 	"bytes"
+	"io"
 	. "launchpad.net/gocheck"
 )
 
@@ -18,6 +19,14 @@ servers:
     irc.gamesurge.net:
         port: 3333
 `
+
+type dyingReader struct {
+}
+
+func (d *dyingReader) Read(b []byte) (n int, err error) {
+	err = io.ErrUnexpectedEOF
+	return
+}
 
 func (s *s) TestConfig_FromFile(c *C) {
 	buf := bytes.NewBufferString(conf)
@@ -43,8 +52,13 @@ func (s *s) TestConfig_FromFile(c *C) {
 }
 
 func (s *s) TestConfig_FromFileError(c *C) {
+	conf := CreateConfigFromReader(&dyingReader{})
+	c.Assert(len(conf.Errors), Equals, 1)
+	c.Assert(conf.Errors[0].Error(), Matches,
+		errMsgInvalidConfigFile[:len(errMsgInvalidConfigFile)-4]+`.*`)
+
 	buf := bytes.NewBufferString("defaults:\n\tport: 5555")
-	conf := CreateConfigFromReader(buf)
+	conf = CreateConfigFromReader(buf)
 	c.Assert(len(conf.Errors), Equals, 1)
 	c.Assert(conf.Errors[0].Error(), Matches,
 		errMsgInvalidConfigFile[:len(errMsgInvalidConfigFile)-4]+`.*`)
