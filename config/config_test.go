@@ -29,7 +29,7 @@ func setLogger() {
 func (s *s) TestConfig(c *C) {
 	config := CreateConfig()
 	c.Assert(config.Servers, NotNil)
-	c.Assert(config.Defaults, NotNil)
+	c.Assert(config.Global, NotNil)
 }
 
 func (s *s) TestConfig_Fallbacks(c *C) {
@@ -40,7 +40,7 @@ func (s *s) TestConfig_Fallbacks(c *C) {
 		"a", "b", "c", "d", "e", "f"
 	chans := []string{"#chan1", "#chan2"}
 
-	config.Defaults = &Server{
+	config.Global = &Server{
 		parent, name, host,
 		port, ssl, true, verifyCert, true,
 		nick, altnick, username, userhost, realname, prefix, chans,
@@ -66,17 +66,17 @@ func (s *s) TestConfig_Fallbacks(c *C) {
 	c.Assert(server.GetHost(), Equals, host)
 	c.Assert(server.GetName(), Equals, name)
 	c.Assert(server.GetPort(), Equals, port)
-	c.Assert(server.GetSsl(), Equals, config.Defaults.Ssl)
-	c.Assert(server.GetVerifyCert(), Equals, config.Defaults.VerifyCert)
-	c.Assert(server.GetNick(), Equals, config.Defaults.Nick)
-	c.Assert(server.GetAltnick(), Equals, config.Defaults.Altnick)
-	c.Assert(server.GetUsername(), Equals, config.Defaults.Username)
-	c.Assert(server.GetUserhost(), Equals, config.Defaults.Userhost)
-	c.Assert(server.GetRealname(), Equals, config.Defaults.Realname)
-	c.Assert(server.GetPrefix(), Equals, config.Defaults.Prefix)
-	c.Assert(len(server.GetChannels()), Equals, len(config.Defaults.Channels))
+	c.Assert(server.GetSsl(), Equals, config.Global.Ssl)
+	c.Assert(server.GetVerifyCert(), Equals, config.Global.VerifyCert)
+	c.Assert(server.GetNick(), Equals, config.Global.Nick)
+	c.Assert(server.GetAltnick(), Equals, config.Global.Altnick)
+	c.Assert(server.GetUsername(), Equals, config.Global.Username)
+	c.Assert(server.GetUserhost(), Equals, config.Global.Userhost)
+	c.Assert(server.GetRealname(), Equals, config.Global.Realname)
+	c.Assert(server.GetPrefix(), Equals, config.Global.Prefix)
+	c.Assert(len(server.GetChannels()), Equals, len(config.Global.Channels))
 	for i, v := range server.GetChannels() {
-		c.Assert(v, Equals, config.Defaults.Channels[i])
+		c.Assert(v, Equals, config.Global.Channels[i])
 	}
 
 	//Check default bools more throughly
@@ -87,15 +87,15 @@ func (s *s) TestConfig_Fallbacks(c *C) {
 
 	server.IsSslSet = false
 	server.IsVerifyCertSet = false
-	config.Defaults.Ssl = false
-	config.Defaults.VerifyCert = false
+	config.Global.Ssl = false
+	config.Global.VerifyCert = false
 	c.Assert(server.GetSsl(), Equals, false)
 	c.Assert(server.GetVerifyCert(), Equals, false)
 
 	//Check default values more thoroughly
-	config.Defaults.Port = 0
+	config.Global.Port = 0
 	c.Assert(server.GetPort(), Equals, uint16(ircDefaultPort))
-	config.Defaults.Prefix = ""
+	config.Global.Prefix = ""
 	c.Assert(server.GetPrefix(), Equals, ".")
 }
 
@@ -185,7 +185,7 @@ func (s *s) TestConfig_Validation(c *C) {
 		Server("").
 		Port(srv1.Port)
 	c.Assert(len(conf.Servers), Equals, 0)
-	c.Assert(conf.Defaults.Port, Equals, uint16(srv1.Port))
+	c.Assert(conf.Global.Port, Equals, uint16(srv1.Port))
 	c.Assert(conf.IsValid(), Equals, false)
 	c.Assert(len(conf.Errors), Equals, 2)
 
@@ -225,15 +225,6 @@ func (s *s) TestConfig_Validation(c *C) {
 		Realname(`@ !`)             // no special chars
 	c.Assert(conf.IsValid(), Equals, false)
 	c.Assert(len(conf.Errors), Equals, 5)
-
-	conf = CreateConfig().
-		Nick(srv1.Nick).
-		Channels(`#chan`). // error, default channels
-		Realname(srv1.Realname).
-		Userhost(srv1.Userhost).
-		Server(srv1.Host)
-	c.Assert(conf.IsValid(), Equals, false)
-	c.Assert(len(conf.Errors), Equals, 1) // default chan
 
 	conf = CreateConfig().
 		Server(srv1.Host).

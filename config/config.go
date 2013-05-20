@@ -26,7 +26,6 @@ const (
 	fmtErrMissing         = "config(%v): Requires %v, but nothing was given."
 	errMsgServersRequired = "config: At least one server is required."
 	errMsgDuplicateServer = "config: Server names must be unique, use .Host()"
-	errMsgDefaultChannels = "config: Channels may not be set at a global level"
 
 	// The following is for mapping config setting names to strings
 	errHost     = "host"
@@ -84,18 +83,18 @@ var (
 // Config holds all the information related to the bot including global settings
 // default settings, and server specific settings.
 type Config struct {
-	Servers  map[string]*Server
-	Defaults *Server
-	context  *Server
-	Errors   []error "-"
+	Servers map[string]*Server
+	Global  *Server
+	context *Server
+	Errors  []error "-"
 }
 
 // CreateConfig initializes a Config object.
 func CreateConfig() *Config {
 	return &Config{
-		Defaults: &Server{},
-		Servers:  make(map[string]*Server, nAssumedServers),
-		Errors:   make([]error, 0),
+		Global:  &Server{},
+		Servers: make(map[string]*Server, nAssumedServers),
+		Errors:  make([]error, 0),
 	}
 }
 
@@ -114,10 +113,6 @@ func (c *Config) addError(format string, args ...interface{}) {
 func (c *Config) IsValid() bool {
 	if len(c.Servers) == 0 {
 		c.addError(errMsgServersRequired)
-		return false
-	}
-	if len(c.Defaults.Channels) > 0 {
-		c.addError(errMsgDefaultChannels)
 		return false
 	}
 
@@ -171,12 +166,12 @@ func (c *Config) DisplayErrors() {
 }
 
 // Gets the current configuration context, if no context has been set, returns
-// the default instance.
+// the global instance.
 func (c *Config) GetContext() *Server {
 	if c.context != nil {
 		return c.context
 	}
-	return c.Defaults
+	return c.Global
 }
 
 // Server fluently creates a server object and sets the context on the Config to
@@ -276,7 +271,7 @@ func (c *Config) Channels(channels ...string) *Config {
 // ServerConfig stores the all the details necessary to connect to an irc server
 // Although all of these are exported so they can be deserialized into a yaml
 // file, they are not for direct reading and the helper methods should ALWAYS
-// be used to preserve correct default-value resolution.
+// be used to preserve correct global-value resolution.
 type Server struct {
 	parent *Config
 
@@ -314,115 +309,115 @@ func (s *Server) GetName() string {
 }
 
 // GetPort returns port of the irc config, if it hasn't been set, returns the
-// value of the default, if that hasn't been set returns ircDefaultPort.
+// value of the global, if that hasn't been set returns ircDefaultPort.
 func (s *Server) GetPort() uint16 {
 	if s.Port != 0 {
 		return s.Port
-	} else if s.parent != nil && s.parent.Defaults != nil &&
-		s.parent.Defaults.Port != 0 {
+	} else if s.parent != nil && s.parent.Global != nil &&
+		s.parent.Global.Port != 0 {
 
-		return s.parent.Defaults.Port
+		return s.parent.Global.Port
 	}
 	return ircDefaultPort
 }
 
 // GetSsl returns ssl of the irc config, if it hasn't been set, returns the
-// value of the default, if that hasn't been set returns false.
+// value of the global, if that hasn't been set returns false.
 func (s *Server) GetSsl() bool {
 	if s.IsSslSet {
 		return s.Ssl
-	} else if s.parent != nil && s.parent.Defaults != nil {
-		return s.parent.Defaults.IsSslSet && s.parent.Defaults.Ssl
+	} else if s.parent != nil && s.parent.Global != nil {
+		return s.parent.Global.IsSslSet && s.parent.Global.Ssl
 	}
 	return false
 }
 
 // GetSsl returns verifyCert of the irc config, if it hasn't been set, returns
-// the value of the default, if that hasn't been set returns false.
+// the value of the global, if that hasn't been set returns false.
 func (s *Server) GetVerifyCert() bool {
 	if s.IsVerifyCertSet {
 		return s.VerifyCert
-	} else if s.parent != nil && s.parent.Defaults != nil {
-		return s.parent.Defaults.IsVerifyCertSet && s.parent.Defaults.VerifyCert
+	} else if s.parent != nil && s.parent.Global != nil {
+		return s.parent.Global.IsVerifyCertSet && s.parent.Global.VerifyCert
 	}
 	return false
 }
 
 // GetNick returns the nickname of the irc config, if it's empty, it returns the
-// value of the default configuration.
+// value of the global configuration.
 func (s *Server) GetNick() string {
 	if len(s.Nick) == 0 &&
-		s.parent != nil && s.parent.Defaults != nil {
+		s.parent != nil && s.parent.Global != nil {
 
-		return s.parent.Defaults.Nick
+		return s.parent.Global.Nick
 	}
 	return s.Nick
 }
 
 // GetAltnick returns the altnick of the irc config, if it's empty, it returns
-// the value of the default configuration.
+// the value of the global configuration.
 func (s *Server) GetAltnick() string {
 	if len(s.Altnick) == 0 &&
-		s.parent != nil && s.parent.Defaults != nil {
+		s.parent != nil && s.parent.Global != nil {
 
-		return s.parent.Defaults.Altnick
+		return s.parent.Global.Altnick
 	}
 	return s.Altnick
 }
 
 // GetUsername returns the username of the irc config, if it's empty, it returns
-// the value of the default configuration.
+// the value of the global configuration.
 func (s *Server) GetUsername() string {
 	if len(s.Username) == 0 &&
-		s.parent != nil && s.parent.Defaults != nil {
+		s.parent != nil && s.parent.Global != nil {
 
-		return s.parent.Defaults.Username
+		return s.parent.Global.Username
 	}
 	return s.Username
 }
 
 // GetUserhost returns the userhost of the irc config, if it's empty, it returns
-// the value of the default configuration.
+// the value of the global configuration.
 func (s *Server) GetUserhost() string {
 	if len(s.Userhost) == 0 &&
-		s.parent != nil && s.parent.Defaults != nil {
+		s.parent != nil && s.parent.Global != nil {
 
-		return s.parent.Defaults.Userhost
+		return s.parent.Global.Userhost
 	}
 	return s.Userhost
 }
 
 // GetRealname returns the realname of the irc config, if it's empty, it returns
-// the value of the default configuration.
+// the value of the global configuration.
 func (s *Server) GetRealname() string {
 	if len(s.Realname) == 0 &&
-		s.parent != nil && s.parent.Defaults != nil {
+		s.parent != nil && s.parent.Global != nil {
 
-		return s.parent.Defaults.Realname
+		return s.parent.Global.Realname
 	}
 	return s.Realname
 }
 
 // GetPrefix returns the prefix of the irc config, if it's empty, it returns
-// the value of the default configuration.
+// the value of the global configuration.
 func (s *Server) GetPrefix() string {
 	if len(s.Prefix) > 0 {
 		return s.Prefix
-	} else if s.parent != nil && s.parent.Defaults != nil &&
-		len(s.parent.Defaults.Prefix) > 0 {
+	} else if s.parent != nil && s.parent.Global != nil &&
+		len(s.parent.Global.Prefix) > 0 {
 
-		return s.parent.Defaults.Prefix
+		return s.parent.Global.Prefix
 	}
 	return defaultPrefix
 }
 
 // GetChannels returns the channels of the irc config, if it's empty, it returns
-// the value of the default configuration.
+// the value of the global configuration.
 func (s *Server) GetChannels() []string {
 	if len(s.Channels) == 0 &&
-		s.parent != nil && s.parent.Defaults != nil {
+		s.parent != nil && s.parent.Global != nil {
 
-		return s.parent.Defaults.Channels
+		return s.parent.Global.Channels
 	}
 	return s.Channels
 }

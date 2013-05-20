@@ -6,7 +6,7 @@ import (
 	. "launchpad.net/gocheck"
 )
 
-var conf = `defaults:
+var conf = `global:
     port: 5555
     nick: nick
     username: username
