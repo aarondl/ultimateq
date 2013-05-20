@@ -66,7 +66,7 @@ func (s *s) TestCreateBot(c *C) {
 	c.Assert(err, IsNil)
 }
 
-func (s *s) TestBot_StartShutdown(c *C) {
+func (s *s) TestBot_StartStop(c *C) {
 	mockCtrl := gomock.NewController(c)
 	defer mockCtrl.Finish()
 
@@ -84,8 +84,30 @@ func (s *s) TestBot_StartShutdown(c *C) {
 	ers := b.Connect()
 	c.Assert(len(ers), Equals, 0)
 	b.Start()
-	b.Shutdown()
-	b.WaitForShutdown()
+	b.Stop()
+	b.WaitForHalt()
+}
+
+func (s *s) TestBot_StartStopServer(c *C) {
+	mockCtrl := gomock.NewController(c)
+	defer mockCtrl.Finish()
+
+	conn := mocks.NewMockConn(mockCtrl)
+	conn.EXPECT().Read(gomock.Any()).Return(0, net.ErrWriteToConnected)
+	conn.EXPECT().Close()
+
+	connProvider := func(srv string) (net.Conn, error) {
+		return conn, nil
+	}
+
+	b, err := createBot(fakeConfig, nil, connProvider)
+	b.dispatcher.Unregister(irc.RAW, b.handlerId)
+	c.Assert(err, IsNil)
+	ers := b.Connect()
+	c.Assert(len(ers), Equals, 0)
+	b.StartServer(serverId)
+	b.StopServer(serverId)
+	b.WaitForServer(serverId)
 }
 
 func (s *s) TestBot_Dispatching(c *C) {
@@ -117,7 +139,7 @@ func (s *s) TestBot_Dispatching(c *C) {
 	ers := b.Connect()
 	c.Assert(len(ers), Equals, 0)
 	b.start(false, true)
-	b.WaitForShutdown()
+	b.WaitForHalt()
 	waiter.Wait()
 }
 
@@ -225,5 +247,5 @@ func (s *s) TestServerSender(c *C) {
 	c.Assert(len(ers), Equals, 0)
 	b.start(true, false)
 	srvsender.Writeln(str)
-	b.WaitForShutdown()
+	b.WaitForHalt()
 }

@@ -64,7 +64,7 @@ func testHandlerResponse(c *C, startWriter, startReader bool,
 		after(b, conn, server.conf)
 	}
 
-	b.WaitForShutdown()
+	b.WaitForHalt()
 }
 
 //==============

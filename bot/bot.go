@@ -40,6 +40,8 @@ var (
 	// errFmtReaderClosed is when a write fails due to a closed socket or
 	// a shutdown on the client.
 	errFmtReaderClosed = "bot: %v reader closed\n"
+	// errFmtClosingServer is when a IrcClient.Close returns an error.
+	errFmtClosingServer = "bot: Error closing server (%v)\n"
 )
 
 type (
@@ -122,7 +124,7 @@ func CreateBot(conf *config.Config) (*Bot, error) {
 func (b *Bot) Connect() []error {
 	var ers = make([]error, 0, nAssumedServers)
 	for _, srv := range b.servers {
-		err := srv.createIrcClient()
+		err := b.connectServer(srv)
 		if err != nil {
 			ers = append(ers, err)
 		}
@@ -134,40 +136,94 @@ func (b *Bot) Connect() []error {
 	return nil
 }
 
+// ConnectServer creates the connection and IrcClient object for the given
+// serverId.
+func (b *Bot) ConnectServer(serverId string) error {
+	if srv, ok := b.servers[serverId]; ok {
+		return b.connectServer(srv)
+	}
+	return nil
+}
+
+// connectServer creates the connection and IrcClient object for the given
+// server.
+func (b *Bot) connectServer(srv *Server) error {
+	return srv.createIrcClient()
+}
+
 // Start begins message pumps on all defined and connected servers.
 func (b *Bot) Start() {
 	b.start(true, true)
+}
+
+// StartServer begins message pumps on a server by id.
+func (b *Bot) StartServer(serverId string) {
+	if srv, ok := b.servers[serverId]; ok {
+		b.startServer(srv, true, true)
+	}
 }
 
 // start begins the called for routines on all servers
 func (b *Bot) start(writing, reading bool) {
 	b.msgDispatchers = sync.WaitGroup{}
 	for _, srv := range b.servers {
-		if srv.client != nil {
-			srv.client.SpawnWorkers(writing, reading)
+		b.startServer(srv, writing, reading)
+	}
+}
 
-			b.dispatchMessage(srv, &irc.IrcMessage{Name: irc.CONNECT})
+// startServer begins the called for routines on the specific server
+func (b *Bot) startServer(srv *Server, writing, reading bool) {
+	if srv.client != nil {
+		srv.client.SpawnWorkers(writing, reading)
 
-			if reading {
-				b.msgDispatchers.Add(1)
-				go b.dispatchMessages(srv)
-			}
+		b.dispatchMessage(srv, &irc.IrcMessage{Name: irc.CONNECT})
+
+		if reading {
+			b.msgDispatchers.Add(1)
+			go b.dispatchMessages(srv)
 		}
 	}
 }
 
-// Shutdown closes all connections to the servers
-func (b *Bot) Shutdown() {
+// Stop closes all connections to the servers
+func (b *Bot) Stop() {
 	for _, srv := range b.servers {
-		srv.client.Close()
+		b.stopServer(srv)
 	}
 }
 
-// WaitForShutdown waits on someone else to call shutdown.
-func (b *Bot) WaitForShutdown() {
+// StopServer stops the given server by id.
+func (b *Bot) StopServer(serverId string) {
+	if srv, ok := b.servers[serverId]; ok {
+		b.stopServer(srv)
+	}
+}
+
+// stopServer stops the given server.
+func (b *Bot) stopServer(srv *Server) {
+	err := srv.client.Close()
+	if err != nil {
+		log.Printf(errFmtClosingServer, err)
+	}
+}
+
+// WaitForServer waits on someone else to halt a server by id.
+func (b *Bot) WaitForServer(serverId string) {
+	if srv, ok := b.servers[serverId]; ok {
+		b.waitForServer(srv)
+	}
+}
+
+// WaitForServer waits on someone else to halt a server by id.
+func (b *Bot) waitForServer(srv *Server) {
+	srv.client.Wait()
+	srv.dispatcher.WaitForCompletion()
+}
+
+// WaitForHalt waits on someone else to call shutdown.
+func (b *Bot) WaitForHalt() {
 	for _, srv := range b.servers {
-		srv.client.Wait()
-		srv.dispatcher.WaitForCompletion()
+		b.waitForServer(srv)
 	}
 	b.msgDispatchers.Wait()
 	b.dispatcher.WaitForCompletion()
