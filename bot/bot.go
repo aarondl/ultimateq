@@ -248,7 +248,7 @@ func createBot(conf *config.Config,
 	}
 
 	var err error
-	if err = b.createDispatcher(); err != nil {
+	if err = b.createDispatcher(conf.Global.GetChannels()); err != nil {
 		return nil, err
 	}
 
@@ -284,9 +284,9 @@ func (b *Bot) createServer(conf *config.Server) (*Server, error) {
 }
 
 // createDispatcher uses the bot's current ProtoCaps to create a dispatcher.
-func (b *Bot) createDispatcher() error {
+func (b *Bot) createDispatcher(channels []string) error {
 	var err error
-	b.dispatcher, err = dispatch.CreateRichDispatcher(b.caps, nil)
+	b.dispatcher, err = dispatch.CreateRichDispatcher(b.caps, channels)
 	if err != nil {
 		return err
 	}
