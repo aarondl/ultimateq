@@ -13,6 +13,7 @@ import (
 type MockConn struct {
 	ctrl     *gomock.Controller
 	recorder *_MockConnRecorder
+	Writechan chan []byte
 }
 
 // Recorder for MockConn (not exported)
@@ -108,6 +109,9 @@ func (_mr *_MockConnRecorder) SetWriteDeadline(arg0 interface{}) *gomock.Call {
 
 func (_m *MockConn) Write(_param0 []byte) (int, error) {
 	ret := _m.ctrl.Call(_m, "Write", _param0)
+	if _m.Writechan != nil {
+		_m.Writechan <- _param0
+	}
 	ret0, _ := ret[0].(int)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1

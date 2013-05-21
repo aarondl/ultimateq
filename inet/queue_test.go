@@ -10,7 +10,6 @@ func (s *s) TestQueue(c *C) {
 	c.Assert(q.length, Equals, 0)
 	c.Assert(q.front, IsNil)
 	c.Assert(q.back, IsNil)
-	c.Assert(q.mutex, NotNil)
 }
 
 func (s *s) TestQueue_Queuing(c *C) {
@@ -19,19 +18,13 @@ func (s *s) TestQueue_Queuing(c *C) {
 
 	q := Queue{}
 
-	q.Enqueue()
-	c.Assert(q.length, Equals, 0)
-	dq := q.Dequeue(1)
-	c.Assert(dq, IsNil)
-
 	q.Enqueue(test1)
-	q.Enqueue(test2, test1)
+	q.Enqueue(test2)
 
-	dq1 := q.Dequeue(1)
-	c.Assert(bytes.Compare(test1, dq1[0]), Equals, 0)
-	dq2 := q.Dequeue(20)
-	c.Assert(bytes.Compare(test2, dq2[0]), Equals, 0)
-	c.Assert(bytes.Compare(test1, dq2[1]), Equals, 0)
+	dq1 := q.Dequeue()
+	c.Assert(bytes.Compare(test1, dq1), Equals, 0)
+	dq2 := q.Dequeue()
+	c.Assert(bytes.Compare(test2, dq2), Equals, 0)
 }
 
 func (s *s) TestQueue_queue(c *C) {
@@ -39,10 +32,11 @@ func (s *s) TestQueue_queue(c *C) {
 	test2 := []byte{4, 5, 6}
 
 	q := Queue{}
-	q.enqueue(&test1)
+	q.Enqueue(nil) // Should be consequenceless test cov
+	q.Enqueue(test1)
 	c.Assert(q.length, Equals, 1)
 	c.Assert(q.front, Equals, q.back)
-	q.enqueue(&test2)
+	q.Enqueue(test2)
 	c.Assert(q.length, Equals, 2)
 	c.Assert(q.front, Not(Equals), q.back)
 
@@ -55,16 +49,16 @@ func (s *s) TestQueue_dequeue(c *C) {
 	test2 := []byte{4, 5, 6}
 
 	q := Queue{}
-	c.Assert(q.dequeue(), IsNil)
+	c.Assert(q.Dequeue(), IsNil)
 
-	q.enqueue(&test1)
-	q.enqueue(&test2)
+	q.Enqueue(test1)
+	q.Enqueue(test2)
 
 	c.Assert(q.front, Not(Equals), q.back)
-	dq1 := *q.dequeue()
+	dq1 := q.Dequeue()
 	c.Assert(bytes.Compare(test1, dq1), Equals, 0)
 	c.Assert(q.front, Equals, q.back)
-	dq2 := *q.dequeue()
+	dq2 := q.Dequeue()
 	c.Assert(bytes.Compare(test2, dq2), Equals, 0)
 	c.Assert(q.front, IsNil)
 	c.Assert(q.back, IsNil)
