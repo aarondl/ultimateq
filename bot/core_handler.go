@@ -28,9 +28,10 @@ func (c *coreHandler) HandleRaw(msg *irc.IrcMessage, sender irc.Sender) {
 		sender.Writeln(irc.PONG + " :" + msg.Args[0])
 
 	case msg.Name == irc.CONNECT:
-		c.protect.RLock()
+		c.protect.Lock()
 		server := c.getServer(sender)
-		c.protect.RUnlock()
+		c.nickvalue = 0
+		c.protect.Unlock()
 		sender.Writeln("NICK :" + server.conf.GetNick())
 		sender.Writeln(fmt.Sprintf(
 			"USER %v 0 * :%v",
@@ -58,7 +59,7 @@ func (c *coreHandler) HandleRaw(msg *irc.IrcMessage, sender irc.Sender) {
 }
 
 // getServer is a helper to look up the server based on sender key.
-func (c *coreHandler) getServer(sender irc.Sender) *Server {
+func (c coreHandler) getServer(sender irc.Sender) *Server {
 	c.bot.serversProtect.RLock()
 	defer c.bot.serversProtect.RUnlock()
 	return c.bot.servers[sender.GetKey()]

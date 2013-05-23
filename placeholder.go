@@ -37,7 +37,8 @@ func conf(c *config.Config) *config.Config {
 	c. // First server
 		Server("irc.gamesurge.net1").
 		Host("localhost").
-		Nick("nobody1")
+		Nick("Aaron").
+		Altnick("nobody1")
 
 	c. // Second Server
 		Server("irc.gamesurge.net2").

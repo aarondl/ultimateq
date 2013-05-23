@@ -80,9 +80,6 @@ type Bot struct {
 	capsProvider CapsProvider
 	connProvider ConnProvider
 
-	handlerId int
-	handler   coreHandler
-
 	msgDispatchers sync.WaitGroup
 	// servers
 	serversProtect sync.RWMutex
@@ -99,6 +96,9 @@ type Server struct {
 	caps       *irc.ProtoCaps
 
 	killdispatch chan int
+
+	handlerId int
+	handler   *coreHandler
 
 	// state, conf, client
 	protect sync.RWMutex
@@ -410,9 +410,6 @@ func createBot(conf *config.Config,
 		return nil, err
 	}
 
-	b.handler = coreHandler{bot: b}
-	b.handlerId = b.dispatcher.Register(irc.RAW, &b.handler)
-
 	for name, srv := range conf.Servers {
 		server, err := b.createServer(srv)
 		if err != nil {
@@ -438,6 +435,9 @@ func (b *Bot) createServer(conf *config.Server) (*Server, error) {
 	if err := s.createDispatcher(conf.GetChannels()); err != nil {
 		return nil, err
 	}
+
+	s.handler = &coreHandler{bot: b}
+	s.handlerId = s.dispatcher.Register(irc.RAW, s.handler)
 
 	return s, nil
 }

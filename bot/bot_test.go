@@ -79,7 +79,8 @@ func (s *s) TestBot_StartStop(c *C) {
 	}
 
 	b, err := createBot(fakeConfig, nil, connProvider)
-	b.dispatcher.Unregister(irc.RAW, b.handlerId)
+	srv := b.servers[serverId]
+	srv.dispatcher.Unregister(irc.RAW, srv.handlerId)
 	c.Assert(err, IsNil)
 	ers := b.Connect()
 	c.Assert(len(ers), Equals, 0)
@@ -104,9 +105,9 @@ func (s *s) TestBot_StartStopServer(c *C) {
 
 	b, err := createBot(fakeConfig, nil, connProvider)
 	c.Assert(err, IsNil)
-	b.dispatcher.Unregister(irc.RAW, b.handlerId)
 
 	srv := b.servers[serverId]
+	srv.dispatcher.Unregister(irc.RAW, srv.handlerId)
 	c.Assert(srv.IsStarted(), Equals, false)
 	c.Assert(srv.IsConnected(), Equals, false)
 
@@ -151,7 +152,8 @@ func (s *s) TestBot_Dispatching(c *C) {
 	waiter := sync.WaitGroup{}
 	waiter.Add(1)
 	b, err := createBot(fakeConfig, nil, connProvider)
-	b.dispatcher.Unregister(irc.RAW, b.handlerId)
+	srv := b.servers[serverId]
+	srv.dispatcher.Unregister(irc.RAW, srv.handlerId)
 
 	b.Register(irc.PRIVMSG, &testHandler{
 		func(m *irc.IrcMessage, send irc.Sender) {
@@ -255,10 +257,9 @@ func (s *s) TestServerSender(c *C) {
 	str := "PRIVMSG user :msg\r\n"
 
 	conn := mocks.NewMockConn(mockCtrl)
+	conn.Writechan = make(chan []byte)
 	gomock.InOrder(
 		conn.EXPECT().Write([]byte(str)).Return(len(str), nil),
-		conn.EXPECT().Write(gomock.Any()).Return(14, nil),
-		conn.EXPECT().Write(gomock.Any()).Return(28, io.EOF),
 		conn.EXPECT().Close(),
 	)
 
@@ -268,12 +269,15 @@ func (s *s) TestServerSender(c *C) {
 
 	b, err := createBot(fakeConfig, nil, connProvider)
 	c.Assert(err, IsNil)
-	srvsender := ServerSender{serverId, b.servers[serverId]}
+	srv := b.servers[serverId]
+	srv.dispatcher.Unregister(irc.RAW, srv.handlerId)
+	srvsender := ServerSender{serverId, srv}
 
 	ers := b.Connect()
 	c.Assert(len(ers), Equals, 0)
 	b.start(true, false)
 	srvsender.Writeln(str)
+	<-conn.Writechan
 	b.WaitForHalt()
 	b.Disconnect()
 }
