@@ -42,7 +42,7 @@ var serverId = "irc.gamesurge.net"
 
 var fakeConfig = Configure().
 	Nick("nobody").
-	Altnick("nobody_").
+	Altnick("nobody1").
 	Username("nobody").
 	Userhost("bitforge.ca").
 	Realname("ultimateq").
@@ -153,7 +153,7 @@ func (s *s) TestBot_Dispatching(c *C) {
 	b, err := createBot(fakeConfig, nil, connProvider)
 	b.dispatcher.Unregister(irc.RAW, b.handlerId)
 
-	b.Register(irc.PRIVMSG, testHandler{
+	b.Register(irc.PRIVMSG, &testHandler{
 		func(m *irc.IrcMessage, send irc.Sender) {
 			waiter.Done()
 		},
@@ -180,8 +180,8 @@ func (s *s) TestBot_Register(c *C) {
 	}
 
 	b, err := createBot(fakeConfig, nil, connProvider)
-	gid := b.Register(irc.PRIVMSG, coreHandler{})
-	id, err := b.RegisterServer(serverId, irc.PRIVMSG, coreHandler{})
+	gid := b.Register(irc.PRIVMSG, &coreHandler{})
+	id, err := b.RegisterServer(serverId, irc.PRIVMSG, &coreHandler{})
 	c.Assert(err, IsNil)
 
 	c.Assert(b.Unregister(irc.PRIVMSG, id), Equals, false)
@@ -192,7 +192,7 @@ func (s *s) TestBot_Register(c *C) {
 	ok, err = b.UnregisterServer(serverId, irc.PRIVMSG, id)
 	c.Assert(ok, Equals, true)
 
-	_, err = b.RegisterServer("", "", coreHandler{})
+	_, err = b.RegisterServer("", "", &coreHandler{})
 	c.Assert(err, Equals, errUnknownServerId)
 	_, err = b.UnregisterServer("", "", 0)
 	c.Assert(err, Equals, errUnknownServerId)

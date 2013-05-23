@@ -90,11 +90,11 @@ func testHandlerResponse(c *C, startWriter, startReader bool,
 		after(b, conn, server.conf, channel)
 	}
 
+	b.WaitForHalt()
 	if startReader {
 		b.Stop()
 	}
 	b.Disconnect()
-	b.WaitForHalt()
 }
 
 //==============
@@ -125,6 +125,41 @@ func (s *s) TestCoreHandler_Connect(c *C) {
 		func(_ *Bot, conn *mocks.MockConn, conf *config.Server, c chan []byte) {
 			<-c
 			<-c
+		},
+	)
+}
+
+func (s *s) TestCoreHandler_Nick(c *C) {
+	testHandlerResponse(c, true, true,
+		func(_ *Bot, conn *mocks.MockConn, conf *config.Server, c chan []byte) {
+			nickstr := "NICK :%v\r\n"
+			nick1 := fmt.Sprintf(nickstr, conf.GetNick())
+			nick2 := fmt.Sprintf(nickstr, conf.GetAltnick())
+			nick3 := fmt.Sprintf(nickstr, conf.GetNick()+"_")
+			nick4 := fmt.Sprintf(nickstr, conf.GetNick()+"__")
+			user := fmt.Sprintf("USER %v 0 * :%v\r\n",
+				conf.GetUsername(), conf.GetRealname())
+			errmsg := fmt.Sprintf("433 :Nick is in use\r\n")
+
+			mocks.ByteFiller = []byte(
+				errmsg + errmsg + errmsg + errmsg,
+			)
+
+			conn.EXPECT().Write([]byte(nick1)).Return(len(nick1), nil)
+			conn.EXPECT().Write([]byte(user)).Return(len(user), nil)
+			conn.EXPECT().Write([]byte(nick2)).Return(len(nick2), nil)
+			conn.EXPECT().Write([]byte(nick3)).Return(len(nick3), nil)
+			conn.EXPECT().Write([]byte(nick4)).Return(len(nick4), io.EOF)
+			gomock.InOrder(
+				conn.EXPECT().Read(gomock.Any()).Return(len(errmsg), nil),
+				conn.EXPECT().Read(gomock.Any()).Return(len(errmsg), nil),
+				conn.EXPECT().Read(gomock.Any()).Return(len(errmsg), io.EOF),
+			)
+		},
+		func(_ *Bot, conn *mocks.MockConn, conf *config.Server, c chan []byte) {
+			for i := 0; i < 5; i++ {
+				<-c
+			}
 		},
 	)
 }

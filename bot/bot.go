@@ -410,8 +410,8 @@ func createBot(conf *config.Config,
 		return nil, err
 	}
 
-	b.handler = coreHandler{b}
-	b.handlerId = b.dispatcher.Register(irc.RAW, b.handler)
+	b.handler = coreHandler{bot: b}
+	b.handlerId = b.dispatcher.Register(irc.RAW, &b.handler)
 
 	for name, srv := range conf.Servers {
 		server, err := b.createServer(srv)
