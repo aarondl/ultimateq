@@ -39,10 +39,12 @@ type (
 // events.
 type Dispatcher struct {
 	events eventTableStore
-	caps   *irc.ProtoCaps
 	finder *irc.ChannelFinder
 	chans  []string
 	waiter sync.WaitGroup
+
+	// Protects all state variables.
+	protect sync.RWMutex
 }
 
 // CreateDispatcher initializes an empty dispatcher ready to register events.
@@ -63,26 +65,53 @@ func CreateRichDispatcher(caps *irc.ProtoCaps,
 	if caps == nil {
 		return nil, errProtoCapsMissing
 	}
-	f, err := irc.CreateChannelFinder(caps.Chantypes)
+
+	d := &Dispatcher{
+		events: make(eventTableStore),
+	}
+
+	err := d.protocaps(caps)
 	if err != nil {
 		return nil, err
 	}
+	d.channels(activeChannels)
 
-	var chans []string = nil
-	length := len(activeChannels)
-	if length > 0 {
-		chans = make([]string, length)
+	return d, nil
+}
+
+// Protocaps sets the protocaps for this dispatcher.
+func (d *Dispatcher) Protocaps(caps *irc.ProtoCaps) (err error) {
+	d.protect.Lock()
+	defer d.protect.Unlock()
+	err = d.protocaps(caps)
+	return
+}
+
+// protocaps sets the protocaps for this dispatcher. Not thread safe.
+func (d *Dispatcher) protocaps(caps *irc.ProtoCaps) (err error) {
+	d.finder, err = irc.CreateChannelFinder(caps.Chantypes)
+	return
+}
+
+// Channels sets the active channels for this dispatcher.
+func (d *Dispatcher) Channels(chans []string) {
+	d.protect.Lock()
+	d.channels(chans)
+	d.protect.Unlock()
+}
+
+// channels sets the active channels for this dispatcher. Not thread
+// safe.
+func (d *Dispatcher) channels(chans []string) {
+	length := len(chans)
+	if length == 0 {
+		d.chans = nil
+	} else {
+		d.chans = make([]string, length)
 		for i := 0; i < length; i++ {
-			chans[i] = strings.ToLower(activeChannels[i])
+			d.chans[i] = strings.ToLower(chans[i])
 		}
 	}
-
-	return &Dispatcher{
-		events: make(eventTableStore),
-		caps:   caps,
-		finder: f,
-		chans:  chans,
-	}, nil
 }
 
 // Register registers an event handler to a particular event. In return a
@@ -91,6 +120,10 @@ func CreateRichDispatcher(caps *irc.ProtoCaps,
 func (d *Dispatcher) Register(event string, handler interface{}) int {
 	event = strings.ToUpper(event)
 	id := rand.Int()
+
+	d.protect.Lock()
+	defer d.protect.Unlock()
+
 	if ev, ok := d.events[event]; !ok {
 		d.events[event] = make(eventTable)
 	} else {
@@ -107,6 +140,10 @@ func (d *Dispatcher) Register(event string, handler interface{}) int {
 // returns true, false if it could not be found.
 func (d *Dispatcher) Unregister(event string, id int) bool {
 	event = strings.ToUpper(event)
+
+	d.protect.Lock()
+	defer d.protect.Unlock()
+
 	if ev, ok := d.events[event]; ok {
 		if _, ok := ev[id]; ok {
 			delete(ev, id)
@@ -121,6 +158,10 @@ func (d *Dispatcher) Unregister(event string, id int) bool {
 // the primary sent event.
 func (d *Dispatcher) Dispatch(msg *irc.IrcMessage, sender irc.Sender) bool {
 	event := strings.ToUpper(msg.Name)
+
+	d.protect.RLock()
+	defer d.protect.RUnlock()
+
 	handled := d.dispatchHelper(event, msg, sender)
 	d.dispatchHelper(irc.RAW, msg, sender)
 
@@ -192,6 +233,8 @@ func (d *Dispatcher) resolveHandler(
 // shouldDispatch checks if we should dispatch this event. Works for user and
 // channel based messages.
 func (d *Dispatcher) shouldDispatch(channel bool, msg *irc.IrcMessage) bool {
+	d.protect.RLock()
+	defer d.protect.RUnlock()
 	return d.finder != nil && channel == d.finder.IsChannel(msg.Args[0]) &&
 		(!channel || d.checkChannels(msg))
 }

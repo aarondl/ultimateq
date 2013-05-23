@@ -468,6 +468,40 @@ func (s *s) TestDispatcher_FilterNoticeChannels(c *C) {
 	c.Assert(uc, IsNil)
 }
 
+func (s *s) TestDispatcher_UpdateChannels(c *C) {
+	d, err := CreateRichDispatcher(&irc.ProtoCaps{Chantypes: "#"}, nil)
+	chans := []string{"#chan1", "#chan2"}
+	c.Assert(err, IsNil)
+	d.Channels(chans)
+	c.Assert(len(d.chans), Equals, len(chans))
+	for i, v := range chans {
+		c.Assert(d.chans[i], Equals, v)
+	}
+	d.Channels([]string{})
+	c.Assert(len(d.chans), Equals, 0)
+	d.Channels(chans)
+	c.Assert(len(d.chans), Equals, len(chans))
+	d.Channels(nil)
+	c.Assert(len(d.chans), Equals, 0)
+}
+
+func (s *s) TestDispatcher_UpdateProtoCaps(c *C) {
+	d, err := CreateRichDispatcher(&irc.ProtoCaps{Chantypes: "#"}, nil)
+	c.Assert(err, IsNil)
+	var should bool
+	should = d.shouldDispatch(true, &irc.IrcMessage{Args: []string{"#chan"}})
+	c.Assert(should, Equals, true)
+	should = d.shouldDispatch(true, &irc.IrcMessage{Args: []string{"&chan"}})
+	c.Assert(should, Equals, false)
+
+	err = d.Protocaps(&irc.ProtoCaps{Chantypes: "&"})
+	c.Assert(err, IsNil)
+	should = d.shouldDispatch(true, &irc.IrcMessage{Args: []string{"#chan"}})
+	c.Assert(should, Equals, false)
+	should = d.shouldDispatch(true, &irc.IrcMessage{Args: []string{"&chan"}})
+	c.Assert(should, Equals, true)
+}
+
 func (s *s) TestDispatcher_shouldDispatch(c *C) {
 	d, err := CreateRichDispatcher(&irc.ProtoCaps{Chantypes: "#"}, nil)
 	c.Assert(err, IsNil)
