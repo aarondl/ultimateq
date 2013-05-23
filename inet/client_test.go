@@ -179,11 +179,13 @@ func (s *s) TestIrcClient_Siphon(c *C) {
 	client := CreateIrcClient(conn, "")
 	client.SpawnWorkers(false, true)
 
-	msg := <-client.siphonchan
+	ch := client.ReadChannel()
+
+	msg := <-ch
 	c.Assert(bytes.Compare(test1[:len(test1)-2], msg), Equals, 0)
-	msg = <-client.siphonchan
+	msg = <-ch
 	c.Assert(bytes.Compare(test2[:len(test2)-2], msg), Equals, 0)
-	_, ok := <-client.siphonchan
+	_, ok := <-ch
 	c.Assert(ok, Equals, false)
 	client.Close()
 

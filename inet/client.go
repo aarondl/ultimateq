@@ -284,6 +284,11 @@ func (c *IrcClient) ReadMessage() ([]byte, bool) {
 	return ret, ok
 }
 
+// Retrieves the channel that's used to read.
+func (c *IrcClient) ReadChannel() <-chan []byte {
+	return c.siphonchan
+}
+
 // Read implements the io.Reader interface, but this method is just here for
 // convenience. It is not efficient and should probably not even be used.
 // Instead use ReadMessage as it it has already allocated a buffer and copied
