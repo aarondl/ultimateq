@@ -11,8 +11,8 @@ import (
 
 // Mock of Conn interface
 type MockConn struct {
-	ctrl     *gomock.Controller
-	recorder *_MockConnRecorder
+	ctrl      *gomock.Controller
+	recorder  *_MockConnRecorder
 	Writechan chan []byte
 }
 

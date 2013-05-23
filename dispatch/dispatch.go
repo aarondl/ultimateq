@@ -157,12 +157,12 @@ func (d *Dispatcher) resolveHandler(
 	switch t := handler.(type) {
 	case PrivmsgHandler, PrivmsgUserHandler, PrivmsgChannelHandler:
 
-		if channelHandler, ok := t.(PrivmsgChannelHandler);
-			ok && d.shouldDispatch(true, msg) {
+		if channelHandler, ok := t.(PrivmsgChannelHandler); ok &&
+			d.shouldDispatch(true, msg) {
 
 			channelHandler.PrivmsgChannel(&irc.Message{msg}, sender)
-		} else if userHandler, ok := t.(PrivmsgUserHandler);
-			ok && d.shouldDispatch(false, msg) {
+		} else if userHandler, ok := t.(PrivmsgUserHandler); ok &&
+			d.shouldDispatch(false, msg) {
 
 			userHandler.PrivmsgUser(&irc.Message{msg}, sender)
 		} else if privmsgHandler, ok := t.(PrivmsgHandler); ok {
@@ -171,12 +171,12 @@ func (d *Dispatcher) resolveHandler(
 
 	case NoticeHandler, NoticeUserHandler, NoticeChannelHandler:
 
-		if channelHandler, ok := t.(NoticeChannelHandler);
-			ok && d.shouldDispatch(true, msg) {
+		if channelHandler, ok := t.(NoticeChannelHandler); ok &&
+			d.shouldDispatch(true, msg) {
 
 			channelHandler.NoticeChannel(&irc.Message{msg}, sender)
-		} else if userHandler, ok := t.(NoticeUserHandler);
-			ok && d.shouldDispatch(false, msg) {
+		} else if userHandler, ok := t.(NoticeUserHandler); ok &&
+			d.shouldDispatch(false, msg) {
 
 			userHandler.NoticeUser(&irc.Message{msg}, sender)
 		} else if noticeHandler, ok := t.(NoticeHandler); ok {
