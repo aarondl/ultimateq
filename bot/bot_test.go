@@ -85,6 +85,7 @@ func (s *s) TestBot_StartStop(c *C) {
 	c.Assert(len(ers), Equals, 0)
 	b.Start()
 	b.Stop()
+	b.Disconnect()
 	b.WaitForHalt()
 }
 
@@ -95,19 +96,41 @@ func (s *s) TestBot_StartStopServer(c *C) {
 	conn := mocks.NewMockConn(mockCtrl)
 	conn.EXPECT().Read(gomock.Any()).Return(0, net.ErrWriteToConnected)
 	conn.EXPECT().Close()
+	conn.EXPECT().Close()
 
 	connProvider := func(srv string) (net.Conn, error) {
 		return conn, nil
 	}
 
 	b, err := createBot(fakeConfig, nil, connProvider)
-	b.dispatcher.Unregister(irc.RAW, b.handlerId)
 	c.Assert(err, IsNil)
-	ers := b.Connect()
-	c.Assert(len(ers), Equals, 0)
+	b.dispatcher.Unregister(irc.RAW, b.handlerId)
+
+	srv := b.servers[serverId]
+	c.Assert(srv.IsStarted(), Equals, false)
+	c.Assert(srv.IsConnected(), Equals, false)
+
+	_, err = b.ConnectServer(serverId)
+	c.Assert(err, IsNil)
+	c.Assert(srv.IsConnected(), Equals, true)
+
+	_, err = b.ConnectServer(serverId)
+	c.Assert(err, NotNil)
+
 	b.StartServer(serverId)
+	c.Assert(srv.IsStarted(), Equals, true)
+
 	b.StopServer(serverId)
-	b.WaitForServer(serverId)
+	c.Assert(srv.IsStarted(), Equals, false)
+
+	b.DisconnectServer(serverId)
+	c.Assert(srv.IsConnected(), Equals, false)
+
+	b.WaitForHalt()
+
+	_, err = b.ConnectServer(serverId)
+	c.Assert(err, IsNil)
+	b.DisconnectServer(serverId)
 }
 
 func (s *s) TestBot_Dispatching(c *C) {
@@ -119,6 +142,7 @@ func (s *s) TestBot_Dispatching(c *C) {
 	conn := mocks.NewMockConn(mockCtrl)
 	mocks.ByteFiller = str
 	conn.EXPECT().Read(gomock.Any()).Return(len(str), io.EOF)
+	conn.EXPECT().Close()
 
 	connProvider := func(srv string) (net.Conn, error) {
 		return conn, nil
@@ -139,8 +163,10 @@ func (s *s) TestBot_Dispatching(c *C) {
 	ers := b.Connect()
 	c.Assert(len(ers), Equals, 0)
 	b.start(false, true)
-	b.WaitForHalt()
 	waiter.Wait()
+	b.Stop()
+	b.WaitForHalt()
+	b.Disconnect()
 }
 
 func (s *s) TestBot_Register(c *C) {
@@ -233,6 +259,7 @@ func (s *s) TestServerSender(c *C) {
 		conn.EXPECT().Write([]byte(str)).Return(len(str), nil),
 		conn.EXPECT().Write(gomock.Any()).Return(14, nil),
 		conn.EXPECT().Write(gomock.Any()).Return(28, io.EOF),
+		conn.EXPECT().Close(),
 	)
 
 	connProvider := func(srv string) (net.Conn, error) {
@@ -248,4 +275,5 @@ func (s *s) TestServerSender(c *C) {
 	b.start(true, false)
 	srvsender.Writeln(str)
 	b.WaitForHalt()
+	b.Disconnect()
 }

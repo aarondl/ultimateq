@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 )
 
 type Handler struct {
@@ -35,12 +36,12 @@ func conf(c *config.Config) *config.Config {
 
 	c. // First server
 		Server("irc.gamesurge.net1").
-		Host("irc.gamesurge.net").
+		Host("localhost").
 		Nick("nobody1")
 
 	c. // Second Server
 		Server("irc.gamesurge.net2").
-		Host("irc.gamesurge.net").
+		Host("localhost").
 		Nick("nobody2")
 
 	return c
@@ -62,5 +63,23 @@ func main() {
 		return
 	}
 	b.Start()
-	b.WaitForShutdown()
+
+	server1 := "irc.gamesurge.net1"
+	<-time.After(30 * time.Second)
+	b.StopServer(server1)
+	b.DisconnectServer(server1)
+	log.Println("Server Disconnected... Waiting 10s")
+	<-time.After(10 * time.Second)
+	log.Println("Reconnecting")
+	_, err = b.ConnectServer(server1)
+	if err != nil {
+		log.Println("Could not connect again:", err)
+	} else {
+		b.StartServer(server1)
+	}
+
+	b.WaitForHalt()
+	b.Stop()
+	b.Disconnect()
+	<-time.After(10 * time.Second)
 }

@@ -20,16 +20,14 @@ func (c coreHandler) HandleRaw(msg *irc.IrcMessage, sender irc.Sender) {
 		sender.Writeln("PONG :" + msg.Args[0])
 
 	case msg.Name == irc.CONNECT:
+		c.bot.serversProtect.RLock()
 		server := c.bot.servers[sender.GetKey()]
+		c.bot.serversProtect.RUnlock()
 		sender.Writeln("NICK :" + server.conf.GetNick())
 		sender.Writeln(fmt.Sprintf(
 			"USER %v 0 * :%v",
 			server.conf.GetUsername(),
 			server.conf.GetRealname(),
 		))
-
-	case msg.Name == irc.DISCONNECT:
-		server := c.bot.servers[sender.GetKey()]
-		server.client.Close()
 	}
 }
