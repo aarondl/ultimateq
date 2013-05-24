@@ -205,7 +205,7 @@ func (s *s) TestcreateBot(c *C) {
 	defer mockCtrl.Finish()
 
 	capsProvider := func() *irc.ProtoCaps {
-		return &irc.ProtoCaps{Chantypes: "#"}
+		return irc.CreateProtoCaps()
 	}
 	connProvider := func(srv string) (net.Conn, error) {
 		return mocks.NewMockConn(mockCtrl), nil
@@ -222,7 +222,9 @@ func (s *s) TestcreateBot(c *C) {
 
 func (s *s) TestBot_Providers(c *C) {
 	capsProv := func() *irc.ProtoCaps {
-		return &irc.ProtoCaps{Chantypes: "H"}
+		p := irc.CreateProtoCaps()
+		p.ParseProtoCaps(&irc.IrcMessage{Args: []string{"CHANTYPES=H"}})
+		return p
 	}
 	connProv := func(s string) (net.Conn, error) {
 		return nil, net.ErrWriteToConnected

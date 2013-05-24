@@ -89,7 +89,7 @@ func (d *Dispatcher) Protocaps(caps *irc.ProtoCaps) (err error) {
 
 // protocaps sets the protocaps for this dispatcher. Not thread safe.
 func (d *Dispatcher) protocaps(caps *irc.ProtoCaps) (err error) {
-	d.finder, err = irc.CreateChannelFinder(caps.Chantypes)
+	d.finder, err = irc.CreateChannelFinder(caps.Chantypes())
 	return
 }
 

@@ -49,7 +49,9 @@ func (s *s) TestDispatcher(c *C) {
 	c.Assert(d.events, NotNil)
 	d, err := CreateRichDispatcher(nil, nil)
 	c.Assert(err, Equals, errProtoCapsMissing)
-	d, err = CreateRichDispatcher(&irc.ProtoCaps{Chantypes: "H"}, nil)
+	p := irc.CreateProtoCaps()
+	p.ParseProtoCaps(&irc.IrcMessage{Args: []string{"CHANTYPES=H"}})
+	d, err = CreateRichDispatcher(p, nil)
 	c.Assert(err, NotNil)
 }
 
@@ -238,7 +240,7 @@ func (s *s) TestDispatcher_Privmsg(c *C) {
 		pc = m
 	}}
 
-	d, err := CreateRichDispatcher(&irc.ProtoCaps{Chantypes: "#"}, nil)
+	d, err := CreateRichDispatcher(irc.CreateProtoCaps(), nil)
 	c.Assert(err, IsNil)
 	d.Register(irc.PRIVMSG, ph)
 	d.Register(irc.PRIVMSG, puh)
@@ -270,7 +272,7 @@ func (s *s) TestDispatcher_PrivmsgMultiple(c *C) {
 		},
 	}
 
-	d, err := CreateRichDispatcher(&irc.ProtoCaps{Chantypes: "#"}, nil)
+	d, err := CreateRichDispatcher(irc.CreateProtoCaps(), nil)
 	c.Assert(err, IsNil)
 	d.Register(irc.PRIVMSG, pall)
 
@@ -323,7 +325,7 @@ func (s *s) TestDispatcher_Notice(c *C) {
 		nc = m
 	}}
 
-	d, err := CreateRichDispatcher(&irc.ProtoCaps{Chantypes: "#"}, nil)
+	d, err := CreateRichDispatcher(irc.CreateProtoCaps(), nil)
 	c.Assert(err, IsNil)
 	d.Register(irc.NOTICE, nh)
 	d.Register(irc.NOTICE, nuh)
@@ -355,7 +357,7 @@ func (s *s) TestDispatcher_NoticeMultiple(c *C) {
 		},
 	}
 
-	d, err := CreateRichDispatcher(&irc.ProtoCaps{Chantypes: "#"}, nil)
+	d, err := CreateRichDispatcher(irc.CreateProtoCaps(), nil)
 	c.Assert(err, IsNil)
 	d.Register(irc.NOTICE, nall)
 
@@ -418,7 +420,7 @@ func (s *s) TestDispatcher_FilterPrivmsgChannels(c *C) {
 	}}
 
 	d, err := CreateRichDispatcher(
-		&irc.ProtoCaps{Chantypes: "#"}, []string{"#CHAN"})
+		irc.CreateProtoCaps(), []string{"#CHAN"})
 	c.Assert(err, IsNil)
 	d.Register(irc.PRIVMSG, ph)
 	d.Register(irc.PRIVMSG, pch)
@@ -451,7 +453,7 @@ func (s *s) TestDispatcher_FilterNoticeChannels(c *C) {
 	}}
 
 	d, err := CreateRichDispatcher(
-		&irc.ProtoCaps{Chantypes: "#"}, []string{"#CHAN"})
+		irc.CreateProtoCaps(), []string{"#CHAN"})
 	c.Assert(err, IsNil)
 	d.Register(irc.NOTICE, uh)
 	d.Register(irc.NOTICE, uch)
@@ -470,7 +472,7 @@ func (s *s) TestDispatcher_FilterNoticeChannels(c *C) {
 
 func (s *s) TestDispatcher_AddRemoveChannels(c *C) {
 	chans := []string{"#chan1", "#chan2", "#chan3"}
-	d, err := CreateRichDispatcher(&irc.ProtoCaps{Chantypes: "#"}, chans)
+	d, err := CreateRichDispatcher(irc.CreateProtoCaps(), chans)
 	c.Assert(err, IsNil)
 
 	c.Assert(len(d.chans), Equals, len(chans))
@@ -505,7 +507,7 @@ func (s *s) TestDispatcher_AddRemoveChannels(c *C) {
 }
 
 func (s *s) TestDispatcher_UpdateChannels(c *C) {
-	d, err := CreateRichDispatcher(&irc.ProtoCaps{Chantypes: "#"}, nil)
+	d, err := CreateRichDispatcher(irc.CreateProtoCaps(), nil)
 	c.Assert(err, IsNil)
 	chans := []string{"#chan1", "#chan2"}
 	d.Channels(chans)
@@ -522,7 +524,9 @@ func (s *s) TestDispatcher_UpdateChannels(c *C) {
 }
 
 func (s *s) TestDispatcher_UpdateProtoCaps(c *C) {
-	d, err := CreateRichDispatcher(&irc.ProtoCaps{Chantypes: "#"}, nil)
+	p := irc.CreateProtoCaps()
+	p.ParseProtoCaps(&irc.IrcMessage{Args: []string{"CHANTYPES=#"}})
+	d, err := CreateRichDispatcher(p, nil)
 	c.Assert(err, IsNil)
 	var should bool
 	should = d.shouldDispatch(true, &irc.IrcMessage{Args: []string{"#chan"}})
@@ -530,7 +534,9 @@ func (s *s) TestDispatcher_UpdateProtoCaps(c *C) {
 	should = d.shouldDispatch(true, &irc.IrcMessage{Args: []string{"&chan"}})
 	c.Assert(should, Equals, false)
 
-	err = d.Protocaps(&irc.ProtoCaps{Chantypes: "&"})
+	p = irc.CreateProtoCaps()
+	p.ParseProtoCaps(&irc.IrcMessage{Args: []string{"CHANTYPES=&"}})
+	err = d.Protocaps(p)
 	c.Assert(err, IsNil)
 	should = d.shouldDispatch(true, &irc.IrcMessage{Args: []string{"#chan"}})
 	c.Assert(should, Equals, false)
@@ -539,7 +545,7 @@ func (s *s) TestDispatcher_UpdateProtoCaps(c *C) {
 }
 
 func (s *s) TestDispatcher_shouldDispatch(c *C) {
-	d, err := CreateRichDispatcher(&irc.ProtoCaps{Chantypes: "#"}, nil)
+	d, err := CreateRichDispatcher(irc.CreateProtoCaps(), nil)
 	c.Assert(err, IsNil)
 
 	var should bool
@@ -556,7 +562,7 @@ func (s *s) TestDispatcher_shouldDispatch(c *C) {
 
 func (s *s) TestDispatcher_filterChannelDispatch(c *C) {
 	d, err := CreateRichDispatcher(
-		&irc.ProtoCaps{Chantypes: "#"}, []string{"#CHAN"})
+		irc.CreateProtoCaps(), []string{"#CHAN"})
 	c.Assert(err, IsNil)
 	c.Assert(d.chans, NotNil)
 

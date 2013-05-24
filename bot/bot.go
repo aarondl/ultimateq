@@ -31,9 +31,6 @@ const (
 )
 
 const (
-	// defaultChanTypes is used to create a barebones ProtoCaps until
-	// the real values can be filled in by the handler.
-	defaultChanTypes = "#&~"
 	// nAssumedServers is how many servers a bot typically connects to.
 	nAssumedServers = 1
 
@@ -400,7 +397,7 @@ func createBot(conf *config.Config,
 	}
 
 	if capsProv == nil {
-		b.caps = &irc.ProtoCaps{Chantypes: defaultChanTypes}
+		b.caps = irc.CreateProtoCaps()
 	} else {
 		b.caps = capsProv()
 	}
