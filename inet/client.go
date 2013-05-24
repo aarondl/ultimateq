@@ -5,6 +5,7 @@ the connection
 package inet
 
 import (
+	"bytes"
 	"io"
 	"log"
 	"math"
@@ -23,6 +24,11 @@ const (
 	resetTicks = 3
 	// defaultTimePerTick is the default scale of the sleeps and timeouts.
 	defaultTimePerTick = time.Second
+)
+
+var (
+	// pong allows replies from pong to write directly without waiting on sleeps
+	pong = []byte("PONG")
 )
 
 // Format strings for errors and logging output
@@ -117,6 +123,7 @@ func (c *IrcClient) calcSleepTime(t time.Time) time.Duration {
 func (c *IrcClient) pump() {
 	var err error
 	var sleeper <-chan time.Time
+	defer close(c.pumpservice)
 
 	for err == nil {
 		select {
@@ -126,7 +133,11 @@ func (c *IrcClient) pump() {
 				break
 			}
 
-			if sleeper == nil {
+			if bytes.HasPrefix(message, pong) {
+				if err = c.writeMessage(message); err != nil {
+					break
+				}
+			} else if sleeper == nil {
 				sleepTime := c.calcSleepTime(time.Now())
 				if sleepTime == 0 {
 					if err = c.writeMessage(message); err != nil {
@@ -151,7 +162,6 @@ func (c *IrcClient) pump() {
 			}
 		case <-c.killpump:
 			log.Printf(fmtErrPumpClosed, c.name, errMsgShutdown)
-			close(c.pumpservice)
 			return
 		}
 	}

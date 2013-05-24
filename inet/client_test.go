@@ -65,14 +65,18 @@ func (s *s) TestIrcClient_Pump(c *C) {
 	mockCtrl := gomock.NewController(c)
 	defer mockCtrl.Finish()
 
-	test1 := []byte("PRIVMSG :arg1 arg2\r\n")
+	test1 := []byte("PONG :arg1 arg2\r\n")
 	test2 := []byte("NOTICE :arg1\r\n")
 	split := 2
 
 	conn := mocks.NewMockConn(mockCtrl)
-	conn.EXPECT().Write(test1).Return(split, nil)
-	conn.EXPECT().Write(test1[split:]).Return(len(test1[split:]), nil)
-	conn.EXPECT().Write(test2).Return(0, io.EOF)
+	gomock.InOrder(
+		conn.EXPECT().Write(test1).Return(split, nil),
+		conn.EXPECT().Write(test1[split:]).Return(len(test1[split:]), nil),
+		conn.EXPECT().Write(test2).Return(0, io.EOF),
+		conn.EXPECT().Write(test1).Return(0, io.EOF),
+	)
+	conn.EXPECT().Close()
 	conn.EXPECT().Close()
 
 	client := CreateIrcClient(conn, "")
@@ -83,6 +87,15 @@ func (s *s) TestIrcClient_Pump(c *C) {
 	ch <- []byte{} //Inconsequential, testcov error handling
 	client.Write(test1)
 	client.Write(test2)
+	client.Close()
+
+	//Shameful test coverage
+	client.isShutdownProtect.Lock()
+	client.isShutdown = false
+	client.isShutdownProtect.Unlock()
+	client.pumpservice = make(chan chan []byte)
+	client.SpawnWorkers(true, false)
+	client.Write(test1)
 	client.Close()
 	c.Assert(client.lastwrite.Equal(fakelast), Equals, false)
 }
