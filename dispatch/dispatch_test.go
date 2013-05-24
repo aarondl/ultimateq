@@ -468,10 +468,46 @@ func (s *s) TestDispatcher_FilterNoticeChannels(c *C) {
 	c.Assert(uc, IsNil)
 }
 
+func (s *s) TestDispatcher_AddRemoveChannels(c *C) {
+	chans := []string{"#chan1", "#chan2", "#chan3"}
+	d, err := CreateRichDispatcher(&irc.ProtoCaps{Chantypes: "#"}, chans)
+	c.Assert(err, IsNil)
+
+	c.Assert(len(d.chans), Equals, len(chans))
+	for i, v := range chans {
+		c.Assert(d.chans[i], Equals, v)
+	}
+
+	d.RemoveChannels(chans...)
+	c.Assert(d.chans, IsNil)
+	d.RemoveChannels(chans...)
+	c.Assert(d.chans, IsNil)
+	d.RemoveChannels()
+	c.Assert(d.chans, IsNil)
+
+	d.Channels(chans)
+	d.RemoveChannels(chans[1:]...)
+	c.Assert(len(d.chans), Equals, len(chans)-2)
+	for i, v := range chans[:1] {
+		c.Assert(d.chans[i], Equals, v)
+	}
+	d.AddChannels(chans[1:]...)
+	c.Assert(len(d.chans), Equals, len(chans))
+	for i, v := range chans {
+		c.Assert(d.chans[i], Equals, v)
+	}
+	d.AddChannels(chans[0])
+	d.AddChannels()
+	c.Assert(len(d.chans), Equals, len(chans))
+	d.RemoveChannels(chans...)
+	d.AddChannels(chans...)
+	c.Assert(len(d.chans), Equals, len(chans))
+}
+
 func (s *s) TestDispatcher_UpdateChannels(c *C) {
 	d, err := CreateRichDispatcher(&irc.ProtoCaps{Chantypes: "#"}, nil)
-	chans := []string{"#chan1", "#chan2"}
 	c.Assert(err, IsNil)
+	chans := []string{"#chan1", "#chan2"}
 	d.Channels(chans)
 	c.Assert(len(d.chans), Equals, len(chans))
 	for i, v := range chans {

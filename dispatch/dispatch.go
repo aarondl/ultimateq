@@ -100,6 +100,64 @@ func (d *Dispatcher) Channels(chans []string) {
 	d.protect.Unlock()
 }
 
+// AddChannels adds channels to the active channels for this dispatcher.
+func (d *Dispatcher) AddChannels(chans ...string) {
+	if 0 == len(chans) {
+		return
+	}
+	d.protect.Lock()
+	defer d.protect.Unlock()
+
+	if d.chans == nil {
+		d.chans = make([]string, 0, len(chans))
+	}
+
+	for i := 0; i < len(chans); i++ {
+		addchan := strings.ToLower(chans[i])
+		found := false
+		for j, length := 0, len(d.chans); j < length; j++ {
+			if d.chans[j] == addchan {
+				found = true
+				break
+			}
+		}
+		if !found {
+			d.chans = append(d.chans, addchan)
+		}
+	}
+}
+
+// RemoveChannels removes channels to the active channels for this dispatcher.
+func (d *Dispatcher) RemoveChannels(chans ...string) {
+	if 0 == len(chans) {
+		return
+	}
+	d.protect.Lock()
+	defer d.protect.Unlock()
+
+	if d.chans == nil || 0 == len(d.chans) {
+		return
+	}
+
+	for i := 0; i < len(chans); i++ {
+		removechan := strings.ToLower(chans[i])
+		for j, length := 0, len(d.chans); j < length; j++ {
+			if d.chans[j] == removechan {
+				if length == 1 {
+					d.chans = nil
+					return
+				}
+				if j < length-1 {
+					d.chans[j], d.chans[length-1] =
+						d.chans[length-1], d.chans[j]
+				}
+				d.chans = d.chans[:length-1]
+				length--
+			}
+		}
+	}
+}
+
 // channels sets the active channels for this dispatcher. Not thread
 // safe.
 func (d *Dispatcher) channels(chans []string) {
