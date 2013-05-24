@@ -8,11 +8,11 @@ import (
 func (s *s) TestProtoCaps(c *C) {
 	p := CreateProtoCaps()
 
-	s1 := `RFC2812 IRCD=ngIRCd CASEMAPPING=ascii PREFIX=(ov)@+ CHANTYPES=#&+ ` +
-		`CHANMODES=beI,k,l,imnOPRstz CHANLIMIT=#&+:20`
+	s1 := `NICK RFC8812 IRCD=gIRCd CASEMAPPING=scii PREFIX=(v)+ ` +
+		`CHANTYPES=#& CHANMODES=eI,k,l,imnOPRstz CHANLIMIT=#&+:10`
 
-	s2 := `CHANNELLEN=50 NICKLEN=9 TOPICLEN=490 AWAYLEN=127 KICKLEN=400 ` +
-		`MODES=5 MAXLIST=beI:50 EXCEPTS=e INVEX=I PENALTY`
+	s2 := `NICK CHANNELLEN=49 NICKLEN=8 TOPICLEN=489 AWAYLEN=126 KICKLEN=399 ` +
+		`MODES=4 MAXLIST=beI:49 EXCEPTS=e INVEX=I PENALTY`
 
 	msg1 := &IrcMessage{
 		Name:   RPL_BOUNCE,
@@ -28,20 +28,21 @@ func (s *s) TestProtoCaps(c *C) {
 	p.ParseProtoCaps(msg1)
 	p.ParseProtoCaps(msg2)
 
-	c.Assert(p.RFC(), Equals, "RFC2812")
-	c.Assert(p.IRCD(), Equals, "ngIRCd")
-	c.Assert(p.Casemapping(), Equals, "ascii")
-	c.Assert(p.Prefix(), Equals, "(ov)@+")
-	c.Assert(p.Chantypes(), Equals, "#&+")
-	c.Assert(p.Chanmodes(), Equals, "beI,k,l,imnOPRstz")
-	c.Assert(p.Chanlimit(), Equals, 20)
-	c.Assert(p.Channellen(), Equals, 50)
-	c.Assert(p.Nicklen(), Equals, 9)
-	c.Assert(p.Topiclen(), Equals, 490)
-	c.Assert(p.Awaylen(), Equals, 127)
-	c.Assert(p.Kicklen(), Equals, 400)
-	c.Assert(p.Modes(), Equals, 5)
+	c.Assert(p.RFC(), Equals, "RFC8812")
+	c.Assert(p.IRCD(), Equals, "gIRCd")
+	c.Assert(p.Casemapping(), Equals, "scii")
+	c.Assert(p.Prefix(), Equals, "(v)+")
+	c.Assert(p.Chantypes(), Equals, "#&")
+	c.Assert(p.Chanmodes(), Equals, "eI,k,l,imnOPRstz")
+	c.Assert(p.Chanlimit(), Equals, 10)
+	c.Assert(p.Channellen(), Equals, 49)
+	c.Assert(p.Nicklen(), Equals, 8)
+	c.Assert(p.Topiclen(), Equals, 489)
+	c.Assert(p.Awaylen(), Equals, 126)
+	c.Assert(p.Kicklen(), Equals, 399)
+	c.Assert(p.Modes(), Equals, 4)
 	c.Assert(p.Extra("EXCEPTS"), Equals, "e")
 	c.Assert(p.Extra("PENALTY"), Equals, "true")
 	c.Assert(p.Extra("INVEX"), Equals, "I")
+	c.Assert(p.Extra("NICK"), Equals, "")
 }

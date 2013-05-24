@@ -50,7 +50,7 @@ func (s *s) TestParse_Ping(c *C) {
 func (s *s) TestParse_ExtraSemicolons(c *C) {
 	sender := ":irc.test.net"
 	name := "005"
-	args := []string {
+	args := []string{
 		"nobody1", "RFC2812", "CHANLIMIT=#&:+20", ":are supported",
 	}
 	raw := strings.Join([]string{sender, name, strings.Join(args, " ")}, " ")

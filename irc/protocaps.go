@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 const (
@@ -71,6 +72,8 @@ type ProtoCaps struct {
 
 	// The other flags sent in.
 	extras map[string]string
+
+	protect sync.RWMutex
 }
 
 // CreateProtoCaps initializes a protocaps struct.
@@ -96,77 +99,108 @@ func CreateProtoCaps() *ProtoCaps {
 
 // RFC gets the rfc from the ProtoCaps.
 func (p *ProtoCaps) RFC() string {
+	p.protect.RLock()
+	defer p.protect.RUnlock()
 	return p.rfc
 }
 
 // IRCD gets the ircd from the ProtoCaps.
 func (p *ProtoCaps) IRCD() string {
+	p.protect.RLock()
+	defer p.protect.RUnlock()
 	return p.ircd
 }
 
 // Casemapping gets the casemapping from the ProtoCaps.
 func (p *ProtoCaps) Casemapping() string {
+	p.protect.RLock()
+	defer p.protect.RUnlock()
 	return p.casemapping
 }
 
 // Prefix gets the prefix from the ProtoCaps.
 func (p *ProtoCaps) Prefix() string {
+	p.protect.RLock()
+	defer p.protect.RUnlock()
 	return p.prefix
 }
 
 // Chantypes gets the chantypes from the ProtoCaps.
 func (p *ProtoCaps) Chantypes() string {
+	p.protect.RLock()
+	defer p.protect.RUnlock()
 	return p.chantypes
 }
 
 // Chanmodes gets the chanmodes from the ProtoCaps.
 func (p *ProtoCaps) Chanmodes() string {
+	p.protect.RLock()
+	defer p.protect.RUnlock()
 	return p.chanmodes
 }
 
 // Chanlimit gets the chanlimit from the ProtoCaps.
 func (p *ProtoCaps) Chanlimit() int {
+	p.protect.RLock()
+	defer p.protect.RUnlock()
 	return p.chanlimit
 }
 
 // Channellen gets the channellen from the ProtoCaps.
 func (p *ProtoCaps) Channellen() int {
+	p.protect.RLock()
+	defer p.protect.RUnlock()
 	return p.channellen
 }
 
 // Nicklen gets the nicklen from the ProtoCaps.
 func (p *ProtoCaps) Nicklen() int {
+	p.protect.RLock()
+	defer p.protect.RUnlock()
 	return p.nicklen
 }
 
 // Topiclen gets the topiclen from the ProtoCaps.
 func (p *ProtoCaps) Topiclen() int {
+	p.protect.RLock()
+	defer p.protect.RUnlock()
 	return p.topiclen
 }
 
 // Awaylen gets the awaylen from the ProtoCaps.
 func (p *ProtoCaps) Awaylen() int {
+	p.protect.RLock()
+	defer p.protect.RUnlock()
 	return p.awaylen
 }
 
 // Kicklen gets the kicklen from the ProtoCaps.
 func (p *ProtoCaps) Kicklen() int {
+	p.protect.RLock()
+	defer p.protect.RUnlock()
 	return p.kicklen
 }
 
 // Modes gets the modes from the ProtoCaps.
 func (p *ProtoCaps) Modes() int {
+	p.protect.RLock()
+	defer p.protect.RUnlock()
 	return p.modes
 }
 
 // Extra gets any non-hardcoded modes from the ProtoCaps.
 func (p *ProtoCaps) Extra(key string) string {
+	p.protect.RLock()
+	defer p.protect.RUnlock()
 	return p.extras[key]
 }
 
 // ParseProtoCaps adds all values in a 005 to the current protocaps object.
 func (p *ProtoCaps) ParseProtoCaps(m *IrcMessage) {
-	for _, arg := range m.Args {
+	p.protect.Lock()
+	defer p.protect.Unlock()
+
+	for _, arg := range m.Args[1:] {
 		if strings.Contains(arg, " ") {
 			continue
 		}

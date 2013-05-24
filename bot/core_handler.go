@@ -23,11 +23,12 @@ type coreHandler struct {
 // HandleRaw implements the dispatch.EventHandler interface so the bot can
 // deal with all irc messages coming in.
 func (c *coreHandler) HandleRaw(msg *irc.IrcMessage, sender irc.Sender) {
-	switch {
-	case msg.Name == irc.PING:
+	switch msg.Name {
+
+	case irc.PING:
 		sender.Writeln(irc.PONG + " :" + msg.Args[0])
 
-	case msg.Name == irc.CONNECT:
+	case irc.CONNECT:
 		c.protect.Lock()
 		server := c.getServer(sender)
 		c.nickvalue = 0
@@ -39,7 +40,7 @@ func (c *coreHandler) HandleRaw(msg *irc.IrcMessage, sender irc.Sender) {
 			server.conf.GetRealname(),
 		))
 
-	case msg.Name == irc.ERR_NICKNAMEINUSE:
+	case irc.ERR_NICKNAMEINUSE:
 		c.protect.Lock()
 		server := c.getServer(sender)
 		var nick string
@@ -55,6 +56,14 @@ func (c *coreHandler) HandleRaw(msg *irc.IrcMessage, sender irc.Sender) {
 		}
 		c.protect.Unlock()
 		sender.Writeln("NICK :" + nick)
+
+	case irc.RPL_BOUNCE:
+		c.protect.Lock()
+		server := c.getServer(sender)
+		c.protect.Unlock()
+		server.caps.ParseProtoCaps(msg)
+		server.dispatcher.Protocaps(server.caps)
+
 	}
 }
 

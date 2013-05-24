@@ -50,7 +50,7 @@ func (s *s) TestDispatcher(c *C) {
 	d, err := CreateRichDispatcher(nil, nil)
 	c.Assert(err, Equals, errProtoCapsMissing)
 	p := irc.CreateProtoCaps()
-	p.ParseProtoCaps(&irc.IrcMessage{Args: []string{"CHANTYPES=H"}})
+	p.ParseProtoCaps(&irc.IrcMessage{Args: []string{"nick", "CHANTYPES=H"}})
 	d, err = CreateRichDispatcher(p, nil)
 	c.Assert(err, NotNil)
 }
@@ -525,7 +525,7 @@ func (s *s) TestDispatcher_UpdateChannels(c *C) {
 
 func (s *s) TestDispatcher_UpdateProtoCaps(c *C) {
 	p := irc.CreateProtoCaps()
-	p.ParseProtoCaps(&irc.IrcMessage{Args: []string{"CHANTYPES=#"}})
+	p.ParseProtoCaps(&irc.IrcMessage{Args: []string{"nick", "CHANTYPES=#"}})
 	d, err := CreateRichDispatcher(p, nil)
 	c.Assert(err, IsNil)
 	var should bool
@@ -535,7 +535,7 @@ func (s *s) TestDispatcher_UpdateProtoCaps(c *C) {
 	c.Assert(should, Equals, false)
 
 	p = irc.CreateProtoCaps()
-	p.ParseProtoCaps(&irc.IrcMessage{Args: []string{"CHANTYPES=&"}})
+	p.ParseProtoCaps(&irc.IrcMessage{Args: []string{"nick", "CHANTYPES=&"}})
 	err = d.Protocaps(p)
 	c.Assert(err, IsNil)
 	should = d.shouldDispatch(true, &irc.IrcMessage{Args: []string{"#chan"}})

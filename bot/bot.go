@@ -97,7 +97,7 @@ type Server struct {
 	handlerId int
 	handler   *coreHandler
 
-	// state, conf, client
+	// protects client reading/writing
 	protect sync.RWMutex
 }
 

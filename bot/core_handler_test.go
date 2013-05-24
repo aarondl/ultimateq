@@ -24,7 +24,7 @@ func resetTestWritten() {
 }
 
 func (t testSender) GetKey() string {
-	return ""
+	return serverId
 }
 
 func (t testSender) Writeln(str string) error {
@@ -162,4 +162,25 @@ func (s *s) TestCoreHandler_Nick(c *C) {
 			}
 		},
 	)
+}
+
+func (s *s) TestCoreHandler_005(c *C) {
+	mockCtrl := gomock.NewController(c)
+	defer mockCtrl.Finish()
+
+	conn := mocks.NewMockConn(mockCtrl)
+	connProvider := func(srv string) (net.Conn, error) {
+		return conn, nil
+	}
+
+	b, err := createBot(fakeConfig, nil, connProvider)
+	c.Assert(err, IsNil)
+
+	msg := &irc.IrcMessage{
+		Name: "005",
+		Args: []string{"RFC8213", "CHANTYPES=&$"},
+	}
+	srv := b.servers[serverId]
+	srv.handler.HandleRaw(msg, testSender{})
+	c.Assert(srv.caps.Chantypes(), Equals, "&$")
 }
