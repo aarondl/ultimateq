@@ -67,8 +67,13 @@ func (c *coreHandler) HandleRaw(msg *irc.IrcMessage, sender irc.Sender) {
 	}
 }
 
-// getServer is a helper to look up the server based on sender key.
+// getServer is a helper to look up the server based on sender.
 func (c coreHandler) getServer(sender irc.Sender) *Server {
+	s, ok := sender.(ServerSender)
+	if ok {
+		return s.server
+	}
+
 	c.bot.serversProtect.RLock()
 	defer c.bot.serversProtect.RUnlock()
 	return c.bot.servers[sender.GetKey()]
