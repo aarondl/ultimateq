@@ -17,7 +17,7 @@ const (
 var (
 	// ircRegex is used to parse the parts of irc protocol.
 	ircRegex = regexp.MustCompile(
-		`^(?::(\S+) )?([A-Z0-9]+)((?: (?:[^:\s]+))*)(?: :(.*))?$`)
+		`^(?::(\S+) )?([A-Z0-9]+)((?: (?:[^:\s][^\s]*))*)(?: :(.*))?$`)
 )
 
 // ParseError is generated when something does not match the regex, irc.Parse

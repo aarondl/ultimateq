@@ -47,6 +47,23 @@ func (s *s) TestParse_Ping(c *C) {
 	c.Assert(msg.Args[0], Equals, test2[1:])
 }
 
+func (s *s) TestParse_ExtraSemicolons(c *C) {
+	sender := ":irc.test.net"
+	name := "005"
+	args := []string {
+		"nobody1", "RFC2812", "CHANLIMIT=#&:+20", ":are supported",
+	}
+	raw := strings.Join([]string{sender, name, strings.Join(args, " ")}, " ")
+	msg, err := Parse(raw)
+	c.Assert(err, IsNil)
+	c.Assert(msg.Name, Equals, name)
+	c.Assert(msg.Sender, Equals, sender[1:])
+	c.Assert(msg.Args[0], Equals, args[0])
+	c.Assert(msg.Args[1], Equals, args[1])
+	c.Assert(msg.Args[2], Equals, args[2])
+	c.Assert(msg.Args[3], Equals, args[3][1:])
+}
+
 func (s *s) TestParse_Error(c *C) {
 	_, err := Parse("")
 	c.Assert(err.Error(), Equals, errMsgParseFailure)
