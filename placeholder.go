@@ -32,13 +32,15 @@ func conf(c *config.Config) *config.Config {
 		Altnick("nobody_").
 		Realname("there").
 		Username("guy").
-		Userhost("friend")
+		Userhost("friend").
+		NoReconnect(true)
 
 	c. // First server
 		Server("irc.gamesurge.net1").
 		Host("localhost").
 		Nick("Aaron").
-		Altnick("nobody1")
+		Altnick("nobody1").
+		ReconnectTimeout(5)
 
 	c. // Second Server
 		Server("irc.gamesurge.net2").
@@ -66,18 +68,8 @@ func main() {
 	b.Start()
 
 	server1 := "irc.gamesurge.net1"
-	<-time.After(30 * time.Second)
-	b.StopServer(server1)
+	<-time.After(5 * time.Second)
 	b.DisconnectServer(server1)
-	log.Println("Server Disconnected... Waiting 10s")
-	<-time.After(10 * time.Second)
-	log.Println("Reconnecting")
-	_, err = b.ConnectServer(server1)
-	if err != nil {
-		log.Println("Could not connect again:", err)
-	} else {
-		b.StartServer(server1)
-	}
 
 	b.WaitForHalt()
 	b.Stop()

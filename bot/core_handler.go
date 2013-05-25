@@ -29,8 +29,8 @@ func (c *coreHandler) HandleRaw(msg *irc.IrcMessage, sender irc.Sender) {
 		sender.Writeln(irc.PONG + " :" + msg.Args[0])
 
 	case irc.CONNECT:
-		c.protect.Lock()
 		server := c.getServer(sender)
+		c.protect.Lock()
 		c.nickvalue = 0
 		c.protect.Unlock()
 		sender.Writeln("NICK :" + server.conf.GetNick())
@@ -41,8 +41,8 @@ func (c *coreHandler) HandleRaw(msg *irc.IrcMessage, sender irc.Sender) {
 		))
 
 	case irc.ERR_NICKNAMEINUSE:
-		c.protect.Lock()
 		server := c.getServer(sender)
+		c.protect.Lock()
 		var nick string
 		if c.nickvalue == 0 && 0 < len(server.conf.GetAltnick()) {
 			nick = server.conf.GetAltnick()
@@ -58,17 +58,14 @@ func (c *coreHandler) HandleRaw(msg *irc.IrcMessage, sender irc.Sender) {
 		sender.Writeln("NICK :" + nick)
 
 	case irc.RPL_BOUNCE:
-		c.protect.Lock()
 		server := c.getServer(sender)
-		c.protect.Unlock()
 		server.caps.ParseProtoCaps(msg)
 		server.dispatcher.Protocaps(server.caps)
-
 	}
 }
 
 // getServer is a helper to look up the server based on sender.
-func (c coreHandler) getServer(sender irc.Sender) *Server {
+func (c *coreHandler) getServer(sender irc.Sender) *Server {
 	s, ok := sender.(ServerSender)
 	if ok {
 		return s.server

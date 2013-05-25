@@ -34,40 +34,26 @@ func (s *s) TestConfig(c *C) {
 
 func (s *s) TestConfig_Fallbacks(c *C) {
 	config := CreateConfig()
-	parent, name, host, ssl, verifyCert := config, "irc", "irc.com", true, true
-	var port uint16 = 10
-	nick, altnick, username, userhost, realname, prefix :=
-		"a", "b", "c", "d", "e", "f"
-	chans := []string{"#chan1", "#chan2"}
 
+	host, name := "irc.gamesurge.net", "gamesurge"
 	config.Global = &Server{
-		parent, name, host,
-		port, ssl, true, verifyCert, true,
-		nick, altnick, username, userhost, realname, prefix, chans,
+		config, "irc", "irc.nuclearfallout.net",
+		5555, true, true, true, true, true, true, 500,
+		"n1", "a1", "u1", "h1", "r1", "p1",
+		[]string{"#chan", "#chan2"},
 	}
 
-	blank := &Server{}
-	c.Assert(blank.Port, Equals, uint16(0))
-	c.Assert(blank.Ssl, Equals, false)
-	c.Assert(blank.IsSslSet, Equals, false)
-	c.Assert(blank.VerifyCert, Equals, false)
-	c.Assert(blank.IsVerifyCertSet, Equals, false)
-	c.Assert(blank.Nick, Equals, "")
-	c.Assert(blank.Altnick, Equals, "")
-	c.Assert(blank.Username, Equals, "")
-	c.Assert(blank.Userhost, Equals, "")
-	c.Assert(blank.Realname, Equals, "")
-	c.Assert(blank.Prefix, Equals, "")
-	c.Assert(blank.Channels, IsNil)
-
-	server := &Server{parent: parent, Name: name, Host: host}
+	server := &Server{parent: config, Name: name, Host: host}
 	config.Servers[name] = server
 
 	c.Assert(server.GetHost(), Equals, host)
 	c.Assert(server.GetName(), Equals, name)
-	c.Assert(server.GetPort(), Equals, port)
+	c.Assert(server.GetPort(), Equals, config.Global.Port)
 	c.Assert(server.GetSsl(), Equals, config.Global.Ssl)
 	c.Assert(server.GetVerifyCert(), Equals, config.Global.VerifyCert)
+	c.Assert(server.GetNoReconnect(), Equals, config.Global.NoReconnect)
+	c.Assert(server.GetReconnectTimeout(), Equals,
+		config.Global.ReconnectTimeout)
 	c.Assert(server.GetNick(), Equals, config.Global.Nick)
 	c.Assert(server.GetAltnick(), Equals, config.Global.Altnick)
 	c.Assert(server.GetUsername(), Equals, config.Global.Username)
@@ -79,35 +65,45 @@ func (s *s) TestConfig_Fallbacks(c *C) {
 		c.Assert(v, Equals, config.Global.Channels[i])
 	}
 
-	//Check default bools more throughly
+	//Check bools more throughly
 	server.IsSslSet = true
 	server.IsVerifyCertSet = true
+	server.IsNoReconnectSet = true
 	c.Assert(server.GetSsl(), Equals, false)
 	c.Assert(server.GetVerifyCert(), Equals, false)
+	c.Assert(server.GetNoReconnect(), Equals, false)
 
 	server.IsSslSet = false
 	server.IsVerifyCertSet = false
+	server.IsNoReconnectSet = false
 	config.Global.Ssl = false
 	config.Global.VerifyCert = false
+	config.Global.NoReconnect = false
 	c.Assert(server.GetSsl(), Equals, false)
 	c.Assert(server.GetVerifyCert(), Equals, false)
+	c.Assert(server.GetNoReconnect(), Equals, false)
 
 	//Check default values more thoroughly
 	config.Global.Port = 0
-	c.Assert(server.GetPort(), Equals, uint16(ircDefaultPort))
+	c.Assert(server.GetPort(), Equals, uint16(defaultIrcPort))
 	config.Global.Prefix = ""
 	c.Assert(server.GetPrefix(), Equals, ".")
+	config.Global.ReconnectTimeout = 0
+	c.Assert(server.GetReconnectTimeout(), Equals,
+		uint(defaultReconnectTimeout))
 }
 
 func (s *s) TestConfig_Fluent(c *C) {
 	srv1 := Server{
 		nil, "irc", "irc.gamesurge.net",
-		5555, true, true, false, true, "n1", "a1", "u1", "h1", "r1", "p1",
+		5555, true, true, false, true, false, true, 10,
+		"n1", "a1", "u1", "h1", "r1", "p1",
 		[]string{"#chan", "#chan2"},
 	}
 	defs := Server{
 		nil, "irc2", "nuclearfallout.gamesurge.net",
-		7777, false, false, true, false, "n2", "a2", "u2", "h2", "r2", "p2",
+		7777, false, false, true, false, false, false, 10,
+		"n2", "a2", "u2", "h2", "r2", "p2",
 		[]string{"#chan2"},
 	}
 	srv2 := "znc.gamesurge.net"
@@ -115,6 +111,7 @@ func (s *s) TestConfig_Fluent(c *C) {
 	conf := CreateConfig().
 		Host(""). // Should not break anything
 		Port(defs.Port).
+		ReconnectTimeout(defs.ReconnectTimeout).
 		Nick(defs.Nick).
 		Altnick(defs.Altnick).
 		Username(defs.Username).
@@ -127,6 +124,8 @@ func (s *s) TestConfig_Fluent(c *C) {
 		Port(srv1.Port).
 		Ssl(srv1.Ssl).
 		VerifyCert(srv1.VerifyCert).
+		NoReconnect(srv1.NoReconnect).
+		ReconnectTimeout(srv1.ReconnectTimeout).
 		Nick(srv1.Nick).
 		Altnick(srv1.Altnick).
 		Username(srv1.Username).
@@ -143,6 +142,8 @@ func (s *s) TestConfig_Fluent(c *C) {
 	c.Assert(server.GetPort(), Equals, srv1.GetPort())
 	c.Assert(server.GetSsl(), Equals, srv1.GetSsl())
 	c.Assert(server.GetVerifyCert(), Equals, srv1.GetVerifyCert())
+	c.Assert(server.GetNoReconnect(), Equals, srv1.GetNoReconnect())
+	c.Assert(server.GetReconnectTimeout(), Equals, srv1.GetReconnectTimeout())
 	c.Assert(server.GetNick(), Equals, srv1.GetNick())
 	c.Assert(server.GetAltnick(), Equals, srv1.GetAltnick())
 	c.Assert(server.GetUsername(), Equals, srv1.GetUsername())
@@ -158,6 +159,8 @@ func (s *s) TestConfig_Fluent(c *C) {
 	c.Assert(server2.GetPort(), Equals, defs.GetPort())
 	c.Assert(server2.GetSsl(), Equals, defs.GetSsl())
 	c.Assert(server2.GetVerifyCert(), Equals, defs.GetVerifyCert())
+	c.Assert(server2.GetNoReconnect(), Equals, defs.GetNoReconnect())
+	c.Assert(server2.GetReconnectTimeout(), Equals, defs.GetReconnectTimeout())
 	c.Assert(server2.GetNick(), Equals, defs.GetNick())
 	c.Assert(server2.GetAltnick(), Equals, defs.GetAltnick())
 	c.Assert(server2.GetUsername(), Equals, defs.GetUsername())
@@ -173,7 +176,8 @@ func (s *s) TestConfig_Fluent(c *C) {
 func (s *s) TestConfig_Validation(c *C) {
 	srv1 := Server{
 		nil, "irc", "irc.gamesurge.net",
-		5555, true, true, false, true, "n1", "a1", "u1", "h1", "r1", "p1",
+		5555, true, true, false, true, false, true, 10,
+		"n1", "a1", "u1", "h1", "r1", "p1",
 		[]string{"#chan", "#chan2"},
 	}
 

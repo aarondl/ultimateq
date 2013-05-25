@@ -16,6 +16,7 @@ import (
 	"net"
 	"strconv"
 	"sync"
+	"time"
 )
 
 // Server States
@@ -23,16 +24,20 @@ const (
 	STATE_NEW          = 0x0
 	STATE_CONNECTED    = 0x1
 	STATE_STARTED      = 0x2
+	STATE_RECONNECTING = 0x4
 	STATE_STOPPED      = ^STATE_STARTED
 	STATE_DISCONNECTED = ^STATE_CONNECTED
 
 	MASK_CONNECTION = STATE_CONNECTED
 	MASK_DISPATCHER = STATE_STARTED
+	MASK_RECONNECT  = STATE_RECONNECTING
 )
 
 const (
 	// nAssumedServers is how many servers a bot typically connects to.
 	nAssumedServers = 1
+	// defaultReconnScale is how the config's ReconnTimeout is scaled.
+	defaultReconnScale = time.Second
 
 	// errFmtParsingIrcMessage is when the bot fails to parse a message
 	// during it's dispatch loop.
@@ -45,6 +50,8 @@ const (
 	// errServerAlreadyConnected occurs if a server has not been shutdown
 	// before another attempt to connect to it is made.
 	errFmtAlreadyConnected = "bot: %v already connected.\n"
+	// fmtDisconnected shows when the bot is disconnected and needs to reconnect
+	fmtDisconnected = "bot: %v disconnected, reconnecting in %v..."
 )
 
 var (
@@ -92,7 +99,10 @@ type Server struct {
 	conf       *config.Server
 	caps       *irc.ProtoCaps
 
+	reconnScale time.Duration
+
 	killdispatch chan int
+	killreconn   chan int
 
 	handlerId int
 	handler   *coreHandler
@@ -284,22 +294,47 @@ func (b *Bot) DisconnectServer(serverId string) (found bool) {
 
 // disconnectServer disconnects the given server.
 func (b *Bot) disconnectServer(srv *Server) {
-	srv.protect.Lock()
-	defer srv.protect.Unlock()
-
+	srv.protect.RLock()
 	if srv.client == nil {
+		srv.protect.RUnlock()
 		return
 	}
 	srv.client.Close()
-	srv.dispatcher.WaitForCompletion()
+	srv.protect.RUnlock()
+
+	srv.protect.Lock()
+	defer srv.protect.Unlock()
 	srv.client = nil
 	srv.setDisconnected(false)
+}
+
+// InterruptReconnect stops reconnecting the given server by id.
+func (b *Bot) InterruptReconnect(serverId string) (found bool) {
+	b.serversProtect.RLock()
+	if srv, ok := b.servers[serverId]; ok {
+		b.interruptReconnect(srv)
+		found = true
+	}
+	b.serversProtect.RUnlock()
+	return
+}
+
+// interruptReconnect stops reconnecting the given server.
+func (b *Bot) interruptReconnect(srv *Server) {
+	if srv.IsReconnecting() {
+		srv.killreconn <- 0
+	}
 }
 
 // WaitForHalt waits for all servers to halt.
 func (b *Bot) WaitForHalt() {
 	b.msgDispatchers.Wait()
 	b.dispatcher.WaitForCompletion()
+	b.serversProtect.RLock()
+	for _, srv := range b.servers {
+		srv.dispatcher.WaitForCompletion()
+	}
+	b.serversProtect.RUnlock()
 }
 
 // Register adds an event handler to the bot's global dispatcher.
@@ -372,8 +407,31 @@ func (b *Bot) dispatchMessages(s *Server) {
 	}
 	s.protect.RUnlock()
 
-	b.msgDispatchers.Done()
-	if disconnect {
+	reconn := disconnect && !s.conf.GetNoReconnect()
+
+	if !reconn {
+		b.msgDispatchers.Done()
+	}
+
+	if reconn {
+		sec := time.Duration(s.conf.GetReconnectTimeout()) * s.reconnScale
+		log.Printf(fmtDisconnected, s.conf.GetName(), sec)
+		s.setStopped(true)
+		b.disconnectServer(s)
+		s.setReconnecting(true)
+		select {
+		case <-time.After(sec):
+			s.setNotReconnecting(true)
+			break
+		case <-s.killreconn:
+			s.setNotReconnecting(true)
+			b.msgDispatchers.Done()
+			return
+		}
+		b.connectServer(s)
+		b.startServer(s, true, true)
+		b.msgDispatchers.Done()
+	} else if disconnect {
 		<-s.killdispatch
 	}
 }
@@ -427,6 +485,8 @@ func (b *Bot) createServer(conf *config.Server) (*Server, error) {
 		caps:         &copyCaps,
 		conf:         conf,
 		killdispatch: make(chan int),
+		killreconn:   make(chan int),
+		reconnScale:  defaultReconnScale,
 	}
 
 	if err := s.createDispatcher(conf.GetChannels()); err != nil {
@@ -541,4 +601,30 @@ func (s *Server) setStopped(lock bool) {
 		defer s.protect.Unlock()
 	}
 	s.state &= STATE_STOPPED
+}
+
+// IsReconnecting checks to see if the dispatcher is running on the server.
+func (s *Server) IsReconnecting() bool {
+	s.protect.RLock()
+	defer s.protect.RUnlock()
+
+	return STATE_RECONNECTING == s.state&MASK_RECONNECT
+}
+
+// setStarted clears the server's started flag.
+func (s *Server) setReconnecting(lock bool) {
+	if lock {
+		s.protect.Lock()
+		defer s.protect.Unlock()
+	}
+	s.state |= STATE_RECONNECTING
+}
+
+// setStopped clears the server's started flag.
+func (s *Server) setNotReconnecting(lock bool) {
+	if lock {
+		s.protect.Lock()
+		defer s.protect.Unlock()
+	}
+	s.state &= ^STATE_RECONNECTING
 }

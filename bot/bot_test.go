@@ -12,6 +12,7 @@ import (
 	"os"
 	"sync"
 	"testing"
+	"time"
 )
 
 func Test(t *testing.T) { TestingT(t) } //Hook into testing package
@@ -46,6 +47,7 @@ var fakeConfig = Configure().
 	Username("nobody").
 	Userhost("bitforge.ca").
 	Realname("ultimateq").
+	NoReconnect(true).
 	Ssl(true).
 	Server(serverId)
 
@@ -132,6 +134,51 @@ func (s *s) TestBot_StartStopServer(c *C) {
 	_, err = b.ConnectServer(serverId)
 	c.Assert(err, IsNil)
 	b.DisconnectServer(serverId)
+}
+
+func (s *s) TestBot_Reconnecting(c *C) {
+	conf := Configure().Nick("nobody").Altnick("nobody1").Username("nobody").
+		Userhost("bitforge.ca").Realname("ultimateq").NoReconnect(false).
+		ReconnectTimeout(1).Ssl(true).Server(serverId)
+
+	mockCtrl := gomock.NewController(c)
+	defer mockCtrl.Finish()
+
+	conn := mocks.NewMockConn(mockCtrl)
+	conn.EXPECT().Read(gomock.Any()).Return(0, io.EOF)
+	conn.EXPECT().Read(gomock.Any()).Return(0, io.EOF)
+	conn.EXPECT().Close()
+	conn.EXPECT().Close()
+
+	connProvider := func(srv string) (net.Conn, error) {
+		return conn, nil
+	}
+
+	b, err := createBot(conf, nil, connProvider)
+	c.Assert(err, IsNil)
+	srv := b.servers[serverId]
+	srv.reconnScale = time.Millisecond
+
+	mu := sync.Mutex{}
+	discs := 0
+
+	handler := testHandler{func(m *irc.IrcMessage, s irc.Sender) {
+		if m.Name == irc.DISCONNECT {
+			mu.Lock()
+			discs++
+			if discs >= 2 {
+				b.InterruptReconnect(serverId)
+				b.disconnectServer(srv)
+			}
+			mu.Unlock()
+		}
+	}}
+
+	srv.dispatcher.Unregister(irc.RAW, srv.handlerId)
+	b.Register(irc.DISCONNECT, handler)
+	b.Connect()
+	b.start(false, true)
+	b.WaitForHalt()
 }
 
 func (s *s) TestBot_Dispatching(c *C) {
@@ -274,6 +321,7 @@ func (s *s) TestServerSender(c *C) {
 	srv := b.servers[serverId]
 	srv.dispatcher.Unregister(irc.RAW, srv.handlerId)
 	srvsender := ServerSender{serverId, srv}
+	c.Assert(srvsender.GetKey(), Equals, serverId)
 
 	ers := b.Connect()
 	c.Assert(len(ers), Equals, 0)
@@ -282,4 +330,37 @@ func (s *s) TestServerSender(c *C) {
 	<-conn.Writechan
 	b.WaitForHalt()
 	b.Disconnect()
+}
+
+func (s *s) TestServer_State(c *C) {
+	srv := &Server{}
+	srv.setStarted(false)
+	c.Assert(srv.IsStarted(), Equals, true)
+	srv.setStopped(false)
+	c.Assert(srv.IsStarted(), Equals, false)
+
+	srv.setStarted(true)
+	c.Assert(srv.IsStarted(), Equals, true)
+	srv.setStopped(true)
+	c.Assert(srv.IsStarted(), Equals, false)
+
+	srv.setConnected(true)
+	c.Assert(srv.IsConnected(), Equals, true)
+	srv.setDisconnected(true)
+	c.Assert(srv.IsConnected(), Equals, false)
+
+	srv.setConnected(true)
+	c.Assert(srv.IsConnected(), Equals, true)
+	srv.setDisconnected(true)
+	c.Assert(srv.IsConnected(), Equals, false)
+
+	srv.setReconnecting(true)
+	c.Assert(srv.IsReconnecting(), Equals, true)
+	srv.setNotReconnecting(true)
+	c.Assert(srv.IsReconnecting(), Equals, false)
+
+	srv.setReconnecting(true)
+	c.Assert(srv.IsReconnecting(), Equals, true)
+	srv.setNotReconnecting(true)
+	c.Assert(srv.IsReconnecting(), Equals, false)
 }

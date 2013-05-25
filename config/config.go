@@ -14,9 +14,11 @@ import (
 const (
 	// nAssumedServers is the typcial number of configured servers for a bot
 	nAssumedServers = 1
-	// ircDefaultPort is IRC Server's default tcp port.
-	ircDefaultPort = 6667
-	// botDefaultPrefix
+	// defaultIrcPort is IRC Server's default tcp port.
+	defaultIrcPort = 6667
+	// defaultReconnectTimeout is how many seconds to wait between reconns.
+	defaultReconnectTimeout = 20
+	// botDefaultPrefix is the command prefix by default
 	defaultPrefix = "."
 	// maxHostSize is the biggest hostname possible
 	maxHostSize = 255
@@ -222,6 +224,20 @@ func (c *Config) VerifyCert(verifyCert bool) *Config {
 	return c
 }
 
+// NoReconnect fluently sets reconnection for the current config context
+func (c *Config) NoReconnect(noreconnect bool) *Config {
+	context := c.GetContext()
+	context.NoReconnect = noreconnect
+	context.IsNoReconnectSet = true
+	return c
+}
+
+// ReconnectTimeout fluently sets the port for the current config context
+func (c *Config) ReconnectTimeout(seconds uint) *Config {
+	c.GetContext().ReconnectTimeout = seconds
+	return c
+}
+
 // Nick fluently sets the nick for the current config context
 func (c *Config) Nick(nick string) *Config {
 	c.GetContext().Nick = nick
@@ -286,6 +302,11 @@ type Server struct {
 	VerifyCert      bool
 	IsVerifyCertSet bool
 
+	// Auto reconnection
+	NoReconnect      bool
+	IsNoReconnectSet bool
+	ReconnectTimeout uint
+
 	// Irc User data
 	Nick     string
 	Altnick  string
@@ -318,7 +339,7 @@ func (s *Server) GetPort() uint16 {
 
 		return s.parent.Global.Port
 	}
-	return ircDefaultPort
+	return defaultIrcPort
 }
 
 // GetSsl returns ssl of the irc config, if it hasn't been set, returns the
@@ -341,6 +362,30 @@ func (s *Server) GetVerifyCert() bool {
 		return s.parent.Global.IsVerifyCertSet && s.parent.Global.VerifyCert
 	}
 	return false
+}
+
+// GetNoReconnect returns verifyCert of the irc config, if it hasn't been
+// set, returns the value of the global, if that hasn't been set returns false.
+func (s *Server) GetNoReconnect() bool {
+	if s.IsNoReconnectSet {
+		return s.NoReconnect
+	} else if s.parent != nil && s.parent.Global != nil {
+		return s.parent.Global.IsNoReconnectSet && s.parent.Global.NoReconnect
+	}
+	return false
+}
+
+// GetPort returns port of the irc config, if it hasn't been set, returns the
+// value of the global, if that hasn't been set returns ircDefaultPort.
+func (s *Server) GetReconnectTimeout() uint {
+	if s.ReconnectTimeout != 0 {
+		return s.ReconnectTimeout
+	} else if s.parent != nil && s.parent.Global != nil &&
+		s.parent.Global.ReconnectTimeout != 0 {
+
+		return s.parent.Global.ReconnectTimeout
+	}
+	return defaultReconnectTimeout
 }
 
 // GetNick returns the nickname of the irc config, if it's empty, it returns the
