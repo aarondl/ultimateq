@@ -56,3 +56,28 @@ func (c *Config) fixReferencesAndNames() {
 		}
 	}
 }
+
+// FlushConfigToFile writes a config out to a writer
+func FlushConfigToFile(conf *Config, filename string) (err error) {
+	var file *os.File
+	file, err = os.Create(filename)
+	if err != nil {
+		return
+	}
+	err = FlushConfigToWriter(conf, file)
+	return
+}
+
+// FlushConfigToWriter writes a config out to a writer
+func FlushConfigToWriter(conf *Config, writer io.Writer) (err error) {
+	marshalled, err := goyaml.Marshal(conf)
+	if err != nil {
+		return
+	}
+	var n, written = 0, 0
+	for err == nil && written < len(marshalled) {
+		n, err = writer.Write(marshalled[written:])
+		written += n
+	}
+	return
+}
