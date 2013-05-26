@@ -45,6 +45,9 @@ var (
 	errUnknownServerId = errors.New("bot: Unknown Server id.")
 	// temporary error until ssl is fixed.
 	errSslNotImplemented = errors.New("bot: Ssl not implemented")
+
+	// A global variable for the bot's previously loaded config.
+	confName string
 )
 
 type (
@@ -58,8 +61,9 @@ type (
 // irc bot. It should be able to carry out most major functions that a bot would
 // need through it's exported functions.
 type Bot struct {
-	conf    *config.Config
 	servers map[string]*Server
+
+	conf *config.Config
 
 	caps       *irc.ProtoCaps
 	dispatcher *dispatch.Dispatcher
@@ -70,6 +74,8 @@ type Bot struct {
 	msgDispatchers sync.WaitGroup
 	// servers
 	serversProtect sync.RWMutex
+	// configs (including server configs)
+	configsProtect sync.RWMutex
 }
 
 // Configure starts a configuration by calling CreateConfig. Alias for
@@ -81,6 +87,7 @@ func Configure() *config.Config {
 // ConfigureFile starts a configuration by reading in a file. Alias for
 // config.CreateConfigFromFile
 func ConfigureFile(filename string) *config.Config {
+	confName = filename
 	return config.CreateConfigFromFile(filename)
 }
 
@@ -89,11 +96,19 @@ func ConfigureFunction(cnf func(*config.Config) *config.Config) *config.Config {
 	return cnf(config.CreateConfig())
 }
 
+// Check config checks a bots config for validity.
+func CheckConfig(c *config.Config) bool {
+	if !c.IsValid() {
+		c.DisplayErrors()
+		return false
+	}
+	return true
+}
+
 // CreateBot simplifies the call to createBotFull by using default
 // caps and conn provider functions.
 func CreateBot(conf *config.Config) (*Bot, error) {
-	if !conf.IsValid() {
-		conf.DisplayErrors()
+	if !CheckConfig(conf) {
 		return nil, errInvalidConfig
 	}
 	return createBot(conf, nil, nil)
