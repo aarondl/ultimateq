@@ -26,6 +26,20 @@ func setLogger() {
 	}
 }
 
+var srv1 = &Server{
+	nil, "irc", "irc.gamesurge.net",
+	5555, true, true, false, true, false, true, 10,
+	"n1", "a1", "u1", "h1", "r1", "p1",
+	[]string{"#chan", "#chan2"},
+}
+
+var srv2 = &Server{
+	nil, "irc2", "nuclearfallout.gamesurge.net",
+	7777, false, false, true, false, false, false, 10,
+	"n2", "a2", "u2", "h2", "r2", "p2",
+	[]string{"#chan2"},
+}
+
 func (s *s) TestConfig(c *C) {
 	config := CreateConfig()
 	c.Assert(config.Servers, NotNil)
@@ -36,12 +50,9 @@ func (s *s) TestConfig_Fallbacks(c *C) {
 	config := CreateConfig()
 
 	host, name := "irc.gamesurge.net", "gamesurge"
-	config.Global = &Server{
-		config, "irc", "irc.nuclearfallout.net",
-		5555, true, true, true, true, true, true, 500,
-		"n1", "a1", "u1", "h1", "r1", "p1",
-		[]string{"#chan", "#chan2"},
-	}
+
+	srv := *srv1
+	config.Global = &srv
 
 	server := &Server{parent: config, Name: name, Host: host}
 	config.Servers[name] = server
@@ -94,31 +105,19 @@ func (s *s) TestConfig_Fallbacks(c *C) {
 }
 
 func (s *s) TestConfig_Fluent(c *C) {
-	srv1 := Server{
-		nil, "irc", "irc.gamesurge.net",
-		5555, true, true, false, true, false, true, 10,
-		"n1", "a1", "u1", "h1", "r1", "p1",
-		[]string{"#chan", "#chan2"},
-	}
-	defs := Server{
-		nil, "irc2", "nuclearfallout.gamesurge.net",
-		7777, false, false, true, false, false, false, 10,
-		"n2", "a2", "u2", "h2", "r2", "p2",
-		[]string{"#chan2"},
-	}
-	srv2 := "znc.gamesurge.net"
+	srv2host := "znc.gamesurge.net"
 
 	conf := CreateConfig().
 		Host(""). // Should not break anything
-		Port(defs.Port).
-		ReconnectTimeout(defs.ReconnectTimeout).
-		Nick(defs.Nick).
-		Altnick(defs.Altnick).
-		Username(defs.Username).
-		Userhost(defs.Userhost).
-		Realname(defs.Realname).
-		Prefix(defs.Prefix).
-		Channels(defs.Channels...).
+		Port(srv2.Port).
+		ReconnectTimeout(srv2.ReconnectTimeout).
+		Nick(srv2.Nick).
+		Altnick(srv2.Altnick).
+		Username(srv2.Username).
+		Userhost(srv2.Userhost).
+		Realname(srv2.Realname).
+		Prefix(srv2.Prefix).
+		Channels(srv2.Channels...).
 		Server(srv1.Name).
 		Host(srv1.Host).
 		Port(srv1.Port).
@@ -133,10 +132,10 @@ func (s *s) TestConfig_Fluent(c *C) {
 		Realname(srv1.Realname).
 		Prefix(srv1.Prefix).
 		Channels(srv1.Channels...).
-		Server(srv2)
+		Server(srv2host)
 
-	server := conf.Servers[srv1.Name]
-	server2 := conf.Servers[srv2]
+	server := conf.GetServer(srv1.Name)
+	server2 := conf.GetServer(srv2host)
 	c.Assert(server.GetHost(), Equals, srv1.GetHost())
 	c.Assert(server.GetName(), Equals, srv1.GetName())
 	c.Assert(server.GetPort(), Equals, srv1.GetPort())
@@ -155,32 +154,25 @@ func (s *s) TestConfig_Fluent(c *C) {
 		c.Assert(v, Equals, srv1.Channels[i])
 	}
 
-	c.Assert(server2.GetHost(), Equals, srv2)
-	c.Assert(server2.GetPort(), Equals, defs.GetPort())
-	c.Assert(server2.GetSsl(), Equals, defs.GetSsl())
-	c.Assert(server2.GetVerifyCert(), Equals, defs.GetVerifyCert())
-	c.Assert(server2.GetNoReconnect(), Equals, defs.GetNoReconnect())
-	c.Assert(server2.GetReconnectTimeout(), Equals, defs.GetReconnectTimeout())
-	c.Assert(server2.GetNick(), Equals, defs.GetNick())
-	c.Assert(server2.GetAltnick(), Equals, defs.GetAltnick())
-	c.Assert(server2.GetUsername(), Equals, defs.GetUsername())
-	c.Assert(server2.GetUserhost(), Equals, defs.GetUserhost())
-	c.Assert(server2.GetRealname(), Equals, defs.GetRealname())
-	c.Assert(server2.GetPrefix(), Equals, defs.GetPrefix())
-	c.Assert(len(server2.GetChannels()), Equals, len(defs.GetChannels()))
+	c.Assert(server2.GetHost(), Equals, srv2host)
+	c.Assert(server2.GetPort(), Equals, srv2.GetPort())
+	c.Assert(server2.GetSsl(), Equals, srv2.GetSsl())
+	c.Assert(server2.GetVerifyCert(), Equals, srv2.GetVerifyCert())
+	c.Assert(server2.GetNoReconnect(), Equals, srv2.GetNoReconnect())
+	c.Assert(server2.GetReconnectTimeout(), Equals, srv2.GetReconnectTimeout())
+	c.Assert(server2.GetNick(), Equals, srv2.GetNick())
+	c.Assert(server2.GetAltnick(), Equals, srv2.GetAltnick())
+	c.Assert(server2.GetUsername(), Equals, srv2.GetUsername())
+	c.Assert(server2.GetUserhost(), Equals, srv2.GetUserhost())
+	c.Assert(server2.GetRealname(), Equals, srv2.GetRealname())
+	c.Assert(server2.GetPrefix(), Equals, srv2.GetPrefix())
+	c.Assert(len(server2.GetChannels()), Equals, len(srv2.GetChannels()))
 	for i, v := range server2.GetChannels() {
-		c.Assert(v, Equals, defs.Channels[i])
+		c.Assert(v, Equals, srv2.Channels[i])
 	}
 }
 
 func (s *s) TestConfig_Validation(c *C) {
-	srv1 := Server{
-		nil, "irc", "irc.gamesurge.net",
-		5555, true, true, false, true, false, true, 10,
-		"n1", "a1", "u1", "h1", "r1", "p1",
-		[]string{"#chan", "#chan2"},
-	}
-
 	conf := CreateConfig()
 	c.Assert(conf.IsValid(), Equals, false)
 	c.Assert(len(conf.Errors), Not(Equals), 0)
@@ -257,6 +249,30 @@ func (s *s) TestConfig_DisplayErrors(c *C) {
 	conf.DisplayErrors()
 	c.Assert(buf.Len(), Not(Equals), 0)
 	setLogger() // Reset the logger
+}
+
+func (s *s) TestConfig_GetServer(c *C) {
+	conf := CreateConfig()
+	conf.Servers[srv1.GetName()] = srv1
+	conf.Servers[srv2.GetName()] = srv2
+	c.Assert(conf.GetServer(srv1.GetName()), Equals, srv1)
+	c.Assert(conf.GetServer(srv2.GetName()), Equals, srv2)
+}
+
+func (s *s) TestConfig_SetContext(c *C) {
+	conf := CreateConfig()
+	srv := *srv1
+	conf.Servers[srv1.GetName()] = &srv
+
+	var p1, p2, p3 uint16 = 1, 2, 3
+
+	conf.Port(p1)
+	conf.ServerContext(srv1.GetName())
+	conf.Port(p2)
+	conf.GlobalContext()
+	conf.Port(p3)
+
+	c.Assert(conf.GetServer(srv1.GetName()).GetPort(), Equals, srv1.GetPort())
 }
 
 func (s *s) TestValidNames(c *C) {

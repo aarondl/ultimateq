@@ -28,6 +28,7 @@ const (
 	fmtErrMissing         = "config(%v): Requires %v, but nothing was given."
 	errMsgServersRequired = "config: At least one server is required."
 	errMsgDuplicateServer = "config: Server names must be unique, use .Host()"
+	errMsgServerNotFound  = "config: Server not found, given: %v"
 
 	// The following is for mapping config setting names to strings
 	errHost     = "host"
@@ -167,13 +168,35 @@ func (c *Config) DisplayErrors() {
 	}
 }
 
-// Gets the current configuration context, if no context has been set, returns
-// the global instance.
+// GlobalContext clears the configs server context
+func (c *Config) GlobalContext() *Config {
+	c.context = nil
+	return c
+}
+
+// ServerContext the configs server context, adds an error if the if server
+// key is not found.
+func (c *Config) ServerContext(name string) *Config {
+	if srv, ok := c.Servers[name]; !ok {
+		c.context = srv
+	} else {
+		c.addError(errMsgServerNotFound, name)
+	}
+	return c
+}
+
+// GetContext retrieves the current configuration context, if no context has
+// been set, returns the global setting object.
 func (c *Config) GetContext() *Server {
 	if c.context != nil {
 		return c.context
 	}
 	return c.Global
+}
+
+// GetServer retrieves the server by name if it exists, nil if not.
+func (c *Config) GetServer(name string) *Server {
+	return c.Servers[name]
 }
 
 // Server fluently creates a server object and sets the context on the Config to
