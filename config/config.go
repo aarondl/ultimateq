@@ -86,10 +86,11 @@ var (
 // Config holds all the information related to the bot including global settings
 // default settings, and server specific settings.
 type Config struct {
-	Servers map[string]*Server
-	Global  *Server
-	context *Server
-	Errors  []error "-"
+	Servers  map[string]*Server
+	Global   *Server
+	context  *Server
+	filename string
+	Errors   []error "-"
 }
 
 // CreateConfig initializes a Config object.
@@ -157,6 +158,7 @@ func (c *Config) IsValid() bool {
 			}
 		}
 	}
+
 	return len(c.Errors) == 0
 }
 
@@ -177,7 +179,7 @@ func (c *Config) GlobalContext() *Config {
 // ServerContext the configs server context, adds an error if the if server
 // key is not found.
 func (c *Config) ServerContext(name string) *Config {
-	if srv, ok := c.Servers[name]; !ok {
+	if srv, ok := c.Servers[name]; ok {
 		c.context = srv
 	} else {
 		c.addError(errMsgServerNotFound, name)

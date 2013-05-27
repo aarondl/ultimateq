@@ -2,9 +2,28 @@ package config
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	. "launchpad.net/gocheck"
 )
+
+type testBuffer struct {
+	io.ReadWriter
+	closed bool
+}
+
+func (t *testBuffer) Close() error {
+	t.closed = true
+	return nil
+}
+
+type dyingReader struct {
+}
+
+func (d *dyingReader) Read(b []byte) (n int, err error) {
+	err = io.ErrUnexpectedEOF
+	return
+}
 
 var configuration = `global:
     port: 5555
@@ -37,14 +56,6 @@ func verifyFakeConfig(c *C, conf *Config) {
 	c.Assert(srv2.GetName(), Equals, srv2.GetHost())
 }
 
-type dyingReader struct {
-}
-
-func (d *dyingReader) Read(b []byte) (n int, err error) {
-	err = io.ErrUnexpectedEOF
-	return
-}
-
 func (s *s) TestConfig_FromReader(c *C) {
 	buf := bytes.NewBufferString(configuration)
 	conf := CreateConfigFromReader(buf)
@@ -75,6 +86,68 @@ func (s *s) TestConfig_ToWriter(c *C) {
 
 	inbuf := &bytes.Buffer{}
 	FlushConfigToWriter(conf, inbuf)
+
+	conf = CreateConfigFromReader(inbuf)
+	verifyFakeConfig(c, conf)
+}
+
+func (s *s) TestConfig_FromFile(c *C) {
+	buf := &testBuffer{bytes.NewBufferString(configuration), false}
+	name := "check.yaml"
+	conf := createConfigFromFile(name, func(f string) (io.ReadCloser, error) {
+		return buf, nil
+	})
+	c.Assert(len(conf.Errors), Equals, 0)
+	c.Assert(conf.filename, Equals, name)
+	c.Assert(buf.closed, Equals, true)
+
+	verifyFakeConfig(c, conf)
+	c.Assert(conf.IsValid(), Equals, true)
+
+	conf = createConfigFromFile(name, func(f string) (io.ReadCloser, error) {
+		return nil, errors.New("")
+	})
+	c.Assert(len(conf.Errors), Equals, 1)
+}
+
+func (s *s) TestConfig_ToFile(c *C) {
+	outbuf := bytes.NewBufferString(configuration)
+	conf := CreateConfigFromReader(outbuf)
+	c.Assert(len(conf.Errors), Equals, 0)
+
+	inbuf := &testBuffer{&bytes.Buffer{}, false}
+	c.Assert(inbuf.closed, Equals, false)
+	err := flushConfigToFile(conf, "", func(f string) (io.WriteCloser, error) {
+		c.Assert(f, Equals, defaultConfigFileName)
+		return inbuf, nil
+	})
+	c.Assert(err, IsNil)
+	c.Assert(inbuf.closed, Equals, true)
+
+	conf.filename = "check.yaml"
+	inbuf.closed = false
+	err = flushConfigToFile(conf, "", func(f string) (io.WriteCloser, error) {
+		c.Assert(f, Equals, conf.filename)
+		return inbuf, nil
+	})
+	c.Assert(err, IsNil)
+	c.Assert(inbuf.closed, Equals, true)
+
+	name := "other.yaml"
+	inbuf.closed = false
+	flushConfigToFile(conf, name, func(f string) (io.WriteCloser, error) {
+		c.Assert(f, Equals, name)
+		return inbuf, nil
+	})
+	c.Assert(err, IsNil)
+	c.Assert(inbuf.closed, Equals, true)
+
+	inbuf.closed = false
+	err = flushConfigToFile(conf, "", func(_ string) (io.WriteCloser, error) {
+		return nil, errors.New("")
+	})
+	c.Assert(err, NotNil)
+	c.Assert(inbuf.closed, Equals, false)
 
 	conf = CreateConfigFromReader(inbuf)
 	verifyFakeConfig(c, conf)

@@ -266,13 +266,20 @@ func (s *s) TestConfig_SetContext(c *C) {
 
 	var p1, p2, p3 uint16 = 1, 2, 3
 
-	conf.Port(p1)
+	conf.Port(p1) // Should set global context
+	c.Assert(conf.Global.GetPort(), Equals, p1)
+
 	conf.ServerContext(srv1.GetName())
 	conf.Port(p2)
 	conf.GlobalContext()
 	conf.Port(p3)
 
-	c.Assert(conf.GetServer(srv1.GetName()).GetPort(), Equals, srv1.GetPort())
+	c.Assert(conf.GetServer(srv1.GetName()).GetPort(), Equals, p2)
+	c.Assert(conf.Global.GetPort(), Equals, p3)
+
+	c.Assert(len(conf.Errors), Equals, 0)
+	conf.ServerContext("")
+	c.Assert(len(conf.Errors), Equals, 1)
 }
 
 func (s *s) TestValidNames(c *C) {
