@@ -102,6 +102,23 @@ func CreateConfig() *Config {
 	}
 }
 
+// Clone deep copies a configuration object.
+func (c *Config) Clone() *Config {
+	global := *c.Global
+	newconf := &Config{
+		Global:   &global,
+		Servers:  make(map[string]*Server, len(c.Servers)),
+		Errors:   make([]error, 0),
+		filename: c.filename,
+	}
+	for name, srv := range c.Servers {
+		newsrv := *srv
+		newsrv.parent = newconf
+		newconf.Servers[name] = &newsrv
+	}
+	return newconf
+}
+
 // addError builds an error object and returns it using Sprintf.
 func (c *Config) addError(format string, args ...interface{}) {
 	c.Errors = append(
@@ -344,6 +361,15 @@ type Server struct {
 	Channels []string
 }
 
+// GetFilename returns fileName of the configuration, or the default.
+func (c *Config) GetFilename() (filename string) {
+	filename = defaultConfigFileName
+	if len(c.filename) > 0 {
+		filename = c.filename
+	}
+	return
+}
+
 // GetHost gets s.host
 func (s *Server) GetHost() string {
 	return s.Host
@@ -354,140 +380,134 @@ func (s *Server) GetName() string {
 	return s.Name
 }
 
-// GetPort returns port of the irc config, if it hasn't been set, returns the
-// value of the global, if that hasn't been set returns ircDefaultPort.
-func (s *Server) GetPort() uint16 {
+// GetPort returns gets Port of the server, or the global port, or
+// ircDefaultPort
+func (s *Server) GetPort() (port uint16) {
+	port = defaultIrcPort
 	if s.Port != 0 {
-		return s.Port
-	} else if s.parent != nil && s.parent.Global != nil &&
-		s.parent.Global.Port != 0 {
-
-		return s.parent.Global.Port
+		port = s.Port
+	} else if s.parent != nil && s.parent.Global.Port != 0 {
+		port = s.parent.Global.Port
 	}
-	return defaultIrcPort
+	return
 }
 
-// GetSsl returns ssl of the irc config, if it hasn't been set, returns the
-// value of the global, if that hasn't been set returns false.
-func (s *Server) GetSsl() bool {
-	if s.IsSslSet {
-		return s.Ssl
-	} else if s.parent != nil && s.parent.Global != nil {
-		return s.parent.Global.IsSslSet && s.parent.Global.Ssl
+// GetSsl returns Ssl of the server, or the global ssl, or false
+func (s *Server) GetSsl() (ssl bool) {
+	if s != nil && s.IsSslSet {
+		ssl = s.Ssl
+	} else if s.parent != nil && s.parent.Global.IsSslSet {
+		ssl = s.parent.Global.Ssl
 	}
-	return false
+	return
 }
 
-// GetSsl returns verifyCert of the irc config, if it hasn't been set, returns
-// the value of the global, if that hasn't been set returns false.
-func (s *Server) GetVerifyCert() bool {
-	if s.IsVerifyCertSet {
-		return s.VerifyCert
-	} else if s.parent != nil && s.parent.Global != nil {
-		return s.parent.Global.IsVerifyCertSet && s.parent.Global.VerifyCert
+// GetVerifyCert gets VerifyCert of the server, or the global verifyCert, or
+// false
+func (s *Server) GetVerifyCert() (verifyCert bool) {
+	if s != nil && s.IsVerifyCertSet {
+		verifyCert = s.VerifyCert
+	} else if s.parent != nil && s.parent.Global.IsVerifyCertSet {
+		verifyCert = s.parent.Global.VerifyCert
 	}
-	return false
+	return
 }
 
-// GetNoReconnect returns verifyCert of the irc config, if it hasn't been
-// set, returns the value of the global, if that hasn't been set returns false.
-func (s *Server) GetNoReconnect() bool {
-	if s.IsNoReconnectSet {
-		return s.NoReconnect
-	} else if s.parent != nil && s.parent.Global != nil {
-		return s.parent.Global.IsNoReconnectSet && s.parent.Global.NoReconnect
+// GetNoReconnect gets NoReconnect of the server, or the global noReconnect, or
+// false
+func (s *Server) GetNoReconnect() (noReconnect bool) {
+	if s != nil && s.IsNoReconnectSet {
+		noReconnect = s.NoReconnect
+	} else if s.parent != nil && s.parent.Global.IsNoReconnectSet {
+		noReconnect = s.parent.Global.NoReconnect
 	}
-	return false
+	return
 }
 
-// GetPort returns port of the irc config, if it hasn't been set, returns the
-// value of the global, if that hasn't been set returns ircDefaultPort.
-func (s *Server) GetReconnectTimeout() uint {
+// GetReconnectTimeout gets ReconnectTimeout of the server, or the global
+// reconnectTimeout, or defaultReconnectTimeout
+func (s *Server) GetReconnectTimeout() (reconnTimeout uint) {
+	reconnTimeout = defaultReconnectTimeout
 	if s.ReconnectTimeout != 0 {
-		return s.ReconnectTimeout
-	} else if s.parent != nil && s.parent.Global != nil &&
-		s.parent.Global.ReconnectTimeout != 0 {
-
-		return s.parent.Global.ReconnectTimeout
+		reconnTimeout = s.ReconnectTimeout
+	} else if s.parent != nil && s.parent.Global.ReconnectTimeout != 0 {
+		reconnTimeout = s.parent.Global.ReconnectTimeout
 	}
-	return defaultReconnectTimeout
+	return
 }
 
-// GetNick returns the nickname of the irc config, if it's empty, it returns the
-// value of the global configuration.
-func (s *Server) GetNick() string {
-	if len(s.Nick) == 0 &&
-		s.parent != nil && s.parent.Global != nil {
-
-		return s.parent.Global.Nick
+// GetNick gets Nick of the server, or the global nick, or empty string.
+func (s *Server) GetNick() (nick string) {
+	if len(s.Nick) > 0 {
+		nick = s.Nick
+	} else if s.parent != nil && len(s.parent.Global.Nick) > 0 {
+		nick = s.parent.Global.Nick
 	}
-	return s.Nick
+	return
 }
 
-// GetAltnick returns the altnick of the irc config, if it's empty, it returns
-// the value of the global configuration.
-func (s *Server) GetAltnick() string {
-	if len(s.Altnick) == 0 &&
-		s.parent != nil && s.parent.Global != nil {
-
-		return s.parent.Global.Altnick
+// GetAltnick gets Altnick of the server, or the global altnick, or empty
+// string.
+func (s *Server) GetAltnick() (altnick string) {
+	if len(s.Altnick) > 0 {
+		altnick = s.Altnick
+	} else if s.parent != nil && len(s.parent.Global.Altnick) > 0 {
+		altnick = s.parent.Global.Altnick
 	}
-	return s.Altnick
+	return
 }
 
-// GetUsername returns the username of the irc config, if it's empty, it returns
-// the value of the global configuration.
-func (s *Server) GetUsername() string {
-	if len(s.Username) == 0 &&
-		s.parent != nil && s.parent.Global != nil {
-
-		return s.parent.Global.Username
+// GetUsername gets Username of the server, or the global username, or empty
+// string.
+func (s *Server) GetUsername() (username string) {
+	if len(s.Username) > 0 {
+		username = s.Username
+	} else if s.parent != nil && len(s.parent.Global.Username) > 0 {
+		username = s.parent.Global.Username
 	}
-	return s.Username
+	return
 }
 
-// GetUserhost returns the userhost of the irc config, if it's empty, it returns
-// the value of the global configuration.
-func (s *Server) GetUserhost() string {
-	if len(s.Userhost) == 0 &&
-		s.parent != nil && s.parent.Global != nil {
-
-		return s.parent.Global.Userhost
+// GetUserhost gets Userhost of the server, or the global userhost, or empty
+// string.
+func (s *Server) GetUserhost() (userhost string) {
+	if len(s.Userhost) > 0 {
+		userhost = s.Userhost
+	} else if s.parent != nil && len(s.parent.Global.Userhost) > 0 {
+		userhost = s.parent.Global.Userhost
 	}
-	return s.Userhost
+	return
 }
 
-// GetRealname returns the realname of the irc config, if it's empty, it returns
-// the value of the global configuration.
-func (s *Server) GetRealname() string {
-	if len(s.Realname) == 0 &&
-		s.parent != nil && s.parent.Global != nil {
-
-		return s.parent.Global.Realname
+// GetRealname gets Realname of the server, or the global realname, or empty
+// string.
+func (s *Server) GetRealname() (realname string) {
+	if len(s.Realname) > 0 {
+		realname = s.Realname
+	} else if s.parent != nil && len(s.parent.Global.Realname) > 0 {
+		realname = s.parent.Global.Realname
 	}
-	return s.Realname
+	return
 }
 
-// GetPrefix returns the prefix of the irc config, if it's empty, it returns
-// the value of the global configuration.
-func (s *Server) GetPrefix() string {
+// GetPrefix gets Prefix of the server, or the global prefix, or defaultPrefix.
+func (s *Server) GetPrefix() (prefix string) {
+	prefix = defaultPrefix
 	if len(s.Prefix) > 0 {
-		return s.Prefix
-	} else if s.parent != nil && s.parent.Global != nil &&
-		len(s.parent.Global.Prefix) > 0 {
-
-		return s.parent.Global.Prefix
+		prefix = s.Prefix
+	} else if s.parent != nil && len(s.parent.Global.Prefix) > 0 {
+		prefix = s.parent.Global.Prefix
 	}
-	return defaultPrefix
+	return
 }
 
-// GetChannels returns the channels of the irc config, if it's empty, it returns
-// the value of the global configuration.
-func (s *Server) GetChannels() []string {
-	if len(s.Channels) == 0 &&
-		s.parent != nil && s.parent.Global != nil {
-
-		return s.parent.Global.Channels
+// GetChannels gets Channels of the server, or the global channels, or nil
+// slice of string (check the length!).
+func (s *Server) GetChannels() (channels []string) {
+	if len(s.Channels) > 0 {
+		channels = s.Channels
+	} else if s.parent != nil && len(s.parent.Global.Channels) > 0 {
+		channels = s.parent.Global.Channels
 	}
-	return s.Channels
+	return
 }

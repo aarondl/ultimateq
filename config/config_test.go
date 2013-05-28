@@ -110,6 +110,8 @@ func (s *s) TestConfig_Fluent(c *C) {
 	conf := CreateConfig().
 		Host(""). // Should not break anything
 		Port(srv2.Port).
+		Ssl(srv2.Ssl).
+		VerifyCert(srv2.VerifyCert).
 		ReconnectTimeout(srv2.ReconnectTimeout).
 		Nick(srv2.Nick).
 		Altnick(srv2.Altnick).
@@ -136,37 +138,37 @@ func (s *s) TestConfig_Fluent(c *C) {
 
 	server := conf.GetServer(srv1.Name)
 	server2 := conf.GetServer(srv2host)
-	c.Assert(server.GetHost(), Equals, srv1.GetHost())
-	c.Assert(server.GetName(), Equals, srv1.GetName())
-	c.Assert(server.GetPort(), Equals, srv1.GetPort())
-	c.Assert(server.GetSsl(), Equals, srv1.GetSsl())
-	c.Assert(server.GetVerifyCert(), Equals, srv1.GetVerifyCert())
-	c.Assert(server.GetNoReconnect(), Equals, srv1.GetNoReconnect())
-	c.Assert(server.GetReconnectTimeout(), Equals, srv1.GetReconnectTimeout())
-	c.Assert(server.GetNick(), Equals, srv1.GetNick())
-	c.Assert(server.GetAltnick(), Equals, srv1.GetAltnick())
-	c.Assert(server.GetUsername(), Equals, srv1.GetUsername())
-	c.Assert(server.GetUserhost(), Equals, srv1.GetUserhost())
-	c.Assert(server.GetRealname(), Equals, srv1.GetRealname())
-	c.Assert(server.GetPrefix(), Equals, srv1.GetPrefix())
-	c.Assert(len(server.GetChannels()), Equals, len(srv1.GetChannels()))
+	c.Assert(server.GetHost(), Equals, srv1.Host)
+	c.Assert(server.GetName(), Equals, srv1.Name)
+	c.Assert(server.GetPort(), Equals, srv1.Port)
+	c.Assert(server.GetSsl(), Equals, srv1.Ssl)
+	c.Assert(server.GetVerifyCert(), Equals, srv1.VerifyCert)
+	c.Assert(server.GetNoReconnect(), Equals, srv1.NoReconnect)
+	c.Assert(server.GetReconnectTimeout(), Equals, srv1.ReconnectTimeout)
+	c.Assert(server.GetNick(), Equals, srv1.Nick)
+	c.Assert(server.GetAltnick(), Equals, srv1.Altnick)
+	c.Assert(server.GetUsername(), Equals, srv1.Username)
+	c.Assert(server.GetUserhost(), Equals, srv1.Userhost)
+	c.Assert(server.GetRealname(), Equals, srv1.Realname)
+	c.Assert(server.GetPrefix(), Equals, srv1.Prefix)
+	c.Assert(len(server.GetChannels()), Equals, len(srv1.Channels))
 	for i, v := range server.GetChannels() {
 		c.Assert(v, Equals, srv1.Channels[i])
 	}
 
 	c.Assert(server2.GetHost(), Equals, srv2host)
-	c.Assert(server2.GetPort(), Equals, srv2.GetPort())
-	c.Assert(server2.GetSsl(), Equals, srv2.GetSsl())
-	c.Assert(server2.GetVerifyCert(), Equals, srv2.GetVerifyCert())
-	c.Assert(server2.GetNoReconnect(), Equals, srv2.GetNoReconnect())
-	c.Assert(server2.GetReconnectTimeout(), Equals, srv2.GetReconnectTimeout())
-	c.Assert(server2.GetNick(), Equals, srv2.GetNick())
-	c.Assert(server2.GetAltnick(), Equals, srv2.GetAltnick())
-	c.Assert(server2.GetUsername(), Equals, srv2.GetUsername())
-	c.Assert(server2.GetUserhost(), Equals, srv2.GetUserhost())
-	c.Assert(server2.GetRealname(), Equals, srv2.GetRealname())
-	c.Assert(server2.GetPrefix(), Equals, srv2.GetPrefix())
-	c.Assert(len(server2.GetChannels()), Equals, len(srv2.GetChannels()))
+	c.Assert(server2.GetPort(), Equals, srv2.Port)
+	c.Assert(server2.GetSsl(), Equals, srv2.Ssl)
+	c.Assert(server2.GetVerifyCert(), Equals, srv2.VerifyCert)
+	c.Assert(server2.GetNoReconnect(), Equals, srv2.NoReconnect)
+	c.Assert(server2.GetReconnectTimeout(), Equals, srv2.ReconnectTimeout)
+	c.Assert(server2.GetNick(), Equals, srv2.Nick)
+	c.Assert(server2.GetAltnick(), Equals, srv2.Altnick)
+	c.Assert(server2.GetUsername(), Equals, srv2.Username)
+	c.Assert(server2.GetUserhost(), Equals, srv2.Userhost)
+	c.Assert(server2.GetRealname(), Equals, srv2.Realname)
+	c.Assert(server2.GetPrefix(), Equals, srv2.Prefix)
+	c.Assert(len(server2.GetChannels()), Equals, len(srv2.Channels))
 	for i, v := range server2.GetChannels() {
 		c.Assert(v, Equals, srv2.Channels[i])
 	}
@@ -306,6 +308,48 @@ func (s *s) TestValidNames(c *C) {
 			c.Errorf("Bad nick passed regex: %v\n", badNicks[i])
 		}
 	}
+}
+
+func (s *s) TestConfig_Clone(c *C) {
+	conf := CreateConfig()
+
+	srv := *srv1
+	srv.parent = conf
+	name := srv1.Name
+	filename := "file.yaml"
+	conf.filename = filename
+	conf.Servers[name] = &srv
+
+	var globalPort, serverPort uint16 = 1, 2
+
+	newconf := conf.Clone().
+		GlobalContext().
+		Port(globalPort).
+		ServerContext(name).
+		Port(0)
+
+	c.Assert(newconf.GetFilename(), Equals, conf.GetFilename())
+
+	newconf.GlobalContext()
+	c.Assert(conf.Global.Port, Not(Equals), globalPort)
+	c.Assert(srv1.Port, Not(Equals), globalPort)
+	c.Assert(newconf.GetServer(name).GetPort(), Equals, globalPort)
+
+	newconf.
+		ServerContext(srv1.Name).
+		Port(serverPort)
+
+	c.Assert(conf.Global.Port, Not(Equals), serverPort)
+	c.Assert(srv1.Port, Not(Equals), serverPort)
+	c.Assert(newconf.GetServer(name).GetPort(), Equals, serverPort)
+}
+
+func (s *s) TestConfig_Filename(c *C) {
+	conf := CreateConfig()
+	filename := "file.yaml"
+	c.Assert(conf.GetFilename(), Equals, defaultConfigFileName)
+	conf.filename = filename
+	c.Assert(conf.GetFilename(), Equals, filename)
 }
 
 func (s *s) TestValidChannels(c *C) {
