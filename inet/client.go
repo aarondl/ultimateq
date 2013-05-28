@@ -277,9 +277,8 @@ func (c *IrcClient) Close() error {
 // IsClosed returns true if the IrcClient has been closed.
 func (c *IrcClient) IsClosed() bool {
 	c.isShutdownProtect.RLock()
-	b := c.isShutdown
-	c.isShutdownProtect.RUnlock()
-	return b
+	defer c.isShutdownProtect.RUnlock()
+	return c.isShutdown
 }
 
 // Reads a message from the read channel in it's entirety. More efficient than
