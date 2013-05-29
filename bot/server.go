@@ -27,6 +27,19 @@ const (
 	MASK_RECONNECT  = STATE_RECONNECTING
 )
 
+const (
+	// errServerAlreadyConnected occurs if a server has not been shutdown
+	// before another attempt to connect to it is made.
+	errFmtAlreadyConnected = "bot: %v already connected.\n"
+)
+
+var (
+	// errNotConnected happens when a write occurs to a disconnected server.
+	errNotConnected = errors.New("bot: Server not connected")
+	// temporary error until ssl is fixed.
+	errSslNotImplemented = errors.New("bot: Ssl not implemented")
+)
+
 // Server is all the details around a specific server connection. Also contains
 // the connection and configuration for the specific server.
 type Server struct {
@@ -63,10 +76,31 @@ func (s ServerSender) GetKey() string {
 
 // Writeln writes to the ServerSender's IrcClient.
 func (s ServerSender) Writeln(str string) error {
-	s.server.protect.RLock()
-	_, err := s.server.client.Write([]byte(str))
-	s.server.protect.RUnlock()
+	_, err := s.server.Write([]byte(str))
 	return err
+}
+
+// Write writes to the ServerSender's IrcClient.
+func (s ServerSender) Write(buf []byte) (int, error) {
+	return s.server.Write(buf)
+}
+
+// Writeln writes to the server's IrcClient.
+func (s *Server) Writeln(str string) error {
+	_, err := s.Write([]byte(str))
+	return err
+}
+
+// Write writes to the server's IrcClient.
+func (s *Server) Write(buf []byte) (int, error) {
+	s.protect.RLock()
+	defer s.protect.RUnlock()
+
+	if s.isConnected() {
+		return s.client.Write(buf)
+	}
+
+	return 0, errNotConnected
 }
 
 // createDispatcher uses the server's current ProtoCaps to create a dispatcher.
@@ -116,6 +150,11 @@ func (s *Server) IsConnected() bool {
 	s.protect.RLock()
 	defer s.protect.RUnlock()
 
+	return s.isConnected()
+}
+
+// IsConnected checks to see if the server is connected without locking
+func (s *Server) isConnected() bool {
 	return STATE_CONNECTED == s.state&MASK_CONNECTION
 }
 
@@ -142,6 +181,12 @@ func (s *Server) IsStarted() bool {
 	s.protect.RLock()
 	defer s.protect.RUnlock()
 
+	return s.isStarted()
+}
+
+// IsStarted checks to see if the dispatcher is running on the server without
+// locking.
+func (s *Server) isStarted() bool {
 	return STATE_STARTED == s.state&MASK_DISPATCHER
 }
 
@@ -163,11 +208,18 @@ func (s *Server) setStopped(lock bool) {
 	s.state &= STATE_STOPPED
 }
 
-// IsReconnecting checks to see if the dispatcher is running on the server.
+// IsReconnecting checks to see if the dispatcher is waiting to reconnect the
+// server.
 func (s *Server) IsReconnecting() bool {
 	s.protect.RLock()
 	defer s.protect.RUnlock()
 
+	return s.isReconnecting()
+}
+
+// isReconnecting checks to see if the dispatcher is waiting to reconnect the
+// without locking server.
+func (s *Server) isReconnecting() bool {
 	return STATE_RECONNECTING == s.state&MASK_RECONNECT
 }
 

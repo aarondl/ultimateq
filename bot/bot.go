@@ -30,9 +30,6 @@ const (
 	errFmtReaderClosed = "bot: %v reader closed\n"
 	// errFmtClosingServer is when a IrcClient.Close returns an error.
 	errFmtClosingServer = "bot: Error closing server (%v)\n"
-	// errServerAlreadyConnected occurs if a server has not been shutdown
-	// before another attempt to connect to it is made.
-	errFmtAlreadyConnected = "bot: %v already connected.\n"
 	// fmtDisconnected shows when the bot is disconnected and needs to reconnect
 	fmtDisconnected = "bot: %v disconnected, reconnecting in %v..."
 )
@@ -43,8 +40,6 @@ var (
 	// errInvalidServerId occurs when the user passes in an unknown
 	// server id to a method requiring a server id.
 	errUnknownServerId = errors.New("bot: Unknown Server id.")
-	// temporary error until ssl is fixed.
-	errSslNotImplemented = errors.New("bot: Ssl not implemented")
 
 	// A global variable for the bot's previously loaded config.
 	confName string
@@ -175,7 +170,6 @@ func (b *Bot) StartServer(serverId string) (found bool) {
 
 // start begins the called for routines on all servers
 func (b *Bot) start(writing, reading bool) {
-	b.msgDispatchers = sync.WaitGroup{}
 	b.serversProtect.RLock()
 	for _, srv := range b.servers {
 		b.startServer(srv, writing, reading)
@@ -185,9 +179,14 @@ func (b *Bot) start(writing, reading bool) {
 
 // startServer begins the called for routines on the specific server
 func (b *Bot) startServer(srv *Server, writing, reading bool) {
+	if srv.IsStarted() {
+		return
+	}
+
 	srv.protect.Lock()
 	defer srv.protect.Unlock()
-	if srv.client != nil {
+
+	if srv.isConnected() && srv.client != nil {
 		srv.setStarted(false)
 		srv.client.SpawnWorkers(writing, reading)
 
@@ -251,7 +250,7 @@ func (b *Bot) DisconnectServer(serverId string) (found bool) {
 // disconnectServer disconnects the given server.
 func (b *Bot) disconnectServer(srv *Server) {
 	srv.protect.RLock()
-	if srv.client == nil {
+	if !srv.isConnected() || srv.client == nil {
 		srv.protect.RUnlock()
 		return
 	}
@@ -389,6 +388,18 @@ func (b *Bot) dispatchMessages(s *Server) {
 		b.msgDispatchers.Done()
 	} else if disconnect {
 		<-s.killdispatch
+	}
+}
+
+// Writeln writes a string to the given server's IrcClient.
+func (b *Bot) Writeln(server, message string) error {
+	b.serversProtect.RLock()
+	defer b.serversProtect.RUnlock()
+
+	if srv, ok := b.servers[server]; !ok {
+		return errUnknownServerId
+	} else {
+		return srv.Writeln(message)
 	}
 }
 

@@ -12,11 +12,12 @@ func (s *s) TestServerSender(c *C) {
 	mockCtrl := gomock.NewController(c)
 	defer mockCtrl.Finish()
 
-	str := "PRIVMSG user :msg\r\n"
+	str := "PONG :msg\r\n"
 
 	conn := mocks.NewMockConn(mockCtrl)
 	conn.Writechan = make(chan []byte)
 	gomock.InOrder(
+		conn.EXPECT().Write([]byte(str)).Return(len(str), nil),
 		conn.EXPECT().Write([]byte(str)).Return(len(str), nil),
 		conn.EXPECT().Close(),
 	)
@@ -35,8 +36,54 @@ func (s *s) TestServerSender(c *C) {
 	ers := b.Connect()
 	c.Assert(len(ers), Equals, 0)
 	b.start(true, false)
-	srvsender.Writeln(str)
+	err = srvsender.Writeln(str)
 	<-conn.Writechan
+	c.Assert(err, IsNil)
+	_, err = srvsender.Write([]byte(str))
+	<-conn.Writechan
+	c.Assert(err, IsNil)
+	b.WaitForHalt()
+	b.Disconnect()
+}
+
+func (s *s) TestServer_Write(c *C) {
+	mockCtrl := gomock.NewController(c)
+	defer mockCtrl.Finish()
+
+	str := "PONG :msg\r\n"
+
+	conn := mocks.NewMockConn(mockCtrl)
+	conn.Writechan = make(chan []byte)
+	gomock.InOrder(
+		conn.EXPECT().Write([]byte(str)).Return(len(str), nil),
+		conn.EXPECT().Write([]byte(str)).Return(len(str), nil),
+		conn.EXPECT().Close(),
+	)
+
+	connProvider := func(srv string) (net.Conn, error) {
+		return conn, nil
+	}
+
+	b, err := createBot(fakeConfig, nil, connProvider)
+	c.Assert(err, IsNil)
+	srv := b.servers[serverId]
+	srv.dispatcher.Unregister(irc.RAW, srv.handlerId)
+
+	_, err = srv.Write([]byte{})
+	c.Assert(err, Equals, errNotConnected)
+
+	ers := b.Connect()
+	c.Assert(len(ers), Equals, 0)
+	b.start(true, false)
+
+	err = srv.Writeln(str)
+	<-conn.Writechan
+	c.Assert(err, IsNil)
+	err = b.Writeln(serverId, str)
+	<-conn.Writechan
+	c.Assert(err, IsNil)
+	err = b.Writeln("notrealserver", str)
+	c.Assert(err, NotNil)
 	b.WaitForHalt()
 	b.Disconnect()
 }

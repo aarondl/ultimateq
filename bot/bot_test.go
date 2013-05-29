@@ -87,6 +87,7 @@ func (s *s) TestBot_StartStop(c *C) {
 	ers := b.Connect()
 	c.Assert(len(ers), Equals, 0)
 	b.Start()
+	b.Start() // This shouldn't do anything.
 	b.Stop()
 	b.Disconnect()
 	b.WaitForHalt()
@@ -247,7 +248,7 @@ func (s *s) TestBot_Register(c *C) {
 	c.Assert(err, Equals, errUnknownServerId)
 }
 
-func (s *s) TestcreateBot(c *C) {
+func (s *s) TestBot_createBot(c *C) {
 	mockCtrl := gomock.NewController(c)
 	defer mockCtrl.Finish()
 
