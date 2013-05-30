@@ -1,20 +1,21 @@
 package bot
 
 import (
+	"bytes"
 	"github.com/aarondl/ultimateq/config"
+	"github.com/aarondl/ultimateq/irc"
+	"github.com/aarondl/ultimateq/mocks"
 	. "launchpad.net/gocheck"
 	"net"
 )
 
-func (s *s) TestBot_ReadConfig(c *C) {
-	c.SucceedNow()
-	connProvider := func(srv string) (net.Conn, error) {
-		return nil, nil
-	}
+var zeroConnProvider = func(srv string) (net.Conn, error) {
+	return nil, nil
+}
 
-	b, err := createBot(fakeConfig, nil, connProvider)
+func (s *s) TestBot_ReadConfig(c *C) {
+	b, err := createBot(fakeConfig, nil, nil)
 	c.Assert(err, IsNil)
-	_ = b
 
 	b.ReadConfig(func(conf *config.Config) {
 		c.Assert(
@@ -26,14 +27,8 @@ func (s *s) TestBot_ReadConfig(c *C) {
 }
 
 func (s *s) TestBot_WriteConfig(c *C) {
-	c.SucceedNow()
-	connProvider := func(srv string) (net.Conn, error) {
-		return nil, nil
-	}
-
-	b, err := createBot(fakeConfig, nil, connProvider)
+	b, err := createBot(fakeConfig, nil, nil)
 	c.Assert(err, IsNil)
-	_ = b
 
 	b.WriteConfig(func(conf *config.Config) {
 		c.Assert(
@@ -45,5 +40,111 @@ func (s *s) TestBot_WriteConfig(c *C) {
 }
 
 func (s *s) TestBot_ReplaceConfig(c *C) {
-	c.Skip("Not implemented")
+	nick := []byte(irc.NICK + " :newnick\r\n")
+
+	conns := make(map[string]*mocks.Conn)
+	connProvider := func(srv string) (net.Conn, error) {
+		conn := mocks.CreateConn()
+		conns[srv[:len(srv)-5]] = conn //Remove port
+		return conn, nil
+	}
+
+	c1 := fakeConfig.Clone().
+		GlobalContext().
+		Channels("#chan1", "#chan2", "#chan3").
+		Server("newserver")
+
+	c2 := fakeConfig.Clone().
+		ServerContext(serverId).
+		Nick("newnick").
+		Channels("#chan1", "#chan3").
+		Server("anothernewserver")
+
+	b, err := createBot(c1, nil, connProvider)
+	c.Assert(err, IsNil)
+	c.Assert(len(b.servers), Equals, 2)
+
+	oldsrv1, oldsrv2 := b.servers[serverId], b.servers["newserver"]
+	oldsrv1.dispatcher.Unregister(irc.RAW, oldsrv1.handlerId)
+	oldsrv2.dispatcher.Unregister(irc.RAW, oldsrv2.handlerId)
+
+	errs := b.Connect()
+	c.Assert(len(errs), Equals, 0)
+	b.start(true, false)
+
+	servers := b.ReplaceConfig(c2)
+	c.Assert(len(servers), Equals, 1)
+	c.Assert(len(b.servers), Equals, 2)
+
+	c.Assert(servers[0].Err, IsNil)
+	c.Assert(servers[0].ServerName, Equals, "anothernewserver")
+
+	c.Assert(
+		bytes.Compare(conns[serverId].Receive(len(nick), nil), nick),
+		Equals,
+		0,
+	)
+
+	server := servers[0].server
+	c.Assert(server, NotNil)
+	server.dispatcher.Unregister(irc.RAW, server.handlerId)
+
+	errs = b.Connect()
+	c.Assert(len(errs), Equals, 1)
+	c.Assert(errs[0].Error(), Matches, ".*already connected.\n")
+
+	b.start(true, false)
+
+	c.Assert(oldsrv1.IsConnected(), Equals, true)
+	c.Assert(server.IsConnected(), Equals, true)
+
+	b.Stop()
+	b.Disconnect()
+	b.WaitForHalt()
+}
+
+func (s *s) TestBot_StartNewServers(c *C) {
+	conn := mocks.CreateConn()
+	connProvider1 := func(srv string) (net.Conn, error) {
+		return conn, nil
+	}
+	connProvider2 := func(srv string) (net.Conn, error) {
+		return nil, net.ErrWriteToConnected
+	}
+
+	b, err := createBot(fakeConfig, nil, connProvider1)
+	c.Assert(err, IsNil)
+	srv := b.servers[serverId]
+	srv.dispatcher.Unregister(irc.RAW, srv.handlerId)
+
+	arr := []NewServer{{
+		ServerName: serverId,
+		server:     b.servers[serverId],
+	}}
+
+	b.StartNewServers(arr)
+	c.Assert(arr[0].Err, IsNil)
+
+	conn.Send([]byte{}, 0, net.ErrWriteToConnected)
+
+	b.Stop()
+	b.Disconnect()
+	b.WaitForHalt()
+
+	c.Assert(b.servers[serverId].client, IsNil)
+
+	b, err = createBot(fakeConfig, nil, connProvider2)
+	c.Assert(err, IsNil)
+
+	arr = []NewServer{{
+		ServerName: serverId,
+		server:     b.servers[serverId],
+	}}
+
+	b.StartNewServers(arr)
+	c.Assert(arr[0].Err, Equals, net.ErrWriteToConnected)
+
+	b.Stop()
+	b.Disconnect()
+	b.WaitForHalt()
 }

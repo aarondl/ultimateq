@@ -10,13 +10,14 @@ import "strings"
 // IRC Messages, these messages are 1-1 constant to string lookups for ease of
 // use when registering handlers etc.
 const (
-	PRIVMSG = "PRIVMSG"
-	NOTICE  = "NOTICE"
-	QUIT    = "QUIT"
 	JOIN    = "JOIN"
+	NICK    = "NICK"
+	NOTICE  = "NOTICE"
 	PART    = "PART"
 	PING    = "PING"
 	PONG    = "PONG"
+	PRIVMSG = "PRIVMSG"
+	QUIT    = "QUIT"
 )
 
 // IRC Reply and Error Messages. These are sent in reply to a previous message.
