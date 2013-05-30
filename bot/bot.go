@@ -146,7 +146,7 @@ func (b *Bot) connectServer(srv *Server) (err error) {
 	srv.protect.Lock()
 	err = srv.createIrcClient()
 	if err == nil {
-		srv.setConnected(false)
+		srv.setConnected(true, false)
 	}
 	srv.protect.Unlock()
 	return
@@ -187,7 +187,12 @@ func (b *Bot) startServer(srv *Server, writing, reading bool) {
 	defer srv.protect.Unlock()
 
 	if srv.isConnected() && srv.client != nil {
-		srv.setStarted(false)
+		if writing {
+			srv.setWriting(true, false)
+		}
+		if reading {
+			srv.setReading(true, false)
+		}
 		srv.client.SpawnWorkers(writing, reading)
 
 		b.dispatchMessage(srv, &irc.IrcMessage{Name: irc.CONNECT})
@@ -221,9 +226,9 @@ func (b *Bot) StopServer(serverId string) (found bool) {
 
 // stopServer stops dispatcher on the given server.
 func (b *Bot) stopServer(srv *Server) {
-	if srv.IsStarted() {
+	if srv.IsReading() {
 		srv.killdispatch <- 0
-		srv.setStopped(true)
+		srv.setReading(false, true)
 	}
 }
 
@@ -260,7 +265,8 @@ func (b *Bot) disconnectServer(srv *Server) {
 	srv.protect.Lock()
 	defer srv.protect.Unlock()
 	srv.client = nil
-	srv.setDisconnected(false)
+	srv.setWriting(false, false)
+	srv.setConnected(false, false)
 }
 
 // InterruptReconnect stops reconnecting the given server by id.
@@ -371,15 +377,17 @@ func (b *Bot) dispatchMessages(s *Server) {
 	if reconn {
 		sec := time.Duration(s.conf.GetReconnectTimeout()) * s.reconnScale
 		log.Printf(fmtDisconnected, s.conf.GetName(), sec)
-		s.setStopped(true)
 		b.disconnectServer(s)
-		s.setReconnecting(true)
+		s.protect.Lock()
+		s.setStarted(false, false)
+		s.setReconnecting(true, false)
+		s.protect.Unlock()
 		select {
 		case <-time.After(sec):
-			s.setNotReconnecting(true)
+			s.setReconnecting(false, true)
 			break
 		case <-s.killreconn:
-			s.setNotReconnecting(true)
+			s.setReconnecting(false, true)
 			b.msgDispatchers.Done()
 			return
 		}

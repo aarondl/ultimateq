@@ -17,14 +17,11 @@ import (
 const (
 	STATE_NEW          = 0x0
 	STATE_CONNECTED    = 0x1
-	STATE_STARTED      = 0x2
-	STATE_RECONNECTING = 0x4
-	STATE_STOPPED      = ^STATE_STARTED
-	STATE_DISCONNECTED = ^STATE_CONNECTED
+	STATE_READING      = 0x2
+	STATE_WRITING      = 0x4
+	STATE_RECONNECTING = 0x8
 
-	MASK_CONNECTION = STATE_CONNECTED
-	MASK_DISPATCHER = STATE_STARTED
-	MASK_RECONNECT  = STATE_RECONNECTING
+	MASK_STARTED = STATE_READING | STATE_WRITING
 )
 
 const (
@@ -153,30 +150,26 @@ func (s *Server) IsConnected() bool {
 	return s.isConnected()
 }
 
-// IsConnected checks to see if the server is connected without locking
+// isConnected checks to see if the server is connected without locking
 func (s *Server) isConnected() bool {
-	return STATE_CONNECTED == s.state&MASK_CONNECTION
+	return STATE_CONNECTED == s.state&STATE_CONNECTED
 }
 
 // setConnected sets the server's connected flag.
-func (s *Server) setConnected(lock bool) {
+func (s *Server) setConnected(value, lock bool) {
 	if lock {
 		s.protect.Lock()
 		defer s.protect.Unlock()
 	}
-	s.state |= STATE_CONNECTED
-}
 
-// setDisconnected clears the server's connected flag.
-func (s *Server) setDisconnected(lock bool) {
-	if lock {
-		s.protect.Lock()
-		defer s.protect.Unlock()
+	if value {
+		s.state |= STATE_CONNECTED
+	} else {
+		s.state &= ^STATE_CONNECTED
 	}
-	s.state &= STATE_DISCONNECTED
 }
 
-// IsStarted checks to see if the dispatcher is running on the server.
+// IsStarted checks to see if the the server is currently reading or writing.
 func (s *Server) IsStarted() bool {
 	s.protect.RLock()
 	defer s.protect.RUnlock()
@@ -184,28 +177,80 @@ func (s *Server) IsStarted() bool {
 	return s.isStarted()
 }
 
-// IsStarted checks to see if the dispatcher is running on the server without
-// locking.
+// isStarted checks to see if the the server is currently reading or writing
+// without locking.
 func (s *Server) isStarted() bool {
-	return STATE_STARTED == s.state&MASK_DISPATCHER
+	return 0 != s.state&MASK_STARTED
 }
 
-// setStarted clears the server's started flag.
-func (s *Server) setStarted(lock bool) {
+// setStarted sets the server's reading and writing flags simultaneously.
+func (s *Server) setStarted(value, lock bool) {
 	if lock {
 		s.protect.Lock()
 		defer s.protect.Unlock()
 	}
-	s.state |= STATE_STARTED
+
+	if value {
+		s.state |= MASK_STARTED
+	} else {
+		s.state &= ^MASK_STARTED
+	}
 }
 
-// setStopped clears the server's started flag.
-func (s *Server) setStopped(lock bool) {
+// IsReading checks to see if the dispatcher read-loop is running on the server.
+func (s *Server) IsReading() bool {
+	s.protect.RLock()
+	defer s.protect.RUnlock()
+
+	return s.isReading()
+}
+
+// isReading checks to see if the dispatcher read-loop is running on the server
+// without locking.
+func (s *Server) isReading() bool {
+	return STATE_READING == s.state&STATE_READING
+}
+
+// setReading sets the server's reading flag.
+func (s *Server) setReading(value, lock bool) {
 	if lock {
 		s.protect.Lock()
 		defer s.protect.Unlock()
 	}
-	s.state &= STATE_STOPPED
+
+	if value {
+		s.state |= STATE_READING
+	} else {
+		s.state &= ^STATE_READING
+	}
+}
+
+// IsWriting checks to see if the server's write loop has been activated.
+func (s *Server) IsWriting() bool {
+	s.protect.RLock()
+	defer s.protect.RUnlock()
+
+	return s.isWriting()
+}
+
+// isWriting checks to see if the server's write loop has been activated without
+// locking.
+func (s *Server) isWriting() bool {
+	return STATE_WRITING == s.state&STATE_WRITING
+}
+
+// setWriting sets the server's writing flag.
+func (s *Server) setWriting(value, lock bool) {
+	if lock {
+		s.protect.Lock()
+		defer s.protect.Unlock()
+	}
+
+	if value {
+		s.state |= STATE_WRITING
+	} else {
+		s.state &= ^STATE_WRITING
+	}
 }
 
 // IsReconnecting checks to see if the dispatcher is waiting to reconnect the
@@ -218,25 +263,21 @@ func (s *Server) IsReconnecting() bool {
 }
 
 // isReconnecting checks to see if the dispatcher is waiting to reconnect the
-// without locking server.
+// without locking.
 func (s *Server) isReconnecting() bool {
-	return STATE_RECONNECTING == s.state&MASK_RECONNECT
+	return STATE_RECONNECTING == s.state&STATE_RECONNECTING
 }
 
-// setStarted clears the server's started flag.
-func (s *Server) setReconnecting(lock bool) {
+// setStarted sets the server's reconnecting flag.
+func (s *Server) setReconnecting(value, lock bool) {
 	if lock {
 		s.protect.Lock()
 		defer s.protect.Unlock()
 	}
-	s.state |= STATE_RECONNECTING
-}
 
-// setStopped clears the server's started flag.
-func (s *Server) setNotReconnecting(lock bool) {
-	if lock {
-		s.protect.Lock()
-		defer s.protect.Unlock()
+	if value {
+		s.state |= STATE_RECONNECTING
+	} else {
+		s.state &= ^STATE_RECONNECTING
 	}
-	s.state &= ^STATE_RECONNECTING
 }

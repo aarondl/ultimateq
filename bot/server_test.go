@@ -90,33 +90,62 @@ func (s *s) TestServer_Write(c *C) {
 
 func (s *s) TestServer_State(c *C) {
 	srv := &Server{}
-	srv.setStarted(false)
+
+	srv.setStarted(true, false)
 	c.Assert(srv.IsStarted(), Equals, true)
-	srv.setStopped(false)
+	srv.setStarted(false, false)
 	c.Assert(srv.IsStarted(), Equals, false)
 
-	srv.setStarted(true)
+	srv.setStarted(true, true)
 	c.Assert(srv.IsStarted(), Equals, true)
-	srv.setStopped(true)
+	srv.setStarted(false, true)
 	c.Assert(srv.IsStarted(), Equals, false)
 
-	srv.setConnected(true)
+	srv.setReading(true, false)
+	c.Assert(srv.IsReading(), Equals, true)
+	c.Assert(srv.IsStarted(), Equals, true)
+	srv.setReading(false, false)
+	c.Assert(srv.IsReading(), Equals, false)
+	c.Assert(srv.IsStarted(), Equals, false)
+
+	srv.setReading(true, true)
+	c.Assert(srv.IsReading(), Equals, true)
+	c.Assert(srv.IsStarted(), Equals, true)
+	srv.setReading(false, true)
+	c.Assert(srv.IsReading(), Equals, false)
+	c.Assert(srv.IsStarted(), Equals, false)
+
+	srv.setWriting(true, false)
+	c.Assert(srv.IsWriting(), Equals, true)
+	c.Assert(srv.IsStarted(), Equals, true)
+	srv.setWriting(false, false)
+	c.Assert(srv.IsWriting(), Equals, false)
+	c.Assert(srv.IsStarted(), Equals, false)
+
+	srv.setWriting(true, true)
+	c.Assert(srv.IsWriting(), Equals, true)
+	c.Assert(srv.IsStarted(), Equals, true)
+	srv.setWriting(false, true)
+	c.Assert(srv.IsWriting(), Equals, false)
+	c.Assert(srv.IsStarted(), Equals, false)
+
+	srv.setConnected(true, false)
 	c.Assert(srv.IsConnected(), Equals, true)
-	srv.setDisconnected(true)
+	srv.setConnected(false, false)
 	c.Assert(srv.IsConnected(), Equals, false)
 
-	srv.setConnected(true)
+	srv.setConnected(true, true)
 	c.Assert(srv.IsConnected(), Equals, true)
-	srv.setDisconnected(true)
+	srv.setConnected(false, true)
 	c.Assert(srv.IsConnected(), Equals, false)
 
-	srv.setReconnecting(true)
+	srv.setReconnecting(true, false)
 	c.Assert(srv.IsReconnecting(), Equals, true)
-	srv.setNotReconnecting(true)
+	srv.setReconnecting(false, false)
 	c.Assert(srv.IsReconnecting(), Equals, false)
 
-	srv.setReconnecting(true)
+	srv.setReconnecting(true, true)
 	c.Assert(srv.IsReconnecting(), Equals, true)
-	srv.setNotReconnecting(true)
+	srv.setReconnecting(false, true)
 	c.Assert(srv.IsReconnecting(), Equals, false)
 }
