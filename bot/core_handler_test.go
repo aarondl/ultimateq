@@ -1,11 +1,11 @@
 package bot
 
 import (
-	"code.google.com/p/gomock/gomock"
+	"bytes"
 	"fmt"
 	"github.com/aarondl/ultimateq/config"
-	mocks "github.com/aarondl/ultimateq/inet/test"
 	"github.com/aarondl/ultimateq/irc"
+	"github.com/aarondl/ultimateq/mocks"
 	"io"
 	. "launchpad.net/gocheck"
 	"net"
@@ -34,7 +34,7 @@ func (t testSender) Writeln(str string) error {
 
 // callBack gets the Bot, the mock Connection, the server's config, and the
 // write channel if during the call to testHandlerResponse startWriter was true
-type callBack func(*Bot, *mocks.MockConn, *config.Server, chan []byte)
+type callBack func(*Bot, *mocks.Conn, *config.Server)
 
 /* WARNING:
  This test requires that we be able to wait on the socket to receive some data.
@@ -58,16 +58,7 @@ type callBack func(*Bot, *mocks.MockConn, *config.Server, chan []byte)
 func testHandlerResponse(c *C, startWriter, startReader bool,
 	before callBack, after callBack) {
 
-	mockCtrl := gomock.NewController(c)
-	defer mockCtrl.Finish()
-
-	conn := mocks.NewMockConn(mockCtrl)
-	var channel chan []byte
-	if startWriter {
-		conn.Writechan = make(chan []byte)
-		channel = conn.Writechan
-	}
-
+	conn := mocks.CreateConn()
 	connProvider := func(srv string) (net.Conn, error) {
 		return conn, nil
 	}
@@ -78,16 +69,14 @@ func testHandlerResponse(c *C, startWriter, startReader bool,
 	server := b.servers[serverId]
 
 	if before != nil {
-		before(b, conn, server.conf, channel)
+		before(b, conn, server.conf)
 	}
-
-	conn.EXPECT().Close()
 
 	b.Connect()
 	b.start(startWriter, startReader)
 
 	if after != nil {
-		after(b, conn, server.conf, channel)
+		after(b, conn, server.conf)
 	}
 
 	b.WaitForHalt()
@@ -111,66 +100,53 @@ func (s *s) TestCoreHandler_Ping(c *C) {
 }
 
 func (s *s) TestCoreHandler_Connect(c *C) {
-	testHandlerResponse(c, true, false,
-		func(_ *Bot, conn *mocks.MockConn, conf *config.Server, c chan []byte) {
-			msg1 := fmt.Sprintf("NICK :%v\r\n", conf.GetNick())
-			msg2 := fmt.Sprintf("USER %v 0 * :%v\r\n",
-				conf.GetUsername(), conf.GetRealname())
+	testHandlerResponse(c, true, false, nil,
+		func(b *Bot, conn *mocks.Conn, conf *config.Server) {
+			msg1 := []byte(fmt.Sprintf("NICK :%v\r\n", conf.GetNick()))
+			msg2 := []byte(fmt.Sprintf("USER %v 0 * :%v\r\n",
+				conf.GetUsername(), conf.GetRealname()))
 
-			gomock.InOrder(
-				conn.EXPECT().Write([]byte(msg1)).Return(len(msg1), nil),
-				conn.EXPECT().Write([]byte(msg2)).Return(len(msg2), io.EOF),
-			)
-		},
-		func(_ *Bot, conn *mocks.MockConn, conf *config.Server, c chan []byte) {
-			<-c
-			<-c
+			c.Assert(bytes.Compare(conn.Receive(len(msg1), nil), msg1),
+				Equals, 0)
+			c.Assert(bytes.Compare(conn.Receive(len(msg2), nil), msg2),
+				Equals, 0)
 		},
 	)
 }
 
 func (s *s) TestCoreHandler_Nick(c *C) {
-	testHandlerResponse(c, true, true,
-		func(_ *Bot, conn *mocks.MockConn, conf *config.Server, c chan []byte) {
+	testHandlerResponse(c, true, true, nil,
+		func(_ *Bot, conn *mocks.Conn, conf *config.Server) {
 			nickstr := "NICK :%v\r\n"
-			nick1 := fmt.Sprintf(nickstr, conf.GetNick())
-			nick2 := fmt.Sprintf(nickstr, conf.GetAltnick())
-			nick3 := fmt.Sprintf(nickstr, conf.GetNick()+"_")
-			nick4 := fmt.Sprintf(nickstr, conf.GetNick()+"__")
-			user := fmt.Sprintf("USER %v 0 * :%v\r\n",
-				conf.GetUsername(), conf.GetRealname())
-			errmsg := fmt.Sprintf("433 :Nick is in use\r\n")
+			nick1 := []byte(fmt.Sprintf(nickstr, conf.GetNick()))
+			nick2 := []byte(fmt.Sprintf(nickstr, conf.GetAltnick()))
+			nick3 := []byte(fmt.Sprintf(nickstr, conf.GetNick()+"_"))
+			nick4 := []byte(fmt.Sprintf(nickstr, conf.GetNick()+"__"))
+			user := []byte(fmt.Sprintf("USER %v 0 * :%v\r\n",
+				conf.GetUsername(), conf.GetRealname()))
+			errmsg := []byte(fmt.Sprintf("433 :Nick is in use\r\n"))
 
-			mocks.ByteFiller = []byte(
-				errmsg + errmsg + errmsg + errmsg,
-			)
-
-			conn.EXPECT().Write([]byte(nick1)).Return(len(nick1), nil)
-			conn.EXPECT().Write([]byte(user)).Return(len(user), nil)
-			conn.EXPECT().Write([]byte(nick2)).Return(len(nick2), nil)
-			conn.EXPECT().Write([]byte(nick3)).Return(len(nick3), nil)
-			conn.EXPECT().Write([]byte(nick4)).Return(len(nick4), io.EOF)
-			gomock.InOrder(
-				conn.EXPECT().Read(gomock.Any()).Return(len(errmsg), nil),
-				conn.EXPECT().Read(gomock.Any()).Return(len(errmsg), nil),
-				conn.EXPECT().Read(gomock.Any()).Return(len(errmsg), io.EOF),
-			)
-		},
-		func(_ *Bot, conn *mocks.MockConn, conf *config.Server, c chan []byte) {
-			for i := 0; i < 5; i++ {
-				<-c
-			}
+			c.Assert(bytes.Compare(conn.Receive(len(nick1), nil), nick1),
+				Equals, 0)
+			c.Assert(bytes.Compare(conn.Receive(len(user), nil), user),
+				Equals, 0)
+			conn.Send(errmsg, len(errmsg), nil)
+			c.Assert(bytes.Compare(conn.Receive(len(nick2), nil), nick2),
+				Equals, 0)
+			conn.Send(errmsg, len(errmsg), nil)
+			c.Assert(bytes.Compare(conn.Receive(len(nick3), nil), nick3),
+				Equals, 0)
+			conn.Send(errmsg, len(errmsg), nil)
+			c.Assert(bytes.Compare(conn.Receive(len(nick4), nil), nick4),
+				Equals, 0)
+			conn.Send(errmsg, 0, io.EOF)
 		},
 	)
 }
 
 func (s *s) TestCoreHandler_005(c *C) {
-	mockCtrl := gomock.NewController(c)
-	defer mockCtrl.Finish()
-
-	conn := mocks.NewMockConn(mockCtrl)
 	connProvider := func(srv string) (net.Conn, error) {
-		return conn, nil
+		return nil, nil
 	}
 
 	b, err := createBot(fakeConfig, nil, connProvider)

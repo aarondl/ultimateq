@@ -1,10 +1,9 @@
 package bot
 
 import (
-	"code.google.com/p/gomock/gomock"
 	"github.com/aarondl/ultimateq/config"
-	mocks "github.com/aarondl/ultimateq/inet/test"
 	"github.com/aarondl/ultimateq/irc"
+	"github.com/aarondl/ultimateq/mocks"
 	"io"
 	. "launchpad.net/gocheck"
 	"log"
@@ -69,13 +68,7 @@ func (s *s) TestCreateBot(c *C) {
 }
 
 func (s *s) TestBot_StartStop(c *C) {
-	mockCtrl := gomock.NewController(c)
-	defer mockCtrl.Finish()
-
-	conn := mocks.NewMockConn(mockCtrl)
-	conn.EXPECT().Read(gomock.Any()).Return(0, net.ErrWriteToConnected)
-	conn.EXPECT().Close()
-
+	conn := mocks.CreateConn()
 	connProvider := func(srv string) (net.Conn, error) {
 		return conn, nil
 	}
@@ -88,20 +81,16 @@ func (s *s) TestBot_StartStop(c *C) {
 	c.Assert(len(ers), Equals, 0)
 	b.Start()
 	b.Start() // This shouldn't do anything.
+
+	conn.Send([]byte{}, 0, io.EOF)
+
 	b.Stop()
 	b.Disconnect()
 	b.WaitForHalt()
 }
 
 func (s *s) TestBot_StartStopServer(c *C) {
-	mockCtrl := gomock.NewController(c)
-	defer mockCtrl.Finish()
-
-	conn := mocks.NewMockConn(mockCtrl)
-	conn.EXPECT().Read(gomock.Any()).Return(0, net.ErrWriteToConnected)
-	conn.EXPECT().Close()
-	conn.EXPECT().Close()
-
+	conn := mocks.CreateConn()
 	connProvider := func(srv string) (net.Conn, error) {
 		return conn, nil
 	}
@@ -123,16 +112,24 @@ func (s *s) TestBot_StartStopServer(c *C) {
 
 	b.StartServer(serverId)
 	c.Assert(srv.IsStarted(), Equals, true)
+	c.Assert(srv.IsReading(), Equals, true)
+	c.Assert(srv.IsWriting(), Equals, true)
 
 	b.StopServer(serverId)
-	c.Assert(srv.IsStarted(), Equals, false)
+	c.Assert(srv.IsStarted(), Equals, true)
+	c.Assert(srv.IsReading(), Equals, false)
+	c.Assert(srv.IsWriting(), Equals, true)
+
+	conn.Send([]byte{}, 0, io.EOF)
 
 	b.DisconnectServer(serverId)
 	c.Assert(srv.IsConnected(), Equals, false)
+	c.Assert(srv.IsWriting(), Equals, false)
 
 	b.WaitForHalt()
 
 	_, err = b.ConnectServer(serverId)
+	conn.ResetDeath()
 	c.Assert(err, IsNil)
 	b.DisconnectServer(serverId)
 }
@@ -142,16 +139,15 @@ func (s *s) TestBot_Reconnecting(c *C) {
 		Userhost("bitforge.ca").Realname("ultimateq").NoReconnect(false).
 		ReconnectTimeout(1).Ssl(true).Server(serverId)
 
-	mockCtrl := gomock.NewController(c)
-	defer mockCtrl.Finish()
-
-	conn := mocks.NewMockConn(mockCtrl)
-	conn.EXPECT().Read(gomock.Any()).Return(0, io.EOF)
-	conn.EXPECT().Read(gomock.Any()).Return(0, io.EOF)
-	conn.EXPECT().Close()
-	conn.EXPECT().Close()
-
+	cumutex := sync.Mutex{}
+	waiter := sync.WaitGroup{}
+	waiter.Add(2)
+	var conn *mocks.Conn
 	connProvider := func(srv string) (net.Conn, error) {
+		cumutex.Lock()
+		conn = mocks.CreateConn()
+		cumutex.Unlock()
+		waiter.Done()
 		return conn, nil
 	}
 
@@ -179,20 +175,29 @@ func (s *s) TestBot_Reconnecting(c *C) {
 	b.Register(irc.DISCONNECT, handler)
 	b.Connect()
 	b.start(false, true)
+
+	cumutex.Lock()
+	conn.Send([]byte{}, 0, io.EOF)
+	conn.WaitForDeath()
+	cumutex.Unlock()
+
+	waiter.Wait()
+
+	cumutex.Lock()
+	conn.Send([]byte{}, 0, io.EOF)
+	conn.WaitForDeath()
+	cumutex.Unlock()
 	b.WaitForHalt()
+
+	mu.Lock()
+	c.Assert(discs, Equals, 2)
+	mu.Unlock()
 }
 
 func (s *s) TestBot_Dispatching(c *C) {
-	mockCtrl := gomock.NewController(c)
-	defer mockCtrl.Finish()
-
 	str := []byte("PRIVMSG #chan :msg\r\n#\r\n")
 
-	conn := mocks.NewMockConn(mockCtrl)
-	mocks.ByteFiller = str
-	conn.EXPECT().Read(gomock.Any()).Return(len(str), io.EOF)
-	conn.EXPECT().Close()
-
+	conn := mocks.CreateConn()
 	connProvider := func(srv string) (net.Conn, error) {
 		return conn, nil
 	}
@@ -213,6 +218,9 @@ func (s *s) TestBot_Dispatching(c *C) {
 	ers := b.Connect()
 	c.Assert(len(ers), Equals, 0)
 	b.start(false, true)
+
+	conn.Send(str, len(str), io.EOF)
+
 	waiter.Wait()
 	b.Stop()
 	b.WaitForHalt()
@@ -220,11 +228,7 @@ func (s *s) TestBot_Dispatching(c *C) {
 }
 
 func (s *s) TestBot_Register(c *C) {
-	mockCtrl := gomock.NewController(c)
-	defer mockCtrl.Finish()
-
-	conn := mocks.NewMockConn(mockCtrl)
-
+	conn := mocks.CreateConn()
 	connProvider := func(srv string) (net.Conn, error) {
 		return conn, nil
 	}
@@ -249,14 +253,12 @@ func (s *s) TestBot_Register(c *C) {
 }
 
 func (s *s) TestBot_createBot(c *C) {
-	mockCtrl := gomock.NewController(c)
-	defer mockCtrl.Finish()
-
 	capsProvider := func() *irc.ProtoCaps {
 		return irc.CreateProtoCaps()
 	}
+	conn := mocks.CreateConn()
 	connProvider := func(srv string) (net.Conn, error) {
-		return mocks.NewMockConn(mockCtrl), nil
+		return conn, nil
 	}
 
 	b, err := createBot(fakeConfig, capsProvider, connProvider)

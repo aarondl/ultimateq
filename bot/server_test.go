@@ -1,27 +1,17 @@
 package bot
 
 import (
-	"code.google.com/p/gomock/gomock"
-	mocks "github.com/aarondl/ultimateq/inet/test"
+	"bytes"
 	"github.com/aarondl/ultimateq/irc"
+	"github.com/aarondl/ultimateq/mocks"
 	. "launchpad.net/gocheck"
 	"net"
 )
 
 func (s *s) TestServerSender(c *C) {
-	mockCtrl := gomock.NewController(c)
-	defer mockCtrl.Finish()
-
 	str := "PONG :msg\r\n"
 
-	conn := mocks.NewMockConn(mockCtrl)
-	conn.Writechan = make(chan []byte)
-	gomock.InOrder(
-		conn.EXPECT().Write([]byte(str)).Return(len(str), nil),
-		conn.EXPECT().Write([]byte(str)).Return(len(str), nil),
-		conn.EXPECT().Close(),
-	)
-
+	conn := mocks.CreateConn()
 	connProvider := func(srv string) (net.Conn, error) {
 		return conn, nil
 	}
@@ -37,29 +27,19 @@ func (s *s) TestServerSender(c *C) {
 	c.Assert(len(ers), Equals, 0)
 	b.start(true, false)
 	err = srvsender.Writeln(str)
-	<-conn.Writechan
+	c.Assert(bytes.Compare(conn.Receive(len(str), nil), []byte(str)), Equals, 0)
 	c.Assert(err, IsNil)
 	_, err = srvsender.Write([]byte(str))
-	<-conn.Writechan
+	c.Assert(bytes.Compare(conn.Receive(len(str), nil), []byte(str)), Equals, 0)
 	c.Assert(err, IsNil)
 	b.WaitForHalt()
 	b.Disconnect()
 }
 
 func (s *s) TestServer_Write(c *C) {
-	mockCtrl := gomock.NewController(c)
-	defer mockCtrl.Finish()
-
 	str := "PONG :msg\r\n"
 
-	conn := mocks.NewMockConn(mockCtrl)
-	conn.Writechan = make(chan []byte)
-	gomock.InOrder(
-		conn.EXPECT().Write([]byte(str)).Return(len(str), nil),
-		conn.EXPECT().Write([]byte(str)).Return(len(str), nil),
-		conn.EXPECT().Close(),
-	)
-
+	conn := mocks.CreateConn()
 	connProvider := func(srv string) (net.Conn, error) {
 		return conn, nil
 	}
@@ -77,10 +57,10 @@ func (s *s) TestServer_Write(c *C) {
 	b.start(true, false)
 
 	err = srv.Writeln(str)
-	<-conn.Writechan
+	c.Assert(bytes.Compare(conn.Receive(len(str), nil), []byte(str)), Equals, 0)
 	c.Assert(err, IsNil)
-	err = b.Writeln(serverId, str)
-	<-conn.Writechan
+	_, err = srv.Write([]byte(str))
+	c.Assert(bytes.Compare(conn.Receive(len(str), nil), []byte(str)), Equals, 0)
 	c.Assert(err, IsNil)
 	err = b.Writeln("notrealserver", str)
 	c.Assert(err, NotNil)

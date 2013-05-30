@@ -88,6 +88,10 @@ func CreateIrcClient(conn net.Conn, name string) *IrcClient {
 // Siphon, and one that is constantly working on eliminating the write queue by
 // writing. Also sets up the instances kill channels.
 func (c *IrcClient) SpawnWorkers(pump, siphon bool) {
+	c.isShutdownProtect.Lock()
+	defer c.isShutdownProtect.Unlock()
+	c.isShutdown = false
+
 	if pump {
 		c.killpump = make(chan int)
 		go c.pump()
@@ -262,7 +266,6 @@ func (c *IrcClient) Close() error {
 
 	c.isShutdownProtect.Lock()
 	c.isShutdown = true
-	c.isShutdownProtect.Unlock()
 
 	if c.killpump != nil {
 		c.killpump <- 0
@@ -270,6 +273,7 @@ func (c *IrcClient) Close() error {
 	if c.killsiphon != nil {
 		c.killsiphon <- 0
 	}
+	c.isShutdownProtect.Unlock()
 
 	return err
 }
