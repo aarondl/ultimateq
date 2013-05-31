@@ -506,6 +506,25 @@ func (s *s) TestDispatcher_AddRemoveChannels(c *C) {
 	c.Assert(len(d.chans), Equals, len(chans))
 }
 
+func (s *s) TestDispatcher_GetChannels(c *C) {
+	d, err := CreateRichDispatcher(irc.CreateProtoCaps(), nil)
+	c.Assert(err, IsNil)
+
+	c.Assert(d.GetChannels(), IsNil)
+	chans := []string{"#chan1", "#chan2"}
+	d.Channels(chans)
+
+	for i, ch := range d.GetChannels() {
+		c.Assert(d.chans[i], Equals, ch)
+	}
+
+	first := d.GetChannels()
+	first[0] = "#chan3"
+	for i, ch := range d.GetChannels() {
+		c.Assert(d.chans[i], Equals, ch)
+	}
+}
+
 func (s *s) TestDispatcher_UpdateChannels(c *C) {
 	d, err := CreateRichDispatcher(irc.CreateProtoCaps(), nil)
 	c.Assert(err, IsNil)

@@ -49,15 +49,21 @@ func (s *s) TestBot_ReplaceConfig(c *C) {
 		return conn, nil
 	}
 
+	chans1 := []string{"#chan1", "#chan2", "#chan3"}
+	chans2 := []string{"#chan1", "#chan3"}
+	chans3 := []string{"#chan1"}
+
 	c1 := fakeConfig.Clone().
 		GlobalContext().
-		Channels("#chan1", "#chan2", "#chan3").
+		Channels(chans1...).
 		Server("newserver")
 
 	c2 := fakeConfig.Clone().
+		GlobalContext().
+		Channels(chans2...).
 		ServerContext(serverId).
 		Nick("newnick").
-		Channels("#chan1", "#chan3").
+		Channels(chans3...).
 		Server("anothernewserver")
 
 	b, err := createBot(c1, nil, connProvider)
@@ -72,9 +78,28 @@ func (s *s) TestBot_ReplaceConfig(c *C) {
 	c.Assert(len(errs), Equals, 0)
 	b.start(true, false)
 
-	servers := b.ReplaceConfig(c2)
+	c.Assert(elementsEquals(b.conf.Global.Channels, chans1), Equals, true)
+	c.Assert(elementsEquals(oldsrv1.conf.GetChannels(), chans1), Equals, true)
+	c.Assert(elementsEquals(oldsrv2.conf.GetChannels(), chans1), Equals, true)
+	c.Assert(elementsEquals(b.dispatcher.GetChannels(), chans1), Equals, true)
+	c.Assert(elementsEquals(oldsrv1.dispatcher.GetChannels(), chans1),
+		Equals, true)
+	c.Assert(elementsEquals(oldsrv2.dispatcher.GetChannels(), chans1),
+		Equals, true)
+
+	servers := b.replaceConfig(c2)
 	c.Assert(len(servers), Equals, 1)
 	c.Assert(len(b.servers), Equals, 2)
+
+	c.Assert(elementsEquals(b.conf.Global.Channels, chans2), Equals, true)
+	c.Assert(elementsEquals(oldsrv1.conf.GetChannels(), chans3), Equals, true)
+	c.Assert(elementsEquals(servers[0].server.conf.GetChannels(), chans2),
+		Equals, true)
+	c.Assert(elementsEquals(b.dispatcher.GetChannels(), chans2), Equals, true)
+	c.Assert(elementsEquals(oldsrv1.dispatcher.GetChannels(), chans3),
+		Equals, true)
+	c.Assert(elementsEquals(servers[0].server.dispatcher.GetChannels(), chans2),
+		Equals, true)
 
 	c.Assert(servers[0].Err, IsNil)
 	c.Assert(servers[0].ServerName, Equals, "anothernewserver")
@@ -122,7 +147,7 @@ func (s *s) TestBot_StartNewServers(c *C) {
 		server:     b.servers[serverId],
 	}}
 
-	b.StartNewServers(arr)
+	b.startNewServers(arr)
 	c.Assert(arr[0].Err, IsNil)
 
 	conn.Send([]byte{}, 0, net.ErrWriteToConnected)
@@ -141,10 +166,30 @@ func (s *s) TestBot_StartNewServers(c *C) {
 		server:     b.servers[serverId],
 	}}
 
-	b.StartNewServers(arr)
+	b.startNewServers(arr)
 	c.Assert(arr[0].Err, Equals, net.ErrWriteToConnected)
 
 	b.Stop()
 	b.Disconnect()
 	b.WaitForHalt()
+}
+
+func (s *s) TestBot_testElementEquals(c *C) {
+	a := []string{"a", "b"}
+	b := []string{"b", "a"}
+	c.Assert(elementsEquals(a, b), Equals, true)
+
+	a = []string{"a", "b", "c"}
+	c.Assert(elementsEquals(a, b), Equals, false)
+
+	a = []string{}
+	b = []string{}
+	c.Assert(elementsEquals(a, b), Equals, true)
+
+	b = []string{"a"}
+	c.Assert(elementsEquals(a, b), Equals, false)
+
+	a = []string{"a"}
+	b = []string{}
+	c.Assert(elementsEquals(a, b), Equals, false)
 }

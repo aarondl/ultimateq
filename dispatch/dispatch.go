@@ -100,6 +100,19 @@ func (d *Dispatcher) Channels(chans []string) {
 	d.protect.Unlock()
 }
 
+// GetChannels gets the active channels for this dispatcher.
+func (d *Dispatcher) GetChannels() (chans []string) {
+	d.protect.Lock()
+	defer d.protect.Unlock()
+
+	if d.chans == nil {
+		return
+	}
+	chans = make([]string, len(d.chans))
+	copy(chans, d.chans)
+	return
+}
+
 // AddChannels adds channels to the active channels for this dispatcher.
 func (d *Dispatcher) AddChannels(chans ...string) {
 	if 0 == len(chans) {

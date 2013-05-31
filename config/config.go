@@ -236,6 +236,16 @@ func (c *Config) Server(name string) *Config {
 	return c
 }
 
+// RemoveServer removes a server by name. Note that this does not work on
+// host if a name has been set on the server.
+func (c *Config) RemoveServer(name string) (deleted bool) {
+	if _, deleted := c.Servers[name]; deleted {
+		delete(c.Servers, name)
+		c.context = nil
+	}
+	return
+}
+
 // Host fluently sets the host for the current config context
 func (c *Config) Host(host string) *Config {
 	if c.context != nil {

@@ -67,9 +67,22 @@ func main() {
 	}
 	b.Start()
 
-	server1 := "irc.gamesurge.net1"
-	<-time.After(5 * time.Second)
-	b.DisconnectServer(server1)
+	<-time.After(20 * time.Second)
+	c := conf(config.CreateConfig())
+	c.RemoveServer("irc.gamesurge.net1")
+	c.GlobalContext().
+		Channels("#test").
+		Server("irc.gamesurge.net3").
+		Host("localhost").
+		Nick("super").
+		ServerContext("irc.gamesurge.net2").
+		Nick("heythere").
+		Channels("#hithere")
+	if !c.IsValid() {
+		c.DisplayErrors()
+		log.Fatal("Config error")
+	}
+	b.ReplaceConfig(c)
 
 	b.WaitForHalt()
 	b.Stop()

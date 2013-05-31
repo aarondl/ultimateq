@@ -261,6 +261,25 @@ func (s *s) TestConfig_GetServer(c *C) {
 	c.Assert(conf.GetServer(srv2.GetName()), Equals, srv2)
 }
 
+func (s *s) TestConfig_RemoveServer(c *C) {
+	conf := CreateConfig()
+	conf.Servers[srv1.GetName()] = srv1
+	conf.Servers[srv2.GetName()] = srv2
+	c.Assert(conf.GetServer(srv1.GetName()), Equals, srv1)
+	c.Assert(conf.GetServer(srv2.GetName()), Equals, srv2)
+
+	conf.ServerContext(srv1.GetName())
+	c.Assert(conf.context, NotNil)
+
+	conf.RemoveServer(srv1.GetName())
+	c.Assert(conf.IsValid(), Equals, true)
+
+	c.Assert(conf.context, IsNil)
+
+	c.Assert(conf.GetServer(srv1.GetName()), IsNil)
+	c.Assert(conf.GetServer(srv2.GetName()), Equals, srv2)
+}
+
 func (s *s) TestConfig_SetContext(c *C) {
 	conf := CreateConfig()
 	srv := *srv1

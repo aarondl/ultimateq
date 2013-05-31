@@ -31,8 +31,17 @@ func (b *Bot) WriteConfig(fn configCallback) {
 
 // ReplaceConfig replaces the current configuration for the bot. Running
 // servers not present in the new config will be shut down immediately, while
-// new servers will be created and returned, ready to start.
+// new servers will be started up.
 func (b *Bot) ReplaceConfig(newConfig *config.Config) []NewServer {
+	newServers := b.replaceConfig(newConfig)
+	b.startNewServers(newServers)
+	return newServers
+}
+
+// replaceConfig replaces the current configuration for the bot. Running
+// servers not present in the new config will be shut down immediately, while
+// new servers will be created and returned, ready to start.
+func (b *Bot) replaceConfig(newConfig *config.Config) []NewServer {
 	if !newConfig.IsValid() {
 		return nil
 	}
@@ -51,12 +60,24 @@ func (b *Bot) ReplaceConfig(newConfig *config.Config) []NewServer {
 			delete(b.servers, k)
 		} else {
 			setNick := s.conf.GetNick() != serverConf.GetNick()
+			setChannels :=
+				!elementsEquals(s.conf.GetChannels(), serverConf.GetChannels())
+
 			s.conf = serverConf
 
 			if setNick {
 				s.Writeln(irc.NICK + " :" + s.conf.GetNick())
 			}
+			if setChannels {
+				s.dispatcher.Channels(s.conf.GetChannels())
+			}
 		}
+	}
+
+	if !elementsEquals(b.conf.Global.GetChannels(),
+		newConfig.Global.GetChannels()) {
+
+		b.dispatcher.Channels(newConfig.Global.GetChannels())
 	}
 
 	for k, s := range newConfig.Servers {
@@ -75,7 +96,7 @@ func (b *Bot) ReplaceConfig(newConfig *config.Config) []NewServer {
 // StartNewServers starts the servers in the regular way for the bot. If there
 // is any error starting the bot it will write back to the NewServer array any
 // errors.
-func (b *Bot) StartNewServers(servers []NewServer) {
+func (b *Bot) startNewServers(servers []NewServer) {
 	for i := 0; i < len(servers); i++ {
 		err := b.connectServer(servers[i].server)
 		if err != nil {
@@ -106,4 +127,27 @@ func (b *Bot) DumpConfig() (err error) {
 	defer b.configsProtect.RUnlock()
 	err = config.FlushConfigToFile(b.conf, confName)
 	return
+}
+
+// elementsEquals checks that the string arrays contain the same elements.
+func elementsEquals(a, b []string) bool {
+	lena, lenb := len(a), len(b)
+	if lena != lenb {
+		return false
+	}
+
+	for i := 0; i < lena; i++ {
+		found := false
+		for j := 0; j < lenb; j++ {
+			if a[i] == b[j] {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+
+	return true
 }
