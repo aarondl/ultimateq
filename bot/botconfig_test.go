@@ -125,52 +125,6 @@ func (s *s) TestBot_ReplaceConfig(c *C) {
 	b.WaitForHalt()
 }
 
-/*func (s *s) TestBot_StartNewServers(c *C) {
-	conn := mocks.CreateConn()
-	connProvider1 := func(srv string) (net.Conn, error) {
-		return conn, nil
-	}
-	connProvider2 := func(srv string) (net.Conn, error) {
-		return nil, net.ErrWriteToConnected
-	}
-
-	b, err := createBot(fakeConfig, nil, connProvider1)
-	c.Assert(err, IsNil)
-	srv := b.servers[serverId]
-	srv.dispatcher.Unregister(irc.RAW, srv.handlerId)
-
-	arr := []NewServer{{
-		ServerName: serverId,
-		server:     b.servers[serverId],
-	}}
-
-	b.startNewServers(arr)
-	c.Assert(arr[0].Err, IsNil)
-
-	conn.Send([]byte{}, 0, net.ErrWriteToConnected)
-
-	b.Stop()
-	b.Disconnect()
-	b.WaitForHalt()
-
-	c.Assert(b.servers[serverId].client, IsNil)
-
-	b, err = createBot(fakeConfig, nil, connProvider2)
-	c.Assert(err, IsNil)
-
-	arr = []NewServer{{
-		ServerName: serverId,
-		server:     b.servers[serverId],
-	}}
-
-	b.startNewServers(arr)
-	c.Assert(arr[0].Err, Equals, net.ErrWriteToConnected)
-
-	b.Stop()
-	b.Disconnect()
-	b.WaitForHalt()
-}*/
-
 func (s *s) TestBot_testElementEquals(c *C) {
 	a := []string{"a", "b"}
 	b := []string{"b", "a"}
