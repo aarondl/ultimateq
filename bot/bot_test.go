@@ -73,14 +73,12 @@ func (s *s) TestBot_StartStop(c *C) {
 		return conn, nil
 	}
 
-	b, err := createBot(fakeConfig, nil, connProvider)
-	srv := b.servers[serverId]
-	srv.dispatcher.Unregister(irc.RAW, srv.handlerId)
+	b, err := createBot(fakeConfig, nil, connProvider, false)
 	c.Assert(err, IsNil)
 	ers := b.Connect()
 	c.Assert(len(ers), Equals, 0)
 	b.Start()
-	b.Start() // This shouldn't do anything.
+	b.Start() // This shouldn't do anything, test cov
 
 	conn.Send([]byte{}, 0, io.EOF)
 
@@ -95,11 +93,10 @@ func (s *s) TestBot_StartStopServer(c *C) {
 		return conn, nil
 	}
 
-	b, err := createBot(fakeConfig, nil, connProvider)
+	b, err := createBot(fakeConfig, nil, connProvider, false)
 	c.Assert(err, IsNil)
 
 	srv := b.servers[serverId]
-	srv.dispatcher.Unregister(irc.RAW, srv.handlerId)
 	c.Assert(srv.IsStarted(), Equals, false)
 	c.Assert(srv.IsConnected(), Equals, false)
 
@@ -151,7 +148,7 @@ func (s *s) TestBot_Reconnecting(c *C) {
 		return conn, nil
 	}
 
-	b, err := createBot(conf, nil, connProvider)
+	b, err := createBot(conf, nil, connProvider, false)
 	c.Assert(err, IsNil)
 	srv := b.servers[serverId]
 	srv.reconnScale = time.Millisecond
@@ -171,7 +168,6 @@ func (s *s) TestBot_Reconnecting(c *C) {
 		}
 	}}
 
-	srv.dispatcher.Unregister(irc.RAW, srv.handlerId)
 	b.Register(irc.DISCONNECT, handler)
 	b.Connect()
 	b.start(false, true)
@@ -204,9 +200,7 @@ func (s *s) TestBot_Dispatching(c *C) {
 
 	waiter := sync.WaitGroup{}
 	waiter.Add(1)
-	b, err := createBot(fakeConfig, nil, connProvider)
-	srv := b.servers[serverId]
-	srv.dispatcher.Unregister(irc.RAW, srv.handlerId)
+	b, err := createBot(fakeConfig, nil, connProvider, false)
 
 	b.Register(irc.PRIVMSG, &testHandler{
 		func(m *irc.IrcMessage, send irc.Sender) {
@@ -233,7 +227,7 @@ func (s *s) TestBot_Register(c *C) {
 		return conn, nil
 	}
 
-	b, err := createBot(fakeConfig, nil, connProvider)
+	b, err := createBot(fakeConfig, nil, connProvider, false)
 	gid := b.Register(irc.PRIVMSG, &coreHandler{})
 	id, err := b.RegisterServer(serverId, irc.PRIVMSG, &coreHandler{})
 	c.Assert(err, IsNil)
@@ -261,7 +255,7 @@ func (s *s) TestBot_createBot(c *C) {
 		return conn, nil
 	}
 
-	b, err := createBot(fakeConfig, capsProvider, connProvider)
+	b, err := createBot(fakeConfig, capsProvider, connProvider, false)
 	c.Assert(b, NotNil)
 	c.Assert(err, IsNil)
 	c.Assert(len(b.servers), Equals, 1)
@@ -280,16 +274,16 @@ func (s *s) TestBot_Providers(c *C) {
 		return nil, net.ErrWriteToConnected
 	}
 
-	b, err := createBot(fakeConfig, capsProv, connProv)
+	b, err := createBot(fakeConfig, capsProv, connProv, false)
 	c.Assert(err, NotNil)
 	c.Assert(err, Not(Equals), net.ErrWriteToConnected)
-	b, err = createBot(fakeConfig, nil, connProv)
+	b, err = createBot(fakeConfig, nil, connProv, false)
 	ers := b.Connect()
 	c.Assert(ers[0], Equals, net.ErrWriteToConnected)
 }
 
 func (s *s) TestBot_createIrcClient(c *C) {
-	b, err := createBot(fakeConfig, nil, nil)
+	b, err := createBot(fakeConfig, nil, nil, false)
 	c.Assert(err, IsNil)
 	ers := b.Connect()
 	c.Assert(ers[0], Equals, errSslNotImplemented)
@@ -298,6 +292,6 @@ func (s *s) TestBot_createIrcClient(c *C) {
 func (s *s) TestBot_createDispatcher(c *C) {
 	_, err := createBot(fakeConfig, func() *irc.ProtoCaps {
 		return nil
-	}, nil)
+	}, nil, false)
 	c.Assert(err, NotNil)
 }

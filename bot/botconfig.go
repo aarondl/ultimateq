@@ -31,17 +31,10 @@ func (b *Bot) WriteConfig(fn configCallback) {
 
 // ReplaceConfig replaces the current configuration for the bot. Running
 // servers not present in the new config will be shut down immediately, while
-// new servers will be started up.
+// new servers will be connected to any ready to start. Updates active channels
+// for all dispatchers as well as sends nick messages to the servers with
+// updates for nicknames.
 func (b *Bot) ReplaceConfig(newConfig *config.Config) []NewServer {
-	newServers := b.replaceConfig(newConfig)
-	b.startNewServers(newServers)
-	return newServers
-}
-
-// replaceConfig replaces the current configuration for the bot. Running
-// servers not present in the new config will be shut down immediately, while
-// new servers will be created and returned, ready to start.
-func (b *Bot) replaceConfig(newConfig *config.Config) []NewServer {
 	if !newConfig.IsValid() {
 		return nil
 	}
@@ -84,6 +77,13 @@ func (b *Bot) replaceConfig(newConfig *config.Config) []NewServer {
 		if serverConf := b.conf.GetServer(k); nil == serverConf {
 			server, err := b.createServer(s)
 			b.servers[k] = server
+
+			if err != nil {
+				err = b.connectServer(server)
+				if err != nil {
+					b.startServer(server, true, true)
+				}
+			}
 			servers = append(servers, NewServer{k, server, err})
 		}
 	}
@@ -91,20 +91,6 @@ func (b *Bot) replaceConfig(newConfig *config.Config) []NewServer {
 	b.conf = newConfig
 
 	return servers
-}
-
-// StartNewServers starts the servers in the regular way for the bot. If there
-// is any error starting the bot it will write back to the NewServer array any
-// errors.
-func (b *Bot) startNewServers(servers []NewServer) {
-	for i := 0; i < len(servers); i++ {
-		err := b.connectServer(servers[i].server)
-		if err != nil {
-			servers[i].Err = err
-			continue
-		}
-		b.startServer(servers[i].server, true, true)
-	}
 }
 
 // Rehash loads the config from a file. It attempts to use the previously read

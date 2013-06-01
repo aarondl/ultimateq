@@ -41,6 +41,7 @@ var (
 // the connection and configuration for the specific server.
 type Server struct {
 	bot        *Bot
+	name       string
 	state      int
 	dispatcher *dispatch.Dispatcher
 	client     *inet.IrcClient
@@ -117,7 +118,7 @@ func (s *Server) createIrcClient() error {
 	var err error
 
 	if s.client != nil {
-		return errors.New(fmt.Sprintf(errFmtAlreadyConnected, s.conf.GetName()))
+		return errors.New(fmt.Sprintf(errFmtAlreadyConnected, s.name))
 	}
 
 	port := strconv.Itoa(int(s.conf.GetPort()))
@@ -138,7 +139,7 @@ func (s *Server) createIrcClient() error {
 		}
 	}
 
-	s.client = inet.CreateIrcClient(conn, s.conf.GetName())
+	s.client = inet.CreateIrcClient(conn, s.name)
 	return nil
 }
 

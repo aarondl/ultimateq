@@ -2,7 +2,6 @@ package bot
 
 import (
 	"bytes"
-	"github.com/aarondl/ultimateq/irc"
 	"github.com/aarondl/ultimateq/mocks"
 	. "launchpad.net/gocheck"
 	"net"
@@ -16,10 +15,9 @@ func (s *s) TestServerSender(c *C) {
 		return conn, nil
 	}
 
-	b, err := createBot(fakeConfig, nil, connProvider)
+	b, err := createBot(fakeConfig, nil, connProvider, false)
 	c.Assert(err, IsNil)
 	srv := b.servers[serverId]
-	srv.dispatcher.Unregister(irc.RAW, srv.handlerId)
 	srvsender := ServerSender{serverId, srv}
 	c.Assert(srvsender.GetKey(), Equals, serverId)
 
@@ -44,10 +42,9 @@ func (s *s) TestServer_Write(c *C) {
 		return conn, nil
 	}
 
-	b, err := createBot(fakeConfig, nil, connProvider)
+	b, err := createBot(fakeConfig, nil, connProvider, false)
 	c.Assert(err, IsNil)
 	srv := b.servers[serverId]
-	srv.dispatcher.Unregister(irc.RAW, srv.handlerId)
 
 	_, err = srv.Write([]byte{})
 	c.Assert(err, Equals, errNotConnected)

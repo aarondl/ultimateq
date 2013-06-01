@@ -63,7 +63,7 @@ func testHandlerResponse(c *C, startWriter, startReader bool,
 		return conn, nil
 	}
 
-	b, err := createBot(fakeConfig, nil, connProvider)
+	b, err := createBot(fakeConfig, nil, connProvider, true)
 	c.Assert(err, IsNil)
 
 	server := b.servers[serverId]
@@ -149,7 +149,7 @@ func (s *s) TestCoreHandler_005(c *C) {
 		return nil, nil
 	}
 
-	b, err := createBot(fakeConfig, nil, connProvider)
+	b, err := createBot(fakeConfig, nil, connProvider, true)
 	c.Assert(err, IsNil)
 
 	msg := &irc.IrcMessage{

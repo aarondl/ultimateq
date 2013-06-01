@@ -63,8 +63,10 @@ type Bot struct {
 	caps       *irc.ProtoCaps
 	dispatcher *dispatch.Dispatcher
 
-	capsProvider CapsProvider
-	connProvider ConnProvider
+	// IoC and DI components mostly for testing.
+	attachHandlers bool
+	capsProvider   CapsProvider
+	connProvider   ConnProvider
 
 	msgDispatchers sync.WaitGroup
 	// servers
@@ -106,7 +108,7 @@ func CreateBot(conf *config.Config) (*Bot, error) {
 	if !CheckConfig(conf) {
 		return nil, errInvalidConfig
 	}
-	return createBot(conf, nil, nil)
+	return createBot(conf, nil, nil, true)
 }
 
 // Connect creates the connections and the IrcClient objects, as well as
@@ -349,7 +351,7 @@ func (b *Bot) dispatchMessages(s *Server) {
 		select {
 		case msg, ok := <-read:
 			if !ok {
-				log.Printf(errFmtReaderClosed, s.conf.GetName())
+				log.Printf(errFmtReaderClosed, s.name)
 				b.dispatchMessage(s, &irc.IrcMessage{Name: irc.DISCONNECT})
 				stop, disconnect = true, true
 				break
@@ -361,7 +363,7 @@ func (b *Bot) dispatchMessages(s *Server) {
 				b.dispatchMessage(s, ircMsg)
 			}
 		case <-s.killdispatch:
-			log.Printf(errFmtReaderClosed, s.conf.GetName())
+			log.Printf(errFmtReaderClosed, s.name)
 			stop = true
 			break
 		}
@@ -376,7 +378,7 @@ func (b *Bot) dispatchMessages(s *Server) {
 
 	if reconn {
 		sec := time.Duration(s.conf.GetReconnectTimeout()) * s.reconnScale
-		log.Printf(fmtDisconnected, s.conf.GetName(), sec)
+		log.Printf(fmtDisconnected, s.name, sec)
 		b.disconnectServer(s)
 		s.protect.Lock()
 		s.setStarted(false, false)
@@ -413,20 +415,22 @@ func (b *Bot) Writeln(server, message string) error {
 
 // dispatch sends a message to both the bot's dispatcher and the given servers
 func (b *Bot) dispatchMessage(s *Server, msg *irc.IrcMessage) {
-	sender := ServerSender{s.conf.GetName(), s}
+	sender := ServerSender{s.name, s}
 	b.dispatcher.Dispatch(msg, sender)
 	s.dispatcher.Dispatch(msg, sender)
 }
 
 // createBot creates a bot from the given configuration, using the providers
 // given to create connections and protocol caps.
-func createBot(conf *config.Config,
-	capsProv CapsProvider, connProv ConnProvider) (*Bot, error) {
+func createBot(conf *config.Config, capsProv CapsProvider,
+	connProv ConnProvider, attachHandlers bool) (*Bot, error) {
+
 	b := &Bot{
-		conf:         conf,
-		servers:      make(map[string]*Server, nAssumedServers),
-		capsProvider: capsProv,
-		connProvider: connProv,
+		conf:           conf,
+		servers:        make(map[string]*Server, nAssumedServers),
+		capsProvider:   capsProv,
+		connProvider:   connProv,
+		attachHandlers: attachHandlers,
 	}
 
 	if capsProv == nil {
@@ -445,6 +449,13 @@ func createBot(conf *config.Config,
 		if err != nil {
 			return nil, err
 		}
+
+		if b.attachHandlers {
+			server.handler = &coreHandler{bot: b}
+			server.handlerId =
+				server.dispatcher.Register(irc.RAW, server.handler)
+		}
+
 		b.servers[name] = server
 	}
 
@@ -454,9 +465,11 @@ func createBot(conf *config.Config,
 // createServer creates a dispatcher, and an irc client to connect to this
 // server.
 func (b *Bot) createServer(conf *config.Server) (*Server, error) {
+
 	var copyCaps irc.ProtoCaps = *b.caps
 	s := &Server{
 		bot:          b,
+		name:         conf.GetName(),
 		caps:         &copyCaps,
 		conf:         conf,
 		killdispatch: make(chan int),
@@ -467,9 +480,6 @@ func (b *Bot) createServer(conf *config.Server) (*Server, error) {
 	if err := s.createDispatcher(conf.GetChannels()); err != nil {
 		return nil, err
 	}
-
-	s.handler = &coreHandler{bot: b}
-	s.handlerId = s.dispatcher.Register(irc.RAW, s.handler)
 
 	return s, nil
 }
