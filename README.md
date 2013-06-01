@@ -13,7 +13,7 @@ a single extension. This has advantages if the extension is holding a
 database meant to be shared (although for scalability you might consider
 database level scaling with replication, but this is just an example).
 
-The other advantage is that the bot is isolation failure. Because each
+The other advantage is that the bot has failure isolation. Because each
 extension is running in it's own process, even a fatal and unrecoverable
 crash in an extension means nothing to the bot. This adds a resilency to
 this bot that not many other bots share.
@@ -42,12 +42,12 @@ packages can utilize.
 
 ###config
 Config package is used to present a fluent style configuration builder for an
-irc bot. It also provides some validation.
+irc bot. It also provides some validation, and file reading/writing.
 
 ###parse
 This package deals with parsing irc protocols. It is able to consume irc
-protocol messages using the Parse method, returning the common formatted
-IrcMessage type from the irc package.
+protocol messages using the Parse method, returning the common IrcMessage
+type from the irc package.
 
 ###dispatch
 Dispatch package is meant to register callbacks and dispatch IrcMessages onto
@@ -55,14 +55,13 @@ them in an asynchronous method. It also presents many handler types that will
 be easy to use for bot-writers.
 
 ###inet
-Implements the actual connection to the irc server, handles buffering, and
-logarithmic write-speed throttling.
+Implements the actual connection to an irc server, handles buffering, \r\n
+splitting and appending, and logarithmic write-speed throttling.
 
 ###extension
 This package defines helpers to create an extension for the bot. It should
 expose a way to connect/allow connections to the bot via TCP or Unix socket.
-And have simple helpers for some network RPC mechanism (JSON-RPC is a
-likely candidate).
+And have simple helpers for some network RPC mechanism.
 
 ###data
 This package holds data for irc based services. It supplies information
