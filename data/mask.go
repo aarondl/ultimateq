@@ -7,9 +7,63 @@ import (
 // Mask is a type that represents an irc hostmask. nickname!mask@hostname
 type Mask string
 
-// WildMask is a mask that contains wildcards.
-// TODO: DO SOMETHING WITH THIS
+// WildMask is an irc hostmask that contains wildcard characters ? and *
 type WildMask string
+
+func (w WildMask) Match(m Mask) bool {
+	ws, ms := string(w), string(m)
+	wl, ml := len(ws), len(ms)
+
+	if wl == 0 {
+		return ml == 0
+	}
+
+	var i, j, consume = 0, 0, 0
+	for i < wl && j < ml {
+
+		switch ws[i] {
+		case '?', '*':
+			star := false
+			consume = 0
+
+			for i < wl && (ws[i] == '*' || ws[i] == '?') {
+				star = star || ws[i] == '*'
+				i++
+				consume++
+			}
+
+			if star {
+				consume = -1
+			}
+		case ms[j]:
+			consume = 0
+			i++
+			j++
+		default:
+			if consume != 0 {
+				consume--
+				j++
+			} else {
+				return false
+			}
+		}
+	}
+
+	for i < wl && (ws[i] == '?' || ws[i] == '*') {
+		i++
+	}
+
+	if consume < 0 {
+		consume = ml - j
+	}
+	j += consume
+
+	if i < wl || j < ml {
+		return false
+	}
+
+	return true
+}
 
 // GetNick returns the nick of this mask.
 func (m Mask) GetNick() string {
@@ -35,11 +89,6 @@ func (m Mask) GetHost() string {
 
 // GetFullhost returns the fullhost of this mask.
 func (m Mask) GetFullhost() string {
-	return string(m)
-}
-
-// String returns a string representation of this mask.
-func (m Mask) String() string {
 	return string(m)
 }
 

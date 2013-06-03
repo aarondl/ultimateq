@@ -4,6 +4,14 @@ import (
 	"strings"
 )
 
+// MultiMode is used to represent modes that can occur multiple times and
+// rather than indicate state on a target, indicate state on the combination
+// of the target and the arg. (IRC Bans or Channel Voice/Ops for eg.)
+type MultiMode struct {
+	mode rune
+	arg  string
+}
+
 // ModeDiff encapsulates a difference of modes, a combination of both positive
 // change modes, and negative change modes.
 type ModeDiff struct {
@@ -19,9 +27,12 @@ func CreateModeDiff() *ModeDiff {
 	}
 }
 
-// CreateModeDiffFromModestring creates a ModeDiff and applies a modestring.
-func CreateModeDiffFromModestring(modestring, hasargs string) *ModeDiff {
-	return CreateModeDiff().Apply(modestring, hasargs)
+// CreateModeDiffFromModestring takes a modestring with no multiargs and creates
+// a modediff from it.
+func CreateModeDiffFromModestring(modestring, hasargs string) (m *ModeDiff) {
+	m = CreateModeDiff()
+	m.Apply(modestring, hasargs, "")
+	return m
 }
 
 // Checks if applying this diff will set the given simple modestrs.
@@ -34,10 +45,12 @@ func (m *ModeDiff) IsUnset(modestrs ...string) bool {
 	return m.neg.IsSet(modestrs...)
 }
 
-// Apply takes a complex modestring and transforms it into a diff.
-func (m *ModeDiff) Apply(modestring, hasargs string) *ModeDiff {
-	apply(m, modestring, hasargs)
-	return m
+// Apply takes a complex modestring and transforms it into a diff. Returns
+// the positive and negative multimodes.
+func (m *ModeDiff) Apply(modestring, hasargs, multiargs string) ([]MultiMode,
+	[]MultiMode) {
+
+	return apply(m, modestring, hasargs, multiargs)
 }
 
 // String turns a ModeDiff into a complex string representation.
@@ -111,16 +124,20 @@ func CreateModeset() *Modeset {
 	}
 }
 
-// CreateModesetFromModestring creates a Modeset and applies a modestring.
-func CreateModesetFromModestring(modestring, hasargs string) *Modeset {
-	return CreateModeset().Apply(modestring, hasargs)
+// CreateModesetFromModestring takes a modestring with no multiargs and creates
+// a modeset from it.
+func CreateModesetFromModestring(modestring, hasargs string) (m *Modeset) {
+	m = CreateModeset()
+	m.Apply(modestring, hasargs, "")
+	return m
 }
 
 // Apply takes a complex modestring and applies it to a an existing modeset
-// instance.
-func (m *Modeset) Apply(modestring, hasargs string) *Modeset {
-	apply(m, modestring, hasargs)
-	return m
+// instance, returns the positive and negative multimodes.
+func (m *Modeset) Apply(modestring, hasargs, multiargs string) ([]MultiMode,
+	[]MultiMode) {
+
+	return apply(m, modestring, hasargs, multiargs)
 }
 
 // ApplyDiff applies a ModeDiff to the current modeset instance.
@@ -246,9 +263,13 @@ type moder interface {
 }
 
 // apply parses a complex modestring and applies it to a moder interface.
-func apply(m moder, modestring, hasargs string) {
+func apply(m moder, modestring, hasargs, multiargs string) ([]MultiMode,
+	[]MultiMode) {
+
 	adding := true
 	argsUsed := 0
+
+	pos, neg := make([]MultiMode, 0), make([]MultiMode, 0)
 
 	splits := strings.Split(strings.TrimSpace(modestring), " ")
 
@@ -258,11 +279,25 @@ func apply(m moder, modestring, hasargs string) {
 			continue
 		}
 
-		if strings.ContainsRune(hasargs, c) {
+		args, multi := false, false
+		args = strings.ContainsRune(hasargs, c)
+		if !args {
+			multi = strings.ContainsRune(multiargs, c)
+		}
+
+		if args || multi {
 			if adding {
-				m.setPositiveMode(c, splits[argsUsed+1])
+				if args {
+					m.setPositiveMode(c, splits[argsUsed+1])
+				} else {
+					pos = append(pos, MultiMode{c, splits[argsUsed+1]})
+				}
 			} else {
-				m.setNegativeMode(c, splits[argsUsed+1])
+				if args {
+					m.setNegativeMode(c, splits[argsUsed+1])
+				} else {
+					neg = append(neg, MultiMode{c, splits[argsUsed+1]})
+				}
 			}
 			argsUsed++
 		} else {
@@ -273,6 +308,8 @@ func apply(m moder, modestring, hasargs string) {
 			}
 		}
 	}
+
+	return pos, neg
 }
 
 // parseSimpleModestrings morphs many simple mode strings into a single modes

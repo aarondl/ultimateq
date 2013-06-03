@@ -24,7 +24,7 @@ func (s *s) TestModeDiff_Apply(c *C) {
 	c.Assert(d.IsUnset("c"), Equals, true)
 	c.Assert(d.IsUnset("c 10"), Equals, true)
 
-	d.Apply(" +ab-c 10", "b")
+	d.Apply(" +ab-c 10", "b", "")
 	c.Assert(d.IsSet("a"), Equals, true)
 	c.Assert(d.IsSet("b 10"), Equals, true)
 	c.Assert(d.IsUnset("a"), Equals, false)
@@ -32,18 +32,31 @@ func (s *s) TestModeDiff_Apply(c *C) {
 	c.Assert(d.IsSet("c"), Equals, false)
 	c.Assert(d.IsUnset("c"), Equals, true)
 
-	d.Apply("-b 10", "b")
+	d.Apply("-b 10", "b", "")
 	c.Assert(d.IsSet("a"), Equals, true)
 	c.Assert(d.IsSet("b"), Equals, false)
 	c.Assert(d.IsUnset("b"), Equals, true)
 
-	d.Apply("x-y+z", "")
+	d.Apply("x-y+z", "", "")
 	c.Assert(d.IsSet("x"), Equals, true)
 	c.Assert(d.IsUnset("y"), Equals, true)
 	c.Assert(d.IsSet("z"), Equals, true)
 	c.Assert(d.IsUnset("x"), Equals, false)
 	c.Assert(d.IsSet("y"), Equals, false)
 	c.Assert(d.IsUnset("z"), Equals, false)
+}
+
+func (s *s) TestModeDiff_MultiArgs(c *C) {
+	m := CreateModeDiffFromModestring("+ab-c 10 ", "c")
+	pos, neg := m.Apply(" +abbb-cbb 1 2 3 1 2", "", "b")
+	for i := 0; i < len(pos); i++ {
+		c.Assert(pos[i].mode, Equals, 'b')
+		c.Assert(pos[i].arg, Equals, string('1'+i))
+	}
+	for i := 0; i < len(neg); i++ {
+		c.Assert(pos[i].mode, Equals, 'b')
+		c.Assert(pos[i].arg, Equals, string('1'+i))
+	}
 }
 
 func (s *s) TestModeDiff_String(c *C) {
@@ -69,27 +82,45 @@ func (s *s) TestModeset_Apply(c *C) {
 	c.Assert(m.IsSet("b 10"), Equals, false)
 	c.Assert(m.IsSet("c"), Equals, false)
 
-	m.Apply(" +ab-c 10", "b")
+	m.Apply(" +ab-c 10", "b", "")
 	c.Assert(m.IsSet("a"), Equals, true)
 	c.Assert(m.IsSet("b 10"), Equals, true)
 	c.Assert(m.IsSet("c"), Equals, false)
 
-	m.Apply("-b 10", "b")
+	m.Apply("-b 10", "b", "")
 	c.Assert(m.IsSet("a"), Equals, true)
 	c.Assert(m.IsSet("b"), Equals, false)
 
-	m.Apply("x-y+z", "")
+	m.Apply("x-y+z", "", "")
 	c.Assert(m.IsSet("x"), Equals, true)
 	c.Assert(m.IsSet("y"), Equals, false)
 	c.Assert(m.IsSet("z"), Equals, true)
 }
 
-func (s *s) TestModeset_ApplyDiff(c *C) {
+func (s *s) TestModeset_MultiArgs(c *C) {
 	m := CreateModesetFromModestring("+ab-c 10 ", "c")
+	pos, neg := m.Apply(" +abbb-cbb 1 2 3 1 2", "", "b")
+	for i := 0; i < len(pos); i++ {
+		c.Assert(pos[i].mode, Equals, 'b')
+		c.Assert(pos[i].arg, Equals, string('1'+i))
+	}
+	for i := 0; i < len(neg); i++ {
+		c.Assert(pos[i].mode, Equals, 'b')
+		c.Assert(pos[i].arg, Equals, string('1'+i))
+	}
+}
+
+func (s *s) TestModeset_ApplyDiff(c *C) {
+	m := CreateModesetFromModestring("+ab-c 1 10 ", "bc")
 	c.Assert(m.IsSet("ab"), Equals, true)
 	c.Assert(m.IsSet("a 10"), Equals, false)
+	c.Assert(m.IsSet("b 1"), Equals, true)
 	c.Assert(m.IsSet("b 10"), Equals, false)
 	c.Assert(m.IsSet("c"), Equals, false)
+
+	m.ApplyDiff(CreateModeDiffFromModestring("-b 2", "b"))
+	c.Assert(m.IsSet("a"), Equals, true)
+	c.Assert(m.IsSet("b 1"), Equals, true)
 
 	m.ApplyDiff(CreateModeDiffFromModestring(" +ab-c 10", "b"))
 	c.Assert(m.IsSet("a"), Equals, true)
