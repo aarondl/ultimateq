@@ -4,19 +4,23 @@ import (
 	"strings"
 )
 
+const (
+	// banMode is the universal irc mode for bans
+	banMode = 'b'
+)
+
 // Channel encapsulates all the data associated with a channel.
 type Channel struct {
 	name  string
 	topic string
-	bans  []WildMask
-	Modes *Modeset
+	*Modeset
 }
 
 // CreateChannel instantiates a channel object.
-func CreateChannel(name string) *Channel {
+func CreateChannel(name string, kinds *ModeKinds) *Channel {
 	return &Channel{
-		name:  strings.ToLower(name),
-		Modes: CreateModeset(),
+		name:    strings.ToLower(name),
+		Modeset: CreateModeset(kinds),
 	}
 }
 
@@ -40,9 +44,9 @@ func (c *Channel) IsBanned(mask Mask) bool {
 	if !strings.ContainsAny(string(mask), "!@") {
 		mask += "!@"
 	}
-
-	for _, ban := range c.bans {
-		if ban.Match(mask) {
+	bans := c.GetAddresses(banMode)
+	for i := 0; i < len(bans); i++ {
+		if WildMask(bans[i]).Match(mask) {
 			return true
 		}
 	}
@@ -51,43 +55,58 @@ func (c *Channel) IsBanned(mask Mask) bool {
 }
 
 // Bans sets the bans of the channel.
-func (c *Channel) Bans(bans []WildMask) {
-	c.bans = make([]WildMask, len(bans))
-	copy(c.bans, bans)
+func (c *Channel) Bans(bans []string) {
+	delete(c.modes, banMode)
+	for i := 0; i < len(bans); i++ {
+		c.setAddress(banMode, bans[i])
+	}
 }
 
 // AddBans adds to the channel's bans.
-func (c *Channel) AddBan(ban WildMask) {
-	c.bans = append(c.bans, ban)
+func (c *Channel) AddBan(ban string) {
+	c.setAddress(banMode, ban)
 }
 
 // GetBans gets the bans of the channel.
-func (c *Channel) GetBans() []WildMask {
-	bans := make([]WildMask, len(c.bans))
-	copy(bans, c.bans)
+func (c *Channel) GetBans() []string {
+	getBans := c.GetAddresses(banMode)
+	if getBans == nil {
+		return nil
+	}
+	bans := make([]string, len(getBans))
+	copy(bans, getBans)
 	return bans
 }
 
 // HasBan checks to see if a specific mask is present in the banlist.
-func (c *Channel) HasBan(ban WildMask) bool {
-	for i := 0; i < len(c.bans); i++ {
-		if c.bans[i] == ban {
-			return true
-		}
-	}
-	return false
+func (c *Channel) HasBan(ban string) bool {
+	return c.isAddressSet(banMode, ban)
 }
 
 // DeletBan deletes a ban from the list.
-func (c *Channel) DeleteBan(ban WildMask) bool {
-	ln := len(c.bans)
-	for i := 0; i < ln; i++ {
-		if c.bans[i] == ban {
-			c.bans[i], c.bans[ln-1] = c.bans[ln-1], c.bans[i]
-			c.bans = c.bans[:ln-1]
-			return true
+func (c *Channel) DeleteBan(ban string) {
+	c.unsetAddress(banMode, ban)
+}
+
+// DeleteBans deletes all bans that match a mask.
+func (c *Channel) DeleteBans(mask Mask) {
+	bans := c.GetAddresses(banMode)
+	if 0 == len(bans) {
+		return
+	}
+
+	if !strings.ContainsAny(string(mask), "!@") {
+		mask += "!@"
+	}
+
+	toRemove := make([]string, 0, 1) // Assume only one ban will match.
+	for i := 0; i < len(bans); i++ {
+		if WildMask(bans[i]).Match(mask) {
+			toRemove = append(toRemove, bans[i])
 		}
 	}
 
-	return false
+	for i := 0; i < len(toRemove); i++ {
+		c.unsetAddress(banMode, toRemove[i])
+	}
 }
