@@ -8,6 +8,10 @@ type User struct {
 
 // CreateUser creates a user object from a nickname or fullhost.
 func CreateUser(nickorhost string) *User {
+	if len(nickorhost) == 0 {
+		return nil
+	}
+
 	u := &User{}
 
 	u.mask = Mask(nickorhost)

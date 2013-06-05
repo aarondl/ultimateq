@@ -18,6 +18,10 @@ type Channel struct {
 
 // CreateChannel instantiates a channel object.
 func CreateChannel(name string, kinds *ModeKinds) *Channel {
+	if len(name) == 0 {
+		return nil
+	}
+
 	return &Channel{
 		name:    strings.ToLower(name),
 		Modeset: CreateModeset(kinds),

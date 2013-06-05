@@ -6,8 +6,11 @@ import (
 )
 
 func (s *s) TestChannel_Create(c *C) {
+	ch := CreateChannel("", testKinds)
+	c.Assert(ch, IsNil)
+
 	name := "#CHAN"
-	ch := CreateChannel(name, testKinds)
+	ch = CreateChannel(name, testKinds)
 	c.Assert(ch, NotNil)
 	c.Assert(ch.GetName(), Equals, strings.ToLower(name))
 	c.Assert(ch.GetTopic(), Equals, "")
@@ -26,7 +29,7 @@ func (s *s) TestChannel_GettersSetters(c *C) {
 
 func (s *s) TestChannel_Bans(c *C) {
 	bans := []string{"ban1", "ban2"}
-	ch := CreateChannel("", testKinds)
+	ch := CreateChannel("name", testKinds)
 
 	ch.Bans(bans)
 	got := ch.GetBans()
@@ -47,7 +50,7 @@ func (s *s) TestChannel_Bans(c *C) {
 
 func (s *s) TestChannel_IsBanned(c *C) {
 	bans := []string{"*!*@host.com", "nick!*@*"}
-	ch := CreateChannel("", testKinds)
+	ch := CreateChannel("name", testKinds)
 	ch.Bans(bans)
 	c.Assert(ch.IsBanned("nick"), Equals, true)
 	c.Assert(ch.IsBanned("notnick"), Equals, false)
@@ -58,7 +61,7 @@ func (s *s) TestChannel_IsBanned(c *C) {
 
 func (s *s) TestChannel_DeleteBanWild(c *C) {
 	bans := []string{"*!*@host.com", "nick!*@*", "nick2!*@*"}
-	ch := CreateChannel("", testKinds)
+	ch := CreateChannel("name", testKinds)
 	ch.Bans(bans)
 	c.Assert(ch.IsBanned("nick"), Equals, true)
 	c.Assert(ch.IsBanned("notnick"), Equals, false)
@@ -66,8 +69,6 @@ func (s *s) TestChannel_DeleteBanWild(c *C) {
 	c.Assert(ch.IsBanned("notnick!user@host"), Equals, false)
 	c.Assert(ch.IsBanned("notnick!user@host.com"), Equals, true)
 	c.Assert(ch.IsBanned("nick2!user@host"), Equals, true)
-
-	//ch.DeleteBans("nick!user@host")
 
 	ch.DeleteBans("")
 	c.Assert(len(ch.GetBans()), Equals, 3)

@@ -6,7 +6,10 @@ import (
 )
 
 func (s *s) TestUser_Create(c *C) {
-	u := CreateUser("nick")
+	u := CreateUser("")
+	c.Assert(u, IsNil)
+
+	u = CreateUser("nick")
 	c.Assert(u, NotNil)
 	c.Assert(u.GetNick(), Equals, "nick")
 	c.Assert(u.GetFullhost(), Equals, "nick")
