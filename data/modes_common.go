@@ -2,6 +2,7 @@ package data
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -13,9 +14,9 @@ const (
 	ARGS_ADDRESS = 0x3
 )
 
-var (
+const (
 	// csvParseError is thrown when a csv string is not in the correct format.
-	csvParseError = errors.New("data: Could not parse csv string")
+	fmtCsvParseError = "data: Could not parse csv string (%v)"
 )
 
 // ModeKinds contains mode type information, ModeDiff and Modeset require this
@@ -65,12 +66,12 @@ func parseModeKinds(address, always, onset string) (kinds map[rune]int) {
 // The format of which is ARGS_ADDRESS,ARGS_ALWAYS,ARGS_ONSET,ARGS_NONE
 func parseModeKindsCSV(kindstr string) (map[rune]int, error) {
 	if len(kindstr) == 0 {
-		return nil, csvParseError
+		return nil, errors.New(fmt.Sprintf(fmtCsvParseError, kindstr))
 	}
 
 	kindSplits := strings.Split(kindstr, ",")
 	if len(kindSplits) != 4 {
-		return nil, csvParseError
+		return nil, errors.New(fmt.Sprintf(fmtCsvParseError, kindstr))
 	}
 
 	return parseModeKinds(kindSplits[0], kindSplits[1], kindSplits[2]), nil

@@ -26,12 +26,12 @@ func (s *s) TestModeKinds_Create(c *C) {
 
 func (s *s) TestModeKinds_CreateCSV(c *C) {
 	m, err := CreateModeKindsCSV("")
-	c.Assert(err, Equals, csvParseError)
+	c.Assert(err, NotNil)
 
 	m, err = CreateModeKindsCSV(",,,")
 	c.Assert(err, IsNil)
 	m, err = CreateModeKindsCSV(",")
-	c.Assert(err, Equals, csvParseError)
+	c.Assert(err, NotNil)
 
 	m, err = CreateModeKindsCSV("a,b,c,d")
 	c.Assert(m.kinds['a'], Equals, ARGS_ADDRESS)
@@ -59,4 +59,7 @@ func (s *s) TestModeKindsUpdate(c *C) {
 	c.Assert(m.kinds['b'], Equals, ARGS_ALWAYS)
 	c.Assert(m.kinds['c'], Equals, ARGS_ONSET)
 	c.Assert(m.kinds['d'], Equals, ARGS_NONE)
+
+	err = m.UpdateCSV("")
+	c.Assert(err, NotNil)
 }

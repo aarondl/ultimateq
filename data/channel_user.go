@@ -29,7 +29,7 @@ func (u *ChannelUser) HasMode(mode rune) bool {
 	return bit != 0 && (bit == u.modes&bit)
 }
 
-// ClearMode unsets the mode given.
-func (u *ChannelUser) ClearMode(mode rune) {
+// UnsetMode unsets the mode given.
+func (u *ChannelUser) UnsetMode(mode rune) {
 	u.modes &= ^u.GetModeBit(mode)
 }
