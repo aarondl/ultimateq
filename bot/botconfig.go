@@ -78,9 +78,9 @@ func (b *Bot) ReplaceConfig(newConfig *config.Config) []NewServer {
 			server, err := b.createServer(s)
 			b.servers[k] = server
 
-			if err != nil {
+			if err == nil {
 				err = b.connectServer(server)
-				if err != nil {
+				if err == nil {
 					b.startServer(server, true, true)
 				}
 			}

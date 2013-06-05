@@ -6,6 +6,7 @@ package bot
 
 import (
 	"errors"
+	"fmt"
 	"github.com/aarondl/ultimateq/config"
 	"github.com/aarondl/ultimateq/dispatch"
 	"github.com/aarondl/ultimateq/irc"
@@ -145,6 +146,9 @@ func (b *Bot) ConnectServer(serverId string) (found bool, err error) {
 // connectServer creates the connection and IrcClient object for the given
 // server.
 func (b *Bot) connectServer(srv *Server) (err error) {
+	if srv.IsConnected() {
+		return errors.New(fmt.Sprintf(errFmtAlreadyConnected, srv.name))
+	}
 	srv.protect.Lock()
 	err = srv.createIrcClient()
 	if err == nil {
@@ -450,12 +454,6 @@ func createBot(conf *config.Config, capsProv CapsProvider,
 			return nil, err
 		}
 
-		if b.attachHandlers {
-			server.handler = &coreHandler{bot: b}
-			server.handlerId =
-				server.dispatcher.Register(irc.RAW, server.handler)
-		}
-
 		b.servers[name] = server
 	}
 
@@ -465,7 +463,6 @@ func createBot(conf *config.Config, capsProv CapsProvider,
 // createServer creates a dispatcher, and an irc client to connect to this
 // server.
 func (b *Bot) createServer(conf *config.Server) (*Server, error) {
-
 	var copyCaps irc.ProtoCaps = *b.caps
 	s := &Server{
 		bot:          b,
@@ -479,6 +476,12 @@ func (b *Bot) createServer(conf *config.Server) (*Server, error) {
 
 	if err := s.createDispatcher(conf.GetChannels()); err != nil {
 		return nil, err
+	}
+
+	if b.attachHandlers {
+		s.handler = &coreHandler{bot: b}
+		s.handlerId =
+			s.dispatcher.Register(irc.RAW, s.handler)
 	}
 
 	return s, nil

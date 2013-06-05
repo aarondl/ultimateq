@@ -5,6 +5,7 @@ import (
 	"github.com/aarondl/ultimateq/config"
 	"github.com/aarondl/ultimateq/irc"
 	"github.com/aarondl/ultimateq/mocks"
+	"io"
 	. "launchpad.net/gocheck"
 	"net"
 )
@@ -112,13 +113,13 @@ func (s *s) TestBot_ReplaceConfig(c *C) {
 	c.Assert(server, NotNil)
 
 	errs = b.Connect()
-	c.Assert(len(errs), Equals, 1)
+	c.Assert(len(errs), Equals, 2)
 	c.Assert(errs[0].Error(), Matches, ".*already connected.\n")
-
-	b.start(true, false)
 
 	c.Assert(oldsrv1.IsConnected(), Equals, true)
 	c.Assert(server.IsConnected(), Equals, true)
+
+	conns["anothernewserver"].Send([]byte{}, 0, io.EOF)
 
 	b.Stop()
 	b.Disconnect()
