@@ -45,9 +45,6 @@ var (
 	// errInvalidServerId occurs when the user passes in an unknown
 	// server id to a method requiring a server id.
 	errUnknownServerId = errors.New("bot: Unknown Server id.")
-
-	// A global variable for the bot's previously loaded config.
-	confName string
 )
 
 type (
@@ -89,7 +86,6 @@ func Configure() *config.Config {
 // ConfigureFile starts a configuration by reading in a file. Alias for
 // config.CreateConfigFromFile
 func ConfigureFile(filename string) *config.Config {
-	confName = filename
 	return config.CreateConfigFromFile(filename)
 }
 
@@ -380,9 +376,12 @@ func (b *Bot) dispatchMessages(s *Server) {
 
 	var reconn bool
 	var scale time.Duration
+	var timeout uint
 	b.ReadConfig(func(c *config.Config) {
-		reconn = disconnect && !c.GetServer(s.name).GetNoReconnect()
+		cserver := c.GetServer(s.name)
+		reconn = disconnect && !cserver.GetNoReconnect()
 		scale = s.reconnScale
+		timeout = cserver.GetReconnectTimeout()
 	})
 
 	if !reconn {
@@ -393,7 +392,7 @@ func (b *Bot) dispatchMessages(s *Server) {
 
 	if reconn {
 		for {
-			dur := time.Duration(s.conf.GetReconnectTimeout()) * scale
+			dur := time.Duration(timeout) * scale
 			log.Printf(fmtReconnecting, s.name, dur)
 			b.disconnectServer(s)
 			s.protect.Lock()

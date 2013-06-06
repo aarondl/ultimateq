@@ -97,7 +97,11 @@ func (b *Bot) ReplaceConfig(newConfig *config.Config) []NewServer {
 // config file name if loaded from a file... If not it will use a default file
 // name. It then calls Bot.ReplaceConfig.
 func (b *Bot) Rehash() error {
-	conf := config.CreateConfigFromFile(confName)
+	b.configsProtect.RLock()
+	name := b.conf.GetFilename()
+	b.configsProtect.RUnlock()
+
+	conf := config.CreateConfigFromFile(name)
 	if !CheckConfig(conf) {
 		return errInvalidConfig
 	}
@@ -111,7 +115,7 @@ func (b *Bot) Rehash() error {
 func (b *Bot) DumpConfig() (err error) {
 	b.configsProtect.RLock()
 	defer b.configsProtect.RUnlock()
-	err = config.FlushConfigToFile(b.conf, confName)
+	err = config.FlushConfigToFile(b.conf, b.conf.GetFilename())
 	return
 }
 

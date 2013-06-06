@@ -229,7 +229,9 @@ func (s *s) TestBot_InterruptReconnect(c *C) {
 	conn.WaitForDeath()
 
 	c.Assert(b.InterruptReconnect(serverId), Equals, true)
+	cumutex.Lock()
 	c.Assert(ndisc, Equals, 1)
+	cumutex.Unlock()
 }
 
 func (s *s) TestBot_Dispatching(c *C) {
