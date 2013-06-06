@@ -7,64 +7,64 @@ import (
 func (s *s) TestMask(c *C) {
 	var mask Mask = "nick!user@host"
 
-	c.Assert(mask.GetNick(), Equals, "nick")
-	c.Assert(mask.GetUsername(), Equals, "user")
-	c.Assert(mask.GetHost(), Equals, "host")
-	c.Assert(mask.GetFullhost(), Equals, string(mask))
+	c.Check(mask.GetNick(), Equals, "nick")
+	c.Check(mask.GetUsername(), Equals, "user")
+	c.Check(mask.GetHost(), Equals, "host")
+	c.Check(mask.GetFullhost(), Equals, string(mask))
 
 	mask = "nick@user!host"
-	c.Assert(mask.GetNick(), Equals, "nick")
-	c.Assert(mask.GetUsername(), Equals, "")
-	c.Assert(mask.GetHost(), Equals, "")
-	c.Assert(mask.GetFullhost(), Equals, string(mask))
+	c.Check(mask.GetNick(), Equals, "nick")
+	c.Check(mask.GetUsername(), Equals, "")
+	c.Check(mask.GetHost(), Equals, "")
+	c.Check(mask.GetFullhost(), Equals, string(mask))
 
 	mask = "nick"
-	c.Assert(mask.GetNick(), Equals, "nick")
-	c.Assert(mask.GetUsername(), Equals, "")
-	c.Assert(mask.GetHost(), Equals, "")
-	c.Assert(mask.GetFullhost(), Equals, string(mask))
+	c.Check(mask.GetNick(), Equals, "nick")
+	c.Check(mask.GetUsername(), Equals, "")
+	c.Check(mask.GetHost(), Equals, "")
+	c.Check(mask.GetFullhost(), Equals, string(mask))
 }
 
 func (s *s) TestMask_SplitHost(c *C) {
 	var nick, user, host string
 
 	nick, user, host = Mask("").SplitFullhost()
-	c.Assert(nick, Equals, "")
-	c.Assert(user, Equals, "")
-	c.Assert(host, Equals, "")
+	c.Check(nick, Equals, "")
+	c.Check(user, Equals, "")
+	c.Check(host, Equals, "")
 
 	nick, user, host = Mask("nick").SplitFullhost()
-	c.Assert(nick, Equals, "nick")
-	c.Assert(user, Equals, "")
-	c.Assert(host, Equals, "")
+	c.Check(nick, Equals, "nick")
+	c.Check(user, Equals, "")
+	c.Check(host, Equals, "")
 
 	nick, user, host = Mask("nick!").SplitFullhost()
-	c.Assert(nick, Equals, "nick")
-	c.Assert(user, Equals, "")
-	c.Assert(host, Equals, "")
+	c.Check(nick, Equals, "nick")
+	c.Check(user, Equals, "")
+	c.Check(host, Equals, "")
 
 	nick, user, host = Mask("nick@").SplitFullhost()
-	c.Assert(nick, Equals, "nick")
-	c.Assert(user, Equals, "")
-	c.Assert(host, Equals, "")
+	c.Check(nick, Equals, "nick")
+	c.Check(user, Equals, "")
+	c.Check(host, Equals, "")
 
 	nick, user, host = Mask("nick@host!user").SplitFullhost()
-	c.Assert(nick, Equals, "nick")
-	c.Assert(user, Equals, "")
-	c.Assert(host, Equals, "")
+	c.Check(nick, Equals, "nick")
+	c.Check(user, Equals, "")
+	c.Check(host, Equals, "")
 
 	nick, user, host = Mask("nick!user@host").SplitFullhost()
-	c.Assert(nick, Equals, "nick")
-	c.Assert(user, Equals, "user")
-	c.Assert(host, Equals, "host")
+	c.Check(nick, Equals, "nick")
+	c.Check(user, Equals, "user")
+	c.Check(host, Equals, "host")
 }
 
 func (s *s) TestWildMask_Match(c *C) {
 	var wmask WildMask = ""
 	var mask Mask = ""
-	c.Assert(wmask.Match(mask), Equals, true)
+	c.Check(wmask.Match(mask), Equals, true)
 
-	c.Assert(WildMask("nick!*@*").Match("nick!@"), Equals, true)
+	c.Check(WildMask("nick!*@*").Match("nick!@"), Equals, true)
 
 	mask = "nick!user@host"
 

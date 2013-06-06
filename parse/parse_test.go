@@ -21,30 +21,30 @@ var testargs = []string{
 
 func (s *s) TestParse(c *C) {
 	msg, err := Parse(strings.Join(testargs, " "))
-	c.Assert(err, IsNil)
-	c.Assert(msg.Sender, Equals, strings.TrimLeft(testargs[0], ":"))
-	c.Assert(msg.Name, Equals, testargs[1])
-	c.Assert(len(msg.Args), Equals, 2)
-	c.Assert(msg.Args[0], Equals, testargs[2])
-	c.Assert(msg.Args[1], Equals, strings.TrimLeft(testargs[3], ":"))
+	c.Check(err, IsNil)
+	c.Check(msg.Sender, Equals, strings.TrimLeft(testargs[0], ":"))
+	c.Check(msg.Name, Equals, testargs[1])
+	c.Check(len(msg.Args), Equals, 2)
+	c.Check(msg.Args[0], Equals, testargs[2])
+	c.Check(msg.Args[1], Equals, strings.TrimLeft(testargs[3], ":"))
 
 	msg, err = Parse(strings.Join(testargs[1:], " "))
-	c.Assert(err, IsNil)
-	c.Assert(msg.Sender, Equals, "")
+	c.Check(err, IsNil)
+	c.Check(msg.Sender, Equals, "")
 
 	msg, err = Parse(strings.Join(testargs[:len(testargs)-1], " "))
-	c.Assert(err, IsNil)
-	c.Assert(len(msg.Args), Equals, 1)
-	c.Assert(msg.Args[0], Equals, testargs[2])
+	c.Check(err, IsNil)
+	c.Check(len(msg.Args), Equals, 1)
+	c.Check(msg.Args[0], Equals, testargs[2])
 }
 
 func (s *s) TestParse_Ping(c *C) {
 	test1 := "PING"
 	test2 := ":12312323"
 	msg, err := Parse(strings.Join([]string{test1, test2}, " "))
-	c.Assert(err, IsNil)
-	c.Assert(msg.Name, Equals, test1)
-	c.Assert(msg.Args[0], Equals, test2[1:])
+	c.Check(err, IsNil)
+	c.Check(msg.Name, Equals, test1)
+	c.Check(msg.Args[0], Equals, test2[1:])
 }
 
 func (s *s) TestParse_ExtraSemicolons(c *C) {
@@ -55,22 +55,22 @@ func (s *s) TestParse_ExtraSemicolons(c *C) {
 	}
 	raw := strings.Join([]string{sender, name, strings.Join(args, " ")}, " ")
 	msg, err := Parse(raw)
-	c.Assert(err, IsNil)
-	c.Assert(msg.Name, Equals, name)
-	c.Assert(msg.Sender, Equals, sender[1:])
-	c.Assert(msg.Args[0], Equals, args[0])
-	c.Assert(msg.Args[1], Equals, args[1])
-	c.Assert(msg.Args[2], Equals, args[2])
-	c.Assert(msg.Args[3], Equals, args[3][1:])
+	c.Check(err, IsNil)
+	c.Check(msg.Name, Equals, name)
+	c.Check(msg.Sender, Equals, sender[1:])
+	c.Check(msg.Args[0], Equals, args[0])
+	c.Check(msg.Args[1], Equals, args[1])
+	c.Check(msg.Args[2], Equals, args[2])
+	c.Check(msg.Args[3], Equals, args[3][1:])
 }
 
 func (s *s) TestParse_Error(c *C) {
 	_, err := Parse("")
-	c.Assert(err.Error(), Equals, errMsgParseFailure)
+	c.Check(err.Error(), Equals, errMsgParseFailure)
 
 	irc := "invalid irc message"
 	_, err = Parse(irc)
 	e, ok := err.(ParseError)
-	c.Assert(ok, Equals, true)
-	c.Assert(e.Irc, Equals, irc)
+	c.Check(ok, Equals, true)
+	c.Check(e.Irc, Equals, irc)
 }

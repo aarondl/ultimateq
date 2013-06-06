@@ -41,48 +41,48 @@ servers:
 
 func verifyFakeConfig(c *C, conf *Config) {
 	srv1 := conf.Servers["myserver"]
-	c.Assert(srv1.GetNick(), Equals, "nickoverride")
-	c.Assert(srv1.GetPort(), Equals, uint16(5555))
-	c.Assert(srv1.GetUsername(), Equals, "username")
-	c.Assert(srv1.GetUserhost(), Equals, "userhost.com")
-	c.Assert(srv1.GetRealname(), Equals, "realname")
+	c.Check(srv1.GetNick(), Equals, "nickoverride")
+	c.Check(srv1.GetPort(), Equals, uint16(5555))
+	c.Check(srv1.GetUsername(), Equals, "username")
+	c.Check(srv1.GetUserhost(), Equals, "userhost.com")
+	c.Check(srv1.GetRealname(), Equals, "realname")
 
-	c.Assert(srv1.GetName(), Equals, "myserver")
-	c.Assert(srv1.GetHost(), Equals, "irc.gamesurge.net")
+	c.Check(srv1.GetName(), Equals, "myserver")
+	c.Check(srv1.GetHost(), Equals, "irc.gamesurge.net")
 
 	srv2 := conf.Servers["irc.gamesurge.net"]
-	c.Assert(srv2.GetNick(), Equals, "nick")
-	c.Assert(srv2.GetHost(), Equals, "irc.gamesurge.net")
-	c.Assert(srv2.GetName(), Equals, srv2.GetHost())
+	c.Check(srv2.GetNick(), Equals, "nick")
+	c.Check(srv2.GetHost(), Equals, "irc.gamesurge.net")
+	c.Check(srv2.GetName(), Equals, srv2.GetHost())
 }
 
 func (s *s) TestConfig_FromReader(c *C) {
 	buf := bytes.NewBufferString(configuration)
 	conf := CreateConfigFromReader(buf)
-	c.Assert(len(conf.Errors), Equals, 0)
+	c.Check(len(conf.Errors), Equals, 0)
 
 	verifyFakeConfig(c, conf)
 
-	c.Assert(conf.IsValid(), Equals, true)
+	c.Check(conf.IsValid(), Equals, true)
 }
 
 func (s *s) TestConfig_FromReaderErrors(c *C) {
 	conf := CreateConfigFromReader(&dyingReader{})
-	c.Assert(len(conf.Errors), Equals, 1)
-	c.Assert(conf.Errors[0].Error(), Matches,
+	c.Check(len(conf.Errors), Equals, 1)
+	c.Check(conf.Errors[0].Error(), Matches,
 		errMsgInvalidConfigFile[:len(errMsgInvalidConfigFile)-4]+`.*`)
 
 	buf := bytes.NewBufferString("defaults:\n\tport: 5555")
 	conf = CreateConfigFromReader(buf)
-	c.Assert(len(conf.Errors), Equals, 1)
-	c.Assert(conf.Errors[0].Error(), Matches,
+	c.Check(len(conf.Errors), Equals, 1)
+	c.Check(conf.Errors[0].Error(), Matches,
 		errMsgInvalidConfigFile[:len(errMsgInvalidConfigFile)-4]+`.*`)
 }
 
 func (s *s) TestConfig_ToWriter(c *C) {
 	outbuf := bytes.NewBufferString(configuration)
 	conf := CreateConfigFromReader(outbuf)
-	c.Assert(len(conf.Errors), Equals, 0)
+	c.Check(len(conf.Errors), Equals, 0)
 
 	inbuf := &bytes.Buffer{}
 	FlushConfigToWriter(conf, inbuf)
@@ -97,57 +97,57 @@ func (s *s) TestConfig_FromFile(c *C) {
 	conf := createConfigFromFile(name, func(f string) (io.ReadCloser, error) {
 		return buf, nil
 	})
-	c.Assert(len(conf.Errors), Equals, 0)
-	c.Assert(conf.filename, Equals, name)
-	c.Assert(buf.closed, Equals, true)
+	c.Check(len(conf.Errors), Equals, 0)
+	c.Check(conf.filename, Equals, name)
+	c.Check(buf.closed, Equals, true)
 
 	verifyFakeConfig(c, conf)
-	c.Assert(conf.IsValid(), Equals, true)
+	c.Check(conf.IsValid(), Equals, true)
 
 	conf = createConfigFromFile(name, func(f string) (io.ReadCloser, error) {
 		return nil, errors.New("")
 	})
-	c.Assert(len(conf.Errors), Equals, 1)
+	c.Check(len(conf.Errors), Equals, 1)
 }
 
 func (s *s) TestConfig_ToFile(c *C) {
 	outbuf := bytes.NewBufferString(configuration)
 	conf := CreateConfigFromReader(outbuf)
-	c.Assert(len(conf.Errors), Equals, 0)
+	c.Check(len(conf.Errors), Equals, 0)
 
 	inbuf := &testBuffer{&bytes.Buffer{}, false}
-	c.Assert(inbuf.closed, Equals, false)
+	c.Check(inbuf.closed, Equals, false)
 	err := flushConfigToFile(conf, "", func(f string) (io.WriteCloser, error) {
-		c.Assert(f, Equals, defaultConfigFileName)
+		c.Check(f, Equals, defaultConfigFileName)
 		return inbuf, nil
 	})
-	c.Assert(err, IsNil)
-	c.Assert(inbuf.closed, Equals, true)
+	c.Check(err, IsNil)
+	c.Check(inbuf.closed, Equals, true)
 
 	conf.filename = "check.yaml"
 	inbuf.closed = false
 	err = flushConfigToFile(conf, "", func(f string) (io.WriteCloser, error) {
-		c.Assert(f, Equals, conf.filename)
+		c.Check(f, Equals, conf.filename)
 		return inbuf, nil
 	})
-	c.Assert(err, IsNil)
-	c.Assert(inbuf.closed, Equals, true)
+	c.Check(err, IsNil)
+	c.Check(inbuf.closed, Equals, true)
 
 	name := "other.yaml"
 	inbuf.closed = false
 	flushConfigToFile(conf, name, func(f string) (io.WriteCloser, error) {
-		c.Assert(f, Equals, name)
+		c.Check(f, Equals, name)
 		return inbuf, nil
 	})
-	c.Assert(err, IsNil)
-	c.Assert(inbuf.closed, Equals, true)
+	c.Check(err, IsNil)
+	c.Check(inbuf.closed, Equals, true)
 
 	inbuf.closed = false
 	err = flushConfigToFile(conf, "", func(_ string) (io.WriteCloser, error) {
 		return nil, errors.New("")
 	})
-	c.Assert(err, NotNil)
-	c.Assert(inbuf.closed, Equals, false)
+	c.Check(err, NotNil)
+	c.Check(inbuf.closed, Equals, false)
 
 	conf = CreateConfigFromReader(inbuf)
 	verifyFakeConfig(c, conf)

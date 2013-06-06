@@ -7,9 +7,9 @@ import (
 
 func (s *s) TestQueue(c *C) {
 	q := Queue{}
-	c.Assert(q.length, Equals, 0)
-	c.Assert(q.front, IsNil)
-	c.Assert(q.back, IsNil)
+	c.Check(q.length, Equals, 0)
+	c.Check(q.front, IsNil)
+	c.Check(q.back, IsNil)
 }
 
 func (s *s) TestQueue_Queuing(c *C) {
@@ -22,9 +22,9 @@ func (s *s) TestQueue_Queuing(c *C) {
 	q.Enqueue(test2)
 
 	dq1 := q.Dequeue()
-	c.Assert(bytes.Compare(test1, dq1), Equals, 0)
+	c.Check(bytes.Compare(test1, dq1), Equals, 0)
 	dq2 := q.Dequeue()
-	c.Assert(bytes.Compare(test2, dq2), Equals, 0)
+	c.Check(bytes.Compare(test2, dq2), Equals, 0)
 }
 
 func (s *s) TestQueue_queue(c *C) {
@@ -34,14 +34,14 @@ func (s *s) TestQueue_queue(c *C) {
 	q := Queue{}
 	q.Enqueue(nil) // Should be consequenceless test cov
 	q.Enqueue(test1)
-	c.Assert(q.length, Equals, 1)
-	c.Assert(q.front, Equals, q.back)
+	c.Check(q.length, Equals, 1)
+	c.Check(q.front, Equals, q.back)
 	q.Enqueue(test2)
-	c.Assert(q.length, Equals, 2)
-	c.Assert(q.front, Not(Equals), q.back)
+	c.Check(q.length, Equals, 2)
+	c.Check(q.front, Not(Equals), q.back)
 
-	c.Assert(bytes.Compare(*q.front.data, test1), Equals, 0)
-	c.Assert(bytes.Compare(*q.front.next.data, test2), Equals, 0)
+	c.Check(bytes.Compare(*q.front.data, test1), Equals, 0)
+	c.Check(bytes.Compare(*q.front.next.data, test2), Equals, 0)
 }
 
 func (s *s) TestQueue_dequeue(c *C) {
@@ -49,17 +49,17 @@ func (s *s) TestQueue_dequeue(c *C) {
 	test2 := []byte{4, 5, 6}
 
 	q := Queue{}
-	c.Assert(q.Dequeue(), IsNil)
+	c.Check(q.Dequeue(), IsNil)
 
 	q.Enqueue(test1)
 	q.Enqueue(test2)
 
-	c.Assert(q.front, Not(Equals), q.back)
+	c.Check(q.front, Not(Equals), q.back)
 	dq1 := q.Dequeue()
-	c.Assert(bytes.Compare(test1, dq1), Equals, 0)
-	c.Assert(q.front, Equals, q.back)
+	c.Check(bytes.Compare(test1, dq1), Equals, 0)
+	c.Check(q.front, Equals, q.back)
 	dq2 := q.Dequeue()
-	c.Assert(bytes.Compare(test2, dq2), Equals, 0)
-	c.Assert(q.front, IsNil)
-	c.Assert(q.back, IsNil)
+	c.Check(bytes.Compare(test2, dq2), Equals, 0)
+	c.Check(q.front, IsNil)
+	c.Check(q.back, IsNil)
 }

@@ -13,8 +13,8 @@ var _ = Suite(&s{})
 
 func (s *s) TestStore(c *C) {
 	st, err := CreateStore(irc.CreateProtoCaps())
-	c.Assert(st, NotNil)
-	c.Assert(err, IsNil)
+	c.Check(st, NotNil)
+	c.Check(err, IsNil)
 
 	// Should die on creating kinds
 	fakeCaps := &irc.ProtoCaps{}
@@ -22,8 +22,8 @@ func (s *s) TestStore(c *C) {
 		"NICK", "PREFIX=(ov)@+",
 	}})
 	st, err = CreateStore(fakeCaps)
-	c.Assert(st, IsNil)
-	c.Assert(err, NotNil)
+	c.Check(st, IsNil)
+	c.Check(err, NotNil)
 
 	// Should die on creating user modes
 	fakeCaps = &irc.ProtoCaps{}
@@ -31,6 +31,6 @@ func (s *s) TestStore(c *C) {
 		"NICK", "CHANMODES=a,b,c,d",
 	}})
 	st, err = CreateStore(fakeCaps)
-	c.Assert(st, IsNil)
-	c.Assert(err, NotNil)
+	c.Check(st, IsNil)
+	c.Check(err, NotNil)
 }

@@ -18,7 +18,7 @@ func (s *s) TestIrcMessage_Test(c *C) {
 		Args: []string{strings.Join(args, ",")},
 	}
 	for i, v := range msg.Split(0) {
-		c.Assert(args[i], Equals, v)
+		c.Check(args[i], Equals, v)
 	}
 }
 
@@ -30,8 +30,8 @@ func (s *s) TestMsgTypes_Privmsg(c *C) {
 		Sender: "user@host.com",
 	}}
 
-	c.Assert(pmsg.Target(), Equals, args[0])
-	c.Assert(pmsg.Message(), Equals, args[1])
+	c.Check(pmsg.Target(), Equals, args[0])
+	c.Check(pmsg.Message(), Equals, args[1])
 }
 
 func (s *s) TestMsgTypes_Notice(c *C) {
@@ -42,6 +42,6 @@ func (s *s) TestMsgTypes_Notice(c *C) {
 		Sender: "user@host.com",
 	}}
 
-	c.Assert(notice.Target(), Equals, args[0])
-	c.Assert(notice.Message(), Equals, args[1])
+	c.Check(notice.Target(), Equals, args[0])
+	c.Check(notice.Message(), Equals, args[1])
 }

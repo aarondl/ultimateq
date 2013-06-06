@@ -45,14 +45,14 @@ func (handler testHandler) HandleRaw(msg *irc.IrcMessage, sender irc.Sender) {
 //===========================================================
 func (s *s) TestDispatcher(c *C) {
 	d := CreateDispatcher()
-	c.Assert(d, NotNil)
-	c.Assert(d.events, NotNil)
+	c.Check(d, NotNil)
+	c.Check(d.events, NotNil)
 	d, err := CreateRichDispatcher(nil, nil)
-	c.Assert(err, Equals, errProtoCapsMissing)
+	c.Check(err, Equals, errProtoCapsMissing)
 	p := irc.CreateProtoCaps()
 	p.ParseProtoCaps(&irc.IrcMessage{Args: []string{"nick", "CHANTYPES=H"}})
 	d, err = CreateRichDispatcher(p, nil)
-	c.Assert(err, NotNil)
+	c.Check(err, NotNil)
 }
 
 func (s *s) TestDispatcher_Registration(c *C) {
@@ -60,13 +60,13 @@ func (s *s) TestDispatcher_Registration(c *C) {
 	cb := testHandler{}
 
 	id := d.Register(irc.PRIVMSG, cb)
-	c.Assert(id, Not(Equals), 0)
+	c.Check(id, Not(Equals), 0)
 	id2 := d.Register(irc.PRIVMSG, cb)
-	c.Assert(id2, Not(Equals), id)
+	c.Check(id2, Not(Equals), id)
 	ok := d.Unregister("privmsg", id)
-	c.Assert(ok, Equals, true)
+	c.Check(ok, Equals, true)
 	ok = d.Unregister("privmsg", id)
-	c.Assert(ok, Equals, false)
+	c.Check(ok, Equals, false)
 }
 
 func (s *s) TestDispatcher_Dispatching(c *C) {
@@ -96,14 +96,14 @@ func (s *s) TestDispatcher_Dispatching(c *C) {
 	quitmsg := &irc.IrcMessage{Name: irc.QUIT}
 	d.Dispatch(privmsg, send)
 	d.WaitForCompletion()
-	c.Assert(msg1.Name, Equals, irc.PRIVMSG)
-	c.Assert(msg1, Equals, msg2)
-	c.Assert(s1, NotNil)
-	c.Assert(s1, Equals, s2)
-	c.Assert(msg3, IsNil)
+	c.Check(msg1.Name, Equals, irc.PRIVMSG)
+	c.Check(msg1, Equals, msg2)
+	c.Check(s1, NotNil)
+	c.Check(s1, Equals, s2)
+	c.Check(msg3, IsNil)
 	d.Dispatch(quitmsg, send)
 	d.WaitForCompletion()
-	c.Assert(msg3.Name, Equals, irc.QUIT)
+	c.Check(msg3.Name, Equals, irc.QUIT)
 }
 
 func (s *s) TestDispatcher_RawDispatch(c *C) {
@@ -123,8 +123,8 @@ func (s *s) TestDispatcher_RawDispatch(c *C) {
 	privmsg := &irc.IrcMessage{Name: irc.PRIVMSG}
 	d.Dispatch(privmsg, send)
 	d.WaitForCompletion()
-	c.Assert(msg1, Equals, privmsg)
-	c.Assert(msg1, Equals, msg2)
+	c.Check(msg1, Equals, privmsg)
+	c.Check(msg1, Equals, msg2)
 }
 
 // ================================
@@ -241,21 +241,21 @@ func (s *s) TestDispatcher_Privmsg(c *C) {
 	}}
 
 	d, err := CreateRichDispatcher(irc.CreateProtoCaps(), nil)
-	c.Assert(err, IsNil)
+	c.Check(err, IsNil)
 	d.Register(irc.PRIVMSG, ph)
 	d.Register(irc.PRIVMSG, puh)
 	d.Register(irc.PRIVMSG, pch)
 
 	d.Dispatch(privUsermsg, nil)
 	d.WaitForCompletion()
-	c.Assert(p, NotNil)
-	c.Assert(pu.Raw, Equals, p.Raw)
+	c.Check(p, NotNil)
+	c.Check(pu.Raw, Equals, p.Raw)
 
 	p, pu, pc = nil, nil, nil
 	d.Dispatch(privChanmsg, nil)
 	d.WaitForCompletion()
-	c.Assert(p, NotNil)
-	c.Assert(pc.Raw, Equals, p.Raw)
+	c.Check(p, NotNil)
+	c.Check(pc.Raw, Equals, p.Raw)
 }
 
 func (s *s) TestDispatcher_PrivmsgMultiple(c *C) {
@@ -273,22 +273,22 @@ func (s *s) TestDispatcher_PrivmsgMultiple(c *C) {
 	}
 
 	d, err := CreateRichDispatcher(irc.CreateProtoCaps(), nil)
-	c.Assert(err, IsNil)
+	c.Check(err, IsNil)
 	d.Register(irc.PRIVMSG, pall)
 
 	p, pu, pc = nil, nil, nil
 	d.Dispatch(privChanmsg, nil)
 	d.WaitForCompletion()
-	c.Assert(p, IsNil)
-	c.Assert(pu, IsNil)
-	c.Assert(pc, NotNil)
+	c.Check(p, IsNil)
+	c.Check(pu, IsNil)
+	c.Check(pc, NotNil)
 
 	p, pu, pc = nil, nil, nil
 	d.Dispatch(privUsermsg, nil)
 	d.WaitForCompletion()
-	c.Assert(p, IsNil)
-	c.Assert(pu, NotNil)
-	c.Assert(pc, IsNil)
+	c.Check(p, IsNil)
+	c.Check(pu, NotNil)
+	c.Check(pc, IsNil)
 
 	d = CreateDispatcher()
 	d.Dispatch(privChanmsg, nil)
@@ -297,9 +297,9 @@ func (s *s) TestDispatcher_PrivmsgMultiple(c *C) {
 	p, pu, pc = nil, nil, nil
 	d.Dispatch(privUsermsg, nil)
 	d.WaitForCompletion()
-	c.Assert(p, NotNil)
-	c.Assert(pu, IsNil)
-	c.Assert(pc, IsNil)
+	c.Check(p, NotNil)
+	c.Check(pu, IsNil)
+	c.Check(pc, IsNil)
 }
 
 var noticeChanmsg = &irc.IrcMessage{
@@ -326,21 +326,21 @@ func (s *s) TestDispatcher_Notice(c *C) {
 	}}
 
 	d, err := CreateRichDispatcher(irc.CreateProtoCaps(), nil)
-	c.Assert(err, IsNil)
+	c.Check(err, IsNil)
 	d.Register(irc.NOTICE, nh)
 	d.Register(irc.NOTICE, nuh)
 	d.Register(irc.NOTICE, nch)
 
 	d.Dispatch(noticeUsermsg, nil)
 	d.WaitForCompletion()
-	c.Assert(n, NotNil)
-	c.Assert(nu.Raw, Equals, n.Raw)
+	c.Check(n, NotNil)
+	c.Check(nu.Raw, Equals, n.Raw)
 
 	n, nu, nc = nil, nil, nil
 	d.Dispatch(noticeChanmsg, nil)
 	d.WaitForCompletion()
-	c.Assert(n, NotNil)
-	c.Assert(nc.Raw, Equals, n.Raw)
+	c.Check(n, NotNil)
+	c.Check(nc.Raw, Equals, n.Raw)
 }
 
 func (s *s) TestDispatcher_NoticeMultiple(c *C) {
@@ -358,22 +358,22 @@ func (s *s) TestDispatcher_NoticeMultiple(c *C) {
 	}
 
 	d, err := CreateRichDispatcher(irc.CreateProtoCaps(), nil)
-	c.Assert(err, IsNil)
+	c.Check(err, IsNil)
 	d.Register(irc.NOTICE, nall)
 
 	n, nu, nc = nil, nil, nil
 	d.Dispatch(noticeChanmsg, nil)
 	d.WaitForCompletion()
-	c.Assert(n, IsNil)
-	c.Assert(nu, IsNil)
-	c.Assert(nc, NotNil)
+	c.Check(n, IsNil)
+	c.Check(nu, IsNil)
+	c.Check(nc, NotNil)
 
 	n, nu, nc = nil, nil, nil
 	d.Dispatch(noticeUsermsg, nil)
 	d.WaitForCompletion()
-	c.Assert(n, IsNil)
-	c.Assert(nu, NotNil)
-	c.Assert(nc, IsNil)
+	c.Check(n, IsNil)
+	c.Check(nu, NotNil)
+	c.Check(nc, IsNil)
 
 	d = CreateDispatcher()
 	d.Dispatch(noticeChanmsg, nil)
@@ -382,9 +382,9 @@ func (s *s) TestDispatcher_NoticeMultiple(c *C) {
 	n, nu, nc = nil, nil, nil
 	d.Dispatch(noticeUsermsg, nil)
 	d.WaitForCompletion()
-	c.Assert(n, NotNil)
-	c.Assert(nu, IsNil)
-	c.Assert(nc, IsNil)
+	c.Check(n, NotNil)
+	c.Check(nu, IsNil)
+	c.Check(nc, IsNil)
 }
 
 func (s *s) TestDispatcher_Sender(c *C) {
@@ -398,8 +398,8 @@ func (s *s) TestDispatcher_Sender(c *C) {
 	}
 
 	d.Register(irc.PRIVMSG, func(msg *irc.IrcMessage, sender irc.Sender) {
-		c.Assert(sender.GetKey(), NotNil)
-		c.Assert(sender.Writeln(""), IsNil)
+		c.Check(sender.GetKey(), NotNil)
+		c.Check(sender.Writeln(""), IsNil)
 	})
 	d.Dispatch(msg, send)
 }
@@ -421,20 +421,20 @@ func (s *s) TestDispatcher_FilterPrivmsgChannels(c *C) {
 
 	d, err := CreateRichDispatcher(
 		irc.CreateProtoCaps(), []string{"#CHAN"})
-	c.Assert(err, IsNil)
+	c.Check(err, IsNil)
 	d.Register(irc.PRIVMSG, ph)
 	d.Register(irc.PRIVMSG, pch)
 
 	d.Dispatch(privChanmsg, nil)
 	d.WaitForCompletion()
-	c.Assert(p, NotNil)
-	c.Assert(pc.Raw, Equals, p.Raw)
+	c.Check(p, NotNil)
+	c.Check(pc.Raw, Equals, p.Raw)
 
 	p, pc = nil, nil
 	d.Dispatch(chanmsg2, nil)
 	d.WaitForCompletion()
-	c.Assert(p, NotNil)
-	c.Assert(pc, IsNil)
+	c.Check(p, NotNil)
+	c.Check(pc, IsNil)
 }
 
 func (s *s) TestDispatcher_FilterNoticeChannels(c *C) {
@@ -454,140 +454,140 @@ func (s *s) TestDispatcher_FilterNoticeChannels(c *C) {
 
 	d, err := CreateRichDispatcher(
 		irc.CreateProtoCaps(), []string{"#CHAN"})
-	c.Assert(err, IsNil)
+	c.Check(err, IsNil)
 	d.Register(irc.NOTICE, uh)
 	d.Register(irc.NOTICE, uch)
 
 	d.Dispatch(noticeChanmsg, nil)
 	d.WaitForCompletion()
-	c.Assert(u, NotNil)
-	c.Assert(uc.Raw, Equals, u.Raw)
+	c.Check(u, NotNil)
+	c.Check(uc.Raw, Equals, u.Raw)
 
 	u, uc = nil, nil
 	d.Dispatch(chanmsg2, nil)
 	d.WaitForCompletion()
-	c.Assert(u, NotNil)
-	c.Assert(uc, IsNil)
+	c.Check(u, NotNil)
+	c.Check(uc, IsNil)
 }
 
 func (s *s) TestDispatcher_AddRemoveChannels(c *C) {
 	chans := []string{"#chan1", "#chan2", "#chan3"}
 	d, err := CreateRichDispatcher(irc.CreateProtoCaps(), chans)
-	c.Assert(err, IsNil)
+	c.Check(err, IsNil)
 
-	c.Assert(len(d.chans), Equals, len(chans))
+	c.Check(len(d.chans), Equals, len(chans))
 	for i, v := range chans {
-		c.Assert(d.chans[i], Equals, v)
+		c.Check(d.chans[i], Equals, v)
 	}
 
 	d.RemoveChannels(chans...)
-	c.Assert(d.chans, IsNil)
+	c.Check(d.chans, IsNil)
 	d.RemoveChannels(chans...)
-	c.Assert(d.chans, IsNil)
+	c.Check(d.chans, IsNil)
 	d.RemoveChannels()
-	c.Assert(d.chans, IsNil)
+	c.Check(d.chans, IsNil)
 
 	d.Channels(chans)
 	d.RemoveChannels(chans[1:]...)
-	c.Assert(len(d.chans), Equals, len(chans)-2)
+	c.Check(len(d.chans), Equals, len(chans)-2)
 	for i, v := range chans[:1] {
-		c.Assert(d.chans[i], Equals, v)
+		c.Check(d.chans[i], Equals, v)
 	}
 	d.AddChannels(chans[1:]...)
-	c.Assert(len(d.chans), Equals, len(chans))
+	c.Check(len(d.chans), Equals, len(chans))
 	for i, v := range chans {
-		c.Assert(d.chans[i], Equals, v)
+		c.Check(d.chans[i], Equals, v)
 	}
 	d.AddChannels(chans[0])
 	d.AddChannels()
-	c.Assert(len(d.chans), Equals, len(chans))
+	c.Check(len(d.chans), Equals, len(chans))
 	d.RemoveChannels(chans...)
 	d.AddChannels(chans...)
-	c.Assert(len(d.chans), Equals, len(chans))
+	c.Check(len(d.chans), Equals, len(chans))
 }
 
 func (s *s) TestDispatcher_GetChannels(c *C) {
 	d, err := CreateRichDispatcher(irc.CreateProtoCaps(), nil)
-	c.Assert(err, IsNil)
+	c.Check(err, IsNil)
 
-	c.Assert(d.GetChannels(), IsNil)
+	c.Check(d.GetChannels(), IsNil)
 	chans := []string{"#chan1", "#chan2"}
 	d.Channels(chans)
 
 	for i, ch := range d.GetChannels() {
-		c.Assert(d.chans[i], Equals, ch)
+		c.Check(d.chans[i], Equals, ch)
 	}
 
 	first := d.GetChannels()
 	first[0] = "#chan3"
 	for i, ch := range d.GetChannels() {
-		c.Assert(d.chans[i], Equals, ch)
+		c.Check(d.chans[i], Equals, ch)
 	}
 }
 
 func (s *s) TestDispatcher_UpdateChannels(c *C) {
 	d, err := CreateRichDispatcher(irc.CreateProtoCaps(), nil)
-	c.Assert(err, IsNil)
+	c.Check(err, IsNil)
 	chans := []string{"#chan1", "#chan2"}
 	d.Channels(chans)
-	c.Assert(len(d.chans), Equals, len(chans))
+	c.Check(len(d.chans), Equals, len(chans))
 	for i, v := range chans {
-		c.Assert(d.chans[i], Equals, v)
+		c.Check(d.chans[i], Equals, v)
 	}
 	d.Channels([]string{})
-	c.Assert(len(d.chans), Equals, 0)
+	c.Check(len(d.chans), Equals, 0)
 	d.Channels(chans)
-	c.Assert(len(d.chans), Equals, len(chans))
+	c.Check(len(d.chans), Equals, len(chans))
 	d.Channels(nil)
-	c.Assert(len(d.chans), Equals, 0)
+	c.Check(len(d.chans), Equals, 0)
 }
 
 func (s *s) TestDispatcher_UpdateProtoCaps(c *C) {
 	p := irc.CreateProtoCaps()
 	p.ParseProtoCaps(&irc.IrcMessage{Args: []string{"nick", "CHANTYPES=#"}})
 	d, err := CreateRichDispatcher(p, nil)
-	c.Assert(err, IsNil)
+	c.Check(err, IsNil)
 	var should bool
 	should = d.shouldDispatch(true, &irc.IrcMessage{Args: []string{"#chan"}})
-	c.Assert(should, Equals, true)
+	c.Check(should, Equals, true)
 	should = d.shouldDispatch(true, &irc.IrcMessage{Args: []string{"&chan"}})
-	c.Assert(should, Equals, false)
+	c.Check(should, Equals, false)
 
 	p = irc.CreateProtoCaps()
 	p.ParseProtoCaps(&irc.IrcMessage{Args: []string{"nick", "CHANTYPES=&"}})
 	err = d.Protocaps(p)
-	c.Assert(err, IsNil)
+	c.Check(err, IsNil)
 	should = d.shouldDispatch(true, &irc.IrcMessage{Args: []string{"#chan"}})
-	c.Assert(should, Equals, false)
+	c.Check(should, Equals, false)
 	should = d.shouldDispatch(true, &irc.IrcMessage{Args: []string{"&chan"}})
-	c.Assert(should, Equals, true)
+	c.Check(should, Equals, true)
 }
 
 func (s *s) TestDispatcher_shouldDispatch(c *C) {
 	d, err := CreateRichDispatcher(irc.CreateProtoCaps(), nil)
-	c.Assert(err, IsNil)
+	c.Check(err, IsNil)
 
 	var should bool
 	should = d.shouldDispatch(true, &irc.IrcMessage{Args: []string{"#chan"}})
-	c.Assert(should, Equals, true)
+	c.Check(should, Equals, true)
 	should = d.shouldDispatch(false, &irc.IrcMessage{Args: []string{"#chan"}})
-	c.Assert(should, Equals, false)
+	c.Check(should, Equals, false)
 
 	should = d.shouldDispatch(true, &irc.IrcMessage{Args: []string{"chan"}})
-	c.Assert(should, Equals, false)
+	c.Check(should, Equals, false)
 	should = d.shouldDispatch(false, &irc.IrcMessage{Args: []string{"chan"}})
-	c.Assert(should, Equals, true)
+	c.Check(should, Equals, true)
 }
 
 func (s *s) TestDispatcher_filterChannelDispatch(c *C) {
 	d, err := CreateRichDispatcher(
 		irc.CreateProtoCaps(), []string{"#CHAN"})
-	c.Assert(err, IsNil)
-	c.Assert(d.chans, NotNil)
+	c.Check(err, IsNil)
+	c.Check(d.chans, NotNil)
 
 	var should bool
 	should = d.checkChannels(&irc.IrcMessage{Args: []string{"#chan"}})
-	c.Assert(should, Equals, true)
+	c.Check(should, Equals, true)
 	should = d.checkChannels(&irc.IrcMessage{Args: []string{"#chan2"}})
-	c.Assert(should, Equals, false)
+	c.Check(should, Equals, false)
 }

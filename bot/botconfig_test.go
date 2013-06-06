@@ -16,10 +16,10 @@ var zeroConnProvider = func(srv string) (net.Conn, error) {
 
 func (s *s) TestBot_ReadConfig(c *C) {
 	b, err := createBot(fakeConfig, nil, nil, false)
-	c.Assert(err, IsNil)
+	c.Check(err, IsNil)
 
 	b.ReadConfig(func(conf *config.Config) {
-		c.Assert(
+		c.Check(
 			conf.Servers[serverId].GetNick(),
 			Equals,
 			fakeConfig.Servers[serverId].GetNick(),
@@ -29,10 +29,10 @@ func (s *s) TestBot_ReadConfig(c *C) {
 
 func (s *s) TestBot_WriteConfig(c *C) {
 	b, err := createBot(fakeConfig, nil, nil, false)
-	c.Assert(err, IsNil)
+	c.Check(err, IsNil)
 
 	b.WriteConfig(func(conf *config.Config) {
-		c.Assert(
+		c.Check(
 			conf.Servers[serverId].GetNick(),
 			Equals,
 			fakeConfig.Servers[serverId].GetNick(),
@@ -68,56 +68,56 @@ func (s *s) TestBot_ReplaceConfig(c *C) {
 		Server("anothernewserver")
 
 	b, err := createBot(c1, nil, connProvider, false)
-	c.Assert(err, IsNil)
-	c.Assert(len(b.servers), Equals, 2)
+	c.Check(err, IsNil)
+	c.Check(len(b.servers), Equals, 2)
 
 	oldsrv1, oldsrv2 := b.servers[serverId], b.servers["newserver"]
 
 	errs := b.Connect()
-	c.Assert(len(errs), Equals, 0)
+	c.Check(len(errs), Equals, 0)
 	b.start(true, false)
 
-	c.Assert(elementsEquals(b.conf.Global.Channels, chans1), Equals, true)
-	c.Assert(elementsEquals(oldsrv1.conf.GetChannels(), chans1), Equals, true)
-	c.Assert(elementsEquals(oldsrv2.conf.GetChannels(), chans1), Equals, true)
-	c.Assert(elementsEquals(b.dispatcher.GetChannels(), chans1), Equals, true)
-	c.Assert(elementsEquals(oldsrv1.dispatcher.GetChannels(), chans1),
+	c.Check(elementsEquals(b.conf.Global.Channels, chans1), Equals, true)
+	c.Check(elementsEquals(oldsrv1.conf.GetChannels(), chans1), Equals, true)
+	c.Check(elementsEquals(oldsrv2.conf.GetChannels(), chans1), Equals, true)
+	c.Check(elementsEquals(b.dispatcher.GetChannels(), chans1), Equals, true)
+	c.Check(elementsEquals(oldsrv1.dispatcher.GetChannels(), chans1),
 		Equals, true)
-	c.Assert(elementsEquals(oldsrv2.dispatcher.GetChannels(), chans1),
+	c.Check(elementsEquals(oldsrv2.dispatcher.GetChannels(), chans1),
 		Equals, true)
 
 	servers := b.ReplaceConfig(c2)
-	c.Assert(len(servers), Equals, 1)
-	c.Assert(len(b.servers), Equals, 2)
+	c.Check(len(servers), Equals, 1)
+	c.Check(len(b.servers), Equals, 2)
 
-	c.Assert(elementsEquals(b.conf.Global.Channels, chans2), Equals, true)
-	c.Assert(elementsEquals(oldsrv1.conf.GetChannels(), chans3), Equals, true)
-	c.Assert(elementsEquals(servers[0].server.conf.GetChannels(), chans2),
+	c.Check(elementsEquals(b.conf.Global.Channels, chans2), Equals, true)
+	c.Check(elementsEquals(oldsrv1.conf.GetChannels(), chans3), Equals, true)
+	c.Check(elementsEquals(servers[0].server.conf.GetChannels(), chans2),
 		Equals, true)
-	c.Assert(elementsEquals(b.dispatcher.GetChannels(), chans2), Equals, true)
-	c.Assert(elementsEquals(oldsrv1.dispatcher.GetChannels(), chans3),
+	c.Check(elementsEquals(b.dispatcher.GetChannels(), chans2), Equals, true)
+	c.Check(elementsEquals(oldsrv1.dispatcher.GetChannels(), chans3),
 		Equals, true)
-	c.Assert(elementsEquals(servers[0].server.dispatcher.GetChannels(), chans2),
+	c.Check(elementsEquals(servers[0].server.dispatcher.GetChannels(), chans2),
 		Equals, true)
 
-	c.Assert(servers[0].Err, IsNil)
-	c.Assert(servers[0].ServerName, Equals, "anothernewserver")
+	c.Check(servers[0].Err, IsNil)
+	c.Check(servers[0].ServerName, Equals, "anothernewserver")
 
-	c.Assert(
+	c.Check(
 		bytes.Compare(conns[serverId].Receive(len(nick), nil), nick),
 		Equals,
 		0,
 	)
 
 	server := servers[0].server
-	c.Assert(server, NotNil)
+	c.Check(server, NotNil)
 
 	errs = b.Connect()
-	c.Assert(len(errs), Equals, 2)
-	c.Assert(errs[0].Error(), Matches, ".*already connected.\n")
+	c.Check(len(errs), Equals, 2)
+	c.Check(errs[0].Error(), Matches, ".*already connected.\n")
 
-	c.Assert(oldsrv1.IsConnected(), Equals, true)
-	c.Assert(server.IsConnected(), Equals, true)
+	c.Check(oldsrv1.IsConnected(), Equals, true)
+	c.Check(server.IsConnected(), Equals, true)
 
 	conns["anothernewserver"].Send([]byte{}, 0, io.EOF)
 
@@ -129,19 +129,19 @@ func (s *s) TestBot_ReplaceConfig(c *C) {
 func (s *s) TestBot_testElementEquals(c *C) {
 	a := []string{"a", "b"}
 	b := []string{"b", "a"}
-	c.Assert(elementsEquals(a, b), Equals, true)
+	c.Check(elementsEquals(a, b), Equals, true)
 
 	a = []string{"a", "b", "c"}
-	c.Assert(elementsEquals(a, b), Equals, false)
+	c.Check(elementsEquals(a, b), Equals, false)
 
 	a = []string{}
 	b = []string{}
-	c.Assert(elementsEquals(a, b), Equals, true)
+	c.Check(elementsEquals(a, b), Equals, true)
 
 	b = []string{"a"}
-	c.Assert(elementsEquals(a, b), Equals, false)
+	c.Check(elementsEquals(a, b), Equals, false)
 
 	a = []string{"a"}
 	b = []string{}
-	c.Assert(elementsEquals(a, b), Equals, false)
+	c.Check(elementsEquals(a, b), Equals, false)
 }

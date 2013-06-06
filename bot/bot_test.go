@@ -55,16 +55,16 @@ var fakeConfig = Configure().
 //==================================
 func (s *s) TestCreateBot(c *C) {
 	bot, err := CreateBot(fakeConfig)
-	c.Assert(bot, NotNil)
-	c.Assert(err, IsNil)
+	c.Check(bot, NotNil)
+	c.Check(err, IsNil)
 	_, err = CreateBot(Configure())
-	c.Assert(err, Equals, errInvalidConfig)
+	c.Check(err, Equals, errInvalidConfig)
 	_, err = CreateBot(ConfigureFunction(
 		func(conf *config.Config) *config.Config {
 			return fakeConfig
 		}),
 	)
-	c.Assert(err, IsNil)
+	c.Check(err, IsNil)
 }
 
 func (s *s) TestBot_StartStop(c *C) {
@@ -74,9 +74,9 @@ func (s *s) TestBot_StartStop(c *C) {
 	}
 
 	b, err := createBot(fakeConfig, nil, connProvider, false)
-	c.Assert(err, IsNil)
+	c.Check(err, IsNil)
 	ers := b.Connect()
-	c.Assert(len(ers), Equals, 0)
+	c.Check(len(ers), Equals, 0)
 	b.Start()
 	b.Start() // This shouldn't do anything, test cov
 
@@ -94,40 +94,40 @@ func (s *s) TestBot_StartStopServer(c *C) {
 	}
 
 	b, err := createBot(fakeConfig, nil, connProvider, false)
-	c.Assert(err, IsNil)
+	c.Check(err, IsNil)
 
 	srv := b.servers[serverId]
-	c.Assert(srv.IsStarted(), Equals, false)
-	c.Assert(srv.IsConnected(), Equals, false)
+	c.Check(srv.IsStarted(), Equals, false)
+	c.Check(srv.IsConnected(), Equals, false)
 
 	_, err = b.ConnectServer(serverId)
-	c.Assert(err, IsNil)
-	c.Assert(srv.IsConnected(), Equals, true)
+	c.Check(err, IsNil)
+	c.Check(srv.IsConnected(), Equals, true)
 
 	_, err = b.ConnectServer(serverId)
-	c.Assert(err, NotNil)
+	c.Check(err, NotNil)
 
 	b.StartServer(serverId)
-	c.Assert(srv.IsStarted(), Equals, true)
-	c.Assert(srv.IsReading(), Equals, true)
-	c.Assert(srv.IsWriting(), Equals, true)
+	c.Check(srv.IsStarted(), Equals, true)
+	c.Check(srv.IsReading(), Equals, true)
+	c.Check(srv.IsWriting(), Equals, true)
 
 	b.StopServer(serverId)
-	c.Assert(srv.IsStarted(), Equals, true)
-	c.Assert(srv.IsReading(), Equals, false)
-	c.Assert(srv.IsWriting(), Equals, true)
+	c.Check(srv.IsStarted(), Equals, true)
+	c.Check(srv.IsReading(), Equals, false)
+	c.Check(srv.IsWriting(), Equals, true)
 
 	conn.Send([]byte{}, 0, io.EOF)
 
 	b.DisconnectServer(serverId)
-	c.Assert(srv.IsConnected(), Equals, false)
-	c.Assert(srv.IsWriting(), Equals, false)
+	c.Check(srv.IsConnected(), Equals, false)
+	c.Check(srv.IsWriting(), Equals, false)
 
 	b.WaitForHalt()
 
 	_, err = b.ConnectServer(serverId)
 	conn.ResetDeath()
-	c.Assert(err, IsNil)
+	c.Check(err, IsNil)
 	b.DisconnectServer(serverId)
 }
 
@@ -168,7 +168,7 @@ func (s *s) TestBot_Reconnecting(c *C) {
 
 	var err error
 	b, err = createBot(conf, nil, connProvider, false)
-	c.Assert(err, IsNil)
+	c.Check(err, IsNil)
 	srv := b.servers[serverId]
 	srv.reconnScale = time.Microsecond
 
@@ -195,7 +195,7 @@ func (s *s) TestBot_Reconnecting(c *C) {
 	b.WaitForHalt()
 
 	cumutex.Lock()
-	c.Assert(ndisc, Equals, 3)
+	c.Check(ndisc, Equals, 3)
 	cumutex.Unlock()
 }
 
@@ -219,7 +219,7 @@ func (s *s) TestBot_InterruptReconnect(c *C) {
 
 	var err error
 	b, err = createBot(conf, nil, connProvider, false)
-	c.Assert(err, IsNil)
+	c.Check(err, IsNil)
 	srv := b.servers[serverId]
 
 	b.connectServer(srv)
@@ -228,9 +228,9 @@ func (s *s) TestBot_InterruptReconnect(c *C) {
 	conn.Send([]byte{}, 0, io.EOF)
 	conn.WaitForDeath()
 
-	c.Assert(b.InterruptReconnect(serverId), Equals, true)
+	c.Check(b.InterruptReconnect(serverId), Equals, true)
 	cumutex.Lock()
-	c.Assert(ndisc, Equals, 1)
+	c.Check(ndisc, Equals, 1)
 	cumutex.Unlock()
 }
 
@@ -252,9 +252,9 @@ func (s *s) TestBot_Dispatching(c *C) {
 		},
 	})
 
-	c.Assert(err, IsNil)
+	c.Check(err, IsNil)
 	ers := b.Connect()
-	c.Assert(len(ers), Equals, 0)
+	c.Check(len(ers), Equals, 0)
 	b.start(false, true)
 
 	conn.Send(str, len(str), io.EOF)
@@ -274,20 +274,20 @@ func (s *s) TestBot_Register(c *C) {
 	b, err := createBot(fakeConfig, nil, connProvider, false)
 	gid := b.Register(irc.PRIVMSG, &coreHandler{})
 	id, err := b.RegisterServer(serverId, irc.PRIVMSG, &coreHandler{})
-	c.Assert(err, IsNil)
+	c.Check(err, IsNil)
 
-	c.Assert(b.Unregister(irc.PRIVMSG, id), Equals, false)
-	c.Assert(b.Unregister(irc.PRIVMSG, gid), Equals, true)
+	c.Check(b.Unregister(irc.PRIVMSG, id), Equals, false)
+	c.Check(b.Unregister(irc.PRIVMSG, gid), Equals, true)
 
 	ok, err := b.UnregisterServer(serverId, irc.PRIVMSG, gid)
-	c.Assert(ok, Equals, false)
+	c.Check(ok, Equals, false)
 	ok, err = b.UnregisterServer(serverId, irc.PRIVMSG, id)
-	c.Assert(ok, Equals, true)
+	c.Check(ok, Equals, true)
 
 	_, err = b.RegisterServer("", "", &coreHandler{})
-	c.Assert(err, Equals, errUnknownServerId)
+	c.Check(err, Equals, errUnknownServerId)
 	_, err = b.UnregisterServer("", "", 0)
-	c.Assert(err, Equals, errUnknownServerId)
+	c.Check(err, Equals, errUnknownServerId)
 }
 
 func (s *s) TestBot_createBot(c *C) {
@@ -300,12 +300,12 @@ func (s *s) TestBot_createBot(c *C) {
 	}
 
 	b, err := createBot(fakeConfig, capsProvider, connProvider, false)
-	c.Assert(b, NotNil)
-	c.Assert(err, IsNil)
-	c.Assert(len(b.servers), Equals, 1)
-	c.Assert(b.caps, NotNil)
-	c.Assert(b.capsProvider, NotNil)
-	c.Assert(b.connProvider, NotNil)
+	c.Check(b, NotNil)
+	c.Check(err, IsNil)
+	c.Check(len(b.servers), Equals, 1)
+	c.Check(b.caps, NotNil)
+	c.Check(b.capsProvider, NotNil)
+	c.Check(b.connProvider, NotNil)
 }
 
 func (s *s) TestBot_Providers(c *C) {
@@ -319,23 +319,23 @@ func (s *s) TestBot_Providers(c *C) {
 	}
 
 	b, err := createBot(fakeConfig, capsProv, connProv, false)
-	c.Assert(err, NotNil)
-	c.Assert(err, Not(Equals), net.ErrWriteToConnected)
+	c.Check(err, NotNil)
+	c.Check(err, Not(Equals), net.ErrWriteToConnected)
 	b, err = createBot(fakeConfig, nil, connProv, false)
 	ers := b.Connect()
-	c.Assert(ers[0], Equals, net.ErrWriteToConnected)
+	c.Check(ers[0], Equals, net.ErrWriteToConnected)
 }
 
 func (s *s) TestBot_createIrcClient(c *C) {
 	b, err := createBot(fakeConfig, nil, nil, false)
-	c.Assert(err, IsNil)
+	c.Check(err, IsNil)
 	ers := b.Connect()
-	c.Assert(ers[0], Equals, errSslNotImplemented)
+	c.Check(ers[0], Equals, errSslNotImplemented)
 }
 
 func (s *s) TestBot_createDispatcher(c *C) {
 	_, err := createBot(fakeConfig, func() *irc.ProtoCaps {
 		return nil
 	}, nil, false)
-	c.Assert(err, NotNil)
+	c.Check(err, NotNil)
 }

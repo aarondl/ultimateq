@@ -6,9 +6,9 @@ import (
 
 func (s *s) TestModeDiff_Create(c *C) {
 	diff := CreateModeDiff(testKinds)
-	c.Assert(diff, NotNil)
-	c.Assert(diff.pos, NotNil)
-	c.Assert(diff.neg, NotNil)
+	c.Check(diff, NotNil)
+	c.Check(diff.pos, NotNil)
+	c.Check(diff.neg, NotNil)
 
 	var _ moder = CreateModeDiff(testKinds)
 }
@@ -16,27 +16,27 @@ func (s *s) TestModeDiff_Create(c *C) {
 func (s *s) TestModeDiff_Apply(c *C) {
 	d := CreateModeDiff(testKinds)
 	d.Apply("+ab-c 10 ")
-	c.Assert(d.IsSet("ab 10"), Equals, true)
-	c.Assert(d.IsSet("c"), Equals, false)
-	c.Assert(d.IsUnset("c"), Equals, false)
+	c.Check(d.IsSet("ab 10"), Equals, true)
+	c.Check(d.IsSet("c"), Equals, false)
+	c.Check(d.IsUnset("c"), Equals, false)
 
 	d = CreateModeDiff(testKinds)
 	d.Apply("+b-b 10 10")
-	c.Assert(d.IsSet("b 10"), Equals, false)
-	c.Assert(d.IsUnset("b 10"), Equals, true)
+	c.Check(d.IsSet("b 10"), Equals, false)
+	c.Check(d.IsUnset("b 10"), Equals, true)
 
 	d = CreateModeDiff(testKinds)
 	d.Apply("-b+b 10 10")
-	c.Assert(d.IsSet("b 10"), Equals, true)
-	c.Assert(d.IsUnset("b 10"), Equals, false)
+	c.Check(d.IsSet("b 10"), Equals, true)
+	c.Check(d.IsUnset("b 10"), Equals, false)
 
 	d.Apply("+x-y+z")
-	c.Assert(d.IsSet("x"), Equals, true)
-	c.Assert(d.IsUnset("y"), Equals, true)
-	c.Assert(d.IsSet("z"), Equals, true)
-	c.Assert(d.IsUnset("x"), Equals, false)
-	c.Assert(d.IsSet("y"), Equals, false)
-	c.Assert(d.IsUnset("z"), Equals, false)
+	c.Check(d.IsSet("x"), Equals, true)
+	c.Check(d.IsUnset("y"), Equals, true)
+	c.Check(d.IsSet("z"), Equals, true)
+	c.Check(d.IsUnset("x"), Equals, false)
+	c.Check(d.IsSet("y"), Equals, false)
+	c.Check(d.IsUnset("z"), Equals, false)
 }
 
 func (s *s) TestModeDiff_String(c *C) {
@@ -44,11 +44,11 @@ func (s *s) TestModeDiff_String(c *C) {
 	diff.pos.Set("a", "b host1", "c 1")
 	diff.neg.Set("x", "y", "z", "b host2")
 	str := diff.String()
-	c.Assert(str, Matches, `^\+[abc]{3}-[xyzb]{4}( 1| host1){2}( host2){1}$`)
+	c.Check(str, Matches, `^\+[abc]{3}-[xyzb]{4}( 1| host1){2}( host2){1}$`)
 
 	diff = CreateModeDiff(testKinds)
 	diff.pos.Set("x", "y", "z")
 	diff.neg.Set("x", "y", "z")
 	str = diff.String()
-	c.Assert(str, Matches, `^\+xyz-xyz$`)
+	c.Check(str, Matches, `^\+xyz-xyz$`)
 }

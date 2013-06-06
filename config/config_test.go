@@ -42,8 +42,8 @@ var srv2 = &Server{
 
 func (s *s) TestConfig(c *C) {
 	config := CreateConfig()
-	c.Assert(config.Servers, NotNil)
-	c.Assert(config.Global, NotNil)
+	c.Check(config.Servers, NotNil)
+	c.Check(config.Global, NotNil)
 }
 
 func (s *s) TestConfig_Fallbacks(c *C) {
@@ -57,32 +57,32 @@ func (s *s) TestConfig_Fallbacks(c *C) {
 	server := &Server{parent: config, Name: name, Host: host}
 	config.Servers[name] = server
 
-	c.Assert(server.GetHost(), Equals, host)
-	c.Assert(server.GetName(), Equals, name)
-	c.Assert(server.GetPort(), Equals, config.Global.Port)
-	c.Assert(server.GetSsl(), Equals, config.Global.Ssl)
-	c.Assert(server.GetVerifyCert(), Equals, config.Global.VerifyCert)
-	c.Assert(server.GetNoReconnect(), Equals, config.Global.NoReconnect)
-	c.Assert(server.GetReconnectTimeout(), Equals,
+	c.Check(server.GetHost(), Equals, host)
+	c.Check(server.GetName(), Equals, name)
+	c.Check(server.GetPort(), Equals, config.Global.Port)
+	c.Check(server.GetSsl(), Equals, config.Global.Ssl)
+	c.Check(server.GetVerifyCert(), Equals, config.Global.VerifyCert)
+	c.Check(server.GetNoReconnect(), Equals, config.Global.NoReconnect)
+	c.Check(server.GetReconnectTimeout(), Equals,
 		config.Global.ReconnectTimeout)
-	c.Assert(server.GetNick(), Equals, config.Global.Nick)
-	c.Assert(server.GetAltnick(), Equals, config.Global.Altnick)
-	c.Assert(server.GetUsername(), Equals, config.Global.Username)
-	c.Assert(server.GetUserhost(), Equals, config.Global.Userhost)
-	c.Assert(server.GetRealname(), Equals, config.Global.Realname)
-	c.Assert(server.GetPrefix(), Equals, config.Global.Prefix)
-	c.Assert(len(server.GetChannels()), Equals, len(config.Global.Channels))
+	c.Check(server.GetNick(), Equals, config.Global.Nick)
+	c.Check(server.GetAltnick(), Equals, config.Global.Altnick)
+	c.Check(server.GetUsername(), Equals, config.Global.Username)
+	c.Check(server.GetUserhost(), Equals, config.Global.Userhost)
+	c.Check(server.GetRealname(), Equals, config.Global.Realname)
+	c.Check(server.GetPrefix(), Equals, config.Global.Prefix)
+	c.Check(len(server.GetChannels()), Equals, len(config.Global.Channels))
 	for i, v := range server.GetChannels() {
-		c.Assert(v, Equals, config.Global.Channels[i])
+		c.Check(v, Equals, config.Global.Channels[i])
 	}
 
 	//Check bools more throughly
 	server.IsSslSet = true
 	server.IsVerifyCertSet = true
 	server.IsNoReconnectSet = true
-	c.Assert(server.GetSsl(), Equals, false)
-	c.Assert(server.GetVerifyCert(), Equals, false)
-	c.Assert(server.GetNoReconnect(), Equals, false)
+	c.Check(server.GetSsl(), Equals, false)
+	c.Check(server.GetVerifyCert(), Equals, false)
+	c.Check(server.GetNoReconnect(), Equals, false)
 
 	server.IsSslSet = false
 	server.IsVerifyCertSet = false
@@ -90,17 +90,17 @@ func (s *s) TestConfig_Fallbacks(c *C) {
 	config.Global.Ssl = false
 	config.Global.VerifyCert = false
 	config.Global.NoReconnect = false
-	c.Assert(server.GetSsl(), Equals, false)
-	c.Assert(server.GetVerifyCert(), Equals, false)
-	c.Assert(server.GetNoReconnect(), Equals, false)
+	c.Check(server.GetSsl(), Equals, false)
+	c.Check(server.GetVerifyCert(), Equals, false)
+	c.Check(server.GetNoReconnect(), Equals, false)
 
 	//Check default values more thoroughly
 	config.Global.Port = 0
-	c.Assert(server.GetPort(), Equals, uint16(defaultIrcPort))
+	c.Check(server.GetPort(), Equals, uint16(defaultIrcPort))
 	config.Global.Prefix = ""
-	c.Assert(server.GetPrefix(), Equals, ".")
+	c.Check(server.GetPrefix(), Equals, ".")
 	config.Global.ReconnectTimeout = 0
-	c.Assert(server.GetReconnectTimeout(), Equals,
+	c.Check(server.GetReconnectTimeout(), Equals,
 		uint(defaultReconnectTimeout))
 }
 
@@ -138,54 +138,54 @@ func (s *s) TestConfig_Fluent(c *C) {
 
 	server := conf.GetServer(srv1.Name)
 	server2 := conf.GetServer(srv2host)
-	c.Assert(server.GetHost(), Equals, srv1.Host)
-	c.Assert(server.GetName(), Equals, srv1.Name)
-	c.Assert(server.GetPort(), Equals, srv1.Port)
-	c.Assert(server.GetSsl(), Equals, srv1.Ssl)
-	c.Assert(server.GetVerifyCert(), Equals, srv1.VerifyCert)
-	c.Assert(server.GetNoReconnect(), Equals, srv1.NoReconnect)
-	c.Assert(server.GetReconnectTimeout(), Equals, srv1.ReconnectTimeout)
-	c.Assert(server.GetNick(), Equals, srv1.Nick)
-	c.Assert(server.GetAltnick(), Equals, srv1.Altnick)
-	c.Assert(server.GetUsername(), Equals, srv1.Username)
-	c.Assert(server.GetUserhost(), Equals, srv1.Userhost)
-	c.Assert(server.GetRealname(), Equals, srv1.Realname)
-	c.Assert(server.GetPrefix(), Equals, srv1.Prefix)
-	c.Assert(len(server.GetChannels()), Equals, len(srv1.Channels))
+	c.Check(server.GetHost(), Equals, srv1.Host)
+	c.Check(server.GetName(), Equals, srv1.Name)
+	c.Check(server.GetPort(), Equals, srv1.Port)
+	c.Check(server.GetSsl(), Equals, srv1.Ssl)
+	c.Check(server.GetVerifyCert(), Equals, srv1.VerifyCert)
+	c.Check(server.GetNoReconnect(), Equals, srv1.NoReconnect)
+	c.Check(server.GetReconnectTimeout(), Equals, srv1.ReconnectTimeout)
+	c.Check(server.GetNick(), Equals, srv1.Nick)
+	c.Check(server.GetAltnick(), Equals, srv1.Altnick)
+	c.Check(server.GetUsername(), Equals, srv1.Username)
+	c.Check(server.GetUserhost(), Equals, srv1.Userhost)
+	c.Check(server.GetRealname(), Equals, srv1.Realname)
+	c.Check(server.GetPrefix(), Equals, srv1.Prefix)
+	c.Check(len(server.GetChannels()), Equals, len(srv1.Channels))
 	for i, v := range server.GetChannels() {
-		c.Assert(v, Equals, srv1.Channels[i])
+		c.Check(v, Equals, srv1.Channels[i])
 	}
 
-	c.Assert(server2.GetHost(), Equals, srv2host)
-	c.Assert(server2.GetPort(), Equals, srv2.Port)
-	c.Assert(server2.GetSsl(), Equals, srv2.Ssl)
-	c.Assert(server2.GetVerifyCert(), Equals, srv2.VerifyCert)
-	c.Assert(server2.GetNoReconnect(), Equals, srv2.NoReconnect)
-	c.Assert(server2.GetReconnectTimeout(), Equals, srv2.ReconnectTimeout)
-	c.Assert(server2.GetNick(), Equals, srv2.Nick)
-	c.Assert(server2.GetAltnick(), Equals, srv2.Altnick)
-	c.Assert(server2.GetUsername(), Equals, srv2.Username)
-	c.Assert(server2.GetUserhost(), Equals, srv2.Userhost)
-	c.Assert(server2.GetRealname(), Equals, srv2.Realname)
-	c.Assert(server2.GetPrefix(), Equals, srv2.Prefix)
-	c.Assert(len(server2.GetChannels()), Equals, len(srv2.Channels))
+	c.Check(server2.GetHost(), Equals, srv2host)
+	c.Check(server2.GetPort(), Equals, srv2.Port)
+	c.Check(server2.GetSsl(), Equals, srv2.Ssl)
+	c.Check(server2.GetVerifyCert(), Equals, srv2.VerifyCert)
+	c.Check(server2.GetNoReconnect(), Equals, srv2.NoReconnect)
+	c.Check(server2.GetReconnectTimeout(), Equals, srv2.ReconnectTimeout)
+	c.Check(server2.GetNick(), Equals, srv2.Nick)
+	c.Check(server2.GetAltnick(), Equals, srv2.Altnick)
+	c.Check(server2.GetUsername(), Equals, srv2.Username)
+	c.Check(server2.GetUserhost(), Equals, srv2.Userhost)
+	c.Check(server2.GetRealname(), Equals, srv2.Realname)
+	c.Check(server2.GetPrefix(), Equals, srv2.Prefix)
+	c.Check(len(server2.GetChannels()), Equals, len(srv2.Channels))
 	for i, v := range server2.GetChannels() {
-		c.Assert(v, Equals, srv2.Channels[i])
+		c.Check(v, Equals, srv2.Channels[i])
 	}
 }
 
 func (s *s) TestConfig_Validation(c *C) {
 	conf := CreateConfig()
-	c.Assert(conf.IsValid(), Equals, false)
-	c.Assert(len(conf.Errors), Not(Equals), 0)
+	c.Check(conf.IsValid(), Equals, false)
+	c.Check(len(conf.Errors), Not(Equals), 0)
 
 	conf = CreateConfig().
 		Server("").
 		Port(srv1.Port)
-	c.Assert(len(conf.Servers), Equals, 0)
-	c.Assert(conf.Global.Port, Equals, uint16(srv1.Port))
-	c.Assert(conf.IsValid(), Equals, false)
-	c.Assert(len(conf.Errors), Equals, 2)
+	c.Check(len(conf.Servers), Equals, 0)
+	c.Check(conf.Global.Port, Equals, uint16(srv1.Port))
+	c.Check(conf.IsValid(), Equals, false)
+	c.Check(len(conf.Errors), Equals, 2)
 
 	conf = CreateConfig().
 		Nick(srv1.Nick).
@@ -194,9 +194,9 @@ func (s *s) TestConfig_Validation(c *C) {
 		Userhost(srv1.Userhost).
 		Server("a.com").
 		Server("a.com")
-	c.Assert(len(conf.Servers), Equals, 1)
-	c.Assert(conf.IsValid(), Equals, false)
-	c.Assert(len(conf.Errors), Equals, 1)
+	c.Check(len(conf.Servers), Equals, 1)
+	c.Check(conf.IsValid(), Equals, false)
+	c.Check(len(conf.Errors), Equals, 1)
 
 	conf = CreateConfig().
 		Nick(srv1.Nick).
@@ -204,15 +204,15 @@ func (s *s) TestConfig_Validation(c *C) {
 		Username(srv1.Username).
 		Userhost(srv1.Userhost).
 		Server("%")
-	c.Assert(conf.IsValid(), Equals, false)
+	c.Check(conf.IsValid(), Equals, false)
 	// Invalid: Host
-	c.Assert(len(conf.Errors), Equals, 1)
+	c.Check(len(conf.Errors), Equals, 1)
 
 	conf = CreateConfig().
 		Server(srv1.Host)
-	c.Assert(conf.IsValid(), Equals, false)
+	c.Check(conf.IsValid(), Equals, false)
 	// Missing: Nick, Realname, Username, Userhost
-	c.Assert(len(conf.Errors), Equals, 4)
+	c.Check(len(conf.Errors), Equals, 4)
 
 	conf = CreateConfig().
 		Server(srv1.Host).
@@ -221,8 +221,8 @@ func (s *s) TestConfig_Validation(c *C) {
 		Username(`spaces in here`). // no spaces
 		Userhost(`~#@#$@!`).        // must be a host
 		Realname(`@ !`)             // no special chars
-	c.Assert(conf.IsValid(), Equals, false)
-	c.Assert(len(conf.Errors), Equals, 5)
+	c.Check(conf.IsValid(), Equals, false)
+	c.Check(len(conf.Errors), Equals, 5)
 
 	conf = CreateConfig().
 		Server(srv1.Host).
@@ -232,24 +232,24 @@ func (s *s) TestConfig_Validation(c *C) {
 		Userhost(srv1.Userhost).
 		Realname(srv1.Realname)
 	conf.Servers[srv1.Host].Host = ""
-	c.Assert(conf.IsValid(), Equals, false)
-	c.Assert(len(conf.Errors), Equals, 1) // No host
+	c.Check(conf.IsValid(), Equals, false)
+	c.Check(len(conf.Errors), Equals, 1) // No host
 	conf.Errors = nil
 	conf.Servers[srv1.Host].Host = "@@@"
-	c.Assert(conf.IsValid(), Equals, false)
-	c.Assert(len(conf.Errors), Equals, 1) // Bad host
+	c.Check(conf.IsValid(), Equals, false)
+	c.Check(len(conf.Errors), Equals, 1) // Bad host
 }
 
 func (s *s) TestConfig_DisplayErrors(c *C) {
 	buf := &bytes.Buffer{}
 	log.SetOutput(buf)
-	c.Assert(buf.Len(), Equals, 0)
+	c.Check(buf.Len(), Equals, 0)
 	conf := CreateConfig().
 		Server("localhost")
-	c.Assert(conf.IsValid(), Equals, false)
-	c.Assert(len(conf.Errors), Equals, 4)
+	c.Check(conf.IsValid(), Equals, false)
+	c.Check(len(conf.Errors), Equals, 4)
 	conf.DisplayErrors()
-	c.Assert(buf.Len(), Not(Equals), 0)
+	c.Check(buf.Len(), Not(Equals), 0)
 	setLogger() // Reset the logger
 }
 
@@ -257,27 +257,27 @@ func (s *s) TestConfig_GetServer(c *C) {
 	conf := CreateConfig()
 	conf.Servers[srv1.GetName()] = srv1
 	conf.Servers[srv2.GetName()] = srv2
-	c.Assert(conf.GetServer(srv1.GetName()), Equals, srv1)
-	c.Assert(conf.GetServer(srv2.GetName()), Equals, srv2)
+	c.Check(conf.GetServer(srv1.GetName()), Equals, srv1)
+	c.Check(conf.GetServer(srv2.GetName()), Equals, srv2)
 }
 
 func (s *s) TestConfig_RemoveServer(c *C) {
 	conf := CreateConfig()
 	conf.Servers[srv1.GetName()] = srv1
 	conf.Servers[srv2.GetName()] = srv2
-	c.Assert(conf.GetServer(srv1.GetName()), Equals, srv1)
-	c.Assert(conf.GetServer(srv2.GetName()), Equals, srv2)
+	c.Check(conf.GetServer(srv1.GetName()), Equals, srv1)
+	c.Check(conf.GetServer(srv2.GetName()), Equals, srv2)
 
 	conf.ServerContext(srv1.GetName())
-	c.Assert(conf.context, NotNil)
+	c.Check(conf.context, NotNil)
 
 	conf.RemoveServer(srv1.GetName())
-	c.Assert(conf.IsValid(), Equals, true)
+	c.Check(conf.IsValid(), Equals, true)
 
-	c.Assert(conf.context, IsNil)
+	c.Check(conf.context, IsNil)
 
-	c.Assert(conf.GetServer(srv1.GetName()), IsNil)
-	c.Assert(conf.GetServer(srv2.GetName()), Equals, srv2)
+	c.Check(conf.GetServer(srv1.GetName()), IsNil)
+	c.Check(conf.GetServer(srv2.GetName()), Equals, srv2)
 }
 
 func (s *s) TestConfig_SetContext(c *C) {
@@ -288,19 +288,19 @@ func (s *s) TestConfig_SetContext(c *C) {
 	var p1, p2, p3 uint16 = 1, 2, 3
 
 	conf.Port(p1) // Should set global context
-	c.Assert(conf.Global.GetPort(), Equals, p1)
+	c.Check(conf.Global.GetPort(), Equals, p1)
 
 	conf.ServerContext(srv1.GetName())
 	conf.Port(p2)
 	conf.GlobalContext()
 	conf.Port(p3)
 
-	c.Assert(conf.GetServer(srv1.GetName()).GetPort(), Equals, p2)
-	c.Assert(conf.Global.GetPort(), Equals, p3)
+	c.Check(conf.GetServer(srv1.GetName()).GetPort(), Equals, p2)
+	c.Check(conf.Global.GetPort(), Equals, p3)
 
-	c.Assert(len(conf.Errors), Equals, 0)
+	c.Check(len(conf.Errors), Equals, 0)
 	conf.ServerContext("")
-	c.Assert(len(conf.Errors), Equals, 1)
+	c.Check(len(conf.Errors), Equals, 1)
 }
 
 func (s *s) TestValidNames(c *C) {
@@ -347,28 +347,28 @@ func (s *s) TestConfig_Clone(c *C) {
 		ServerContext(name).
 		Port(0)
 
-	c.Assert(newconf.GetFilename(), Equals, conf.GetFilename())
+	c.Check(newconf.GetFilename(), Equals, conf.GetFilename())
 
 	newconf.GlobalContext()
-	c.Assert(conf.Global.Port, Not(Equals), globalPort)
-	c.Assert(srv1.Port, Not(Equals), globalPort)
-	c.Assert(newconf.GetServer(name).GetPort(), Equals, globalPort)
+	c.Check(conf.Global.Port, Not(Equals), globalPort)
+	c.Check(srv1.Port, Not(Equals), globalPort)
+	c.Check(newconf.GetServer(name).GetPort(), Equals, globalPort)
 
 	newconf.
 		ServerContext(srv1.Name).
 		Port(serverPort)
 
-	c.Assert(conf.Global.Port, Not(Equals), serverPort)
-	c.Assert(srv1.Port, Not(Equals), serverPort)
-	c.Assert(newconf.GetServer(name).GetPort(), Equals, serverPort)
+	c.Check(conf.Global.Port, Not(Equals), serverPort)
+	c.Check(srv1.Port, Not(Equals), serverPort)
+	c.Check(newconf.GetServer(name).GetPort(), Equals, serverPort)
 }
 
 func (s *s) TestConfig_Filename(c *C) {
 	conf := CreateConfig()
 	filename := "file.yaml"
-	c.Assert(conf.GetFilename(), Equals, defaultConfigFileName)
+	c.Check(conf.GetFilename(), Equals, defaultConfigFileName)
 	conf.filename = filename
-	c.Assert(conf.GetFilename(), Equals, filename)
+	c.Check(conf.GetFilename(), Equals, filename)
 }
 
 func (s *s) TestValidChannels(c *C) {

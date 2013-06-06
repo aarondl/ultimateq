@@ -64,7 +64,7 @@ func testHandlerResponse(c *C, startWriter, startReader bool,
 	}
 
 	b, err := createBot(fakeConfig, nil, connProvider, true)
-	c.Assert(err, IsNil)
+	c.Check(err, IsNil)
 
 	server := b.servers[serverId]
 
@@ -96,7 +96,7 @@ func (s *s) TestCoreHandler_Ping(c *C) {
 		Args: []string{"123123123123"},
 	}
 	handler.HandleRaw(msg, testSender{})
-	c.Assert(testWritten[0], Equals, "PONG :"+msg.Args[0])
+	c.Check(testWritten[0], Equals, "PONG :"+msg.Args[0])
 }
 
 func (s *s) TestCoreHandler_Connect(c *C) {
@@ -106,9 +106,9 @@ func (s *s) TestCoreHandler_Connect(c *C) {
 			msg2 := []byte(fmt.Sprintf("USER %v 0 * :%v\r\n",
 				conf.GetUsername(), conf.GetRealname()))
 
-			c.Assert(bytes.Compare(conn.Receive(len(msg1), nil), msg1),
+			c.Check(bytes.Compare(conn.Receive(len(msg1), nil), msg1),
 				Equals, 0)
-			c.Assert(bytes.Compare(conn.Receive(len(msg2), nil), msg2),
+			c.Check(bytes.Compare(conn.Receive(len(msg2), nil), msg2),
 				Equals, 0)
 		},
 	)
@@ -126,18 +126,18 @@ func (s *s) TestCoreHandler_Nick(c *C) {
 				conf.GetUsername(), conf.GetRealname()))
 			errmsg := []byte(fmt.Sprintf("433 :Nick is in use\r\n"))
 
-			c.Assert(bytes.Compare(conn.Receive(len(nick1), nil), nick1),
+			c.Check(bytes.Compare(conn.Receive(len(nick1), nil), nick1),
 				Equals, 0)
-			c.Assert(bytes.Compare(conn.Receive(len(user), nil), user),
-				Equals, 0)
-			conn.Send(errmsg, len(errmsg), nil)
-			c.Assert(bytes.Compare(conn.Receive(len(nick2), nil), nick2),
+			c.Check(bytes.Compare(conn.Receive(len(user), nil), user),
 				Equals, 0)
 			conn.Send(errmsg, len(errmsg), nil)
-			c.Assert(bytes.Compare(conn.Receive(len(nick3), nil), nick3),
+			c.Check(bytes.Compare(conn.Receive(len(nick2), nil), nick2),
 				Equals, 0)
 			conn.Send(errmsg, len(errmsg), nil)
-			c.Assert(bytes.Compare(conn.Receive(len(nick4), nil), nick4),
+			c.Check(bytes.Compare(conn.Receive(len(nick3), nil), nick3),
+				Equals, 0)
+			conn.Send(errmsg, len(errmsg), nil)
+			c.Check(bytes.Compare(conn.Receive(len(nick4), nil), nick4),
 				Equals, 0)
 			conn.Send(errmsg, 0, io.EOF)
 		},
@@ -150,7 +150,7 @@ func (s *s) TestCoreHandler_005(c *C) {
 	}
 
 	b, err := createBot(fakeConfig, nil, connProvider, true)
-	c.Assert(err, IsNil)
+	c.Check(err, IsNil)
 
 	msg := &irc.IrcMessage{
 		Name: "005",
@@ -158,5 +158,5 @@ func (s *s) TestCoreHandler_005(c *C) {
 	}
 	srv := b.servers[serverId]
 	srv.handler.HandleRaw(msg, testSender{})
-	c.Assert(srv.caps.Chantypes(), Equals, "&$")
+	c.Check(srv.caps.Chantypes(), Equals, "&$")
 }
