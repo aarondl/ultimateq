@@ -380,7 +380,7 @@ func (b *Bot) dispatchMessages(s *Server) {
 
 	var reconn bool
 	var scale time.Duration
-	b.ReadConfig(func (c *config.Config) {
+	b.ReadConfig(func(c *config.Config) {
 		reconn = disconnect && !c.GetServer(s.name).GetNoReconnect()
 		scale = s.reconnScale
 	})
