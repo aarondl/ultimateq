@@ -379,9 +379,11 @@ func (b *Bot) dispatchMessages(s *Server) {
 	var timeout uint
 	b.ReadConfig(func(c *config.Config) {
 		cserver := c.GetServer(s.name)
-		reconn = disconnect && !cserver.GetNoReconnect()
-		scale = s.reconnScale
-		timeout = cserver.GetReconnectTimeout()
+		if cserver != nil {
+			reconn = disconnect && !cserver.GetNoReconnect()
+			scale = s.reconnScale
+			timeout = cserver.GetReconnectTimeout()
+		}
 	})
 
 	if !reconn {
