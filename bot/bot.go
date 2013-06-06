@@ -31,8 +31,12 @@ const (
 	errFmtReaderClosed = "bot: %v reader closed\n"
 	// errFmtClosingServer is when a IrcClient.Close returns an error.
 	errFmtClosingServer = "bot: Error closing server (%v)\n"
-	// fmtDisconnected shows when the bot is disconnected and needs to reconnect
-	fmtDisconnected = "bot: %v disconnected, reconnecting in %v..."
+	// fmtFailedConnecting shows when the bot is unable to connect to a server.
+	fmtFailedConnecting = "bot: %v failed to connect (%v)"
+	// fmtDisconnected shows when the bot is disconnected
+	fmtDisconnected = "bot: %v disconnected"
+	// fmtReconnecting shows when the bot is reconnecting
+	fmtReconnecting = "bot: %v reconnecting in %v..."
 )
 
 var (
@@ -374,31 +378,47 @@ func (b *Bot) dispatchMessages(s *Server) {
 	}
 	s.protect.RUnlock()
 
-	reconn := disconnect && !s.conf.GetNoReconnect()
+	var reconn bool
+	var scale time.Duration
+	b.ReadConfig(func (c *config.Config) {
+		reconn = disconnect && !c.GetServer(s.name).GetNoReconnect()
+		scale = s.reconnScale
+	})
 
 	if !reconn {
 		b.msgDispatchers.Done()
 	}
 
+	log.Printf(fmtDisconnected, s.name)
+
 	if reconn {
-		sec := time.Duration(s.conf.GetReconnectTimeout()) * s.reconnScale
-		log.Printf(fmtDisconnected, s.name, sec)
-		b.disconnectServer(s)
-		s.protect.Lock()
-		s.setStarted(false, false)
-		s.setReconnecting(true, false)
-		s.protect.Unlock()
-		select {
-		case <-time.After(sec):
-			s.setReconnecting(false, true)
-			break
-		case <-s.killreconn:
-			s.setReconnecting(false, true)
-			b.msgDispatchers.Done()
-			return
+		for {
+			dur := time.Duration(s.conf.GetReconnectTimeout()) * scale
+			log.Printf(fmtReconnecting, s.name, dur)
+			b.disconnectServer(s)
+			s.protect.Lock()
+			s.setStarted(false, false)
+			s.setReconnecting(true, false)
+			s.protect.Unlock()
+			select {
+			case <-time.After(dur):
+				s.setReconnecting(false, true)
+				break
+			case <-s.killreconn:
+				s.setReconnecting(false, true)
+				b.msgDispatchers.Done()
+				return
+			}
+
+			err := b.connectServer(s)
+			if err != nil {
+				log.Printf(fmtFailedConnecting, s.name, err)
+				continue
+			} else {
+				b.startServer(s, true, true)
+				break
+			}
 		}
-		b.connectServer(s)
-		b.startServer(s, true, true)
 		b.msgDispatchers.Done()
 	} else if disconnect {
 		<-s.killdispatch

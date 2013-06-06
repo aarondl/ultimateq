@@ -137,57 +137,99 @@ func (s *s) TestBot_Reconnecting(c *C) {
 		ReconnectTimeout(1).Ssl(true).Server(serverId)
 
 	cumutex := sync.Mutex{}
+
+	conn := mocks.CreateConn()
 	waiter := sync.WaitGroup{}
-	waiter.Add(2)
-	var conn *mocks.Conn
+	ndisc := 0
+
+	var b *Bot
 	connProvider := func(srv string) (net.Conn, error) {
 		cumutex.Lock()
-		conn = mocks.CreateConn()
-		cumutex.Unlock()
-		waiter.Done()
-		return conn, nil
+		defer cumutex.Unlock()
+		defer waiter.Done()
+
+		ndisc++
+
+		switch ndisc {
+		case 1:
+			return conn, nil
+		case 2:
+			return nil, io.EOF
+		case 3:
+			go func() {
+				b.servers[serverId].killreconn <- 0
+			}()
+			return conn, nil
+		}
+
+		c.Fatal("Unexpected reconnect occured.")
+		return nil, nil
 	}
 
-	b, err := createBot(conf, nil, connProvider, false)
+	var err error
+	b, err = createBot(conf, nil, connProvider, false)
 	c.Assert(err, IsNil)
 	srv := b.servers[serverId]
-	srv.reconnScale = time.Millisecond
+	srv.reconnScale = time.Microsecond
 
-	mu := sync.Mutex{}
-	discs := 0
+	waiter.Add(1)
 
-	handler := testHandler{func(m *irc.IrcMessage, s irc.Sender) {
-		if m.Name == irc.DISCONNECT {
-			mu.Lock()
-			discs++
-			if discs >= 2 {
-				b.InterruptReconnect(serverId)
-				b.disconnectServer(srv)
-			}
-			mu.Unlock()
-		}
-	}}
-
-	b.Register(irc.DISCONNECT, handler)
 	b.Connect()
 	b.start(false, true)
 
-	cumutex.Lock()
+	waiter.Wait()
+	waiter.Add(1)
+
 	conn.Send([]byte{}, 0, io.EOF)
 	conn.WaitForDeath()
-	cumutex.Unlock()
+	conn.ResetDeath()
 
 	waiter.Wait()
+	waiter.Add(1)
 
-	cumutex.Lock()
 	conn.Send([]byte{}, 0, io.EOF)
 	conn.WaitForDeath()
-	cumutex.Unlock()
+	conn.ResetDeath()
+
+	waiter.Wait()
 	b.WaitForHalt()
 
-	mu.Lock()
-	c.Assert(discs, Equals, 2)
-	mu.Unlock()
+	cumutex.Lock()
+	c.Assert(ndisc, Equals, 3)
+	cumutex.Unlock()
+}
+
+func (s *s) TestBot_InterruptReconnect(c *C) {
+	conf := Configure().Nick("nobody").Altnick("nobody1").Username("nobody").
+		Userhost("bitforge.ca").Realname("ultimateq").NoReconnect(false).
+		ReconnectTimeout(1).Ssl(true).Server(serverId)
+
+	cumutex := sync.Mutex{}
+
+	conn := mocks.CreateConn()
+	ndisc := 0
+	var b *Bot
+	connProvider := func(srv string) (net.Conn, error) {
+		cumutex.Lock()
+		defer cumutex.Unlock()
+
+		ndisc++
+		return conn, nil
+	}
+
+	var err error
+	b, err = createBot(conf, nil, connProvider, false)
+	c.Assert(err, IsNil)
+	srv := b.servers[serverId]
+
+	b.connectServer(srv)
+	b.startServer(srv, false, true)
+
+	conn.Send([]byte{}, 0, io.EOF)
+	conn.WaitForDeath()
+
+	c.Assert(b.InterruptReconnect(serverId), Equals, true)
+	c.Assert(ndisc, Equals, 1)
 }
 
 func (s *s) TestBot_Dispatching(c *C) {
