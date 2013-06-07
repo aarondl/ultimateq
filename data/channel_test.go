@@ -93,3 +93,8 @@ func (s *s) TestChannel_DeleteBanWild(c *C) {
 	ch.DeleteBans("nick2!user@host.com")
 	c.Check(len(ch.GetBans()), Equals, 0)
 }
+
+func (s *s) TestChannel_String(c *C) {
+	ch := CreateChannel("name", testKinds)
+	c.Check(ch.String(), Equals, "name")
+}

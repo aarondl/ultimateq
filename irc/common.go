@@ -11,6 +11,8 @@ import "strings"
 // use when registering handlers etc.
 const (
 	JOIN    = "JOIN"
+	KICK    = "KICK"
+	MODE    = "MODE"
 	NICK    = "NICK"
 	NOTICE  = "NOTICE"
 	PART    = "PART"
@@ -18,6 +20,7 @@ const (
 	PONG    = "PONG"
 	PRIVMSG = "PRIVMSG"
 	QUIT    = "QUIT"
+	TOPIC   = "TOPIC"
 )
 
 // IRC Reply and Error Messages. These are sent in reply to a previous message.

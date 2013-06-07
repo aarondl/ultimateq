@@ -92,6 +92,11 @@ func (c *Channel) DeleteBan(ban string) {
 	c.unsetAddress(banMode, ban)
 }
 
+// String returns the name of the channel.
+func (c *Channel) String() string {
+	return c.name
+}
+
 // DeleteBans deletes all bans that match a mask.
 func (c *Channel) DeleteBans(mask Mask) {
 	bans := c.GetAddresses(banMode)
