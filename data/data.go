@@ -25,8 +25,9 @@ type Store struct {
 	channelUsers map[string][]*ChannelUser
 	userChannels map[string][]*UserChannel
 
-	kinds  *ModeKinds
-	umodes *UserModesMeta
+	kinds   *ModeKinds
+	umodes  *UserModesMeta
+	cfinder *irc.ChannelFinder
 }
 
 // CreateStore creates a store from an irc protocaps instance.
@@ -39,6 +40,10 @@ func CreateStore(caps *irc.ProtoCaps) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
+	cfinder, err := irc.CreateChannelFinder(caps.Chantypes())
+	if err != nil {
+		return nil, err
+	}
 
 	return &Store{
 		channels:     make(map[string]*Channel),
@@ -46,8 +51,9 @@ func CreateStore(caps *irc.ProtoCaps) (*Store, error) {
 		channelUsers: make(map[string][]*ChannelUser),
 		userChannels: make(map[string][]*UserChannel),
 
-		kinds:  kinds,
-		umodes: modes,
+		kinds:   kinds,
+		umodes:  modes,
+		cfinder: cfinder,
 	}, nil
 }
 
@@ -78,9 +84,33 @@ func (s *Store) IsOn(nickorhost, channel string) bool {
 
 // addUser adds a user to the database.
 func (s *Store) addUser(nickorhost string) *User {
+	excl, at, per := false, false, false
+	for i := 0; i < len(nickorhost); i++ {
+		switch nickorhost[i] {
+		case '!':
+			excl = true
+		case '@':
+			at = true
+		case '.':
+			per = true
+		}
+	}
+
+	if per && !(excl && at) {
+		return nil
+	}
+
 	nick := strings.ToLower(Mask(nickorhost).GetNick())
-	user := CreateUser(nickorhost)
-	s.users[nick] = user
+	var user *User
+	var ok bool
+	if user, ok = s.users[nick]; ok {
+		if user.GetFullhost() != nickorhost {
+			user.mask = Mask(nickorhost)
+		}
+	} else {
+		user = CreateUser(nickorhost)
+		s.users[nick] = user
+	}
 	return user
 }
 
@@ -99,6 +129,7 @@ func (s *Store) removeUser(nickorhost string) {
 					}
 					s.channelUsers[channel] = cus[:ln-1]
 				}
+				break
 			}
 		}
 	}
@@ -133,6 +164,7 @@ func (s *Store) removeChannel(channel string) {
 					}
 					s.userChannels[user] = cus[:ln-1]
 				}
+				break
 			}
 		}
 	}
@@ -186,6 +218,7 @@ func (s *Store) removeFromChannel(nickorhost, channel string) {
 
 	if _, ok = s.users[nick]; !ok {
 		s.addUser(nickorhost)
+		return
 	}
 
 	if cu, ok = s.channelUsers[channel]; ok {
@@ -198,9 +231,9 @@ func (s *Store) removeFromChannel(nickorhost, channel string) {
 					if i+1 < ln {
 						cu[i], cu[ln-1] = cu[ln-1], cu[i]
 					}
-					cu = cu[:len(cu)-1]
-					s.channelUsers[channel] = cu
+					s.channelUsers[channel] = cu[:len(cu)-1]
 				}
+				break
 			}
 		}
 	}
@@ -215,9 +248,9 @@ func (s *Store) removeFromChannel(nickorhost, channel string) {
 					if i+1 < ln {
 						uc[i], uc[ln-1] = uc[ln-1], uc[i]
 					}
-					uc = uc[:len(uc)-1]
-					s.userChannels[channel] = uc
+					s.userChannels[nick] = uc[:len(uc)-1]
 				}
+				break
 			}
 		}
 	}
@@ -238,12 +271,10 @@ func (s *Store) Update(m *irc.IrcMessage) {
 		s.kick(m)
 	case irc.MODE:
 		s.mode(m)
-	case irc.TOPIC:
-		s.topic(m)
-	case irc.PRIVMSG:
-		s.privmsg(m)
-	case irc.NOTICE:
-		s.notice(m)
+	case irc.RPL_TOPIC:
+		s.rpl_topic(m)
+	case irc.PRIVMSG, irc.NOTICE:
+		s.msg(m)
 	case irc.RPL_WELCOME:
 		s.rpl_welcome(m)
 
@@ -298,6 +329,11 @@ func (s *Store) quit(m *irc.IrcMessage) {
 
 // kick alters the state of the database when a KICK message is received.
 func (s *Store) kick(m *irc.IrcMessage) {
+	if m.Args[1] == s.Self.GetNick() {
+		s.removeChannel(m.Args[0])
+	} else {
+		s.removeFromChannel(m.Args[1], m.Args[0])
+	}
 }
 
 // mode alters the state of the database when a MODE message is received.
@@ -305,17 +341,17 @@ func (s *Store) mode(m *irc.IrcMessage) {
 }
 
 // topic alters the state of the database when a TOPIC message is received.
-func (s *Store) topic(m *irc.IrcMessage) {
+func (s *Store) rpl_topic(m *irc.IrcMessage) {
+	chname := strings.ToLower(m.Args[0])
+	if ch, ok := s.channels[chname]; ok {
+		ch.Topic(m.Args[1])
+	}
 }
 
-// privmsg alters the state of the database when a PRIVMSG message is received.
-func (s *Store) privmsg(m *irc.IrcMessage) {
-
-}
-
-// notice alters the state of the database when a NOTICE message is received.
-func (s *Store) notice(m *irc.IrcMessage) {
-
+// msg alters the state of the database when a PRIVMSG or NOTICE message is
+// received.
+func (s *Store) msg(m *irc.IrcMessage) {
+	s.addUser(m.Sender)
 }
 
 // rpl_welcome alters the state of the database when a RPL_WELCOME message is
