@@ -7,17 +7,17 @@ import (
 // ModeDiff encapsulates a difference of modes, a combination of both positive
 // change modes, and negative change modes.
 type ModeDiff struct {
-	*ModeKinds
-	pos *Modeset
-	neg *Modeset
+	*ChannelModeKinds
+	pos *ChannelModes
+	neg *ChannelModes
 }
 
 // CreateModeDiff creates an empty ModeDiff.
-func CreateModeDiff(kinds *ModeKinds) *ModeDiff {
+func CreateModeDiff(kinds *ChannelModeKinds) *ModeDiff {
 	return &ModeDiff{
-		ModeKinds: kinds,
-		pos:       CreateModeset(kinds),
-		neg:       CreateModeset(kinds),
+		ChannelModeKinds: kinds,
+		pos:       CreateChannelModes(kinds),
+		neg:       CreateChannelModes(kinds),
 	}
 }
 

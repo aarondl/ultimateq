@@ -13,18 +13,18 @@ const (
 type Channel struct {
 	name  string
 	topic string
-	*Modeset
+	*ChannelModes
 }
 
 // CreateChannel instantiates a channel object.
-func CreateChannel(name string, kinds *ModeKinds) *Channel {
+func CreateChannel(name string, kinds *ChannelModeKinds) *Channel {
 	if len(name) == 0 {
 		return nil
 	}
 
 	return &Channel{
 		name:    strings.ToLower(name),
-		Modeset: CreateModeset(kinds),
+		ChannelModes: CreateChannelModes(kinds),
 	}
 }
 

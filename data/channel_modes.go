@@ -4,39 +4,39 @@ import (
 	"strings"
 )
 
-// Modeset encapsulates flag-based modestrings, setting and getting any modes
+// ChannelModes encapsulates flag-based modestrings, setting and getting any modes
 // and potentially using arguments as well. Some functions work with full
 // modestrings containing both + and - characters, and some commands work with
 // simple modestrings with are only positive or negative with the leading +/-
 // omitted.
-type Modeset struct {
+type ChannelModes struct {
 	modes        map[rune]bool
 	argModes     map[rune]string
 	addressModes map[rune][]string
 
-	*ModeKinds
+	*ChannelModeKinds
 
 	addresses int
 }
 
-// CreateModeset creates an empty Modeset.
-func CreateModeset(kinds *ModeKinds) *Modeset {
-	return &Modeset{
+// CreateChannelModes creates an empty ChannelModes.
+func CreateChannelModes(kinds *ChannelModeKinds) *ChannelModes {
+	return &ChannelModes{
 		modes:        make(map[rune]bool),
 		argModes:     make(map[rune]string),
 		addressModes: make(map[rune][]string),
 
-		ModeKinds: kinds,
+		ChannelModeKinds: kinds,
 	}
 }
 
 // Apply takes a complex modestring and applies it to a an existing modeset
-func (m *Modeset) Apply(modestring string) {
+func (m *ChannelModes) Apply(modestring string) {
 	apply(m, modestring)
 }
 
 // ApplyDiff applies a ModeDiff to the current modeset instance.
-func (m *Modeset) ApplyDiff(d *ModeDiff) {
+func (m *ChannelModes) ApplyDiff(d *ModeDiff) {
 	for mode, _ := range d.pos.modes {
 		m.setMode(mode)
 	}
@@ -62,8 +62,8 @@ func (m *Modeset) ApplyDiff(d *ModeDiff) {
 	}
 }
 
-// String turns a Modeset into a simple string representation.
-func (m *Modeset) String() string {
+// String turns a ChannelModes into a simple string representation.
+func (m *ChannelModes) String() string {
 	length := len(m.modes)
 	arglength := len(m.argModes) + m.addresses
 	modes := make([]rune, length+arglength)
@@ -98,7 +98,7 @@ func (m *Modeset) String() string {
 }
 
 // IsSet checks to see if the given modes are set using simple mode strings.
-func (m *Modeset) IsSet(modestrs ...string) bool {
+func (m *ChannelModes) IsSet(modestrs ...string) bool {
 	modes, args := parseSimpleModestrings(modestrs...)
 	if len(modes) == 0 {
 		return false
@@ -134,7 +134,7 @@ func (m *Modeset) IsSet(modestrs ...string) bool {
 }
 
 // Set sets modes using a simple mode string.
-func (m *Modeset) Set(modestrs ...string) {
+func (m *ChannelModes) Set(modestrs ...string) {
 	modes, args := parseSimpleModestrings(modestrs...)
 	if len(modes) == 0 {
 		return
@@ -163,7 +163,7 @@ func (m *Modeset) Set(modestrs ...string) {
 }
 
 // Unset unsets modes using a simple mode string.
-func (m *Modeset) Unset(modestrs ...string) {
+func (m *ChannelModes) Unset(modestrs ...string) {
 	modes, args := parseSimpleModestrings(modestrs...)
 	if len(modes) == 0 {
 		return
@@ -196,34 +196,34 @@ func (m *Modeset) Unset(modestrs ...string) {
 
 // GetArg returns the argument for the current mode. Empty string if the mode
 // is not set.
-func (m *Modeset) GetArg(mode rune) string {
+func (m *ChannelModes) GetArg(mode rune) string {
 	return m.argModes[mode]
 }
 
 // GetArg returns the addresses for the current mode. Nil if the mode is not
 // set.
-func (m *Modeset) GetAddresses(mode rune) []string {
+func (m *ChannelModes) GetAddresses(mode rune) []string {
 	return m.addressModes[mode]
 }
 
 // isModeSet checks to see if a mode has been set.
-func (m *Modeset) isModeSet(mode rune) bool {
+func (m *ChannelModes) isModeSet(mode rune) bool {
 	return m.modes[mode]
 }
 
 // setMode sets a mode.
-func (m *Modeset) setMode(mode rune) {
+func (m *ChannelModes) setMode(mode rune) {
 	m.modes[mode] = true
 }
 
 // unsetMode unsets a mode.
-func (m *Modeset) unsetMode(mode rune) {
+func (m *ChannelModes) unsetMode(mode rune) {
 	delete(m.modes, mode)
 }
 
 // isArgSet checks to see if a specific arg has been set for a mode, if arg is
 // empty string simply checks for the modes existence.
-func (m *Modeset) isArgSet(mode rune, arg string) bool {
+func (m *ChannelModes) isArgSet(mode rune, arg string) bool {
 	if check, has := m.argModes[mode]; has &&
 		(len(arg) == 0 || arg == check) {
 
@@ -233,13 +233,13 @@ func (m *Modeset) isArgSet(mode rune, arg string) bool {
 }
 
 // setArg sets an argument for a mode.
-func (m *Modeset) setArg(mode rune, arg string) {
+func (m *ChannelModes) setArg(mode rune, arg string) {
 	m.argModes[mode] = arg
 }
 
 // unsetArg unsets an argument mode. If arg is not empty string, it will
 // ensure the arg matches as well in order to unset.
-func (m *Modeset) unsetArg(mode rune, arg string) {
+func (m *ChannelModes) unsetArg(mode rune, arg string) {
 	if check, has := m.argModes[mode]; has &&
 		(len(arg) == 0 || arg == check) {
 
@@ -249,7 +249,7 @@ func (m *Modeset) unsetArg(mode rune, arg string) {
 
 // isAddressSet checks to see if a specific address is set in a mode, if address
 // is empty string, simply checks for the modes existence.
-func (m *Modeset) isAddressSet(mode rune, address string) bool {
+func (m *ChannelModes) isAddressSet(mode rune, address string) bool {
 	if addresses, has := m.addressModes[mode]; !has {
 		return false
 	} else if len(address) > 0 {
@@ -265,7 +265,7 @@ func (m *Modeset) isAddressSet(mode rune, address string) bool {
 }
 
 // setAddress sets an address for a mode.
-func (m *Modeset) setAddress(mode rune, address string) {
+func (m *ChannelModes) setAddress(mode rune, address string) {
 	if addresses, has := m.addressModes[mode]; !has {
 		m.addressModes[mode] = []string{address}
 		m.addresses++
@@ -281,7 +281,7 @@ func (m *Modeset) setAddress(mode rune, address string) {
 }
 
 // unsetAddress unsets an address for a mode.
-func (m *Modeset) unsetAddress(mode rune, address string) {
+func (m *ChannelModes) unsetAddress(mode rune, address string) {
 	if addresses, has := m.addressModes[mode]; has {
 		i, lenaddr := 0, len(addresses)
 		for ; i < lenaddr && addresses[i] != address; i++ {

@@ -14,7 +14,7 @@ func (s *s) TestChannel_Create(c *C) {
 	c.Check(ch, NotNil)
 	c.Check(ch.GetName(), Equals, strings.ToLower(name))
 	c.Check(ch.GetTopic(), Equals, "")
-	c.Check(ch.Modeset, NotNil)
+	c.Check(ch.ChannelModes, NotNil)
 }
 
 func (s *s) TestChannel_GettersSetters(c *C) {

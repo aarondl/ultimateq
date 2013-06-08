@@ -11,7 +11,7 @@ import (
 // Self is the bot's user, he's a special case since he has to hold a Modeset.
 type Self struct {
 	*User
-	*Modeset
+	*ChannelModes
 }
 
 // Store is the main data container. It represents the state on a server
@@ -25,18 +25,18 @@ type Store struct {
 	channelUsers map[string][]*ChannelUser
 	userChannels map[string][]*UserChannel
 
-	kinds   *ModeKinds
-	umodes  *UserModesMeta
+	kinds   *ChannelModeKinds
+	umodes  *UserModeKinds
 	cfinder *irc.ChannelFinder
 }
 
 // CreateStore creates a store from an irc protocaps instance.
 func CreateStore(caps *irc.ProtoCaps) (*Store, error) {
-	kinds, err := CreateModeKindsCSV(caps.Chanmodes())
+	kinds, err := CreateChannelModeKindsCSV(caps.Chanmodes())
 	if err != nil {
 		return nil, err
 	}
-	modes, err := CreateUserModesMeta(caps.Prefix())
+	modes, err := CreateUserModeKinds(caps.Prefix())
 	if err != nil {
 		return nil, err
 	}

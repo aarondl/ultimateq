@@ -4,10 +4,10 @@ import (
 	. "launchpad.net/gocheck"
 )
 
-var testKinds = CreateModeKinds("b", "c", "d")
+var testKinds = CreateChannelModeKinds("b", "c", "d")
 
-func (s *s) TestModeset_Create(c *C) {
-	modes := CreateModeset(testKinds)
+func (s *s) TestChannelModes_Create(c *C) {
+	modes := CreateChannelModes(testKinds)
 	c.Check(modes, NotNil)
 	c.Check(modes.modes, NotNil)
 	c.Check(modes.argModes, NotNil)
@@ -15,37 +15,37 @@ func (s *s) TestModeset_Create(c *C) {
 	c.Check(modes.addresses, Equals, 0)
 	c.Check(&modes.kinds, Equals, &testKinds.kinds)
 
-	var _ moder = CreateModeset(testKinds)
+	var _ moder = CreateChannelModes(testKinds)
 }
 
-func (s *s) TestModeset_Apply(c *C) {
-	m := CreateModeset(testKinds)
+func (s *s) TestChannelModes_Apply(c *C) {
+	m := CreateChannelModes(testKinds)
 	m.Apply("abbcd host1 host2 10 arg")
 	c.Check(m.IsSet("abbcd host1 host2 10 arg"), Equals, true)
 
-	m = CreateModeset(testKinds)
+	m = CreateChannelModes(testKinds)
 	m.Apply("+abbcd host1 host2 10 arg")
 	c.Check(m.IsSet("abbcd host1 host2 10 arg"), Equals, true)
 
-	m = CreateModeset(testKinds)
+	m = CreateChannelModes(testKinds)
 	m.Apply(" +ab-c 10")
 	c.Check(m.IsSet("a"), Equals, true)
 	c.Check(m.IsSet("b 10"), Equals, true)
 	c.Check(m.IsSet("c"), Equals, false)
 
-	m = CreateModeset(testKinds)
+	m = CreateChannelModes(testKinds)
 	m.Apply("b 10")
 	c.Check(m.IsSet("b 10"), Equals, true)
 	m.Apply("-b 10 ")
 	c.Check(m.IsSet("b 10"), Equals, false)
 
-	m = CreateModeset(testKinds)
+	m = CreateChannelModes(testKinds)
 	m.Apply("x-y+z")
 	c.Check(m.IsSet("x"), Equals, true)
 	c.Check(m.IsSet("y"), Equals, false)
 	c.Check(m.IsSet("z"), Equals, true)
 
-	m = CreateModeset(testKinds)
+	m = CreateChannelModes(testKinds)
 	m.Apply("+cdb 10")
 	c.Check(m.IsSet("c"), Equals, true)
 	c.Check(m.IsSet("d"), Equals, false)
@@ -56,8 +56,8 @@ func (s *s) TestModeset_Apply(c *C) {
 	c.Check(m.IsSet("b"), Equals, false)
 }
 
-func (s *s) TestModeset_ApplyDiff(c *C) {
-	m := CreateModeset(testKinds)
+func (s *s) TestChannelModes_ApplyDiff(c *C) {
+	m := CreateChannelModes(testKinds)
 	m.Set("abbcd host1 host2 10 arg")
 
 	d := CreateModeDiff(testKinds)
@@ -72,8 +72,8 @@ func (s *s) TestModeset_ApplyDiff(c *C) {
 	c.Check(m.IsSet("a"), Equals, false)
 }
 
-func (s *s) TestModeset_IsSet(c *C) {
-	modes := CreateModeset(testKinds)
+func (s *s) TestChannelModes_IsSet(c *C) {
+	modes := CreateChannelModes(testKinds)
 	modes.modes['a'] = true
 	modes.addressModes['b'] = []string{"*!*@host1", "*!*@host2"}
 	modes.argModes['c'] = "10"
@@ -82,8 +82,8 @@ func (s *s) TestModeset_IsSet(c *C) {
 	check(modes, c)
 }
 
-func (s *s) TestModeset_GetArgs(c *C) {
-	modes := CreateModeset(testKinds)
+func (s *s) TestChannelModes_GetArgs(c *C) {
+	modes := CreateChannelModes(testKinds)
 	modes.Set("bbc host1 host2 10")
 	c.Check(modes.GetArg('c'), Equals, "10")
 	addresses := modes.GetAddresses('b')
@@ -94,7 +94,7 @@ func (s *s) TestModeset_GetArgs(c *C) {
 	c.Check(modes.GetAddresses('z'), IsNil)
 }
 
-func check(modes *Modeset, c *C) {
+func check(modes *ChannelModes, c *C) {
 	// Blanks
 	c.Check(modes.IsSet(), Equals, false)
 	c.Check(modes.IsSet(""), Equals, false)
@@ -153,8 +153,8 @@ func check(modes *Modeset, c *C) {
 	c.Check(modes.IsSet("acb *!*@host1"), Equals, false)
 }
 
-func (s *s) TestModeset_Set(c *C) {
-	modes := CreateModeset(testKinds)
+func (s *s) TestChannelModes_Set(c *C) {
+	modes := CreateChannelModes(testKinds)
 
 	modes.Set()
 	modes.Set("")
@@ -166,22 +166,22 @@ func (s *s) TestModeset_Set(c *C) {
 	modes.Set("d arg")
 	check(modes, c)
 
-	modes = CreateModeset(testKinds)
+	modes = CreateChannelModes(testKinds)
 	modes.Set("a", "b *!*@host1", "b *!*@host2", "c 10", "d arg")
 	check(modes, c)
 
-	modes = CreateModeset(testKinds)
+	modes = CreateChannelModes(testKinds)
 	modes.Set("abbcd *!*@host1 *!*@host2 10 arg")
 	check(modes, c)
 
-	modes = CreateModeset(testKinds)
+	modes = CreateChannelModes(testKinds)
 	modes.Set("cb")
 	c.Check(modes.IsSet("b"), Equals, false)
 	c.Check(modes.IsSet("c"), Equals, false)
 }
 
-func (s *s) TestModeset_AddressTracking(c *C) {
-	modes := CreateModeset(CreateModeKinds("yz", "", ""))
+func (s *s) TestChannelModes_AddressTracking(c *C) {
+	modes := CreateChannelModes(CreateChannelModeKinds("yz", "", ""))
 	c.Check(modes.addresses, Equals, 0)
 	modes.Set("y *!*@host1", "y *!*@host2", "z *!*@host3")
 	c.Check(modes.addresses, Equals, 3)
@@ -192,8 +192,8 @@ func (s *s) TestModeset_AddressTracking(c *C) {
 	c.Check(modes.IsSet("yz"), Equals, false)
 }
 
-func (s *s) TestModeset_Unset(c *C) {
-	modes := CreateModeset(testKinds)
+func (s *s) TestChannelModes_Unset(c *C) {
+	modes := CreateChannelModes(testKinds)
 	modes.Set("a", "b *!*@host1", "b *!*@host2", "c 10", "d arg")
 	modes.Unset()
 	modes.Unset("")
@@ -203,7 +203,7 @@ func (s *s) TestModeset_Unset(c *C) {
 	c.Check(modes.IsSet("c"), Equals, true)
 	c.Check(modes.IsSet("d"), Equals, true)
 
-	modes = CreateModeset(testKinds)
+	modes = CreateChannelModes(testKinds)
 	modes.Set("a", "b *!*@host1", "b *!*@host2", "c 10", "d arg")
 	modes.Unset("a", "b", "d")
 	c.Check(modes.IsSet("a"), Equals, false)
@@ -211,7 +211,7 @@ func (s *s) TestModeset_Unset(c *C) {
 	c.Check(modes.IsSet("c"), Equals, true)
 	c.Check(modes.IsSet("d"), Equals, false)
 
-	modes = CreateModeset(testKinds)
+	modes = CreateChannelModes(testKinds)
 	modes.Set("a", "b *!*@host1", "b *!*@host2", "c 10", "d arg")
 	modes.Unset("b *!*@host1", "c 10")
 	c.Check(modes.IsSet("a"), Equals, true)
@@ -220,7 +220,7 @@ func (s *s) TestModeset_Unset(c *C) {
 	c.Check(modes.IsSet("c"), Equals, false)
 	c.Check(modes.IsSet("d"), Equals, true)
 
-	modes = CreateModeset(testKinds)
+	modes = CreateChannelModes(testKinds)
 	modes.Set("a", "b *!*@host1", "b *!*@host2", "c 10", "d arg")
 	modes.Unset("dbb *!*@host1 *!*@host2")
 	modes.Unset("c")
@@ -229,7 +229,7 @@ func (s *s) TestModeset_Unset(c *C) {
 	c.Check(modes.IsSet("c"), Equals, true)
 	c.Check(modes.IsSet("d"), Equals, false)
 
-	modes = CreateModeset(testKinds)
+	modes = CreateChannelModes(testKinds)
 	modes.Set("a", "b *!*@host1", "b *!*@host2", "c 10", "d arg")
 	modes.Unset("dbc *!*@host1 10")
 	c.Check(modes.IsSet("a"), Equals, true)
@@ -238,7 +238,7 @@ func (s *s) TestModeset_Unset(c *C) {
 	c.Check(modes.IsSet("c"), Equals, false)
 	c.Check(modes.IsSet("d"), Equals, false)
 
-	modes = CreateModeset(testKinds)
+	modes = CreateChannelModes(testKinds)
 	modes.Set("a", "b *!*@host1", "b *!*@host2", "c 10", "d arg")
 	modes.Unset("bad *!*@not.host1")
 	c.Check(modes.IsSet("a"), Equals, false)
@@ -246,7 +246,7 @@ func (s *s) TestModeset_Unset(c *C) {
 	c.Check(modes.IsSet("c"), Equals, true)
 	c.Check(modes.IsSet("d"), Equals, false)
 
-	modes = CreateModeset(testKinds)
+	modes = CreateChannelModes(testKinds)
 	modes.Set("a", "b *!*@host1", "b *!*@host2", "c 10", "d arg")
 	modes.Unset("a", "b *!*@not.host1")
 	c.Check(modes.IsSet("a"), Equals, false)
@@ -255,13 +255,13 @@ func (s *s) TestModeset_Unset(c *C) {
 	c.Check(modes.IsSet("d"), Equals, true)
 }
 
-func (s *s) TestModeset_String(c *C) {
-	modes := CreateModeset(testKinds)
+func (s *s) TestChannelModes_String(c *C) {
+	modes := CreateChannelModes(testKinds)
 	modes.Set("a", "b host1", "b host2", "c 10", "d arg")
 	str := modes.String()
 	c.Check(str, Matches, `^[abbcd]{5}( arg| 10){2}( host1| host2){2}$`)
 
-	modes = CreateModeset(testKinds)
+	modes = CreateChannelModes(testKinds)
 	modes.Set("xyz")
 	str = modes.String()
 	c.Check(str, Matches, `^xyz$`)
