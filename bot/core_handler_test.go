@@ -27,6 +27,11 @@ func (t testSender) GetKey() string {
 	return serverId
 }
 
+func (t testSender) Writef(format string, args ...interface{}) error {
+	testWritten = append(testWritten, fmt.Sprintf(format, args...))
+	return nil
+}
+
 func (t testSender) Writeln(str string) error {
 	testWritten = append(testWritten, str)
 	return nil

@@ -21,6 +21,10 @@ func (tsender testSender) Writeln(s string) error {
 	return nil
 }
 
+func (tsender testSender) Writef(format string, args ...interface{}) error {
+	return nil
+}
+
 func (tsender testSender) GetKey() string {
 	return ""
 }

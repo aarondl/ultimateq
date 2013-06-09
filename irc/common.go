@@ -179,8 +179,10 @@ const (
 // Sender is the sender of an event, and should allow replies on a writing
 // interface as well as a way to identify itself.
 type Sender interface {
-	// Writes a string to an endpoint that makes sense for the given event.
+	// Writes a string to the endpoint contained in the sender.
 	Writeln(string) error
+	// Writes a formatted string to the endpoint contained in the sender.
+	Writef(string, ...interface{}) error
 	// Retrieves a key to retrieve where this event was generated from.
 	GetKey() string
 }
