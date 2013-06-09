@@ -15,10 +15,11 @@ func (s *s) TestStore(c *C) {
 	st, err := CreateStore(irc.CreateProtoCaps())
 	c.Check(st, NotNil)
 	c.Check(err, IsNil)
+	c.Check(st.Self.ChannelModes, NotNil)
 
 	// Should die on creating kinds
 	fakeCaps := &irc.ProtoCaps{}
-	fakeCaps.ParseProtoCaps(&irc.IrcMessage{Args: []string{
+	fakeCaps.ParseISupport(&irc.IrcMessage{Args: []string{
 		"NICK", "CHANTYPES=#&", "PREFIX=(ov)@+",
 	}})
 	st, err = CreateStore(fakeCaps)
@@ -27,7 +28,7 @@ func (s *s) TestStore(c *C) {
 
 	// Should die on creating user modes
 	fakeCaps = &irc.ProtoCaps{}
-	fakeCaps.ParseProtoCaps(&irc.IrcMessage{Args: []string{
+	fakeCaps.ParseISupport(&irc.IrcMessage{Args: []string{
 		"NICK", "CHANTYPES=#&", "CHANMODES=a,b,c,d",
 	}})
 	st, err = CreateStore(fakeCaps)
@@ -36,7 +37,7 @@ func (s *s) TestStore(c *C) {
 
 	// Should die on creating ChannelFinder
 	fakeCaps = &irc.ProtoCaps{}
-	fakeCaps.ParseProtoCaps(&irc.IrcMessage{Args: []string{
+	fakeCaps.ParseISupport(&irc.IrcMessage{Args: []string{
 		"NICK", "CHANTYPES=H", "PREFIX=(ov)@+", "CHANMODES=a,b,c,d",
 	}})
 	st, err = CreateStore(fakeCaps)
@@ -326,18 +327,69 @@ func (s *s) TestStore_UpdateKickSelf(c *C) {
 }
 
 func (s *s) TestStore_UpdateMode(c *C) {
-	c.Skip("Not Done")
 	st, err := CreateStore(irc.CreateProtoCaps())
+	st.Self = self
 	c.Check(err, IsNil)
+
 	m := &irc.IrcMessage{
-		Name:   "JOIN",
-		Sender: users[1],
-		Args:   []string{channels[0]},
+		Name:   irc.MODE,
+		Sender: users[0],
+		Args: []string{channels[0],
+			"+ovmb-vn", nicks[0], nicks[0], "*!*mask", nicks[1],
+		},
 	}
+
+	st.addChannel(channels[0])
+	st.addUser(users[0])
+	st.addUser(users[1])
+	st.addToChannel(users[0], channels[0])
+	st.addToChannel(users[1], channels[0])
+
+	u1modes := st.GetUsersChannelModes(channels[0], users[0])
+	u2modes := st.GetUsersChannelModes(channels[0], users[1])
+	u2modes.SetMode('v')
+	st.GetChannel(channels[0]).Set("n")
+
+	c.Check(st.GetChannel(channels[0]).IsSet("n"), Equals, true)
+	c.Check(st.GetChannel(channels[0]).IsSet("mb"), Equals, false)
+	c.Check(u1modes.HasMode('o'), Equals, false)
+	c.Check(u1modes.HasMode('v'), Equals, false)
+	c.Check(u2modes.HasMode('v'), Equals, true)
 	st.Update(m)
+	c.Check(st.GetChannel(channels[0]).IsSet("n"), Equals, false)
+	c.Check(st.GetChannel(channels[0]).IsSet("mb *!*mask"), Equals, true)
+	c.Check(u1modes.HasMode('o'), Equals, true)
+	c.Check(u1modes.HasMode('v'), Equals, true)
+	c.Check(u2modes.HasMode('v'), Equals, false)
+}
+
+func (s *s) TestStore_UpdateModeSelf(c *C) {
+	st, err := CreateStore(irc.CreateProtoCaps())
+	//st.Self = self
+	st.Self.User = self.User
+	c.Check(err, IsNil)
+
+	m := &irc.IrcMessage{
+		Name:   irc.MODE,
+		Sender: self.GetFullhost(),
+		Args:   []string{self.GetNick(), "+i-o"},
+	}
+
+	st.Self.Set("o")
+
+	c.Check(st.Self.IsSet("i"), Equals, false)
+	c.Check(st.Self.IsSet("o"), Equals, true)
+	st.Update(m)
+	c.Check(st.Self.IsSet("i"), Equals, true)
+	c.Check(st.Self.IsSet("o"), Equals, false)
 }
 
 func (s *s) TestStore_UpdateRplMode(c *C) {
+	c.Skip("Needs Implementing")
+}
+
+func (s *s) TestStore_UpdateRplBanlist(c *C) {
+	c.Skip("Needs Implementing")
 }
 
 func (s *s) TestStore_UpdateTopic(c *C) {

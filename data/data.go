@@ -25,13 +25,15 @@ type Store struct {
 	channelUsers map[string]map[string]*ChannelUser
 	userChannels map[string]map[string]*UserChannel
 
-	kinds   *ChannelModeKinds
-	umodes  *UserModeKinds
-	cfinder *irc.ChannelFinder
+	selfkinds *ChannelModeKinds
+	kinds     *ChannelModeKinds
+	umodes    *UserModeKinds
+	cfinder   *irc.ChannelFinder
 }
 
 // CreateStore creates a store from an irc protocaps instance.
 func CreateStore(caps *irc.ProtoCaps) (*Store, error) {
+	selfkinds := CreateChannelModeKinds("", "", "", caps.Usermodes())
 	kinds, err := CreateChannelModeKindsCSV(caps.Chanmodes())
 	if err != nil {
 		return nil, err
@@ -45,16 +47,21 @@ func CreateStore(caps *irc.ProtoCaps) (*Store, error) {
 		return nil, err
 	}
 
-	return &Store{
+	store := &Store{
 		channels:     make(map[string]*Channel),
 		users:        make(map[string]*User),
 		channelUsers: make(map[string]map[string]*ChannelUser),
 		userChannels: make(map[string]map[string]*UserChannel),
 
-		kinds:   kinds,
-		umodes:  modes,
-		cfinder: cfinder,
-	}, nil
+		selfkinds: selfkinds,
+		kinds:     kinds,
+		umodes:    modes,
+		cfinder:   cfinder,
+	}
+
+	store.Self.ChannelModes = CreateChannelModes(selfkinds)
+
+	return store, nil
 }
 
 // GetUser returns the user if he exists.
@@ -66,6 +73,20 @@ func (s *Store) GetUser(nickorhost string) *User {
 // GetChannel returns the channel if it exists.
 func (s *Store) GetChannel(channel string) *Channel {
 	return s.channels[strings.ToLower(channel)]
+}
+
+// GetUserByChannel fetches a user based
+func (s *Store) GetUsersChannelModes(channel, nickorhost string) *UserModes {
+	nick := strings.ToLower(Mask(nickorhost).GetNick())
+	channel = strings.ToLower(channel)
+
+	if cus, ok := s.channelUsers[channel]; ok {
+		if cu, ok := cus[nick]; ok {
+			return cu.UserModes
+		}
+	}
+
+	return nil
 }
 
 // IsOn checks if a user is on a specific channel.
@@ -284,16 +305,22 @@ func (s *Store) kick(m *irc.IrcMessage) {
 
 // mode alters the state of the database when a MODE message is received.
 func (s *Store) mode(m *irc.IrcMessage) {
-	/*if s.cfinder.IsChannel(m.Args[0]) {
-		if ch, ok := s.channels[m.Args[0]]; ok {
-			pos, neg := ch.Apply(strings.Join(m.Args[1:]))
+	target := strings.ToLower(m.Args[0])
+	if s.cfinder.IsChannel(target) {
+		if ch, ok := s.channels[target]; ok {
+			pos, neg := ch.Apply(strings.Join(m.Args[1:], " "))
 			for i := 0; i < len(pos); i++ {
-				s.channelUsers
+				nick := strings.ToLower(pos[i].Arg)
+				s.channelUsers[target][nick].SetMode(pos[i].Mode)
+			}
+			for i := 0; i < len(neg); i++ {
+				nick := strings.ToLower(neg[i].Arg)
+				s.channelUsers[target][nick].UnsetMode(neg[i].Mode)
 			}
 		}
-	} else if m.Args[0] == s.Self.GetNick() {
+	} else if target == s.Self.GetNick() {
 		s.Self.Apply(m.Args[1])
-	}*/
+	}
 }
 
 // topic alters the state of the database when a TOPIC message is received.
