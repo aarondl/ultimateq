@@ -5,19 +5,19 @@ import (
 )
 
 func (s *s) TestChannelModeKinds_Create(c *C) {
-	m := CreateChannelModeKinds("a", "b", "c")
+	m := CreateChannelModeKinds("a", "b", "c", "d")
 	c.Check(m.kinds['a'], Equals, ARGS_ADDRESS)
 	c.Check(m.kinds['b'], Equals, ARGS_ALWAYS)
 	c.Check(m.kinds['c'], Equals, ARGS_ONSET)
 	c.Check(m.kinds['d'], Equals, ARGS_NONE)
 
-	m = CreateChannelModeKinds("a", "b", "c")
+	m = CreateChannelModeKinds("a", "b", "c", "d")
 	c.Check(m.kinds['a'], Equals, ARGS_ADDRESS)
 	c.Check(m.kinds['b'], Equals, ARGS_ALWAYS)
 	c.Check(m.kinds['c'], Equals, ARGS_ONSET)
 	c.Check(m.kinds['d'], Equals, ARGS_NONE)
 
-	m.Update("d", "c", "b")
+	m.Update("d", "c", "b", "a")
 	c.Check(m.kinds['d'], Equals, ARGS_ADDRESS)
 	c.Check(m.kinds['c'], Equals, ARGS_ALWAYS)
 	c.Check(m.kinds['b'], Equals, ARGS_ONSET)
@@ -41,7 +41,7 @@ func (s *s) TestChannelModeKinds_CreateCSV(c *C) {
 }
 
 func (s *s) TestChannelModeKindsUpdate(c *C) {
-	m := CreateChannelModeKinds("a", "b", "c")
+	m := CreateChannelModeKinds("a", "b", "c", "d")
 	c.Check(m.kinds['a'], Equals, ARGS_ADDRESS)
 	c.Check(m.kinds['b'], Equals, ARGS_ALWAYS)
 	c.Check(m.kinds['c'], Equals, ARGS_ONSET)
@@ -54,7 +54,7 @@ func (s *s) TestChannelModeKindsUpdate(c *C) {
 	c.Check(m.kinds['b'], Equals, ARGS_ONSET)
 	c.Check(m.kinds['a'], Equals, ARGS_NONE)
 
-	m.Update("a", "b", "c")
+	m.Update("a", "b", "c", "d")
 	c.Check(m.kinds['a'], Equals, ARGS_ADDRESS)
 	c.Check(m.kinds['b'], Equals, ARGS_ALWAYS)
 	c.Check(m.kinds['c'], Equals, ARGS_ONSET)

@@ -8,10 +8,10 @@ import (
 
 // The various kinds of mode-argument behavior during parsing.
 const (
-	ARGS_NONE    = 0x0
-	ARGS_ALWAYS  = 0x1
-	ARGS_ONSET   = 0x2
-	ARGS_ADDRESS = 0x3
+	ARGS_NONE    = 0x1
+	ARGS_ALWAYS  = 0x2
+	ARGS_ONSET   = 0x3
+	ARGS_ADDRESS = 0x4
 )
 
 const (
@@ -21,6 +21,13 @@ const (
 	// in the correct format.
 	fmtErrCouldNotParsePrefix = "data: Could not parse prefix (%v)"
 )
+
+// UnknownMode is returned by apply helper when it encounters a mode it doesn't
+// know. This will regularily be a user mode, which takes an argument.
+type UnknownMode struct {
+	Mode rune
+	Arg  string
+}
 
 // UserModeKinds maps modes applied to a user via a channel to a mode character
 // or display symobol.
@@ -105,14 +112,14 @@ func (u *UserModeKinds) GetModeBit(mode rune) int {
 	return 0
 }
 
-// ChannelModeKinds contains mode type information, ModeDiff and Modeset require this
-// information to parse correctly.
+// ChannelModeKinds contains mode type information, ModeDiff and Modeset
+// require this information to parse correctly.
 type ChannelModeKinds struct {
 	kinds map[rune]int
 }
 
-// CreateChannelModeKindsCSV creates ChannelModeKinds from an IRC CHANMODES csv string. The
-// format of which is ARGS_ADDRESS,ARGS_ALWAYS,ARGS_ONSET,ARGS_NONE
+// CreateChannelModeKindsCSV creates ChannelModeKinds from an IRC CHANMODES csv
+// string. The format of which is ARGS_ADDRESS,ARGS_ALWAYS,ARGS_ONSET,ARGS_NONE
 func CreateChannelModeKindsCSV(kindstr string) (*ChannelModeKinds, error) {
 	if kinds, err := parseChannelModeKindsCSV(kindstr); err != nil {
 		return nil, err
@@ -121,17 +128,20 @@ func CreateChannelModeKindsCSV(kindstr string) (*ChannelModeKinds, error) {
 	}
 }
 
-// CreateChannelModeKinds creates a mode kinds structure taking in a string, one for
-// each kind of mode.
-func CreateChannelModeKinds(address, always, onset string) *ChannelModeKinds {
+// CreateChannelModeKinds creates a mode kinds structure taking in a string,
+// one for each kind of mode.
+func CreateChannelModeKinds(
+	address, always, onset, none string) *ChannelModeKinds {
+
 	return &ChannelModeKinds{
-		parseChannelModeKinds(address, always, onset),
+		parseChannelModeKinds(address, always, onset, none),
 	}
 }
 
-// parseChannelModeKinds creates a map[rune]int from a set of strings, one for each
-// kind of mode present.
-func parseChannelModeKinds(address, always, onset string) (kinds map[rune]int) {
+// parseChannelModeKinds creates a map[rune]int from a set of strings, one for
+// each kind of mode present.
+func parseChannelModeKinds(address, always, onset, none string) (
+	kinds map[rune]int) {
 	size := len(always) + len(onset) + len(address)
 	kinds = make(map[rune]int, size)
 
@@ -144,12 +154,15 @@ func parseChannelModeKinds(address, always, onset string) (kinds map[rune]int) {
 	for _, mode := range address {
 		kinds[mode] = ARGS_ADDRESS
 	}
+	for _, mode := range none {
+		kinds[mode] = ARGS_NONE
+	}
 
 	return
 }
 
-// parseChannelModeKindsCSV creates a map[rune]int from an IRC CHANMODES csv string.
-// The format of which is ARGS_ADDRESS,ARGS_ALWAYS,ARGS_ONSET,ARGS_NONE
+// parseChannelModeKindsCSV creates a map[rune]int from an IRC CHANMODES csv
+// string. The format of which is ARGS_ADDRESS,ARGS_ALWAYS,ARGS_ONSET,ARGS_NONE
 func parseChannelModeKindsCSV(kindstr string) (map[rune]int, error) {
 	if len(kindstr) == 0 {
 		return nil, errors.New(fmt.Sprintf(fmtErrCsvParse, kindstr))
@@ -160,17 +173,21 @@ func parseChannelModeKindsCSV(kindstr string) (map[rune]int, error) {
 		return nil, errors.New(fmt.Sprintf(fmtErrCsvParse, kindstr))
 	}
 
-	return parseChannelModeKinds(kindSplits[0], kindSplits[1], kindSplits[2]), nil
+	return parseChannelModeKinds(
+			kindSplits[0], kindSplits[1], kindSplits[2], kindSplits[3]),
+		nil
 }
 
 // Update updates the internal lookup table. This will invalidate all the
-// modes that were set previously using this ChannelModeKinds so they should be reset.
-func (m *ChannelModeKinds) Update(address, always, onset string) {
-	m.kinds = parseChannelModeKinds(address, always, onset)
+// modes that were set previously using this ChannelModeKinds so they should be
+// reset.
+func (m *ChannelModeKinds) Update(address, always, onset, none string) {
+	m.kinds = parseChannelModeKinds(address, always, onset, none)
 }
 
 // UpdateCSV updates the internal lookup table. This will invalidate all the
-// modes that were set previously using this ChannelModeKinds so they should be reset.
+// modes that were set previously using this ChannelModeKinds so they should be
+// reset.
 func (m *ChannelModeKinds) UpdateCSV(kindstr string) error {
 	var err error
 	var kinds map[rune]int
@@ -199,10 +216,14 @@ type moder interface {
 	getKind(rune) int
 }
 
-// apply parses a complex modestring and applies it to a moder interface.
-func apply(m moder, modestring string) {
+// apply parses a complex modestring and applies it to a moder interface. All
+// non-recognized modes are given back a positive and negative array of
+// UnknownMode.
+func apply(m moder, modestring string) (pos, neg []UnknownMode) {
 	adding := true
 	used := 0
+	pos = make([]UnknownMode, 0)
+	neg = make([]UnknownMode, 0)
 
 	splits := strings.Split(strings.TrimSpace(modestring), " ")
 	args := splits[1:]
@@ -249,8 +270,20 @@ func apply(m moder, modestring string) {
 			} else {
 				m.unsetMode(mode)
 			}
+		default:
+			if used >= len(args) {
+				break
+			}
+			if adding {
+				pos = append(pos, UnknownMode{mode, args[used]})
+			} else {
+				neg = append(neg, UnknownMode{mode, args[used]})
+			}
+			used++
 		}
 	}
+
+	return
 }
 
 // parseSimpleModestrings morphs many simple mode strings into a single modes

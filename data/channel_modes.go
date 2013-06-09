@@ -4,8 +4,8 @@ import (
 	"strings"
 )
 
-// ChannelModes encapsulates flag-based modestrings, setting and getting any modes
-// and potentially using arguments as well. Some functions work with full
+// ChannelModes encapsulates flag-based modestrings, setting and getting any
+// modes and potentially using arguments as well. Some functions work with full
 // modestrings containing both + and - characters, and some commands work with
 // simple modestrings with are only positive or negative with the leading +/-
 // omitted.
@@ -30,9 +30,12 @@ func CreateChannelModes(kinds *ChannelModeKinds) *ChannelModes {
 	}
 }
 
-// Apply takes a complex modestring and applies it to a an existing modeset
-func (m *ChannelModes) Apply(modestring string) {
-	apply(m, modestring)
+// Apply takes a complex modestring and applies it to a an existing modeset.
+// Assumes any modes not declared as part of ChannelModeKinds were not intended
+// for channel and are user-targeted (therefore taking an argument)
+// and returns them in two arrays, positive and negative modes respectively.
+func (m *ChannelModes) Apply(modestring string) ([]UnknownMode, []UnknownMode) {
+	return apply(m, modestring)
 }
 
 // ApplyDiff applies a ModeDiff to the current modeset instance.

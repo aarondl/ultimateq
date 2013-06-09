@@ -23,7 +23,7 @@ func CreateChannel(name string, kinds *ChannelModeKinds) *Channel {
 	}
 
 	return &Channel{
-		name:    strings.ToLower(name),
+		name:         strings.ToLower(name),
 		ChannelModes: CreateChannelModes(kinds),
 	}
 }

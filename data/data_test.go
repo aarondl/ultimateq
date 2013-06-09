@@ -64,6 +64,17 @@ func (s *s) TestStore_GetUser(c *C) {
 	st.addUser(users[1])
 	c.Check(st.GetUser(users[0]), NotNil)
 	c.Check(st.GetUser(users[1]), NotNil)
+
+	st, err = CreateStore(irc.CreateProtoCaps())
+	c.Check(err, IsNil)
+	oldHost := "nick!user@host.com"
+	newHost := "nick!user@host.net"
+	st.addUser(oldHost)
+	c.Check(st.GetUser(oldHost).GetFullhost(), Equals, oldHost)
+	c.Check(st.GetUser(newHost).GetFullhost(), Not(Equals), newHost)
+	st.addUser(newHost)
+	c.Check(st.GetUser(oldHost).GetFullhost(), Not(Equals), oldHost)
+	c.Check(st.GetUser(newHost).GetFullhost(), Equals, newHost)
 }
 
 func (s *s) TestStore_GetChannel(c *C) {
@@ -186,20 +197,35 @@ func (s *s) TestStore_UpdatePart(c *C) {
 	st.addChannel(channels[0])
 	st.addChannel(channels[1])
 	st.addToChannel(users[0], channels[0])
+	st.addToChannel(users[1], channels[0])
 	st.addToChannel(users[0], channels[1])
 
 	c.Check(st.IsOn(users[0], channels[0]), Equals, true)
+	c.Check(st.IsOn(users[1], channels[0]), Equals, true)
 	c.Check(st.IsOn(users[0], channels[1]), Equals, true)
+	c.Check(st.IsOn(users[1], channels[1]), Equals, false)
 
 	st.Update(m)
 	c.Check(st.IsOn(users[0], channels[0]), Equals, false)
+	c.Check(st.IsOn(users[1], channels[0]), Equals, true)
 	c.Check(st.IsOn(users[0], channels[1]), Equals, true)
+	c.Check(st.IsOn(users[1], channels[1]), Equals, false)
 
+	m.Sender = users[1]
+	st.Update(m)
+	c.Check(st.IsOn(users[0], channels[0]), Equals, false)
+	c.Check(st.IsOn(users[1], channels[0]), Equals, false)
+	c.Check(st.IsOn(users[0], channels[1]), Equals, true)
+	c.Check(st.IsOn(users[1], channels[1]), Equals, false)
+
+	m.Sender = users[0]
 	m.Args[0] = channels[1]
 	st.Update(m)
 
 	c.Check(st.IsOn(users[0], channels[0]), Equals, false)
+	c.Check(st.IsOn(users[1], channels[0]), Equals, false)
 	c.Check(st.IsOn(users[0], channels[1]), Equals, false)
+	c.Check(st.IsOn(users[1], channels[1]), Equals, false)
 }
 
 func (s *s) TestStore_UpdatePartSelf(c *C) {
@@ -213,13 +239,17 @@ func (s *s) TestStore_UpdatePartSelf(c *C) {
 	}
 
 	st.addChannel(channels[0])
+	st.addChannel(channels[1])
 	st.addToChannel(users[0], channels[0])
+	st.addToChannel(users[0], channels[1])
 	st.addToChannel(self.GetNick(), channels[0])
 
 	c.Check(st.IsOn(users[0], channels[0]), Equals, true)
+	c.Check(st.IsOn(users[0], channels[1]), Equals, true)
 	c.Check(st.IsOn(self.GetNick(), channels[0]), Equals, true)
 	st.Update(m)
 	c.Check(st.IsOn(users[0], channels[0]), Equals, false)
+	c.Check(st.IsOn(users[0], channels[1]), Equals, true)
 	c.Check(st.IsOn(self.GetNick(), channels[0]), Equals, false)
 }
 

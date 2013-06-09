@@ -338,6 +338,16 @@ func (s *Store) kick(m *irc.IrcMessage) {
 
 // mode alters the state of the database when a MODE message is received.
 func (s *Store) mode(m *irc.IrcMessage) {
+	/*if s.cfinder.IsChannel(m.Args[0]) {
+		if ch, ok := s.channels[m.Args[0]]; ok {
+			pos, neg := ch.Apply(strings.Join(m.Args[1:]))
+			for i := 0; i < len(pos); i++ {
+				s.channelUsers
+			}
+		}
+	} else if m.Args[0] == s.Self.GetNick() {
+		s.Self.Apply(m.Args[1])
+	}*/
 }
 
 // topic alters the state of the database when a TOPIC message is received.

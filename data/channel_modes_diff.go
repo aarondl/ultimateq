@@ -16,8 +16,8 @@ type ModeDiff struct {
 func CreateModeDiff(kinds *ChannelModeKinds) *ModeDiff {
 	return &ModeDiff{
 		ChannelModeKinds: kinds,
-		pos:       CreateChannelModes(kinds),
-		neg:       CreateChannelModes(kinds),
+		pos:              CreateChannelModes(kinds),
+		neg:              CreateChannelModes(kinds),
 	}
 }
 
@@ -32,8 +32,11 @@ func (d *ModeDiff) IsUnset(modestrs ...string) bool {
 }
 
 // Apply takes a complex modestring and transforms it into a diff.
-func (d *ModeDiff) Apply(modestring string) {
-	apply(d, modestring)
+// Assumes any modes not declared as part of ChannelModeKinds were not intended
+// for channel and are user-targeted (therefore taking an argument)
+// and returns them in two arrays, positive and negative modes respectively.
+func (d *ModeDiff) Apply(modestring string) ([]UnknownMode, []UnknownMode) {
+	return apply(d, modestring)
 }
 
 // String turns a ModeDiff into a complex string representation.

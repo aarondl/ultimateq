@@ -29,4 +29,3 @@ func (u *UserModes) HasMode(mode rune) bool {
 func (u *UserModes) UnsetMode(mode rune) {
 	u.modes &= ^u.GetModeBit(mode)
 }
-

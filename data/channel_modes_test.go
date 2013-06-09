@@ -4,7 +4,7 @@ import (
 	. "launchpad.net/gocheck"
 )
 
-var testKinds = CreateChannelModeKinds("b", "c", "d")
+var testKinds = CreateChannelModeKinds("b", "c", "d", "axyz")
 
 func (s *s) TestChannelModes_Create(c *C) {
 	modes := CreateChannelModes(testKinds)
@@ -20,18 +20,43 @@ func (s *s) TestChannelModes_Create(c *C) {
 
 func (s *s) TestChannelModes_Apply(c *C) {
 	m := CreateChannelModes(testKinds)
-	m.Apply("abbcd host1 host2 10 arg")
+	pos, neg := m.Apply("abbcd host1 host2 10 arg")
+	c.Check(len(pos), Equals, 0)
+	c.Check(len(neg), Equals, 0)
 	c.Check(m.IsSet("abbcd host1 host2 10 arg"), Equals, true)
 
 	m = CreateChannelModes(testKinds)
-	m.Apply("+abbcd host1 host2 10 arg")
+	pos, neg = m.Apply("+avbbcdo user1 host1 host2 10 arg user2")
+	c.Check(len(pos), Equals, 2)
+	c.Check(len(neg), Equals, 0)
+	c.Check(pos[0].Mode, Equals, 'v')
+	c.Check(pos[0].Arg, Equals, "user1")
+	c.Check(pos[1].Mode, Equals, 'o')
+	c.Check(pos[1].Arg, Equals, "user2")
 	c.Check(m.IsSet("abbcd host1 host2 10 arg"), Equals, true)
 
 	m = CreateChannelModes(testKinds)
-	m.Apply(" +ab-c 10")
+	pos, neg = m.Apply(" +ab-c 10")
 	c.Check(m.IsSet("a"), Equals, true)
 	c.Check(m.IsSet("b 10"), Equals, true)
 	c.Check(m.IsSet("c"), Equals, false)
+
+	m = CreateChannelModes(testKinds)
+	pos, neg = m.Apply("+oxbvy-ozv user1 ban1 user2 user3 user4")
+	c.Check(len(pos), Equals, 2)
+	c.Check(len(neg), Equals, 2)
+	c.Check(pos[0].Mode, Equals, 'o')
+	c.Check(pos[0].Arg, Equals, "user1")
+	c.Check(pos[1].Mode, Equals, 'v')
+	c.Check(pos[1].Arg, Equals, "user2")
+	c.Check(neg[0].Mode, Equals, 'o')
+	c.Check(neg[0].Arg, Equals, "user3")
+	c.Check(neg[1].Mode, Equals, 'v')
+	c.Check(neg[1].Arg, Equals, "user4")
+
+	pos, neg = m.Apply("+o")
+	c.Check(len(pos), Equals, 0)
+	c.Check(len(neg), Equals, 0)
 
 	m = CreateChannelModes(testKinds)
 	m.Apply("b 10")
@@ -181,7 +206,7 @@ func (s *s) TestChannelModes_Set(c *C) {
 }
 
 func (s *s) TestChannelModes_AddressTracking(c *C) {
-	modes := CreateChannelModes(CreateChannelModeKinds("yz", "", ""))
+	modes := CreateChannelModes(CreateChannelModeKinds("yz", "", "", ""))
 	c.Check(modes.addresses, Equals, 0)
 	modes.Set("y *!*@host1", "y *!*@host2", "z *!*@host3")
 	c.Check(modes.addresses, Equals, 3)
