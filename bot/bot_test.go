@@ -311,7 +311,7 @@ func (s *s) TestBot_createBot(c *C) {
 func (s *s) TestBot_Providers(c *C) {
 	capsProv := func() *irc.ProtoCaps {
 		p := irc.CreateProtoCaps()
-		p.ParseProtoCaps(&irc.IrcMessage{Args: []string{"nick", "CHANTYPES=H"}})
+		p.ParseISupport(&irc.IrcMessage{Args: []string{"nick", "CHANTYPES=H"}})
 		return p
 	}
 	connProv := func(s string) (net.Conn, error) {

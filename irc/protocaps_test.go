@@ -7,6 +7,9 @@ import (
 
 func (s *s) TestProtoCaps(c *C) {
 	p := CreateProtoCaps()
+	serverId := "irc.gamesurge.net"
+
+	s0 := "irc.test.net testircd-1.2 acCior beiIklmnoOPrR"
 
 	s1 := `NICK RFC8812 IRCD=gIRCd CASEMAPPING=scii PREFIX=(v)+ ` +
 		`CHANTYPES=#& CHANMODES=eI,k,l,imnOPRstz CHANLIMIT=#&+:10`
@@ -14,20 +17,30 @@ func (s *s) TestProtoCaps(c *C) {
 	s2 := `NICK CHANNELLEN=49 NICKLEN=8 TOPICLEN=489 AWAYLEN=126 KICKLEN=399 ` +
 		`MODES=4 MAXLIST=beI:49 EXCEPTS=e INVEX=I PENALTY`
 
+	msg0 := &IrcMessage{
+		Name:   RPL_MYINFO,
+		Args:   strings.Split(s0, " "),
+		Sender: serverId,
+	}
 	msg1 := &IrcMessage{
-		Name:   RPL_BOUNCE,
+		Name:   RPL_ISUPPORT,
 		Args:   append(strings.Split(s1, " "), "are supported by this server"),
-		Sender: "irc.gamesurge.net",
+		Sender: serverId,
 	}
 	msg2 := &IrcMessage{
-		Name:   RPL_BOUNCE,
+		Name:   RPL_ISUPPORT,
 		Args:   append(strings.Split(s2, " "), "are supported by this server"),
-		Sender: "irc.gamesurge.net",
+		Sender: serverId,
 	}
 
-	p.ParseProtoCaps(msg1)
-	p.ParseProtoCaps(msg2)
+	p.ParseMyInfo(msg0)
+	p.ParseISupport(msg1)
+	p.ParseISupport(msg2)
 
+	c.Check(p.ServerName(), Equals, "irc.test.net")
+	c.Check(p.IrcdVersion(), Equals, "testircd-1.2")
+	c.Check(p.Usermodes(), Equals, "acCior")
+	c.Check(p.LegacyChanmodes(), Equals, "beiIklmnoOPrR")
 	c.Check(p.RFC(), Equals, "RFC8812")
 	c.Check(p.IRCD(), Equals, "gIRCd")
 	c.Check(p.Casemapping(), Equals, "scii")

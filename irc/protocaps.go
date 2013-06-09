@@ -22,8 +22,13 @@ const (
 	CAPS_KICKLEN     = "KICKLEN"
 	CAPS_MODES       = "MODES"
 
+	CAPS_DEFAULT_SERVERNAME  = "unknown"
+	CAPS_DEFAULT_IRCDVERSION = "unknown"
+	CAPS_DEFAULT_USERMODES   = "acCiorRswx"
+	CAPS_DEFAULT_LCHANMODES  = "beiIklmnoOPrRstvz"
+
 	CAPS_DEFAULT_RFC         = "RFC2812"
-	CAPS_DEFAULT_IRCD        = "none"
+	CAPS_DEFAULT_IRCD        = "unknown"
 	CAPS_DEFAULT_CASEMAPPING = "ascii"
 	CAPS_DEFAULT_PREFIX      = "(ov)@+"
 	CAPS_DEFAULT_CHANTYPES   = "#&~"
@@ -43,6 +48,15 @@ var (
 
 // Used to record the server settings, aids in parsing irc protocol.
 type ProtoCaps struct {
+	// The server's self-defined name.
+	serverName string
+	// The ircd's version.
+	ircdVersion string
+	// The user modes
+	usermodes string
+	// The legacy chanmodes, chanmodes should be used instead.
+	lchanmodes string
+
 	// The RFC referred to.
 	rfc string
 	// The IRC name
@@ -79,6 +93,10 @@ type ProtoCaps struct {
 // CreateProtoCaps initializes a protocaps struct.
 func CreateProtoCaps() *ProtoCaps {
 	p := &ProtoCaps{
+		serverName:  CAPS_DEFAULT_SERVERNAME,
+		ircdVersion: CAPS_DEFAULT_IRCDVERSION,
+		usermodes:   CAPS_DEFAULT_USERMODES,
+		lchanmodes:  CAPS_DEFAULT_LCHANMODES,
 		rfc:         CAPS_DEFAULT_RFC,
 		ircd:        CAPS_DEFAULT_IRCD,
 		casemapping: CAPS_DEFAULT_CASEMAPPING,
@@ -95,6 +113,34 @@ func CreateProtoCaps() *ProtoCaps {
 		extras:      make(map[string]string),
 	}
 	return p
+}
+
+// ServerName gets the servername from the ProtoCaps.
+func (p *ProtoCaps) ServerName() string {
+	p.protect.RLock()
+	defer p.protect.RUnlock()
+	return p.serverName
+}
+
+// IrcdVersion gets the irc version from the ProtoCaps.
+func (p *ProtoCaps) IrcdVersion() string {
+	p.protect.RLock()
+	defer p.protect.RUnlock()
+	return p.ircdVersion
+}
+
+// Usermodes gets the usermodes from the ProtoCaps.
+func (p *ProtoCaps) Usermodes() string {
+	p.protect.RLock()
+	defer p.protect.RUnlock()
+	return p.usermodes
+}
+
+// LegacyChanmodes gets the legacy channel modes from the ProtoCaps.
+func (p *ProtoCaps) LegacyChanmodes() string {
+	p.protect.RLock()
+	defer p.protect.RUnlock()
+	return p.lchanmodes
 }
 
 // RFC gets the rfc from the ProtoCaps.
@@ -195,8 +241,8 @@ func (p *ProtoCaps) Extra(key string) string {
 	return p.extras[key]
 }
 
-// ParseProtoCaps adds all values in a 005 to the current protocaps object.
-func (p *ProtoCaps) ParseProtoCaps(m *IrcMessage) {
+// ParseISupport adds all values in a 005 to the current protocaps object.
+func (p *ProtoCaps) ParseISupport(m *IrcMessage) {
 	p.protect.Lock()
 	defer p.protect.Unlock()
 
@@ -269,4 +315,15 @@ func (p *ProtoCaps) ParseProtoCaps(m *IrcMessage) {
 			p.extras[name] = value
 		}
 	}
+}
+
+// ParseMyInfo adds all values in a 005 to the current protocaps object.
+func (p *ProtoCaps) ParseMyInfo(m *IrcMessage) {
+	p.protect.Lock()
+	defer p.protect.Unlock()
+
+	p.serverName = m.Args[0]
+	p.ircdVersion = m.Args[1]
+	p.usermodes = m.Args[2]
+	p.lchanmodes = m.Args[3]
 }

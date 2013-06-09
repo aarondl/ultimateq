@@ -57,9 +57,14 @@ func (c *coreHandler) HandleRaw(msg *irc.IrcMessage, sender irc.Sender) {
 		c.protect.Unlock()
 		sender.Writeln("NICK :" + nick)
 
-	case irc.RPL_BOUNCE:
+	case irc.RPL_MYINFO:
 		server := c.getServer(sender)
-		server.caps.ParseProtoCaps(msg)
+		server.caps.ParseMyInfo(msg)
+		server.dispatcher.Protocaps(server.caps)
+
+	case irc.RPL_ISUPPORT:
+		server := c.getServer(sender)
+		server.caps.ParseISupport(msg)
 		server.dispatcher.Protocaps(server.caps)
 	}
 }

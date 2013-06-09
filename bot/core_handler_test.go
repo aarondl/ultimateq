@@ -144,7 +144,7 @@ func (s *s) TestCoreHandler_Nick(c *C) {
 	)
 }
 
-func (s *s) TestCoreHandler_005(c *C) {
+func (s *s) TestCoreHandler_Caps(c *C) {
 	connProvider := func(srv string) (net.Conn, error) {
 		return nil, nil
 	}
@@ -152,11 +152,20 @@ func (s *s) TestCoreHandler_005(c *C) {
 	b, err := createBot(fakeConfig, nil, connProvider, true)
 	c.Check(err, IsNil)
 
-	msg := &irc.IrcMessage{
-		Name: "005",
+	msg1 := &irc.IrcMessage{
+		Name: irc.RPL_MYINFO,
+		Args: []string{"irc.test.net", "testircd-1.2", "acCior", "beiIklmno"},
+	}
+	msg2 := &irc.IrcMessage{
+		Name: irc.RPL_ISUPPORT,
 		Args: []string{"RFC8213", "CHANTYPES=&$"},
 	}
 	srv := b.servers[serverId]
-	srv.handler.HandleRaw(msg, testSender{})
+	srv.handler.HandleRaw(msg1, testSender{})
+	srv.handler.HandleRaw(msg2, testSender{})
+	c.Check(srv.caps.ServerName(), Equals, "irc.test.net")
+	c.Check(srv.caps.IrcdVersion(), Equals, "testircd-1.2")
+	c.Check(srv.caps.Usermodes(), Equals, "acCior")
+	c.Check(srv.caps.LegacyChanmodes(), Equals, "beiIklmno")
 	c.Check(srv.caps.Chantypes(), Equals, "&$")
 }
