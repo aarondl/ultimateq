@@ -59,13 +59,17 @@ func (c *coreHandler) HandleRaw(msg *irc.IrcMessage, sender irc.Sender) {
 
 	case irc.RPL_MYINFO:
 		server := c.getServer(sender)
+		server.protectCaps.RLock()
 		server.caps.ParseMyInfo(msg)
-		server.dispatcher.Protocaps(server.caps)
+		server.protectCaps.RUnlock()
+		server.rehashProtocaps()
 
 	case irc.RPL_ISUPPORT:
 		server := c.getServer(sender)
+		server.protectCaps.RLock()
 		server.caps.ParseISupport(msg)
-		server.dispatcher.Protocaps(server.caps)
+		server.protectCaps.RUnlock()
+		server.rehashProtocaps()
 	}
 }
 

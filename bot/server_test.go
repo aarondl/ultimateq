@@ -2,13 +2,14 @@ package bot
 
 import (
 	"bytes"
+	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/irc"
 	"github.com/aarondl/ultimateq/mocks"
 	. "launchpad.net/gocheck"
 	"net"
 )
 
-func (s *s) TestServerSender(c *C) {
+func (s *s) TestServerSender_Write(c *C) {
 	str := "PONG :msg\r\n"
 
 	conn := mocks.CreateConn()
@@ -33,6 +34,31 @@ func (s *s) TestServerSender(c *C) {
 	c.Check(err, IsNil)
 	b.WaitForHalt()
 	b.Disconnect()
+}
+
+func (s *s) TestServerSender_OpenStore(c *C) {
+	b, err := createBot(fakeConfig, nil, nil, false)
+	c.Check(err, IsNil)
+	srv := b.servers[serverId]
+	srvsender := ServerSender{serverId, srv}
+
+	c.Check(srvsender.GetKey(), Equals, serverId)
+	called := false
+	reportCalled := false
+	reportCalled = srvsender.OpenStore(func(*data.Store) {
+		called = true
+	})
+	c.Check(called, Equals, true)
+	c.Check(reportCalled, Equals, true)
+
+	srv.store = nil
+	called = false
+	reportCalled = false
+	reportCalled = srvsender.OpenStore(func(*data.Store) {
+		called = true
+	})
+	c.Check(called, Equals, false)
+	c.Check(reportCalled, Equals, false)
 }
 
 func (s *s) TestServer_Write(c *C) {

@@ -91,6 +91,19 @@ func (s ServerSender) Write(buf []byte) (int, error) {
 	return s.server.Write(buf)
 }
 
+// OpenStore calls a callback if this ServerSender can present a data store
+// object. The returned boolean is whether or not the function was called.
+func (s ServerSender) OpenStore(fn func(*data.Store)) bool {
+	if s.server.store != nil {
+		s.server.protectStore.RLock()
+		fn(s.server.store)
+		s.server.protectStore.RUnlock()
+		return true
+	} else {
+		return false
+	}
+}
+
 // Writeln writes to the server's IrcClient.
 func (s *Server) Writeln(str string) error {
 	_, err := s.Write([]byte(str))
@@ -156,23 +169,27 @@ func (s *Server) createIrcClient() error {
 // protocaps sets the protocaps for the given server. If an error is returned
 // no update was done.
 func (s *Server) protocaps(caps *irc.ProtoCaps) error {
+	tmp := *caps
+	s.protectCaps.Lock()
+	s.caps = &tmp
+	s.protectCaps.Unlock()
+	return s.rehashProtocaps()
+}
+
+// rehashProtocaps rehashes protocaps from the servers current protocaps.
+func (s *Server) rehashProtocaps() error {
 	var err error
-	if err = s.dispatcher.Protocaps(caps); err != nil {
+	if err = s.dispatcher.Protocaps(s.caps); err != nil {
 		return err
 	}
 	if s.store != nil {
 		s.protectStore.Lock()
-		err = s.store.Protocaps(caps)
+		err = s.store.Protocaps(s.caps)
 		s.protectStore.Unlock()
 		if err != nil {
 			return err
 		}
 	}
-
-	tmp := *caps
-	s.protectCaps.Lock()
-	s.caps = &tmp
-	s.protectCaps.Unlock()
 	return nil
 }
 
