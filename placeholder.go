@@ -2,12 +2,15 @@
 package main
 
 import (
+	"bytes"
 	"github.com/aarondl/ultimateq/bot"
 	"github.com/aarondl/ultimateq/config"
 	"github.com/aarondl/ultimateq/irc"
 	"log"
+	"math/rand"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -23,6 +26,15 @@ func (h Handler) PrivmsgUser(m *irc.Message, sender irc.Sender) {
 func (h Handler) PrivmsgChannel(m *irc.Message, sender irc.Sender) {
 	if m.Message() == "hello" {
 		sender.Writeln("PRIVMSG " + m.Target() + " :Hello to you too!")
+	} else {
+		lock.Lock()
+		chain.Build(
+			bytes.NewBuffer(
+				[]byte(m.Message()),
+			),
+		)
+		sender.Writeln("PRIVMSG " + m.Target() + " :" + chain.Generate(100))
+		lock.Unlock()
 	}
 }
 
@@ -50,7 +62,11 @@ func conf(c *config.Config) *config.Config {
 	return c
 }
 
+var chain = NewChain(2)
+var lock = sync.Mutex{}
+
 func main() {
+	rand.Seed(time.Now().UnixNano()) // Seed the random number generator.
 	log.SetOutput(os.Stdout)
 
 	b, err := bot.CreateBot(bot.ConfigureFunction(conf))
@@ -82,7 +98,7 @@ func main() {
 		c.DisplayErrors()
 		log.Fatal("Config error")
 	}
-	b.ReplaceConfig(c)
+	//b.ReplaceConfig(c)
 
 	b.WaitForHalt()
 	b.Stop()
