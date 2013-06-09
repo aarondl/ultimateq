@@ -11,6 +11,15 @@ type s struct{}
 
 var _ = Suite(&s{})
 
+var server = "irc.server.net"
+var users = []string{"nick1!user1@host1", "nick2!user2@host2"}
+var nicks = []string{"nick1", "nick2"}
+var channels = []string{"#CHAN1", "#CHAN2"}
+
+var self = Self{
+	User: CreateUser("me!my@host.com"),
+}
+
 func (s *s) TestStore(c *C) {
 	st, err := CreateStore(irc.CreateProtoCaps())
 	c.Check(st, NotNil)
@@ -45,13 +54,27 @@ func (s *s) TestStore(c *C) {
 	c.Check(err, NotNil)
 }
 
-var server = "irc.server.net"
-var users = []string{"nick1!user1@host1", "nick2!user2@host2"}
-var nicks = []string{"nick1", "nick2"}
-var channels = []string{"#CHAN1", "#CHAN2"}
+func (s *s) TestStore_UpdateProtoCaps(c *C) {
+	st, err := CreateStore(irc.CreateProtoCaps())
+	c.Check(err, IsNil)
 
-var self = Self{
-	User: CreateUser("me!my@host.com"),
+	fakeCaps := &irc.ProtoCaps{}
+	fakeCaps.ParseISupport(&irc.IrcMessage{Args: []string{
+		"NICK", "CHANTYPES=!", "PREFIX=(q)@", "CHANMODES=,,,q",
+	}})
+	fakeCaps.ParseMyInfo(&irc.IrcMessage{Args: []string{
+		"irc.test.net", "test-12", "q", "abc",
+	}})
+
+	c.Assert(st.selfkinds.kinds['q'], Equals, 0)
+	c.Assert(st.kinds.kinds['q'], Equals, 0)
+	c.Assert(st.umodes.GetModeBit('q'), Equals, 0)
+	c.Assert(st.cfinder.IsChannel("!"), Equals, false)
+	st.UpdateProtoCaps(fakeCaps)
+	c.Assert(st.selfkinds.kinds['q'], Not(Equals), 0)
+	c.Assert(st.kinds.kinds['q'], Not(Equals), 0)
+	c.Assert(st.umodes.GetModeBit('q'), Not(Equals), 0)
+	c.Assert(st.cfinder.IsChannel("!"), Equals, true)
 }
 
 func (s *s) TestStore_GetUser(c *C) {
@@ -365,7 +388,6 @@ func (s *s) TestStore_UpdateMode(c *C) {
 
 func (s *s) TestStore_UpdateModeSelf(c *C) {
 	st, err := CreateStore(irc.CreateProtoCaps())
-	//st.Self = self
 	st.Self.User = self.User
 	c.Check(err, IsNil)
 

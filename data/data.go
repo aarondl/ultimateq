@@ -64,6 +64,28 @@ func CreateStore(caps *irc.ProtoCaps) (*Store, error) {
 	return store, nil
 }
 
+func (s *Store) UpdateProtoCaps(caps *irc.ProtoCaps) error {
+	selfkinds := CreateChannelModeKinds("", "", "", caps.Usermodes())
+	kinds, err := CreateChannelModeKindsCSV(caps.Chanmodes())
+	if err != nil {
+		return err
+	}
+	modes, err := CreateUserModeKinds(caps.Prefix())
+	if err != nil {
+		return err
+	}
+	cfinder, err := irc.CreateChannelFinder(caps.Chantypes())
+	if err != nil {
+		return err
+	}
+
+	s.selfkinds = selfkinds
+	s.kinds = kinds
+	s.umodes = modes
+	s.cfinder = cfinder
+	return nil
+}
+
 // GetUser returns the user if he exists.
 func (s *Store) GetUser(nickorhost string) *User {
 	nick := strings.ToLower(Mask(nickorhost).GetNick())

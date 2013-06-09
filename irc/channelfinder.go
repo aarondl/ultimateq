@@ -24,7 +24,7 @@ func CreateChannelFinder(types string) (*ChannelFinder, error) {
 	for _, c := range types {
 		safetypes += string(`\`) + string(c)
 	}
-	regex, err := regexp.Compile(`[` + safetypes + `][^\s,]+`)
+	regex, err := regexp.Compile(`[` + safetypes + `][^\s,]*`)
 	if err == nil {
 		c.channelRegexp = regex
 		return c, nil
