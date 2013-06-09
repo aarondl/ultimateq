@@ -22,8 +22,8 @@ type Store struct {
 	channels map[string]*Channel
 	users    map[string]*User
 
-	channelUsers map[string][]*ChannelUser
-	userChannels map[string][]*UserChannel
+	channelUsers map[string]map[string]*ChannelUser
+	userChannels map[string]map[string]*UserChannel
 
 	kinds   *ChannelModeKinds
 	umodes  *UserModeKinds
@@ -48,8 +48,8 @@ func CreateStore(caps *irc.ProtoCaps) (*Store, error) {
 	return &Store{
 		channels:     make(map[string]*Channel),
 		users:        make(map[string]*User),
-		channelUsers: make(map[string][]*ChannelUser),
-		userChannels: make(map[string][]*UserChannel),
+		channelUsers: make(map[string]map[string]*ChannelUser),
+		userChannels: make(map[string]map[string]*UserChannel),
 
 		kinds:   kinds,
 		umodes:  modes,
@@ -73,10 +73,8 @@ func (s *Store) IsOn(nickorhost, channel string) bool {
 	nick := strings.ToLower(Mask(nickorhost).GetNick())
 	channel = strings.ToLower(channel)
 	if chans, ok := s.userChannels[nick]; ok {
-		for i := 0; i < len(chans); i++ {
-			if chans[i].Channel.GetName() == channel {
-				return true
-			}
+		if _, ok = chans[channel]; ok {
+			return true
 		}
 	}
 	return false
@@ -117,21 +115,8 @@ func (s *Store) addUser(nickorhost string) *User {
 // removeUser deletes a user from the database.
 func (s *Store) removeUser(nickorhost string) {
 	nick := strings.ToLower(Mask(nickorhost).GetNick())
-	for channel, cus := range s.channelUsers {
-		ln := len(cus)
-		for i := 0; i < ln; i++ {
-			if nick == strings.ToLower(cus[i].User.GetNick()) {
-				if ln == 1 {
-					delete(s.channelUsers, channel)
-				} else {
-					if i+1 < ln {
-						cus[i], cus[ln-1] = cus[ln-1], cus[i]
-					}
-					s.channelUsers[channel] = cus[:ln-1]
-				}
-				break
-			}
-		}
+	for _, cus := range s.channelUsers {
+		delete(cus, nick)
 	}
 
 	delete(s.userChannels, nick)
@@ -152,21 +137,8 @@ func (s *Store) addChannel(channel string) *Channel {
 // removeChannel deletes a channel from the database.
 func (s *Store) removeChannel(channel string) {
 	channel = strings.ToLower(channel)
-	for user, cus := range s.userChannels {
-		ln := len(cus)
-		for i := 0; i < ln; i++ {
-			if channel == strings.ToLower(cus[i].Channel.GetName()) {
-				if ln == 1 {
-					delete(s.userChannels, user)
-				} else {
-					if i+1 < ln {
-						cus[i], cus[ln-1] = cus[ln-1], cus[i]
-					}
-					s.userChannels[user] = cus[:ln-1]
-				}
-				break
-			}
-		}
+	for _, cus := range s.userChannels {
+		delete(cus, channel)
 	}
 
 	delete(s.channelUsers, channel)
@@ -177,8 +149,8 @@ func (s *Store) removeChannel(channel string) {
 func (s *Store) addToChannel(nickorhost, channel string) {
 	var user *User
 	var ch *Channel
-	var cu []*ChannelUser
-	var uc []*UserChannel
+	var cu map[string]*ChannelUser
+	var uc map[string]*UserChannel
 	var ok bool
 
 	nick := strings.ToLower(Mask(nickorhost).GetNick())
@@ -193,24 +165,24 @@ func (s *Store) addToChannel(nickorhost, channel string) {
 	}
 
 	if cu, ok = s.channelUsers[channel]; !ok {
-		cu = make([]*ChannelUser, 0, 1)
+		cu = make(map[string]*ChannelUser, 1)
 	}
 
 	if uc, ok = s.userChannels[nick]; !ok {
-		uc = make([]*UserChannel, 0, 1)
+		uc = make(map[string]*UserChannel, 1)
 	}
 
 	modes := CreateUserModes(s.umodes)
-	cu = append(cu, CreateChannelUser(user, modes))
-	uc = append(uc, CreateUserChannel(ch, modes))
+	cu[nick] = CreateChannelUser(user, modes)
+	uc[channel] = CreateUserChannel(ch, modes)
 	s.channelUsers[channel] = cu
 	s.userChannels[nick] = uc
 }
 
 // removeFromChannel removes a user by nick or fullhost from the channel
 func (s *Store) removeFromChannel(nickorhost, channel string) {
-	var cu []*ChannelUser
-	var uc []*UserChannel
+	var cu map[string]*ChannelUser
+	var uc map[string]*UserChannel
 	var ok bool
 
 	nick := strings.ToLower(Mask(nickorhost).GetNick())
@@ -222,37 +194,11 @@ func (s *Store) removeFromChannel(nickorhost, channel string) {
 	}
 
 	if cu, ok = s.channelUsers[channel]; ok {
-		ln := len(cu)
-		for i := 0; i < ln; i++ {
-			if strings.ToLower(cu[i].User.GetNick()) == nick {
-				if ln == 1 {
-					delete(s.channelUsers, channel)
-				} else {
-					if i+1 < ln {
-						cu[i], cu[ln-1] = cu[ln-1], cu[i]
-					}
-					s.channelUsers[channel] = cu[:len(cu)-1]
-				}
-				break
-			}
-		}
+		delete(cu, nick)
 	}
 
 	if uc, ok = s.userChannels[nick]; ok {
-		ln := len(uc)
-		for i := 0; i < ln; i++ {
-			if strings.ToLower(uc[i].Channel.GetName()) == channel {
-				if ln == 1 {
-					delete(s.userChannels, nick)
-				} else {
-					if i+1 < ln {
-						uc[i], uc[ln-1] = uc[ln-1], uc[i]
-					}
-					s.userChannels[nick] = uc[:len(uc)-1]
-				}
-				break
-			}
-		}
+		delete(uc, channel)
 	}
 }
 
