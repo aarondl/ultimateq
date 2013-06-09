@@ -11,6 +11,8 @@ import (
 
 func (s *s) TestServerSender_Write(c *C) {
 	str := "PONG :msg\r\n"
+	fmt := "PONG :%v\r\n"
+	end := "PONG :test\r\n"
 
 	conn := mocks.CreateConn()
 	connProvider := func(srv string) (net.Conn, error) {
@@ -28,6 +30,9 @@ func (s *s) TestServerSender_Write(c *C) {
 	b.start(true, false)
 	err = srvsender.Writeln(str)
 	c.Check(bytes.Compare(conn.Receive(len(str), nil), []byte(str)), Equals, 0)
+	c.Check(err, IsNil)
+	err = srvsender.Writef(fmt, "test")
+	c.Check(bytes.Compare(conn.Receive(len(end), nil), []byte(end)), Equals, 0)
 	c.Check(err, IsNil)
 	_, err = srvsender.Write([]byte(str))
 	c.Check(bytes.Compare(conn.Receive(len(str), nil), []byte(str)), Equals, 0)

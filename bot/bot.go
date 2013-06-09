@@ -364,6 +364,11 @@ func (b *Bot) dispatchMessages(s *Server) {
 			if err != nil {
 				log.Printf(errFmtParsingIrcMessage, err)
 			} else {
+				s.protectStore.Lock()
+				if s.store != nil {
+					s.store.Update(ircMsg)
+				}
+				s.protectStore.Unlock()
 				b.dispatchMessage(s, ircMsg)
 			}
 		case <-s.killdispatch:

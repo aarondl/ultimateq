@@ -114,6 +114,19 @@ func (s *s) TestStore_GetChannel(c *C) {
 	c.Check(st.GetChannel(channels[1]), NotNil)
 }
 
+func (s *s) TestStore_GetUsersChannelModes(c *C) {
+	st, err := CreateStore(irc.CreateProtoCaps())
+	c.Check(err, IsNil)
+	st.addUser(users[0])
+	st.addUser(users[0]) // Test that adding a user twice does nothing.
+	c.Check(st.GetUsersChannelModes(users[0], channels[0]), IsNil)
+	st.addChannel(channels[0])
+	c.Check(st.GetUsersChannelModes(users[0], channels[0]), IsNil)
+
+	st.addToChannel(users[0], channels[0])
+	c.Check(st.GetUsersChannelModes(users[0], channels[0]), NotNil)
+}
+
 func (s *s) TestStore_IsOn(c *C) {
 	st, err := CreateStore(irc.CreateProtoCaps())
 	c.Check(err, IsNil)
@@ -362,7 +375,7 @@ func (s *s) TestStore_UpdateMode(c *C) {
 		},
 	}
 
-	fail := st.GetUsersChannelModes(channels[0], users[0])
+	fail := st.GetUsersChannelModes(users[0], channels[0])
 	c.Check(fail, IsNil)
 
 	st.addChannel(channels[0])
@@ -371,8 +384,8 @@ func (s *s) TestStore_UpdateMode(c *C) {
 	st.addToChannel(users[0], channels[0])
 	st.addToChannel(users[1], channels[0])
 
-	u1modes := st.GetUsersChannelModes(channels[0], users[0])
-	u2modes := st.GetUsersChannelModes(channels[0], users[1])
+	u1modes := st.GetUsersChannelModes(users[0], channels[0])
+	u2modes := st.GetUsersChannelModes(users[1], channels[0])
 	u2modes.SetMode('v')
 	st.GetChannel(channels[0]).Set("n")
 
@@ -409,14 +422,6 @@ func (s *s) TestStore_UpdateModeSelf(c *C) {
 	c.Check(st.Self.IsSet("o"), Equals, false)
 }
 
-func (s *s) TestStore_UpdateRplMode(c *C) {
-	c.Skip("Needs Implementing")
-}
-
-func (s *s) TestStore_UpdateRplBanlist(c *C) {
-	c.Skip("Needs Implementing")
-}
-
 func (s *s) TestStore_UpdateTopic(c *C) {
 	st, err := CreateStore(irc.CreateProtoCaps())
 	st.Self = self
@@ -424,7 +429,7 @@ func (s *s) TestStore_UpdateTopic(c *C) {
 
 	m := &irc.IrcMessage{
 		Name:   irc.RPL_TOPIC,
-		Sender: users[0],
+		Sender: server,
 		Args:   []string{channels[0], "topic topic"},
 	}
 
@@ -445,9 +450,13 @@ func (s *s) TestStore_UpdatePrivmsg(c *C) {
 		Args:   []string{channels[0]},
 	}
 
+	st.addChannel(channels[0])
+
 	c.Check(st.GetUser(users[0]), IsNil)
+	c.Check(st.GetUsersChannelModes(users[0], channels[0]), IsNil)
 	st.Update(m)
 	c.Check(st.GetUser(users[0]), NotNil)
+	c.Check(st.GetUsersChannelModes(users[0], channels[0]), NotNil)
 
 	m.Sender = server
 	size := len(st.users)
@@ -465,9 +474,13 @@ func (s *s) TestStore_UpdateNotice(c *C) {
 		Args:   []string{channels[0]},
 	}
 
+	st.addChannel(channels[0])
+
 	c.Check(st.GetUser(users[0]), IsNil)
+	c.Check(st.GetUsersChannelModes(users[0], channels[0]), IsNil)
 	st.Update(m)
 	c.Check(st.GetUser(users[0]), NotNil)
+	c.Check(st.GetUsersChannelModes(users[0], channels[0]), NotNil)
 
 	m.Sender = server
 	size := len(st.users)
@@ -497,4 +510,91 @@ func (s *s) TestStore_UpdateWelcome(c *C) {
 	st.Update(m)
 	c.Check(st.Self.GetFullhost(), Equals, users[1])
 	c.Check(st.users[nicks[1]].GetFullhost(), Equals, st.Self.GetFullhost())
+}
+
+func (s *s) TestStore_UpdateRplNamereply(c *C) {
+	st, err := CreateStore(irc.CreateProtoCaps())
+	c.Check(err, IsNil)
+
+	m := &irc.IrcMessage{
+		Name:   irc.RPL_NAMREPLY,
+		Sender: server,
+		Args: []string{
+			self.GetNick(), "=", channels[0],
+			"@" + nicks[0] + " +" + nicks[1] + " " + self.GetNick(),
+		},
+	}
+
+	st.addChannel(channels[0])
+
+	c.Check(st.GetUsersChannelModes(users[0], channels[0]), IsNil)
+	c.Check(st.GetUsersChannelModes(users[1], channels[0]), IsNil)
+	c.Check(st.GetUsersChannelModes(self.GetNick(), channels[0]), IsNil)
+	st.Update(m)
+	c.Check(
+		st.GetUsersChannelModes(users[0], channels[0]).String(), Equals, "o")
+	c.Check(
+		st.GetUsersChannelModes(users[1], channels[0]).String(), Equals, "v")
+	c.Check(st.GetUsersChannelModes(
+		self.GetNick(), channels[0]).String(), Equals, "")
+}
+
+func (s *s) TestStore_RplWhoisReply(c *C) {
+	st, err := CreateStore(irc.CreateProtoCaps())
+	c.Check(err, IsNil)
+
+	m := &irc.IrcMessage{
+		Name:   irc.RPL_WHOREPLY,
+		Sender: server,
+		Args: []string{
+			self.GetNick(), channels[0], Mask(users[0]).GetUsername(),
+			Mask(users[0]).GetHost(), "*.server.net", nicks[0], "Hx@",
+			"3 real name",
+		},
+	}
+
+	st.addChannel(channels[0])
+
+	c.Check(st.GetUser(users[0]), IsNil)
+	c.Check(st.GetUsersChannelModes(users[0], channels[0]), IsNil)
+	st.Update(m)
+	c.Check(st.GetUser(users[0]), NotNil)
+	c.Check(st.GetUser(users[0]).GetFullhost(), Equals, users[0])
+	c.Check(st.GetUser(users[0]).GetRealname(), Equals, "real name")
+	c.Check(
+		st.GetUsersChannelModes(users[0], channels[0]).String(), Equals, "o")
+}
+
+func (s *s) TestStore_UpdateRplMode(c *C) {
+	st, err := CreateStore(irc.CreateProtoCaps())
+	c.Check(err, IsNil)
+
+	m := &irc.IrcMessage{
+		Name:   irc.RPL_CHANNELMODEIS,
+		Sender: server,
+		Args:   []string{self.GetNick(), channels[0], "+ntzl", "10"},
+	}
+
+	st.addChannel(channels[0])
+	c.Check(st.GetChannel(channels[0]).IsSet("ntzl 10"), Equals, false)
+	st.Update(m)
+	c.Check(st.GetChannel(channels[0]).IsSet("ntzl 10"), Equals, true)
+}
+
+func (s *s) TestStore_UpdateRplBanlist(c *C) {
+	st, err := CreateStore(irc.CreateProtoCaps())
+	st.Self = self
+	c.Check(err, IsNil)
+
+	m := &irc.IrcMessage{
+		Name:   irc.RPL_BANLIST,
+		Sender: server,
+		Args: []string{self.GetNick(), channels[0], nicks[0] + "!*@*", nicks[1],
+			"1367197165"},
+	}
+
+	st.addChannel(channels[0])
+	c.Check(st.GetChannel(channels[0]).HasBan(nicks[0]+"!*@*"), Equals, false)
+	st.Update(m)
+	c.Check(st.GetChannel(channels[0]).HasBan(nicks[0]+"!*@*"), Equals, true)
 }

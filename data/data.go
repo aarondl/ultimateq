@@ -85,12 +85,12 @@ func (s *Store) GetChannel(channel string) *Channel {
 }
 
 // GetUserByChannel fetches a user based
-func (s *Store) GetUsersChannelModes(channel, nickorhost string) *UserModes {
+func (s *Store) GetUsersChannelModes(nickorhost, channel string) *UserModes {
 	nick := strings.ToLower(Mask(nickorhost).GetNick())
 	channel = strings.ToLower(channel)
 
-	if cus, ok := s.channelUsers[channel]; ok {
-		if cu, ok := cus[nick]; ok {
+	if nicks, ok := s.channelUsers[channel]; ok {
+		if cu, ok := nicks[nick]; ok {
 			return cu.UserModes
 		}
 	}
@@ -102,6 +102,7 @@ func (s *Store) GetUsersChannelModes(channel, nickorhost string) *UserModes {
 func (s *Store) IsOn(nickorhost, channel string) bool {
 	nick := strings.ToLower(Mask(nickorhost).GetNick())
 	channel = strings.ToLower(channel)
+
 	if chans, ok := s.userChannels[nick]; ok {
 		if _, ok = chans[channel]; ok {
 			return true
@@ -132,7 +133,7 @@ func (s *Store) addUser(nickorhost string) *User {
 	var user *User
 	var ok bool
 	if user, ok = s.users[nick]; ok {
-		if user.GetFullhost() != nickorhost {
+		if excl && at && user.GetFullhost() != nickorhost {
 			user.mask = Mask(nickorhost)
 		}
 	} else {
@@ -181,7 +182,7 @@ func (s *Store) addToChannel(nickorhost, channel string) {
 	var ch *Channel
 	var cu map[string]*ChannelUser
 	var uc map[string]*UserChannel
-	var ok bool
+	var ok, cuhas, uchas bool
 
 	nick := strings.ToLower(Mask(nickorhost).GetNick())
 	channel = strings.ToLower(channel)
@@ -196,10 +197,18 @@ func (s *Store) addToChannel(nickorhost, channel string) {
 
 	if cu, ok = s.channelUsers[channel]; !ok {
 		cu = make(map[string]*ChannelUser, 1)
+	} else {
+		_, cuhas = s.channelUsers[channel][nick]
 	}
 
 	if uc, ok = s.userChannels[nick]; !ok {
 		uc = make(map[string]*UserChannel, 1)
+	} else {
+		_, uchas = s.userChannels[nick][channel]
+	}
+
+	if cuhas || uchas {
+		return
 	}
 
 	modes := CreateUserModes(s.umodes)
@@ -253,6 +262,14 @@ func (s *Store) Update(m *irc.IrcMessage) {
 		s.msg(m)
 	case irc.RPL_WELCOME:
 		s.rpl_welcome(m)
+	case irc.RPL_NAMREPLY:
+		s.rpl_namereply(m)
+	case irc.RPL_WHOREPLY:
+		s.rpl_whoreply(m)
+	case irc.RPL_CHANNELMODEIS:
+		s.rpl_channelmodeis(m)
+	case irc.RPL_BANLIST:
+		s.rpl_banlist(m)
 
 		// TODO: Handle Whois
 	}
@@ -344,6 +361,9 @@ func (s *Store) rpl_topic(m *irc.IrcMessage) {
 // received.
 func (s *Store) msg(m *irc.IrcMessage) {
 	s.addUser(m.Sender)
+	if s.cfinder.IsChannel(m.Args[0]) {
+		s.addToChannel(m.Sender, m.Args[0])
+	}
 }
 
 // rpl_welcome alters the state of the database when a RPL_WELCOME message is
@@ -358,4 +378,60 @@ func (s *Store) rpl_welcome(m *irc.IrcMessage) {
 	user := CreateUser(host)
 	s.Self.User = user
 	s.users[user.GetNick()] = user
+}
+
+// rpl_namereply alters the state of the database when a RPL_NAMEREPLY
+// message is received.
+func (s *Store) rpl_namereply(m *irc.IrcMessage) {
+	channel := m.Args[2]
+	users := strings.Split(m.Args[3], " ")
+	for i := 0; i < len(users); i++ {
+		j := 0
+		mode := rune(0)
+		for ; j < len(s.umodes.modeInfo); j++ {
+			if s.umodes.modeInfo[j][1] == rune(users[i][0]) {
+				mode = s.umodes.modeInfo[j][0]
+				break
+			}
+		}
+		if j < len(s.umodes.modeInfo) {
+			nick := users[i][1:]
+			s.addToChannel(nick, channel)
+			s.GetUsersChannelModes(nick, channel).SetMode(mode)
+		} else {
+			s.addToChannel(users[i], channel)
+		}
+	}
+}
+
+// rpl_whoreply alters the state of the database when a RPL_WHOREPLY message
+// is received.
+func (s *Store) rpl_whoreply(m *irc.IrcMessage) {
+	channel := m.Args[1]
+	fullhost := m.Args[5] + "!" + m.Args[2] + "@" + m.Args[3]
+	modes := m.Args[6]
+	realname := strings.SplitN(m.Args[7], " ", 2)[1]
+
+	s.addToChannel(fullhost, channel)
+	s.GetUser(fullhost).Realname(realname)
+	chanmode := rune(modes[len(modes)-1])
+	mode := s.umodes.GetMode(chanmode)
+	if mode != 0 {
+		s.GetUsersChannelModes(fullhost, channel).SetMode(mode)
+	}
+}
+
+// rpl_channelmodeis alters the state of the database when a RPL_CHANNELMODEIS
+// message is received.
+func (s *Store) rpl_channelmodeis(m *irc.IrcMessage) {
+	channel := m.Args[1]
+	modes := strings.Join(m.Args[2:], " ")
+	s.GetChannel(channel).Apply(modes)
+}
+
+// rpl_banlist alters the state of the database when a RPL_BANLIST message is
+// received.
+func (s *Store) rpl_banlist(m *irc.IrcMessage) {
+	channel := m.Args[1]
+	s.GetChannel(channel).AddBan(m.Args[2])
 }

@@ -29,3 +29,25 @@ func (u *UserModes) HasMode(mode rune) bool {
 func (u *UserModes) UnsetMode(mode rune) {
 	u.modes &= ^u.GetModeBit(mode)
 }
+
+// String turns user modes into a string.
+func (u *UserModes) String() string {
+	ret := ""
+	for i := 0; i < len(u.modeInfo); i++ {
+		if u.HasMode(u.modeInfo[i][0]) {
+			ret += string(u.modeInfo[i][0])
+		}
+	}
+	return ret
+}
+
+// StringSymbols turns user modes into a string but uses mode chars instead.
+func (u *UserModes) StringSymbols() string {
+	ret := ""
+	for i := 0; i < len(u.modeInfo); i++ {
+		if u.HasMode(u.modeInfo[i][0]) {
+			ret += string(u.modeInfo[i][1])
+		}
+	}
+	return ret
+}

@@ -86,6 +86,14 @@ func (s ServerSender) Writeln(str string) error {
 	return err
 }
 
+// Writef writes to the ServerSender's IrcClient, using sprintf as a string
+// builder.
+func (s ServerSender) Writef(format string, args ...interface{}) error {
+	str := fmt.Sprintf(format, args...)
+	_, err := s.server.Write([]byte(str))
+	return err
+}
+
 // Write writes to the ServerSender's IrcClient.
 func (s ServerSender) Write(buf []byte) (int, error) {
 	return s.server.Write(buf)
