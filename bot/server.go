@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/aarondl/ultimateq/config"
+	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/dispatch"
 	"github.com/aarondl/ultimateq/inet"
 	"github.com/aarondl/ultimateq/irc"
@@ -47,6 +48,7 @@ type Server struct {
 	client     *inet.IrcClient
 	conf       *config.Server
 	caps       *irc.ProtoCaps
+	store      *data.Store
 
 	reconnScale time.Duration
 
@@ -58,6 +60,12 @@ type Server struct {
 
 	// protects client reading/writing
 	protect sync.RWMutex
+
+	// protects the caps from reading and writing.
+	protectCaps sync.RWMutex
+
+	// protects the store from reading and writing.
+	protectStore sync.RWMutex
 }
 
 // ServerSender implements the server interface, and wraps the write method
@@ -102,13 +110,15 @@ func (s *Server) Write(buf []byte) (int, error) {
 }
 
 // createDispatcher uses the server's current ProtoCaps to create a dispatcher.
-func (s *Server) createDispatcher(channels []string) error {
-	var err error
+func (s *Server) createDispatcher(channels []string) (err error) {
 	s.dispatcher, err = dispatch.CreateRichDispatcher(s.caps, channels)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
+}
+
+// createStore uses the server's current ProtoCaps to create a store.
+func (s *Server) createStore() (err error) {
+	s.store, err = data.CreateStore(s.caps)
+	return err
 }
 
 // createIrcClient connects to the configured server, and creates an IrcClient
@@ -140,6 +150,29 @@ func (s *Server) createIrcClient() error {
 	}
 
 	s.client = inet.CreateIrcClient(conn, s.name)
+	return nil
+}
+
+// protocaps sets the protocaps for the given server. If an error is returned
+// no update was done.
+func (s *Server) protocaps(caps *irc.ProtoCaps) error {
+	var err error
+	if err = s.dispatcher.Protocaps(caps); err != nil {
+		return err
+	}
+	if s.store != nil {
+		s.protectStore.Lock()
+		err = s.store.Protocaps(caps)
+		s.protectStore.Unlock()
+		if err != nil {
+			return err
+		}
+	}
+
+	tmp := *caps
+	s.protectCaps.Lock()
+	s.caps = &tmp
+	s.protectCaps.Unlock()
 	return nil
 }
 

@@ -276,6 +276,14 @@ func (c *Config) VerifyCert(verifyCert bool) *Config {
 	return c
 }
 
+// NoState fluently sets reconnection for the current config context
+func (c *Config) NoState(nostate bool) *Config {
+	context := c.GetContext()
+	context.NoState = nostate
+	context.IsNoStateSet = true
+	return c
+}
+
 // NoReconnect fluently sets reconnection for the current config context
 func (c *Config) NoReconnect(noreconnect bool) *Config {
 	context := c.GetContext()
@@ -354,6 +362,10 @@ type Server struct {
 	VerifyCert      bool
 	IsVerifyCertSet bool
 
+	// State tracking
+	NoState      bool
+	IsNoStateSet bool
+
 	// Auto reconnection
 	NoReconnect      bool
 	IsNoReconnectSet bool
@@ -419,6 +431,17 @@ func (s *Server) GetVerifyCert() (verifyCert bool) {
 		verifyCert = s.VerifyCert
 	} else if s.parent != nil && s.parent.Global.IsVerifyCertSet {
 		verifyCert = s.parent.Global.VerifyCert
+	}
+	return
+}
+
+// GetNoState gets NoState of the server, or the global nostate, or
+// false
+func (s *Server) GetNoState() (nostate bool) {
+	if s != nil && s.IsNoStateSet {
+		nostate = s.NoState
+	} else if s.parent != nil && s.parent.Global.IsNoStateSet {
+		nostate = s.parent.Global.NoState
 	}
 	return
 }

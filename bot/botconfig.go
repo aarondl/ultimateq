@@ -127,14 +127,13 @@ func elementsEquals(a, b []string) bool {
 	}
 
 	for i := 0; i < lena; i++ {
-		found := false
-		for j := 0; j < lenb; j++ {
+		j := 0
+		for ; j < lenb; j++ {
 			if a[i] == b[j] {
-				found = true
 				break
 			}
 		}
-		if !found {
+		if j >= lenb {
 			return false
 		}
 	}

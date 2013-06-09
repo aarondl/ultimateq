@@ -67,6 +67,8 @@ func (s *s) TestBot_ReplaceConfig(c *C) {
 		Channels(chans3...).
 		Server("anothernewserver")
 
+	c3 := &config.Config{}
+
 	b, err := createBot(c1, nil, connProvider, false)
 	c.Check(err, IsNil)
 	c.Check(len(b.servers), Equals, 2)
@@ -86,7 +88,9 @@ func (s *s) TestBot_ReplaceConfig(c *C) {
 	c.Check(elementsEquals(oldsrv2.dispatcher.GetChannels(), chans1),
 		Equals, true)
 
-	servers := b.ReplaceConfig(c2)
+	servers := b.ReplaceConfig(c3)
+	c.Check(len(servers), Equals, 0)
+	servers = b.ReplaceConfig(c2)
 	c.Check(len(servers), Equals, 1)
 	c.Check(len(b.servers), Equals, 2)
 
@@ -132,6 +136,9 @@ func (s *s) TestBot_testElementEquals(c *C) {
 	c.Check(elementsEquals(a, b), Equals, true)
 
 	a = []string{"a", "b", "c"}
+	c.Check(elementsEquals(a, b), Equals, false)
+
+	a = []string{"x", "y"}
 	c.Check(elementsEquals(a, b), Equals, false)
 
 	a = []string{}

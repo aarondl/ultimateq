@@ -499,6 +499,12 @@ func (b *Bot) createServer(conf *config.Server) (*Server, error) {
 		return nil, err
 	}
 
+	if !conf.GetNoState() {
+		if err := s.createStore(); err != nil {
+			return nil, err
+		}
+	}
+
 	if b.attachHandlers {
 		s.handler = &coreHandler{bot: b}
 		s.handlerId =

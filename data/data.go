@@ -33,38 +33,25 @@ type Store struct {
 
 // CreateStore creates a store from an irc protocaps instance.
 func CreateStore(caps *irc.ProtoCaps) (*Store, error) {
-	selfkinds := CreateChannelModeKinds("", "", "", caps.Usermodes())
-	kinds, err := CreateChannelModeKindsCSV(caps.Chanmodes())
-	if err != nil {
-		return nil, err
-	}
-	modes, err := CreateUserModeKinds(caps.Prefix())
-	if err != nil {
-		return nil, err
-	}
-	cfinder, err := irc.CreateChannelFinder(caps.Chantypes())
+	store := &Store{}
+	err := store.Protocaps(caps)
+
 	if err != nil {
 		return nil, err
 	}
 
-	store := &Store{
-		channels:     make(map[string]*Channel),
-		users:        make(map[string]*User),
-		channelUsers: make(map[string]map[string]*ChannelUser),
-		userChannels: make(map[string]map[string]*UserChannel),
+	store.Self.ChannelModes = CreateChannelModes(store.selfkinds)
 
-		selfkinds: selfkinds,
-		kinds:     kinds,
-		umodes:    modes,
-		cfinder:   cfinder,
-	}
-
-	store.Self.ChannelModes = CreateChannelModes(selfkinds)
+	store.channels = make(map[string]*Channel)
+	store.users = make(map[string]*User)
+	store.channelUsers = make(map[string]map[string]*ChannelUser)
+	store.userChannels = make(map[string]map[string]*UserChannel)
 
 	return store, nil
 }
 
-func (s *Store) UpdateProtoCaps(caps *irc.ProtoCaps) error {
+// Protocaps updates the protocaps of the store.
+func (s *Store) Protocaps(caps *irc.ProtoCaps) error {
 	selfkinds := CreateChannelModeKinds("", "", "", caps.Usermodes())
 	kinds, err := CreateChannelModeKindsCSV(caps.Chanmodes())
 	if err != nil {

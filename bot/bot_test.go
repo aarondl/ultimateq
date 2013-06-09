@@ -308,6 +308,24 @@ func (s *s) TestBot_createBot(c *C) {
 	c.Check(b.connProvider, NotNil)
 }
 
+func (s *s) TestBot_createServer(c *C) {
+	b, err := createBot(fakeConfig, nil, nil, true)
+	c.Check(err, IsNil)
+	srv := b.servers[serverId]
+	c.Check(srv.dispatcher, NotNil)
+	c.Check(srv.store, NotNil)
+	c.Check(srv.handler, NotNil)
+
+	cnf := fakeConfig.Clone()
+	cnf.GlobalContext().NoState(true)
+	b, err = createBot(cnf, nil, nil, false)
+	c.Check(err, IsNil)
+	srv = b.servers[serverId]
+	c.Check(srv.dispatcher, NotNil)
+	c.Check(srv.store, IsNil)
+	c.Check(srv.handler, IsNil)
+}
+
 func (s *s) TestBot_Providers(c *C) {
 	capsProv := func() *irc.ProtoCaps {
 		p := irc.CreateProtoCaps()

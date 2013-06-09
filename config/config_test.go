@@ -28,14 +28,14 @@ func setLogger() {
 
 var srv1 = &Server{
 	nil, "irc", "irc.gamesurge.net",
-	5555, true, true, false, true, false, true, 10,
+	5555, true, true, false, true, false, true, false, true, 10,
 	"n1", "a1", "u1", "h1", "r1", "p1",
 	[]string{"#chan", "#chan2"},
 }
 
 var srv2 = &Server{
 	nil, "irc2", "nuclearfallout.gamesurge.net",
-	7777, false, false, true, false, false, false, 10,
+	7777, false, false, true, false, false, false, false, false, 10,
 	"n2", "a2", "u2", "h2", "r2", "p2",
 	[]string{"#chan2"},
 }
@@ -62,6 +62,7 @@ func (s *s) TestConfig_Fallbacks(c *C) {
 	c.Check(server.GetPort(), Equals, config.Global.Port)
 	c.Check(server.GetSsl(), Equals, config.Global.Ssl)
 	c.Check(server.GetVerifyCert(), Equals, config.Global.VerifyCert)
+	c.Check(server.GetNoState(), Equals, config.Global.NoState)
 	c.Check(server.GetNoReconnect(), Equals, config.Global.NoReconnect)
 	c.Check(server.GetReconnectTimeout(), Equals,
 		config.Global.ReconnectTimeout)
@@ -79,19 +80,24 @@ func (s *s) TestConfig_Fallbacks(c *C) {
 	//Check bools more throughly
 	server.IsSslSet = true
 	server.IsVerifyCertSet = true
+	server.IsNoStateSet = true
 	server.IsNoReconnectSet = true
 	c.Check(server.GetSsl(), Equals, false)
 	c.Check(server.GetVerifyCert(), Equals, false)
+	c.Check(server.GetNoState(), Equals, false)
 	c.Check(server.GetNoReconnect(), Equals, false)
 
 	server.IsSslSet = false
 	server.IsVerifyCertSet = false
+	server.IsNoStateSet = false
 	server.IsNoReconnectSet = false
 	config.Global.Ssl = false
 	config.Global.VerifyCert = false
+	config.Global.NoState = false
 	config.Global.NoReconnect = false
 	c.Check(server.GetSsl(), Equals, false)
 	c.Check(server.GetVerifyCert(), Equals, false)
+	c.Check(server.GetNoState(), Equals, false)
 	c.Check(server.GetNoReconnect(), Equals, false)
 
 	//Check default values more thoroughly
@@ -125,6 +131,7 @@ func (s *s) TestConfig_Fluent(c *C) {
 		Port(srv1.Port).
 		Ssl(srv1.Ssl).
 		VerifyCert(srv1.VerifyCert).
+		NoState(srv1.NoState).
 		NoReconnect(srv1.NoReconnect).
 		ReconnectTimeout(srv1.ReconnectTimeout).
 		Nick(srv1.Nick).
@@ -143,6 +150,7 @@ func (s *s) TestConfig_Fluent(c *C) {
 	c.Check(server.GetPort(), Equals, srv1.Port)
 	c.Check(server.GetSsl(), Equals, srv1.Ssl)
 	c.Check(server.GetVerifyCert(), Equals, srv1.VerifyCert)
+	c.Check(server.GetNoState(), Equals, srv1.NoState)
 	c.Check(server.GetNoReconnect(), Equals, srv1.NoReconnect)
 	c.Check(server.GetReconnectTimeout(), Equals, srv1.ReconnectTimeout)
 	c.Check(server.GetNick(), Equals, srv1.Nick)
@@ -160,6 +168,7 @@ func (s *s) TestConfig_Fluent(c *C) {
 	c.Check(server2.GetPort(), Equals, srv2.Port)
 	c.Check(server2.GetSsl(), Equals, srv2.Ssl)
 	c.Check(server2.GetVerifyCert(), Equals, srv2.VerifyCert)
+	c.Check(server2.GetNoState(), Equals, srv2.NoState)
 	c.Check(server2.GetNoReconnect(), Equals, srv2.NoReconnect)
 	c.Check(server2.GetReconnectTimeout(), Equals, srv2.ReconnectTimeout)
 	c.Check(server2.GetNick(), Equals, srv2.Nick)

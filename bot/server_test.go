@@ -2,6 +2,7 @@ package bot
 
 import (
 	"bytes"
+	"github.com/aarondl/ultimateq/irc"
 	"github.com/aarondl/ultimateq/mocks"
 	. "launchpad.net/gocheck"
 	"net"
@@ -63,6 +64,56 @@ func (s *s) TestServer_Write(c *C) {
 	c.Check(err, NotNil)
 	b.WaitForHalt()
 	b.Disconnect()
+}
+
+func (s *s) TestServer_Protocaps(c *C) {
+	caps := irc.CreateProtoCaps()
+	srv := &Server{
+		caps: caps,
+	}
+	err := srv.createStore()
+	c.Check(err, IsNil)
+	err = srv.createDispatcher(nil)
+	c.Check(err, IsNil)
+
+	c.Check(srv.caps.Usermodes(), Not(Equals), "q")
+	c.Check(srv.caps.Chantypes(), Not(Equals), "!")
+	c.Check(srv.caps.Chanmodes(), Not(Equals), ",,,q")
+	c.Check(srv.caps.Prefix(), Not(Equals), "(q)@")
+
+	fakeCaps := &irc.ProtoCaps{}
+	fakeCaps.ParseISupport(&irc.IrcMessage{Args: []string{
+		"NICK", "CHANTYPES=!", "PREFIX=(q)@", "CHANMODES=,,,q",
+	}})
+	fakeCaps.ParseMyInfo(&irc.IrcMessage{Args: []string{
+		"irc.test.net", "test-12", "q", "abc",
+	}})
+
+	err = srv.protocaps(fakeCaps)
+	c.Check(err, IsNil)
+
+	c.Check(srv.caps.Usermodes(), Equals, "q")
+	c.Check(srv.caps.Chantypes(), Equals, "!")
+	c.Check(srv.caps.Chanmodes(), Equals, ",,,q")
+	c.Check(srv.caps.Prefix(), Equals, "(q)@")
+
+	// Check that there's a copy
+	c.Check(srv.caps, Not(Equals), fakeCaps)
+
+	// Check errors
+	fakeCaps = &irc.ProtoCaps{}
+	fakeCaps.ParseISupport(&irc.IrcMessage{Args: []string{
+		"NICK", "CHANTYPES=H",
+	}})
+	err = srv.protocaps(fakeCaps)
+	c.Check(err, NotNil)
+
+	fakeCaps = &irc.ProtoCaps{}
+	fakeCaps.ParseISupport(&irc.IrcMessage{Args: []string{
+		"NICK", "CHANTYPES=!",
+	}})
+	err = srv.protocaps(fakeCaps)
+	c.Check(err, NotNil)
 }
 
 func (s *s) TestServer_State(c *C) {

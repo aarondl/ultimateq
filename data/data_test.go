@@ -70,7 +70,7 @@ func (s *s) TestStore_UpdateProtoCaps(c *C) {
 	c.Assert(st.kinds.kinds['q'], Equals, 0)
 	c.Assert(st.umodes.GetModeBit('q'), Equals, 0)
 	c.Assert(st.cfinder.IsChannel("!"), Equals, false)
-	st.UpdateProtoCaps(fakeCaps)
+	st.Protocaps(fakeCaps)
 	c.Assert(st.selfkinds.kinds['q'], Not(Equals), 0)
 	c.Assert(st.kinds.kinds['q'], Not(Equals), 0)
 	c.Assert(st.umodes.GetModeBit('q'), Not(Equals), 0)
@@ -361,6 +361,9 @@ func (s *s) TestStore_UpdateMode(c *C) {
 			"+ovmb-vn", nicks[0], nicks[0], "*!*mask", nicks[1],
 		},
 	}
+
+	fail := st.GetUsersChannelModes(channels[0], users[0])
+	c.Check(fail, IsNil)
 
 	st.addChannel(channels[0])
 	st.addUser(users[0])
