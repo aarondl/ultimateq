@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/aarondl/ultimateq/config"
+	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/irc"
 	"github.com/aarondl/ultimateq/mocks"
 	"io"
@@ -14,31 +15,34 @@ import (
 //===================================================================
 // Fixtures for basic responses as well as full bot required messages
 //===================================================================
-var testWritten []string = make([]string, 0, 10)
-
 type testSender struct {
+	testWritten []string
 }
 
-func resetTestWritten() {
-	testWritten = testWritten[:0]
+func makeTestSender() testSender {
+	return testSender{testWritten: make([]string, 0, 10)}
 }
 
-func (t testSender) GetKey() string {
+func (t *testSender) resetTestWritten() {
+	t.testWritten = t.testWritten[:0]
+}
+
+func (t *testSender) GetKey() string {
 	return serverId
 }
 
-func (t testSender) Writef(format string, args ...interface{}) error {
-	testWritten = append(testWritten, fmt.Sprintf(format, args...))
+func (t *testSender) Writef(format string, args ...interface{}) error {
+	t.testWritten = append(t.testWritten, fmt.Sprintf(format, args...))
 	return nil
 }
 
-func (t testSender) Writeln(args ...interface{}) error {
-	testWritten = append(testWritten, fmt.Sprint(args...))
+func (t *testSender) Writeln(args ...interface{}) error {
+	t.testWritten = append(t.testWritten, fmt.Sprint(args...))
 	return nil
 }
 
-func (t testSender) Write(buf []byte) (int, error) {
-	testWritten = append(testWritten, string(buf))
+func (t *testSender) Write(buf []byte) (int, error) {
+	t.testWritten = append(t.testWritten, string(buf))
 	return len(buf), nil
 }
 
@@ -86,8 +90,9 @@ func (s *s) TestCoreHandler_Ping(c *C) {
 		Name: "PING",
 		Args: []string{"123123123123"},
 	}
-	handler.HandleRaw(msg, testSender{})
-	c.Check(testWritten[0], Equals, "PONG :"+msg.Args[0])
+	sender := makeTestSender()
+	handler.HandleRaw(msg, &sender)
+	c.Check(sender.testWritten[0], Equals, "PONG :"+msg.Args[0])
 }
 
 func (s *s) TestCoreHandler_Connect(c *C) {
@@ -152,11 +157,33 @@ func (s *s) TestCoreHandler_Caps(c *C) {
 		Args: []string{"RFC8213", "CHANTYPES=&$"},
 	}
 	srv := b.servers[serverId]
-	srv.handler.HandleRaw(msg1, testSender{})
-	srv.handler.HandleRaw(msg2, testSender{})
+	srv.handler.HandleRaw(msg1, &testSender{})
+	srv.handler.HandleRaw(msg2, &testSender{})
 	c.Check(srv.caps.ServerName(), Equals, "irc.test.net")
 	c.Check(srv.caps.IrcdVersion(), Equals, "testircd-1.2")
 	c.Check(srv.caps.Usermodes(), Equals, "acCior")
 	c.Check(srv.caps.LegacyChanmodes(), Equals, "beiIklmno")
 	c.Check(srv.caps.Chantypes(), Equals, "&$")
+}
+
+func (s *s) TestCoreHandler_Join(c *C) {
+	connProvider := func(srv string) (net.Conn, error) {
+		return nil, nil
+	}
+
+	b, err := createBot(fakeConfig, nil, connProvider, true)
+	srv := b.servers[serverId]
+	c.Check(err, IsNil)
+
+	srv.store.Self.User = data.CreateUser("nick!user@host")
+	msg := &irc.IrcMessage{
+		Name:   irc.JOIN,
+		Sender: srv.store.Self.GetFullhost(),
+		Args:   []string{"#chan"},
+	}
+
+	sender := makeTestSender()
+	srv.handler.HandleRaw(msg, &sender)
+	c.Check(sender.testWritten[0], Equals, "WHO :#chan")
+	c.Check(sender.testWritten[1], Equals, "MODE :#chan")
 }

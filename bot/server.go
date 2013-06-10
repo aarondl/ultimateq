@@ -189,14 +189,14 @@ func (s *Server) rehashProtocaps() error {
 	if err = s.dispatcher.Protocaps(s.caps); err != nil {
 		return err
 	}
+	s.protectStore.Lock()
 	if s.store != nil {
-		s.protectStore.Lock()
 		err = s.store.Protocaps(s.caps)
-		s.protectStore.Unlock()
 		if err != nil {
 			return err
 		}
 	}
+	s.protectStore.Unlock()
 	return nil
 }
 

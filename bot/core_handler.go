@@ -57,6 +57,17 @@ func (c *coreHandler) HandleRaw(msg *irc.IrcMessage, sender irc.Sender) {
 		c.protect.Unlock()
 		sender.Writeln("NICK :" + nick)
 
+	case irc.JOIN:
+		server := c.getServer(sender)
+		server.protectStore.RLock()
+		defer server.protectStore.RUnlock()
+		if server.store != nil {
+			if msg.Sender == server.store.Self.GetFullhost() {
+				sender.Writeln("WHO :", msg.Args[0])
+				sender.Writeln("MODE :", msg.Args[0])
+			}
+		}
+
 	case irc.RPL_MYINFO:
 		server := c.getServer(sender)
 		server.protectCaps.RLock()

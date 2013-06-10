@@ -56,6 +56,12 @@ func (b *Bot) ReplaceConfig(newConfig *config.Config) []NewServer {
 			setChannels :=
 				!elementsEquals(s.conf.GetChannels(), serverConf.GetChannels())
 
+			if !s.conf.GetNoState() && serverConf.GetNoState() {
+				s.protectStore.Lock()
+				s.store = nil
+				s.protectStore.Unlock()
+			}
+
 			s.conf = serverConf
 
 			if setNick {

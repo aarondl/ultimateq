@@ -61,6 +61,7 @@ func (s *s) TestBot_ReplaceConfig(c *C) {
 
 	c2 := fakeConfig.Clone().
 		GlobalContext().
+		NoState(true).
 		Channels(chans2...).
 		ServerContext(serverId).
 		Nick("newnick").
@@ -87,8 +88,9 @@ func (s *s) TestBot_ReplaceConfig(c *C) {
 		Equals, true)
 	c.Check(elementsEquals(oldsrv2.dispatcher.GetChannels(), chans1),
 		Equals, true)
+	c.Check(oldsrv1.store, NotNil)
 
-	servers := b.ReplaceConfig(c3)
+	servers := b.ReplaceConfig(c3) // Invalid Config
 	c.Check(len(servers), Equals, 0)
 	servers = b.ReplaceConfig(c2)
 	c.Check(len(servers), Equals, 1)
@@ -103,6 +105,7 @@ func (s *s) TestBot_ReplaceConfig(c *C) {
 		Equals, true)
 	c.Check(elementsEquals(servers[0].server.dispatcher.GetChannels(), chans2),
 		Equals, true)
+	c.Check(oldsrv1.store, IsNil)
 
 	c.Check(servers[0].Err, IsNil)
 	c.Check(servers[0].ServerName, Equals, "anothernewserver")
