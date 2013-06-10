@@ -17,12 +17,16 @@ var _ = Suite(&s{})
 type testSender struct {
 }
 
-func (tsender testSender) Writeln(s string) error {
+func (tsender testSender) Writeln(_ ...interface{}) error {
 	return nil
 }
 
-func (tsender testSender) Writef(format string, args ...interface{}) error {
+func (tsender testSender) Writef(_ string, _ ...interface{}) error {
 	return nil
+}
+
+func (tsender testSender) Write(_ []byte) (int, error) {
+	return 0, nil
 }
 
 func (tsender testSender) GetKey() string {

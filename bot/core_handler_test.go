@@ -32,9 +32,14 @@ func (t testSender) Writef(format string, args ...interface{}) error {
 	return nil
 }
 
-func (t testSender) Writeln(str string) error {
-	testWritten = append(testWritten, str)
+func (t testSender) Writeln(args ...interface{}) error {
+	testWritten = append(testWritten, fmt.Sprint(args...))
 	return nil
+}
+
+func (t testSender) Write(buf []byte) (int, error) {
+	testWritten = append(testWritten, string(buf))
+	return len(buf), nil
 }
 
 // callBack gets the Bot, the mock Connection, the server's config, and the

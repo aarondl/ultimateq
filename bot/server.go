@@ -81,16 +81,15 @@ func (s ServerSender) GetKey() string {
 }
 
 // Writeln writes to the ServerSender's IrcClient.
-func (s ServerSender) Writeln(str string) error {
-	_, err := s.server.Write([]byte(str))
+func (s ServerSender) Writeln(args ...interface{}) error {
+	_, err := s.server.Write([]byte(fmt.Sprint(args...)))
 	return err
 }
 
 // Writef writes to the ServerSender's IrcClient, using sprintf as a string
 // builder.
 func (s ServerSender) Writef(format string, args ...interface{}) error {
-	str := fmt.Sprintf(format, args...)
-	_, err := s.server.Write([]byte(str))
+	_, err := s.server.Write([]byte(fmt.Sprintf(format, args...)))
 	return err
 }
 
@@ -113,8 +112,8 @@ func (s ServerSender) OpenStore(fn func(*data.Store)) bool {
 }
 
 // Writeln writes to the server's IrcClient.
-func (s *Server) Writeln(str string) error {
-	_, err := s.Write([]byte(str))
+func (s *Server) Writeln(args ...interface{}) error {
+	_, err := s.Write([]byte(fmt.Sprint(args...)))
 	return err
 }
 
