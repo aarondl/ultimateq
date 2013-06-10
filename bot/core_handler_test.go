@@ -46,25 +46,6 @@ func (t testSender) Write(buf []byte) (int, error) {
 // write channel if during the call to testHandlerResponse startWriter was true
 type callBack func(*Bot, *mocks.Conn, *config.Server)
 
-/* WARNING:
- This test requires that we be able to wait on the socket to receive some data.
- Because of that, the mock must be modified.
-
- The two following places should have code injected:
-
- type MockConn struct {
-	 ...
-	 Writechan chan []byte
- }
-
- func (_m *MockConn) Write(_param0 []byte) (int, error) {
-	 ret := _m.ctrl.Call(_m, "Write", _param0)
-	 if _m.Writechan != nil {
-		 _m.Writechan <- _param0
-	 }
-	 ...
- }
-*/
 func testHandlerResponse(c *C, startWriter, startReader bool,
 	before callBack, after callBack) {
 
