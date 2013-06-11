@@ -20,7 +20,7 @@ var testargs = []string{
 }
 
 func (s *s) TestParse(c *C) {
-	msg, err := Parse(strings.Join(testargs, " "))
+	msg, err := Parse([]byte(strings.Join(testargs, " ")))
 	c.Check(err, IsNil)
 	c.Check(msg.Sender, Equals, strings.TrimLeft(testargs[0], ":"))
 	c.Check(msg.Name, Equals, testargs[1])
@@ -28,11 +28,11 @@ func (s *s) TestParse(c *C) {
 	c.Check(msg.Args[0], Equals, testargs[2])
 	c.Check(msg.Args[1], Equals, strings.TrimLeft(testargs[3], ":"))
 
-	msg, err = Parse(strings.Join(testargs[1:], " "))
+	msg, err = Parse([]byte(strings.Join(testargs[1:], " ")))
 	c.Check(err, IsNil)
 	c.Check(msg.Sender, Equals, "")
 
-	msg, err = Parse(strings.Join(testargs[:len(testargs)-1], " "))
+	msg, err = Parse([]byte(strings.Join(testargs[:len(testargs)-1], " ")))
 	c.Check(err, IsNil)
 	c.Check(len(msg.Args), Equals, 1)
 	c.Check(msg.Args[0], Equals, testargs[2])
@@ -41,10 +41,19 @@ func (s *s) TestParse(c *C) {
 func (s *s) TestParse_Ping(c *C) {
 	test1 := "PING"
 	test2 := ":12312323"
-	msg, err := Parse(strings.Join([]string{test1, test2}, " "))
+	msg, err := Parse([]byte(strings.Join([]string{test1, test2}, " ")))
 	c.Check(err, IsNil)
 	c.Check(msg.Name, Equals, test1)
 	c.Check(msg.Args[0], Equals, test2[1:])
+}
+
+func (s *s) TestParse_TrailingSpace(c *C) {
+	test1 := "PING"
+	test2 := "12312323 "
+	msg, err := Parse([]byte(strings.Join([]string{test1, test2}, " ")))
+	c.Check(err, IsNil)
+	c.Check(msg.Name, Equals, test1)
+	c.Check(msg.Args[0], Equals, strings.TrimSpace(test2))
 }
 
 func (s *s) TestParse_ExtraSemicolons(c *C) {
@@ -53,7 +62,9 @@ func (s *s) TestParse_ExtraSemicolons(c *C) {
 	args := []string{
 		"nobody1", "RFC2812", "CHANLIMIT=#&:+20", ":are supported",
 	}
-	raw := strings.Join([]string{sender, name, strings.Join(args, " ")}, " ")
+	raw := []byte(strings.Join([]string{
+		sender, name, strings.Join(args, " "),
+	}, " "))
 	msg, err := Parse(raw)
 	c.Check(err, IsNil)
 	c.Check(msg.Name, Equals, name)
@@ -65,11 +76,11 @@ func (s *s) TestParse_ExtraSemicolons(c *C) {
 }
 
 func (s *s) TestParse_Error(c *C) {
-	_, err := Parse("")
+	_, err := Parse([]byte{})
 	c.Check(err.Error(), Equals, errMsgParseFailure)
 
 	irc := "invalid irc message"
-	_, err = Parse(irc)
+	_, err = Parse([]byte(irc))
 	e, ok := err.(ParseError)
 	c.Check(ok, Equals, true)
 	c.Check(e.Irc, Equals, irc)

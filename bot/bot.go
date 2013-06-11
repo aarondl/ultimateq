@@ -25,7 +25,7 @@ const (
 
 	// errFmtParsingIrcMessage is when the bot fails to parse a message
 	// during it's dispatch loop.
-	errFmtParsingIrcMessage = "bot: Failed to parse irc message (%v)\n"
+	errFmtParsingIrcMessage = "bot: Failed to parse irc message (%v) (%s)\n"
 	// errFmtReaderClosed is when a write fails due to a closed socket or
 	// a shutdown on the client.
 	errFmtReaderClosed = "bot: %v reader closed\n"
@@ -360,9 +360,9 @@ func (b *Bot) dispatchMessages(s *Server) {
 				stop, disconnect = true, true
 				break
 			}
-			ircMsg, err := parse.Parse(string(msg))
+			ircMsg, err := parse.Parse(msg)
 			if err != nil {
-				log.Printf(errFmtParsingIrcMessage, err)
+				log.Printf(errFmtParsingIrcMessage, err, msg)
 			} else {
 				s.protectStore.Lock()
 				if s.store != nil {

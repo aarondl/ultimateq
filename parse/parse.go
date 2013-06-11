@@ -17,7 +17,7 @@ const (
 var (
 	// ircRegex is used to parse the parts of irc protocol.
 	ircRegex = regexp.MustCompile(
-		`^(?::(\S+) )?([A-Z0-9]+)((?: (?:[^:\s][^\s]*))*)(?: :(.*))?$`)
+		`^(?::(\S+) )?([A-Z0-9]+)((?: (?:[^:\s][^\s]*))*)(?: :(.*))?\s*$`)
 )
 
 // ParseError is generated when something does not match the regex, irc.Parse
@@ -34,27 +34,27 @@ func (p ParseError) Error() string {
 	return p.Msg
 }
 
-// Parse produces an IrcMessage from a string. The string is an irc
+// Parse produces an IrcMessage from a byte slice. The string is an irc
 // protocol message, split by \r\n, and \r\n should not be
 // present at the end of the string.
-func Parse(str string) (*irc.IrcMessage, error) {
-	parts := ircRegex.FindStringSubmatch(str)
+func Parse(str []byte) (*irc.IrcMessage, error) {
+	parts := ircRegex.FindSubmatch(str)
 	if parts == nil {
-		return nil, ParseError{Msg: errMsgParseFailure, Irc: str}
+		return nil, ParseError{Msg: errMsgParseFailure, Irc: string(str)}
 	}
 
 	msg := &irc.IrcMessage{}
-	msg.Sender = parts[1]
-	msg.Name = parts[2]
-	if parts[3] != "" {
-		msg.Args = strings.Split(strings.TrimLeft(parts[3], " "), " ")
+	msg.Sender = string(parts[1])
+	msg.Name = string(parts[2])
+	if len(parts[3]) != 0 {
+		msg.Args = strings.Fields(string(parts[3]))
 	}
 
-	if parts[4] != "" {
+	if len(parts[4]) != 0 {
 		if msg.Args != nil {
-			msg.Args = append(msg.Args, parts[4])
+			msg.Args = append(msg.Args, string(parts[4]))
 		} else {
-			msg.Args = []string{parts[4]}
+			msg.Args = []string{string(parts[4])}
 		}
 	}
 
