@@ -98,6 +98,114 @@ func (s *Store) GetUsersChannelModes(nickorhost, channel string) *UserModes {
 	return nil
 }
 
+// GetNUsers returns the number of users in the database.
+func (s *Store) GetNUsers() int {
+	return len(s.users)
+}
+
+// GetNChannels returns the number of channels in the database.
+func (s *Store) GetNChannels() int {
+	return len(s.channels)
+}
+
+// GetNUserChans returns the number of channels for a user in the database.
+func (s *Store) GetNUserChans(nickorhost string) (n int) {
+	nick := strings.ToLower(Mask(nickorhost).GetNick())
+	if ucs, ok := s.userChannels[nick]; ok {
+		n = len(ucs)
+	}
+	return
+}
+
+// GetNChanUsers returns the number of users for a channel in the database.
+func (s *Store) GetNChanUsers(channel string) (n int) {
+	channel = strings.ToLower(channel)
+	if cus, ok := s.channelUsers[channel]; ok {
+		n = len(cus)
+	}
+	return
+}
+
+// EachUser iterates through the users.
+func (s *Store) EachUser(fn func(*User)) {
+	for _, u := range s.users {
+		fn(u)
+	}
+}
+
+// EachChannel iterates through the channels.
+func (s *Store) EachChannel(fn func(*Channel)) {
+	for _, c := range s.channels {
+		fn(c)
+	}
+}
+
+// EachUserChan iterates through the channels a user is on.
+func (s *Store) EachUserChan(nickorhost string, fn func(*UserChannel)) {
+	nick := strings.ToLower(Mask(nickorhost).GetNick())
+	if ucs, ok := s.userChannels[nick]; ok {
+		for _, uc := range ucs {
+			fn(uc)
+		}
+	}
+	return
+}
+
+// EachChanUser iterates through the users on a channel.
+func (s *Store) EachChanUser(channel string, fn func(*ChannelUser)) {
+	channel = strings.ToLower(channel)
+	if cus, ok := s.channelUsers[channel]; ok {
+		for _, cu := range cus {
+			fn(cu)
+		}
+	}
+	return
+}
+
+// GetUser returns a string array of all the users.
+func (s *Store) GetUsers() []string {
+	ret := make([]string, 0, len(s.users))
+	for _, u := range s.users {
+		ret = append(ret, u.GetFullhost())
+	}
+	return ret
+}
+
+// GetChannels returns a string array of all the channels.
+func (s *Store) GetChannels() []string {
+	ret := make([]string, 0, len(s.channels))
+	for _, c := range s.channels {
+		ret = append(ret, c.GetName())
+	}
+	return ret
+}
+
+// GetUserChans returns a string array of the channels a user is on.
+func (s *Store) GetUserChans(nickorhost string) []string {
+	nick := strings.ToLower(Mask(nickorhost).GetNick())
+	if ucs, ok := s.userChannels[nick]; ok {
+		ret := make([]string, 0, len(ucs))
+		for _, uc := range ucs {
+			ret = append(ret, uc.Channel.GetName())
+		}
+		return ret
+	}
+	return nil
+}
+
+// GetChanUsers returns a string array of the users on a channel.
+func (s *Store) GetChanUsers(channel string) []string {
+	channel = strings.ToLower(channel)
+	if cus, ok := s.channelUsers[channel]; ok {
+		ret := make([]string, 0, len(cus))
+		for _, cu := range cus {
+			ret = append(ret, cu.User.GetFullhost())
+		}
+		return ret
+	}
+	return nil
+}
+
 // IsOn checks if a user is on a specific channel.
 func (s *Store) IsOn(nickorhost, channel string) bool {
 	nick := strings.ToLower(Mask(nickorhost).GetNick())
@@ -156,11 +264,11 @@ func (s *Store) removeUser(nickorhost string) {
 
 // addChannel adds a channel to the database.
 func (s *Store) addChannel(channel string) *Channel {
-	channel = strings.ToLower(channel)
+	chankey := strings.ToLower(channel)
 	var ch *Channel
-	if ch, ok := s.channels[channel]; !ok {
+	if ch, ok := s.channels[chankey]; !ok {
 		ch = CreateChannel(channel, s.kinds)
-		s.channels[channel] = ch
+		s.channels[chankey] = ch
 	}
 	return ch
 }
@@ -188,7 +296,7 @@ func (s *Store) addToChannel(nickorhost, channel string) {
 	channel = strings.ToLower(channel)
 
 	if user, ok = s.users[nick]; !ok {
-		user = s.addUser(nickorhost)
+		return
 	}
 
 	if ch, ok = s.channels[channel]; !ok {
@@ -227,11 +335,6 @@ func (s *Store) removeFromChannel(nickorhost, channel string) {
 	nick := strings.ToLower(Mask(nickorhost).GetNick())
 	channel = strings.ToLower(channel)
 
-	if _, ok = s.users[nick]; !ok {
-		s.addUser(nickorhost)
-		return
-	}
-
 	if cu, ok = s.channelUsers[channel]; ok {
 		delete(cu, nick)
 	}
@@ -243,6 +346,7 @@ func (s *Store) removeFromChannel(nickorhost, channel string) {
 
 // Update uses the irc.IrcMessage to modify the database accordingly.
 func (s *Store) Update(m *irc.IrcMessage) {
+	s.addUser(m.Sender)
 	switch m.Name {
 	case irc.NICK:
 		s.nick(m)
@@ -256,6 +360,8 @@ func (s *Store) Update(m *irc.IrcMessage) {
 		s.kick(m)
 	case irc.MODE:
 		s.mode(m)
+	case irc.TOPIC:
+		s.topic(m)
 	case irc.RPL_TOPIC:
 		s.rpl_topic(m)
 	case irc.PRIVMSG, irc.NOTICE:
@@ -350,17 +456,25 @@ func (s *Store) mode(m *irc.IrcMessage) {
 }
 
 // topic alters the state of the database when a TOPIC message is received.
-func (s *Store) rpl_topic(m *irc.IrcMessage) {
+func (s *Store) topic(m *irc.IrcMessage) {
 	chname := strings.ToLower(m.Args[0])
 	if ch, ok := s.channels[chname]; ok {
 		ch.Topic(m.Args[1])
 	}
 }
 
+// rpl_topic alters the state of the database when a RPL_TOPIC message is
+// received.
+func (s *Store) rpl_topic(m *irc.IrcMessage) {
+	chname := strings.ToLower(m.Args[1])
+	if ch, ok := s.channels[chname]; ok {
+		ch.Topic(m.Args[2])
+	}
+}
+
 // msg alters the state of the database when a PRIVMSG or NOTICE message is
 // received.
 func (s *Store) msg(m *irc.IrcMessage) {
-	s.addUser(m.Sender)
 	if s.cfinder.IsChannel(m.Args[0]) {
 		s.addToChannel(m.Sender, m.Args[0])
 	}
@@ -369,7 +483,7 @@ func (s *Store) msg(m *irc.IrcMessage) {
 // rpl_welcome alters the state of the database when a RPL_WELCOME message is
 // received.
 func (s *Store) rpl_welcome(m *irc.IrcMessage) {
-	splits := strings.Split(m.Args[1], " ")
+	splits := strings.Fields(m.Args[1])
 	host := splits[len(splits)-1]
 
 	if !strings.ContainsRune(host, '!') || !strings.ContainsRune(host, '@') {
@@ -384,7 +498,7 @@ func (s *Store) rpl_welcome(m *irc.IrcMessage) {
 // message is received.
 func (s *Store) rpl_namereply(m *irc.IrcMessage) {
 	channel := m.Args[2]
-	users := strings.Split(m.Args[3], " ")
+	users := strings.Fields(m.Args[3])
 	for i := 0; i < len(users); i++ {
 		j := 0
 		mode := rune(0)
@@ -396,9 +510,11 @@ func (s *Store) rpl_namereply(m *irc.IrcMessage) {
 		}
 		if j < len(s.umodes.modeInfo) {
 			nick := users[i][1:]
+			s.addUser(nick)
 			s.addToChannel(nick, channel)
 			s.GetUsersChannelModes(nick, channel).SetMode(mode)
 		} else {
+			s.addUser(users[i])
 			s.addToChannel(users[i], channel)
 		}
 	}
@@ -412,12 +528,13 @@ func (s *Store) rpl_whoreply(m *irc.IrcMessage) {
 	modes := m.Args[6]
 	realname := strings.SplitN(m.Args[7], " ", 2)[1]
 
+	s.addUser(fullhost)
 	s.addToChannel(fullhost, channel)
 	s.GetUser(fullhost).Realname(realname)
-	chanmode := rune(modes[len(modes)-1])
-	mode := s.umodes.GetMode(chanmode)
-	if mode != 0 {
-		s.GetUsersChannelModes(fullhost, channel).SetMode(mode)
+	for _, modechar := range modes {
+		if mode := s.umodes.GetMode(modechar); mode != 0 {
+			s.GetUsersChannelModes(fullhost, channel).SetMode(mode)
+		}
 	}
 }
 

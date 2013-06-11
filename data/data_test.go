@@ -118,7 +118,6 @@ func (s *s) TestStore_GetUsersChannelModes(c *C) {
 	st, err := CreateStore(irc.CreateProtoCaps())
 	c.Check(err, IsNil)
 	st.addUser(users[0])
-	st.addUser(users[0]) // Test that adding a user twice does nothing.
 	c.Check(st.GetUsersChannelModes(users[0], channels[0]), IsNil)
 	st.addChannel(channels[0])
 	c.Check(st.GetUsersChannelModes(users[0], channels[0]), IsNil)
@@ -127,12 +126,182 @@ func (s *s) TestStore_GetUsersChannelModes(c *C) {
 	c.Check(st.GetUsersChannelModes(users[0], channels[0]), NotNil)
 }
 
+func (s *s) TestStore_GetNUsers(c *C) {
+	st, err := CreateStore(irc.CreateProtoCaps())
+	c.Check(err, IsNil)
+	c.Check(st.GetNUsers(), Equals, 0)
+	st.addUser(users[0])
+	st.addUser(users[0]) // Test that adding a user twice does nothing.
+	c.Check(st.GetNUsers(), Equals, 1)
+	st.addUser(users[1])
+	c.Check(st.GetNUsers(), Equals, 2)
+}
+
+func (s *s) TestStore_GetNChannels(c *C) {
+	st, err := CreateStore(irc.CreateProtoCaps())
+	c.Check(err, IsNil)
+	c.Check(st.GetNChannels(), Equals, 0)
+	st.addChannel(channels[0])
+	st.addChannel(channels[0]) // Test that adding a channel twice does nothing.
+	c.Check(st.GetNChannels(), Equals, 1)
+	st.addChannel(channels[1])
+	c.Check(st.GetNChannels(), Equals, 2)
+}
+
+func (s *s) TestStore_GetNUserChans(c *C) {
+	st, err := CreateStore(irc.CreateProtoCaps())
+	c.Check(err, IsNil)
+	c.Check(st.GetNUserChans(users[0]), Equals, 0)
+	c.Check(st.GetNUserChans(users[0]), Equals, 0)
+	st.addChannel(channels[0])
+	st.addChannel(channels[1])
+	c.Check(st.GetNUserChans(users[0]), Equals, 0)
+	c.Check(st.GetNUserChans(users[0]), Equals, 0)
+	st.addUser(users[0])
+	st.addUser(users[1])
+	st.addToChannel(users[0], channels[0])
+	st.addToChannel(users[0], channels[0]) // Test no duplicate adds.
+	st.addToChannel(users[0], channels[1])
+	st.addToChannel(users[1], channels[0])
+	c.Check(st.GetNUserChans(users[0]), Equals, 2)
+	c.Check(st.GetNUserChans(users[1]), Equals, 1)
+}
+
+func (s *s) TestStore_GetNChanUsers(c *C) {
+	st, err := CreateStore(irc.CreateProtoCaps())
+	c.Check(err, IsNil)
+	c.Check(st.GetNChanUsers(channels[0]), Equals, 0)
+	c.Check(st.GetNChanUsers(channels[0]), Equals, 0)
+	st.addChannel(channels[0])
+	st.addChannel(channels[1])
+	c.Check(st.GetNChanUsers(channels[0]), Equals, 0)
+	c.Check(st.GetNChanUsers(channels[0]), Equals, 0)
+	st.addUser(users[0])
+	st.addUser(users[1])
+	st.addToChannel(users[0], channels[0])
+	st.addToChannel(users[0], channels[1])
+	st.addToChannel(users[1], channels[0])
+	c.Check(st.GetNChanUsers(channels[0]), Equals, 2)
+	c.Check(st.GetNChanUsers(channels[1]), Equals, 1)
+}
+
+func (s *s) TestStore_EachUser(c *C) {
+	st, err := CreateStore(irc.CreateProtoCaps())
+	c.Check(err, IsNil)
+	st.addUser(users[0])
+	st.addUser(users[1])
+	i := 0
+	st.EachUser(func(u *User) {
+		c.Check(users[i], Equals, u.GetFullhost())
+		i++
+	})
+	c.Check(i, Equals, 2)
+}
+
+func (s *s) TestStore_EachChannel(c *C) {
+	st, err := CreateStore(irc.CreateProtoCaps())
+	c.Check(err, IsNil)
+	st.addChannel(channels[0])
+	st.addChannel(channels[1])
+	i := 0
+	st.EachChannel(func(ch *Channel) {
+		c.Check(channels[i], Equals, ch.String())
+		i++
+	})
+	c.Check(i, Equals, 2)
+}
+
+func (s *s) TestStore_EachUserChan(c *C) {
+	st, err := CreateStore(irc.CreateProtoCaps())
+	c.Check(err, IsNil)
+	st.addUser(users[0])
+	st.addChannel(channels[0])
+	st.addChannel(channels[1])
+	st.addToChannel(users[0], channels[0])
+	st.addToChannel(users[0], channels[1])
+	i := 0
+	st.EachUserChan(users[0], func(uc *UserChannel) {
+		c.Check(channels[i], Equals, uc.Channel.String())
+		i++
+	})
+	c.Check(i, Equals, 2)
+}
+
+func (s *s) TestStore_EachChanUser(c *C) {
+	st, err := CreateStore(irc.CreateProtoCaps())
+	c.Check(err, IsNil)
+	st.addUser(users[0])
+	st.addUser(users[1])
+	st.addChannel(channels[0])
+	st.addToChannel(users[0], channels[0])
+	st.addToChannel(users[1], channels[0])
+	i := 0
+	st.EachChanUser(channels[0], func(cu *ChannelUser) {
+		c.Check(users[i], Equals, cu.User.GetFullhost())
+		i++
+	})
+	c.Check(i, Equals, 2)
+}
+
+func (s *s) TestStore_GetUsers(c *C) {
+	st, err := CreateStore(irc.CreateProtoCaps())
+	c.Check(err, IsNil)
+	st.addUser(users[0])
+	st.addUser(users[1])
+	c.Check(len(st.GetUsers()), Equals, 2)
+	for i, user := range st.GetUsers() {
+		c.Check(users[i], Equals, user)
+	}
+}
+
+func (s *s) TestStore_GetChannels(c *C) {
+	st, err := CreateStore(irc.CreateProtoCaps())
+	c.Check(err, IsNil)
+	st.addChannel(channels[0])
+	st.addChannel(channels[1])
+	c.Check(len(st.GetChannels()), Equals, 2)
+	for i, channel := range st.GetChannels() {
+		c.Check(channels[i], Equals, channel)
+	}
+}
+
+func (s *s) TestStore_GetUserChans(c *C) {
+	st, err := CreateStore(irc.CreateProtoCaps())
+	c.Check(err, IsNil)
+	c.Check(st.GetUserChans(users[0]), IsNil)
+	st.addUser(users[0])
+	st.addChannel(channels[0])
+	st.addChannel(channels[1])
+	st.addToChannel(users[0], channels[0])
+	st.addToChannel(users[0], channels[1])
+	c.Check(len(st.GetUserChans(users[0])), Equals, 2)
+	for i, channel := range st.GetUserChans(users[0]) {
+		c.Check(channels[i], Equals, channel)
+	}
+}
+
+func (s *s) TestStore_GetChanUsers(c *C) {
+	st, err := CreateStore(irc.CreateProtoCaps())
+	c.Check(err, IsNil)
+	c.Check(st.GetChanUsers(channels[0]), IsNil)
+	st.addUser(users[0])
+	st.addUser(users[1])
+	st.addChannel(channels[0])
+	st.addToChannel(users[0], channels[0])
+	st.addToChannel(users[1], channels[0])
+	c.Check(len(st.GetChanUsers(channels[0])), Equals, 2)
+	for i, user := range st.GetChanUsers(channels[0]) {
+		c.Check(users[i], Equals, user)
+	}
+}
+
 func (s *s) TestStore_IsOn(c *C) {
 	st, err := CreateStore(irc.CreateProtoCaps())
 	c.Check(err, IsNil)
 	c.Check(st.IsOn(users[0], channels[0]), Equals, false)
 	st.addChannel(channels[0])
 	c.Check(st.IsOn(users[0], channels[0]), Equals, false)
+	st.addUser(users[0])
 	st.addToChannel(users[0], channels[0])
 	c.Check(st.IsOn(users[0], channels[0]), Equals, true)
 }
@@ -146,6 +315,7 @@ func (s *s) TestStore_UpdateNick(c *C) {
 		Args:   []string{nicks[1]},
 	}
 
+	st.addUser(users[0])
 	st.addChannel(channels[0])
 	st.addToChannel(users[0], channels[0])
 
@@ -165,6 +335,7 @@ func (s *s) TestStore_UpdateNick(c *C) {
 	m.Args = []string{"newnick"}
 	st.Update(m)
 	c.Check(st.GetUser("newnick"), NotNil)
+	c.Check(st.GetUser(nicks[0]), IsNil)
 }
 
 func (s *s) TestStore_UpdateJoin(c *C) {
@@ -189,7 +360,6 @@ func (s *s) TestStore_UpdateJoin(c *C) {
 	c.Check(st.IsOn(users[0], channels[0]), Equals, false)
 	st.Update(m)
 	c.Check(st.IsOn(users[0], channels[0]), Equals, true)
-	c.Check(st.IsOn(users[1], channels[0]), Equals, false)
 }
 
 func (s *s) TestStore_UpdateJoinSelf(c *C) {
@@ -220,11 +390,8 @@ func (s *s) TestStore_UpdatePart(c *C) {
 		Args:   []string{channels[0]},
 	}
 
-	// Make sure seeing this message will create a user, even if the channel
-	// doesn't exist.
-	c.Check(st.GetUser(users[0]), IsNil)
-	st.Update(m)
-	c.Check(st.GetUser(users[0]), NotNil)
+	st.addUser(users[0])
+	st.addUser(users[1])
 
 	// Test coverage, make sure adding to a channel that doesn't exist does
 	// nothing.
@@ -275,6 +442,8 @@ func (s *s) TestStore_UpdatePartSelf(c *C) {
 		Args:   []string{channels[0]},
 	}
 
+	st.addUser(users[0])
+	st.addUser(self.GetFullhost())
 	st.addChannel(channels[0])
 	st.addChannel(channels[1])
 	st.addToChannel(users[0], channels[0])
@@ -302,7 +471,10 @@ func (s *s) TestStore_UpdateQuit(c *C) {
 
 	// Test Quitting when we don't know the user
 	st.Update(m)
+	c.Check(st.GetUser(users[0]), IsNil)
 
+	st.addUser(users[0])
+	st.addUser(users[1])
 	st.addChannel(channels[0])
 	st.addToChannel(users[0], channels[0])
 	st.addToChannel(users[1], channels[0])
@@ -336,6 +508,9 @@ func (s *s) TestStore_UpdateKick(c *C) {
 		Args:   []string{channels[0], users[0]},
 	}
 
+	st.addUser(users[0])
+	st.addUser(users[1])
+
 	st.addChannel(channels[0])
 	st.addToChannel(users[0], channels[0])
 
@@ -354,6 +529,7 @@ func (s *s) TestStore_UpdateKickSelf(c *C) {
 		Args:   []string{channels[0], st.Self.GetNick()},
 	}
 
+	st.addUser(st.Self.GetFullhost())
 	st.addChannel(channels[0])
 	st.addToChannel(users[0], channels[0])
 
@@ -428,9 +604,27 @@ func (s *s) TestStore_UpdateTopic(c *C) {
 	c.Check(err, IsNil)
 
 	m := &irc.IrcMessage{
+		Name:   irc.TOPIC,
+		Sender: users[1],
+		Args:   []string{channels[0], "topic topic"},
+	}
+
+	st.addChannel(channels[0])
+
+	c.Check(st.GetChannel(channels[0]).GetTopic(), Equals, "")
+	st.Update(m)
+	c.Check(st.GetChannel(channels[0]).GetTopic(), Equals, "topic topic")
+}
+
+func (s *s) TestStore_UpdateRplTopic(c *C) {
+	st, err := CreateStore(irc.CreateProtoCaps())
+	st.Self = self
+	c.Check(err, IsNil)
+
+	m := &irc.IrcMessage{
 		Name:   irc.RPL_TOPIC,
 		Sender: server,
-		Args:   []string{channels[0], "topic topic"},
+		Args:   []string{self.GetNick(), channels[0], "topic topic"},
 	}
 
 	st.addChannel(channels[0])
@@ -539,7 +733,7 @@ func (s *s) TestStore_UpdateRplNamereply(c *C) {
 		self.GetNick(), channels[0]).String(), Equals, "")
 }
 
-func (s *s) TestStore_RplWhoisReply(c *C) {
+func (s *s) TestStore_RplWhoReply(c *C) {
 	st, err := CreateStore(irc.CreateProtoCaps())
 	c.Check(err, IsNil)
 
@@ -548,7 +742,7 @@ func (s *s) TestStore_RplWhoisReply(c *C) {
 		Sender: server,
 		Args: []string{
 			self.GetNick(), channels[0], Mask(users[0]).GetUsername(),
-			Mask(users[0]).GetHost(), "*.server.net", nicks[0], "Hx@",
+			Mask(users[0]).GetHost(), "*.server.net", nicks[0], "Hx@d",
 			"3 real name",
 		},
 	}

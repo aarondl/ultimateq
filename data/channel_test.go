@@ -2,7 +2,6 @@ package data
 
 import (
 	. "launchpad.net/gocheck"
-	"strings"
 )
 
 func (s *s) TestChannel_Create(c *C) {
@@ -12,7 +11,7 @@ func (s *s) TestChannel_Create(c *C) {
 	name := "#CHAN"
 	ch = CreateChannel(name, testKinds)
 	c.Check(ch, NotNil)
-	c.Check(ch.GetName(), Equals, strings.ToLower(name))
+	c.Check(ch.GetName(), Equals, name)
 	c.Check(ch.GetTopic(), Equals, "")
 	c.Check(ch.ChannelModes, NotNil)
 }
