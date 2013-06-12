@@ -9,37 +9,59 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"strconv"
 )
 
 const (
 	// nAssumedServers is the typcial number of configured servers for a bot
 	nAssumedServers = 1
 	// defaultIrcPort is IRC Server's default tcp port.
-	defaultIrcPort = 6667
+	defaultIrcPort = uint16(6667)
+	// defaultFloodProtectBurst is how many messages can be sent before spam
+	// filters set in.
+	defaultFloodProtectBurst = uint(3)
+	// defaultFloodProtectTimeout is how many seconds between messages before
+	// the flood protection resets itself.
+	defaultFloodProtectTimeout = float64(3)
+	// defaultFloodProtectStep is the number of seconds between messages once
+	// flood protection has been activated.
+	defaultFloodProtectStep = float64(3)
 	// defaultReconnectTimeout is how many seconds to wait between reconns.
-	defaultReconnectTimeout = 20
+	defaultReconnectTimeout = uint(20)
 	// botDefaultPrefix is the command prefix by default
 	defaultPrefix = "."
 	// maxHostSize is the biggest hostname possible
 	maxHostSize = 255
+)
 
-	// The following format strings are for formatting various config errors.
+// The following format strings are for formatting various config errors.
+const (
 	fmtErrInvalid         = "config(%v): Invalid %v, given: %v"
 	fmtErrMissing         = "config(%v): Requires %v, but nothing was given."
+	fmtErrServerNotFound  = "config: Server not found, given: %v"
 	errMsgServersRequired = "config: At least one server is required."
 	errMsgDuplicateServer = "config: Server names must be unique, use .Host()"
-	errMsgServerNotFound  = "config: Server not found, given: %v"
+)
 
-	// The following is for mapping config setting names to strings
-	errHost     = "host"
-	errPort     = "port"
-	errNick     = "nickname"
-	errAltnick  = "alternate nickname"
-	errRealname = "realname"
-	errUsername = "username"
-	errUserhost = "userhost"
-	errPrefix   = "prefix"
-	errChannel  = "channel"
+// The following is for mapping config setting names to strings
+const (
+	errHost                = "host"
+	errPort                = "port"
+	errSsl                 = "ssl"
+	errVerifyCert          = "verifycert"
+	errNoState             = "nostate"
+	errFloodProtectBurst   = "floodprotectburst"
+	errFloodProtectTimeout = "floodprotecttimeout"
+	errFloodProtectStep    = "floodprotectstep"
+	errNoReconnect         = "noreconnect"
+	errReconnectTimeout    = "reconnecttimeout"
+	errNick                = "nickname"
+	errAltnick             = "alternate nickname"
+	errRealname            = "realname"
+	errUsername            = "username"
+	errUserhost            = "userhost"
+	errPrefix              = "prefix"
+	errChannel             = "channel"
 )
 
 var (
@@ -137,46 +159,117 @@ func (c *Config) IsValid() bool {
 		return false
 	}
 
+	c.validateServer(c.Global, false)
 	for _, s := range c.Servers {
-		name := s.GetName()
-		if host := s.GetHost(); len(host) == 0 {
-			c.addError(fmtErrMissing, name, errHost)
-		} else if !rgxHost.MatchString(host) || len(host) > maxHostSize {
-			c.addError(fmtErrInvalid, name, errHost, host)
-		}
-
-		if nick := s.GetNick(); len(nick) == 0 {
-			c.addError(fmtErrMissing, name, errNick)
-		} else if !rgxNickname.MatchString(nick) {
-			c.addError(fmtErrInvalid, name, errNick, nick)
-		}
-
-		if username := s.GetUsername(); len(username) == 0 {
-			c.addError(fmtErrMissing, name, errUsername)
-		} else if !rgxUsername.MatchString(username) {
-			c.addError(fmtErrInvalid, name, errUsername, username)
-		}
-
-		if userhost := s.GetUserhost(); len(userhost) == 0 {
-			c.addError(fmtErrMissing, name, errUserhost)
-		} else if !rgxHost.MatchString(userhost) {
-			c.addError(fmtErrInvalid, name, errUserhost, userhost)
-		}
-
-		if realname := s.GetRealname(); len(realname) == 0 {
-			c.addError(fmtErrMissing, name, errRealname)
-		} else if !rgxRealname.MatchString(realname) {
-			c.addError(fmtErrInvalid, name, errRealname, realname)
-		}
-
-		for _, channel := range s.GetChannels() {
-			if !rgxChannel.MatchString(channel) {
-				c.addError(fmtErrInvalid, name, errChannel, channel)
-			}
-		}
+		c.validateServer(s, true)
 	}
 
 	return len(c.Errors) == 0
+}
+
+// validateServer checks a server for errors and adds to the error collection
+// if any are found.
+func (c *Config) validateServer(s *Server, missingIsError bool) {
+	name := s.GetName()
+	if len(s.Ssl) != 0 {
+		if _, err := strconv.ParseBool(s.Ssl); err != nil {
+			c.addError(fmtErrInvalid, name, errSsl, s.Ssl)
+		}
+	}
+
+	if len(s.VerifyCert) != 0 {
+		if _, err := strconv.ParseBool(s.VerifyCert); err != nil {
+			c.addError(fmtErrInvalid, name, errVerifyCert, s.VerifyCert)
+		}
+	}
+
+	if len(s.NoState) != 0 {
+		if _, err := strconv.ParseBool(s.NoState); err != nil {
+			c.addError(fmtErrInvalid, name, errNoState, s.NoState)
+		}
+	}
+
+	if len(s.FloodProtectBurst) != 0 {
+		if _, err :=
+			strconv.ParseUint(s.FloodProtectBurst, 10, 32); err != nil {
+			c.addError(fmtErrInvalid, name, errFloodProtectBurst,
+				s.FloodProtectBurst)
+		}
+	}
+
+	if len(s.FloodProtectTimeout) != 0 {
+		if _, err := strconv.ParseFloat(s.FloodProtectTimeout, 32); err != nil {
+			c.addError(fmtErrInvalid, name, errFloodProtectTimeout,
+				s.FloodProtectTimeout)
+		}
+	}
+
+	if len(s.FloodProtectStep) != 0 {
+		if _, err := strconv.ParseFloat(s.FloodProtectStep, 32); err != nil {
+			c.addError(fmtErrInvalid, name, errFloodProtectStep,
+				s.FloodProtectStep)
+		}
+	}
+
+	if len(s.NoReconnect) != 0 {
+		if _, err := strconv.ParseBool(s.NoReconnect); err != nil {
+			c.addError(fmtErrInvalid, name, errNoReconnect,
+				s.NoReconnect)
+		}
+	}
+
+	if len(s.ReconnectTimeout) != 0 {
+		if _, err := strconv.ParseUint(s.ReconnectTimeout, 10, 32); err != nil {
+			c.addError(fmtErrInvalid, name, errReconnectTimeout,
+				s.ReconnectTimeout)
+		}
+	}
+
+	if host := s.GetHost(); len(host) == 0 {
+		if missingIsError {
+			c.addError(fmtErrMissing, name, errHost)
+		}
+	} else if !rgxHost.MatchString(host) || len(host) > maxHostSize {
+		c.addError(fmtErrInvalid, name, errHost, host)
+	}
+
+	if nick := s.GetNick(); len(nick) == 0 {
+		if missingIsError {
+			c.addError(fmtErrMissing, name, errNick)
+		}
+	} else if !rgxNickname.MatchString(nick) {
+		c.addError(fmtErrInvalid, name, errNick, nick)
+	}
+
+	if username := s.GetUsername(); len(username) == 0 {
+		if missingIsError {
+			c.addError(fmtErrMissing, name, errUsername)
+		}
+	} else if !rgxUsername.MatchString(username) {
+		c.addError(fmtErrInvalid, name, errUsername, username)
+	}
+
+	if userhost := s.GetUserhost(); len(userhost) == 0 {
+		if missingIsError {
+			c.addError(fmtErrMissing, name, errUserhost)
+		}
+	} else if !rgxHost.MatchString(userhost) {
+		c.addError(fmtErrInvalid, name, errUserhost, userhost)
+	}
+
+	if realname := s.GetRealname(); len(realname) == 0 {
+		if missingIsError {
+			c.addError(fmtErrMissing, name, errRealname)
+		}
+	} else if !rgxRealname.MatchString(realname) {
+		c.addError(fmtErrInvalid, name, errRealname, realname)
+	}
+
+	for _, channel := range s.GetChannels() {
+		if !rgxChannel.MatchString(channel) {
+			c.addError(fmtErrInvalid, name, errChannel, channel)
+		}
+	}
 }
 
 // DisplayErrors is a helper function to log the output of all config to the
@@ -199,7 +292,7 @@ func (c *Config) ServerContext(name string) *Config {
 	if srv, ok := c.Servers[name]; ok {
 		c.context = srv
 	} else {
-		c.addError(errMsgServerNotFound, name)
+		c.addError(fmtErrServerNotFound, name)
 	}
 	return c
 }
@@ -262,39 +355,59 @@ func (c *Config) Port(port uint16) *Config {
 
 // Ssl fluently sets the ssl for the current config context
 func (c *Config) Ssl(ssl bool) *Config {
-	context := c.GetContext()
-	context.Ssl = ssl
-	context.IsSslSet = true
+	c.GetContext().Ssl = strconv.FormatBool(ssl)
 	return c
 }
 
 // VerifyCert fluently sets the verifyCert for the current config context
 func (c *Config) VerifyCert(verifyCert bool) *Config {
-	i := c.GetContext()
-	i.VerifyCert = verifyCert
-	i.IsVerifyCertSet = true
+	c.GetContext().VerifyCert = strconv.FormatBool(verifyCert)
 	return c
 }
 
-// NoState fluently sets reconnection for the current config context
+// NoState fluently sets reconnection for the current config context,
+// this turns off the irc state database (data package).
 func (c *Config) NoState(nostate bool) *Config {
-	context := c.GetContext()
-	context.NoState = nostate
-	context.IsNoStateSet = true
+	c.GetContext().NoState = strconv.FormatBool(nostate)
+	return c
+}
+
+// FloodProtectBurst fluently sets flood burst for the current config context,
+// this is how many messages will be bursted through without enabling flood
+// protection.
+func (c *Config) FloodProtectBurst(floodburst uint) *Config {
+	c.GetContext().FloodProtectBurst =
+		strconv.FormatUint(uint64(floodburst), 10)
+	return c
+}
+
+// FloodProtectTimeout fluently sets flood timeout for the current config
+// context, this is how long flood protect will stay enabled after being
+// enabled.
+func (c *Config) FloodProtectTimeout(floodtimeout float64) *Config {
+	c.GetContext().FloodProtectTimeout =
+		strconv.FormatFloat(floodtimeout, 'e', -1, 64)
+	return c
+}
+
+// FloodProtectStep fluently sets flood protect step for the current config
+// context, this is how many seconds to put in between messages after flood
+// protect has been activated (after FloodProtectBurst messages).
+func (c *Config) FloodProtectStep(floodstep float64) *Config {
+	c.GetContext().FloodProtectStep =
+		strconv.FormatFloat(floodstep, 'e', -1, 64)
 	return c
 }
 
 // NoReconnect fluently sets reconnection for the current config context
 func (c *Config) NoReconnect(noreconnect bool) *Config {
-	context := c.GetContext()
-	context.NoReconnect = noreconnect
-	context.IsNoReconnectSet = true
+	c.GetContext().NoReconnect = strconv.FormatBool(noreconnect)
 	return c
 }
 
 // ReconnectTimeout fluently sets the port for the current config context
 func (c *Config) ReconnectTimeout(seconds uint) *Config {
-	c.GetContext().ReconnectTimeout = seconds
+	c.GetContext().ReconnectTimeout = strconv.FormatUint(uint64(seconds), 10)
 	return c
 }
 
@@ -355,21 +468,22 @@ type Server struct {
 	Name string
 
 	// Irc Server connection info
-	Host            string
-	Port            uint16
-	Ssl             bool
-	IsSslSet        bool
-	VerifyCert      bool
-	IsVerifyCertSet bool
+	Host       string
+	Port       uint16
+	Ssl        string
+	VerifyCert string
 
 	// State tracking
-	NoState      bool
-	IsNoStateSet bool
+	NoState string
+
+	// Flood Protection
+	FloodProtectBurst   string
+	FloodProtectTimeout string
+	FloodProtectStep    string
 
 	// Auto reconnection
-	NoReconnect      bool
-	IsNoReconnectSet bool
-	ReconnectTimeout uint
+	NoReconnect      string
+	ReconnectTimeout string
 
 	// Irc User data
 	Nick     string
@@ -416,10 +530,15 @@ func (s *Server) GetPort() (port uint16) {
 
 // GetSsl returns Ssl of the server, or the global ssl, or false
 func (s *Server) GetSsl() (ssl bool) {
-	if s != nil && s.IsSslSet {
-		ssl = s.Ssl
-	} else if s.parent != nil && s.parent.Global.IsSslSet {
-		ssl = s.parent.Global.Ssl
+	var err error
+	if len(s.Ssl) != 0 {
+		ssl, err = strconv.ParseBool(s.Ssl)
+	} else if s.parent != nil && len(s.parent.Global.Ssl) != 0 {
+		ssl, err = strconv.ParseBool(s.parent.Global.Ssl)
+	}
+
+	if err != nil {
+		ssl = false
 	}
 	return
 }
@@ -427,10 +546,15 @@ func (s *Server) GetSsl() (ssl bool) {
 // GetVerifyCert gets VerifyCert of the server, or the global verifyCert, or
 // false
 func (s *Server) GetVerifyCert() (verifyCert bool) {
-	if s != nil && s.IsVerifyCertSet {
-		verifyCert = s.VerifyCert
-	} else if s.parent != nil && s.parent.Global.IsVerifyCertSet {
-		verifyCert = s.parent.Global.VerifyCert
+	var err error
+	if len(s.VerifyCert) != 0 {
+		verifyCert, err = strconv.ParseBool(s.VerifyCert)
+	} else if s.parent != nil && len(s.parent.Global.VerifyCert) != 0 {
+		verifyCert, err = strconv.ParseBool(s.parent.Global.VerifyCert)
+	}
+
+	if err != nil {
+		verifyCert = false
 	}
 	return
 }
@@ -438,10 +562,15 @@ func (s *Server) GetVerifyCert() (verifyCert bool) {
 // GetNoState gets NoState of the server, or the global nostate, or
 // false
 func (s *Server) GetNoState() (nostate bool) {
-	if s != nil && s.IsNoStateSet {
-		nostate = s.NoState
-	} else if s.parent != nil && s.parent.Global.IsNoStateSet {
-		nostate = s.parent.Global.NoState
+	var err error
+	if len(s.NoState) != 0 {
+		nostate, err = strconv.ParseBool(s.NoState)
+	} else if s.parent != nil && len(s.parent.Global.NoState) != 0 {
+		nostate, err = strconv.ParseBool(s.parent.Global.NoState)
+	}
+
+	if err != nil {
+		nostate = false
 	}
 	return
 }
@@ -449,10 +578,76 @@ func (s *Server) GetNoState() (nostate bool) {
 // GetNoReconnect gets NoReconnect of the server, or the global noReconnect, or
 // false
 func (s *Server) GetNoReconnect() (noReconnect bool) {
-	if s != nil && s.IsNoReconnectSet {
-		noReconnect = s.NoReconnect
-	} else if s.parent != nil && s.parent.Global.IsNoReconnectSet {
-		noReconnect = s.parent.Global.NoReconnect
+	var err error
+	if len(s.NoReconnect) != 0 {
+		noReconnect, err = strconv.ParseBool(s.NoReconnect)
+	} else if s.parent != nil && len(s.parent.Global.NoReconnect) != 0 {
+		noReconnect, err = strconv.ParseBool(s.parent.Global.NoReconnect)
+	}
+
+	if err != nil {
+		noReconnect = false
+	}
+	return
+}
+
+// GetFloodProtectBurst gets FloodProtectBurst of the server, or the global
+// floodProtectBurst, or defaultFloodProtectBurst
+func (s *Server) GetFloodProtectBurst() (floodBurst uint) {
+	var err error
+	var u uint64
+	var notset bool
+	floodBurst = defaultFloodProtectBurst
+	if len(s.FloodProtectBurst) != 0 {
+		u, err = strconv.ParseUint(s.FloodProtectBurst, 10, 32)
+	} else if s.parent != nil && len(s.parent.Global.FloodProtectBurst) != 0 {
+		u, err = strconv.ParseUint(s.parent.Global.FloodProtectBurst, 10, 32)
+	} else {
+		notset = true
+	}
+
+	if err != nil {
+		floodBurst = defaultFloodProtectBurst
+	} else if !notset {
+		floodBurst = uint(u)
+	}
+	return
+}
+
+// GetFloodProtectTimeout gets FloodProtectTimeout of the server, or the global
+// floodProtectTimeout, or defaultFloodProtectTimeout
+func (s *Server) GetFloodProtectTimeout() (floodTimeout float64) {
+	var err error
+	floodTimeout = defaultFloodProtectTimeout
+	if len(s.FloodProtectTimeout) != 0 {
+		floodTimeout, err =
+			strconv.ParseFloat(s.FloodProtectTimeout, 32)
+	} else if s.parent != nil && len(s.parent.Global.FloodProtectTimeout) != 0 {
+		floodTimeout, err =
+			strconv.ParseFloat(s.parent.Global.FloodProtectTimeout, 32)
+	}
+
+	if err != nil {
+		floodTimeout = defaultFloodProtectTimeout
+	}
+	return
+}
+
+// GetFloodProtectStep gets FloodProtectStep of the server, or the global
+// floodProtectStep, or defaultFloodProtectStep
+func (s *Server) GetFloodProtectStep() (floodStep float64) {
+	var err error
+	floodStep = defaultFloodProtectStep
+	if len(s.FloodProtectStep) != 0 {
+		floodStep, err =
+			strconv.ParseFloat(s.FloodProtectStep, 32)
+	} else if s.parent != nil && len(s.parent.Global.FloodProtectStep) != 0 {
+		floodStep, err =
+			strconv.ParseFloat(s.parent.Global.FloodProtectStep, 32)
+	}
+
+	if err != nil {
+		floodStep = defaultFloodProtectStep
 	}
 	return
 }
@@ -460,11 +655,22 @@ func (s *Server) GetNoReconnect() (noReconnect bool) {
 // GetReconnectTimeout gets ReconnectTimeout of the server, or the global
 // reconnectTimeout, or defaultReconnectTimeout
 func (s *Server) GetReconnectTimeout() (reconnTimeout uint) {
+	var notset bool
+	var err error
+	var u uint64
 	reconnTimeout = defaultReconnectTimeout
-	if s.ReconnectTimeout != 0 {
-		reconnTimeout = s.ReconnectTimeout
-	} else if s.parent != nil && s.parent.Global.ReconnectTimeout != 0 {
-		reconnTimeout = s.parent.Global.ReconnectTimeout
+	if len(s.ReconnectTimeout) != 0 {
+		u, err = strconv.ParseUint(s.ReconnectTimeout, 10, 32)
+	} else if s.parent != nil && len(s.parent.Global.ReconnectTimeout) != 0 {
+		u, err = strconv.ParseUint(s.parent.Global.ReconnectTimeout, 10, 32)
+	} else {
+		notset = true
+	}
+
+	if err != nil {
+		reconnTimeout = defaultReconnectTimeout
+	} else if !notset {
+		reconnTimeout = uint(u)
 	}
 	return
 }

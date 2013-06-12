@@ -26,18 +26,54 @@ func setLogger() {
 	}
 }
 
+func reqErr(name string) string {
+	return `.*Requires.*` + name + `.*`
+}
+
+func invErr(name string) string {
+	return `.*Invalid.*` + name + `.*`
+}
+
 var srv1 = &Server{
-	nil, "irc", "irc.gamesurge.net",
-	5555, true, true, false, true, false, true, false, true, 10,
-	"n1", "a1", "u1", "h1", "r1", "p1",
-	[]string{"#chan", "#chan2"},
+	Name:                "irc1",
+	Host:                "irc.gamesurge.net",
+	Port:                5555,
+	Ssl:                 "true",
+	VerifyCert:          "false",
+	NoState:             "false",
+	FloodProtectBurst:   "5",
+	FloodProtectTimeout: "3.5",
+	FloodProtectStep:    "5.5",
+	NoReconnect:         "false",
+	ReconnectTimeout:    "10",
+	Nick:                "n1",
+	Altnick:             "a1",
+	Username:            "u1",
+	Userhost:            "h1",
+	Realname:            "r1",
+	Prefix:              "p1",
+	Channels:            []string{"#chan1", "#chan2"},
 }
 
 var srv2 = &Server{
-	nil, "irc2", "nuclearfallout.gamesurge.net",
-	7777, false, false, true, false, false, false, false, false, 10,
-	"n2", "a2", "u2", "h2", "r2", "p2",
-	[]string{"#chan2"},
+	Name:                "irc2",
+	Host:                "irc.gamesurge.com",
+	Port:                6666,
+	Ssl:                 "false",
+	VerifyCert:          "true",
+	NoState:             "true",
+	FloodProtectBurst:   "6",
+	FloodProtectTimeout: "4.5",
+	FloodProtectStep:    "6.5",
+	NoReconnect:         "true",
+	ReconnectTimeout:    "100",
+	Nick:                "n2",
+	Altnick:             "a2",
+	Username:            "u2",
+	Userhost:            "h2",
+	Realname:            "r2",
+	Prefix:              "p2",
+	Channels:            []string{"#chan2"},
 }
 
 func (s *s) TestConfig(c *C) {
@@ -59,144 +95,228 @@ func (s *s) TestConfig_Fallbacks(c *C) {
 
 	c.Check(server.GetHost(), Equals, host)
 	c.Check(server.GetName(), Equals, name)
-	c.Check(server.GetPort(), Equals, config.Global.Port)
-	c.Check(server.GetSsl(), Equals, config.Global.Ssl)
-	c.Check(server.GetVerifyCert(), Equals, config.Global.VerifyCert)
-	c.Check(server.GetNoState(), Equals, config.Global.NoState)
-	c.Check(server.GetNoReconnect(), Equals, config.Global.NoReconnect)
+	c.Check(server.GetPort(), Equals, config.Global.GetPort())
+	c.Check(server.GetSsl(), Equals, config.Global.GetSsl())
+	c.Check(server.GetVerifyCert(), Equals, config.Global.GetVerifyCert())
+	c.Check(server.GetNoState(), Equals, config.Global.GetNoState())
+	c.Check(server.GetFloodProtectBurst(), Equals,
+		config.Global.GetFloodProtectBurst())
+	c.Check(server.GetFloodProtectTimeout(), Equals,
+		config.Global.GetFloodProtectTimeout())
+	c.Check(server.GetFloodProtectStep(), Equals,
+		config.Global.GetFloodProtectStep())
+	c.Check(server.GetNoReconnect(), Equals, config.Global.GetNoReconnect())
 	c.Check(server.GetReconnectTimeout(), Equals,
-		config.Global.ReconnectTimeout)
-	c.Check(server.GetNick(), Equals, config.Global.Nick)
-	c.Check(server.GetAltnick(), Equals, config.Global.Altnick)
-	c.Check(server.GetUsername(), Equals, config.Global.Username)
-	c.Check(server.GetUserhost(), Equals, config.Global.Userhost)
-	c.Check(server.GetRealname(), Equals, config.Global.Realname)
-	c.Check(server.GetPrefix(), Equals, config.Global.Prefix)
+		config.Global.GetReconnectTimeout())
+	c.Check(server.GetNick(), Equals, config.Global.GetNick())
+	c.Check(server.GetAltnick(), Equals, config.Global.GetAltnick())
+	c.Check(server.GetUsername(), Equals, config.Global.GetUsername())
+	c.Check(server.GetUserhost(), Equals, config.Global.GetUserhost())
+	c.Check(server.GetRealname(), Equals, config.Global.GetRealname())
+	c.Check(server.GetPrefix(), Equals, config.Global.GetPrefix())
 	c.Check(len(server.GetChannels()), Equals, len(config.Global.Channels))
 	for i, v := range server.GetChannels() {
 		c.Check(v, Equals, config.Global.Channels[i])
 	}
-
-	//Check bools more throughly
-	server.IsSslSet = true
-	server.IsVerifyCertSet = true
-	server.IsNoStateSet = true
-	server.IsNoReconnectSet = true
-	c.Check(server.GetSsl(), Equals, false)
-	c.Check(server.GetVerifyCert(), Equals, false)
-	c.Check(server.GetNoState(), Equals, false)
-	c.Check(server.GetNoReconnect(), Equals, false)
-
-	server.IsSslSet = false
-	server.IsVerifyCertSet = false
-	server.IsNoStateSet = false
-	server.IsNoReconnectSet = false
-	config.Global.Ssl = false
-	config.Global.VerifyCert = false
-	config.Global.NoState = false
-	config.Global.NoReconnect = false
-	c.Check(server.GetSsl(), Equals, false)
-	c.Check(server.GetVerifyCert(), Equals, false)
-	c.Check(server.GetNoState(), Equals, false)
-	c.Check(server.GetNoReconnect(), Equals, false)
-
-	//Check default values more thoroughly
-	config.Global.Port = 0
-	c.Check(server.GetPort(), Equals, uint16(defaultIrcPort))
-	config.Global.Prefix = ""
-	c.Check(server.GetPrefix(), Equals, ".")
-	config.Global.ReconnectTimeout = 0
-	c.Check(server.GetReconnectTimeout(), Equals,
-		uint(defaultReconnectTimeout))
 }
 
 func (s *s) TestConfig_Fluent(c *C) {
 	srv2host := "znc.gamesurge.net"
 
 	conf := CreateConfig().
+		// Setting Globals
 		Host(""). // Should not break anything
-		Port(srv2.Port).
-		Ssl(srv2.Ssl).
-		VerifyCert(srv2.VerifyCert).
-		ReconnectTimeout(srv2.ReconnectTimeout).
-		Nick(srv2.Nick).
-		Altnick(srv2.Altnick).
-		Username(srv2.Username).
-		Userhost(srv2.Userhost).
-		Realname(srv2.Realname).
-		Prefix(srv2.Prefix).
-		Channels(srv2.Channels...).
-		Server(srv1.Name).
-		Host(srv1.Host).
-		Port(srv1.Port).
-		Ssl(srv1.Ssl).
-		VerifyCert(srv1.VerifyCert).
-		NoState(srv1.NoState).
-		NoReconnect(srv1.NoReconnect).
-		ReconnectTimeout(srv1.ReconnectTimeout).
-		Nick(srv1.Nick).
-		Altnick(srv1.Altnick).
-		Username(srv1.Username).
-		Userhost(srv1.Userhost).
-		Realname(srv1.Realname).
-		Prefix(srv1.Prefix).
-		Channels(srv1.Channels...).
+		Port(srv2.GetPort()).
+		Ssl(srv2.GetSsl()).
+		VerifyCert(srv2.GetVerifyCert()).
+		NoState(srv2.GetNoState()).
+		FloodProtectBurst(srv2.GetFloodProtectBurst()).
+		FloodProtectTimeout(srv2.GetFloodProtectTimeout()).
+		FloodProtectStep(srv2.GetFloodProtectStep()).
+		NoReconnect(srv2.GetNoReconnect()).
+		ReconnectTimeout(srv2.GetReconnectTimeout()).
+		Nick(srv2.GetNick()).
+		Altnick(srv2.GetAltnick()).
+		Username(srv2.GetUsername()).
+		Userhost(srv2.GetUserhost()).
+		Realname(srv2.GetRealname()).
+		Prefix(srv2.GetPrefix()).
+		Channels(srv2.GetChannels()...).
+		// Server 1
+		Server(srv1.GetName()).
+		Host(srv1.GetHost()).
+		Port(srv1.GetPort()).
+		Ssl(srv1.GetSsl()).
+		VerifyCert(srv1.GetVerifyCert()).
+		NoState(srv1.GetNoState()).
+		FloodProtectBurst(srv1.GetFloodProtectBurst()).
+		FloodProtectTimeout(srv1.GetFloodProtectTimeout()).
+		FloodProtectStep(srv1.GetFloodProtectStep()).
+		NoReconnect(srv1.GetNoReconnect()).
+		ReconnectTimeout(srv1.GetReconnectTimeout()).
+		Nick(srv1.GetNick()).
+		Altnick(srv1.GetAltnick()).
+		Username(srv1.GetUsername()).
+		Userhost(srv1.GetUserhost()).
+		Realname(srv1.GetRealname()).
+		Prefix(srv1.GetPrefix()).
+		Channels(srv1.GetChannels()...).
+		// Server 2 using defaults
 		Server(srv2host)
 
 	server := conf.GetServer(srv1.Name)
 	server2 := conf.GetServer(srv2host)
-	c.Check(server.GetHost(), Equals, srv1.Host)
-	c.Check(server.GetName(), Equals, srv1.Name)
-	c.Check(server.GetPort(), Equals, srv1.Port)
-	c.Check(server.GetSsl(), Equals, srv1.Ssl)
-	c.Check(server.GetVerifyCert(), Equals, srv1.VerifyCert)
-	c.Check(server.GetNoState(), Equals, srv1.NoState)
-	c.Check(server.GetNoReconnect(), Equals, srv1.NoReconnect)
-	c.Check(server.GetReconnectTimeout(), Equals, srv1.ReconnectTimeout)
-	c.Check(server.GetNick(), Equals, srv1.Nick)
-	c.Check(server.GetAltnick(), Equals, srv1.Altnick)
-	c.Check(server.GetUsername(), Equals, srv1.Username)
-	c.Check(server.GetUserhost(), Equals, srv1.Userhost)
-	c.Check(server.GetRealname(), Equals, srv1.Realname)
-	c.Check(server.GetPrefix(), Equals, srv1.Prefix)
+	c.Check(server.GetHost(), Equals, srv1.GetHost())
+	c.Check(server.GetName(), Equals, srv1.GetName())
+	c.Check(server.GetPort(), Equals, srv1.GetPort())
+	c.Check(server.GetSsl(), Equals, srv1.GetSsl())
+	c.Check(server.GetVerifyCert(), Equals, srv1.GetVerifyCert())
+	c.Check(server.GetNoState(), Equals, srv1.GetNoState())
+	c.Check(server.GetFloodProtectBurst(), Equals, srv1.GetFloodProtectBurst())
+	c.Check(server.GetFloodProtectTimeout(), Equals,
+		srv1.GetFloodProtectTimeout())
+	c.Check(server.GetFloodProtectStep(), Equals, srv1.GetFloodProtectStep())
+	c.Check(server.GetNoReconnect(), Equals, srv1.GetNoReconnect())
+	c.Check(server.GetReconnectTimeout(), Equals, srv1.GetReconnectTimeout())
+	c.Check(server.GetNick(), Equals, srv1.GetNick())
+	c.Check(server.GetAltnick(), Equals, srv1.GetAltnick())
+	c.Check(server.GetUsername(), Equals, srv1.GetUsername())
+	c.Check(server.GetUserhost(), Equals, srv1.GetUserhost())
+	c.Check(server.GetRealname(), Equals, srv1.GetRealname())
+	c.Check(server.GetPrefix(), Equals, srv1.GetPrefix())
 	c.Check(len(server.GetChannels()), Equals, len(srv1.Channels))
 	for i, v := range server.GetChannels() {
 		c.Check(v, Equals, srv1.Channels[i])
 	}
 
 	c.Check(server2.GetHost(), Equals, srv2host)
-	c.Check(server2.GetPort(), Equals, srv2.Port)
-	c.Check(server2.GetSsl(), Equals, srv2.Ssl)
-	c.Check(server2.GetVerifyCert(), Equals, srv2.VerifyCert)
-	c.Check(server2.GetNoState(), Equals, srv2.NoState)
-	c.Check(server2.GetNoReconnect(), Equals, srv2.NoReconnect)
-	c.Check(server2.GetReconnectTimeout(), Equals, srv2.ReconnectTimeout)
-	c.Check(server2.GetNick(), Equals, srv2.Nick)
-	c.Check(server2.GetAltnick(), Equals, srv2.Altnick)
-	c.Check(server2.GetUsername(), Equals, srv2.Username)
-	c.Check(server2.GetUserhost(), Equals, srv2.Userhost)
-	c.Check(server2.GetRealname(), Equals, srv2.Realname)
-	c.Check(server2.GetPrefix(), Equals, srv2.Prefix)
+	c.Check(server2.GetPort(), Equals, srv2.GetPort())
+	c.Check(server2.GetSsl(), Equals, srv2.GetSsl())
+	c.Check(server2.GetVerifyCert(), Equals, srv2.GetVerifyCert())
+	c.Check(server2.GetNoState(), Equals, srv2.GetNoState())
+	c.Check(server2.GetFloodProtectBurst(), Equals, srv2.GetFloodProtectBurst())
+	c.Check(server2.GetFloodProtectTimeout(), Equals,
+		srv2.GetFloodProtectTimeout())
+	c.Check(server2.GetFloodProtectStep(), Equals, srv2.GetFloodProtectStep())
+	c.Check(server2.GetNoReconnect(), Equals, srv2.GetNoReconnect())
+	c.Check(server2.GetReconnectTimeout(), Equals, srv2.GetReconnectTimeout())
+	c.Check(server2.GetNick(), Equals, srv2.GetNick())
+	c.Check(server2.GetAltnick(), Equals, srv2.GetAltnick())
+	c.Check(server2.GetUsername(), Equals, srv2.GetUsername())
+	c.Check(server2.GetUserhost(), Equals, srv2.GetUserhost())
+	c.Check(server2.GetRealname(), Equals, srv2.GetRealname())
+	c.Check(server2.GetPrefix(), Equals, srv2.GetPrefix())
 	c.Check(len(server2.GetChannels()), Equals, len(srv2.Channels))
 	for i, v := range server2.GetChannels() {
 		c.Check(v, Equals, srv2.Channels[i])
 	}
 }
 
-func (s *s) TestConfig_Validation(c *C) {
+func (s *s) TestConfig_Defaults(c *C) {
+	conf := CreateConfig().
+		Nick(srv1.Nick).
+		Realname(srv1.Realname).
+		Username(srv1.Username).
+		Userhost(srv1.Userhost).
+		Server(srv1.GetName())
+	srv := conf.GetServer(srv1.GetName())
+
+	c.Check(srv.GetPort(), Equals, defaultIrcPort)
+	c.Check(srv.GetSsl(), Equals, false)
+	c.Check(srv.GetVerifyCert(), Equals, false)
+	c.Check(srv.GetNoState(), Equals, false)
+	c.Check(srv.GetFloodProtectBurst(), Equals, defaultFloodProtectBurst)
+	c.Check(srv.GetFloodProtectTimeout(), Equals, defaultFloodProtectTimeout)
+	c.Check(srv.GetFloodProtectStep(), Equals, defaultFloodProtectStep)
+	c.Check(srv.GetNoReconnect(), Equals, false)
+	c.Check(srv.GetReconnectTimeout(), Equals, defaultReconnectTimeout)
+}
+
+func (s *s) TestConfig_InvalidValues(c *C) {
+	conf := CreateConfig().
+		Nick(srv1.Nick).
+		Realname(srv1.Realname).
+		Username(srv1.Username).
+		Userhost(srv1.Userhost).
+		Server(srv1.GetName())
+	srv := conf.GetServer(srv1.GetName())
+	srv.Ssl = "x"
+	srv.FloodProtectBurst = "x"
+	srv.FloodProtectStep = "x"
+	srv.FloodProtectTimeout = "x"
+	srv.VerifyCert = "x"
+	srv.NoState = "x"
+	srv.NoReconnect = "x"
+	srv.ReconnectTimeout = "x"
+
+	c.Check(srv.GetSsl(), Equals, false)
+	c.Check(srv.GetVerifyCert(), Equals, false)
+	c.Check(srv.GetNoState(), Equals, false)
+	c.Check(srv.GetFloodProtectBurst(), Equals, defaultFloodProtectBurst)
+	c.Check(srv.GetFloodProtectTimeout(), Equals, defaultFloodProtectTimeout)
+	c.Check(srv.GetFloodProtectStep(), Equals, defaultFloodProtectStep)
+	c.Check(srv.GetNoReconnect(), Equals, false)
+	c.Check(srv.GetReconnectTimeout(), Equals, defaultReconnectTimeout)
+
+	c.Check(conf.IsValid(), Equals, false)
+	c.Check(len(conf.Errors), Equals, 8)
+	c.Check(conf.Errors[0].Error(), Matches, invErr(errSsl))
+	c.Check(conf.Errors[1].Error(), Matches, invErr(errVerifyCert))
+	c.Check(conf.Errors[2].Error(), Matches, invErr(errNoState))
+	c.Check(conf.Errors[3].Error(), Matches, invErr(errFloodProtectBurst))
+	c.Check(conf.Errors[4].Error(), Matches, invErr(errFloodProtectTimeout))
+	c.Check(conf.Errors[5].Error(), Matches, invErr(errFloodProtectStep))
+	c.Check(conf.Errors[6].Error(), Matches, invErr(errNoReconnect))
+	c.Check(conf.Errors[7].Error(), Matches, invErr(errReconnectTimeout))
+}
+
+func (s *s) TestConfig_ValidationEmpty(c *C) {
 	conf := CreateConfig()
 	c.Check(conf.IsValid(), Equals, false)
-	c.Check(len(conf.Errors), Not(Equals), 0)
+	c.Check(len(conf.Errors), Equals, 1)
+	c.Check(conf.Errors[0].Error(), Equals, errMsgServersRequired)
+}
 
-	conf = CreateConfig().
+func (s *s) TestConfig_ValidationNoHost(c *C) {
+	conf := CreateConfig().
 		Server("").
 		Port(srv1.Port)
 	c.Check(len(conf.Servers), Equals, 0)
 	c.Check(conf.Global.Port, Equals, uint16(srv1.Port))
 	c.Check(conf.IsValid(), Equals, false)
 	c.Check(len(conf.Errors), Equals, 2)
+	c.Check(conf.Errors[0].Error(), Matches, reqErr(errHost))
+	c.Check(conf.Errors[1].Error(), Equals, errMsgServersRequired)
+}
 
-	conf = CreateConfig().
+func (s *s) TestConfig_ValidationInvalidHost(c *C) {
+	conf := CreateConfig().
+		Nick(srv1.Nick).
+		Realname(srv1.Realname).
+		Username(srv1.Username).
+		Userhost(srv1.Userhost).
+		Server("%")
+	c.Check(conf.IsValid(), Equals, false)
+	c.Check(len(conf.Errors), Equals, 1)
+	c.Check(conf.Errors[0].Error(), Matches, invErr(errHost))
+}
+
+func (s *s) TestConfig_ValidationNoHostInternal(c *C) {
+	conf := CreateConfig().
+		Server(srv1.Host).
+		Nick(srv1.Nick).
+		Channels(srv1.Channels...).
+		Username(srv1.Username).
+		Userhost(srv1.Userhost).
+		Realname(srv1.Realname)
+	conf.Servers[srv1.Host].Host = ""
+	c.Check(conf.IsValid(), Equals, false)
+	c.Check(len(conf.Errors), Equals, 1) // Internal No host
+	c.Check(conf.Errors[0].Error(), Matches, reqErr(errHost))
+}
+
+func (s *s) TestConfig_ValidationDuplicateName(c *C) {
+	conf := CreateConfig().
 		Nick(srv1.Nick).
 		Realname(srv1.Realname).
 		Username(srv1.Username).
@@ -206,24 +326,23 @@ func (s *s) TestConfig_Validation(c *C) {
 	c.Check(len(conf.Servers), Equals, 1)
 	c.Check(conf.IsValid(), Equals, false)
 	c.Check(len(conf.Errors), Equals, 1)
+	c.Check(conf.Errors[0].Error(), Equals, errMsgDuplicateServer)
+}
 
-	conf = CreateConfig().
-		Nick(srv1.Nick).
-		Realname(srv1.Realname).
-		Username(srv1.Username).
-		Userhost(srv1.Userhost).
-		Server("%")
-	c.Check(conf.IsValid(), Equals, false)
-	// Invalid: Host
-	c.Check(len(conf.Errors), Equals, 1)
-
-	conf = CreateConfig().
+func (s *s) TestConfig_ValidationMissing(c *C) {
+	conf := CreateConfig().
 		Server(srv1.Host)
 	c.Check(conf.IsValid(), Equals, false)
-	// Missing: Nick, Realname, Username, Userhost
+	// Missing: Nick, Username, Userhost, Realname
 	c.Check(len(conf.Errors), Equals, 4)
+	c.Check(conf.Errors[0].Error(), Matches, reqErr(errNick))
+	c.Check(conf.Errors[1].Error(), Matches, reqErr(errUsername))
+	c.Check(conf.Errors[2].Error(), Matches, reqErr(errUserhost))
+	c.Check(conf.Errors[3].Error(), Matches, reqErr(errRealname))
+}
 
-	conf = CreateConfig().
+func (s *s) TestConfig_ValidationRegex(c *C) {
+	conf := CreateConfig().
 		Server(srv1.Host).
 		Nick(`@Nick`).              // no special chars
 		Channels(`chan`).           // must start with valid prefix
@@ -232,21 +351,11 @@ func (s *s) TestConfig_Validation(c *C) {
 		Realname(`@ !`)             // no special chars
 	c.Check(conf.IsValid(), Equals, false)
 	c.Check(len(conf.Errors), Equals, 5)
-
-	conf = CreateConfig().
-		Server(srv1.Host).
-		Nick(srv1.Nick).
-		Channels(srv1.Channels...).
-		Username(srv1.Username).
-		Userhost(srv1.Userhost).
-		Realname(srv1.Realname)
-	conf.Servers[srv1.Host].Host = ""
-	c.Check(conf.IsValid(), Equals, false)
-	c.Check(len(conf.Errors), Equals, 1) // No host
-	conf.Errors = nil
-	conf.Servers[srv1.Host].Host = "@@@"
-	c.Check(conf.IsValid(), Equals, false)
-	c.Check(len(conf.Errors), Equals, 1) // Bad host
+	c.Check(conf.Errors[0].Error(), Matches, invErr(errNick))
+	c.Check(conf.Errors[1].Error(), Matches, invErr(errUsername))
+	c.Check(conf.Errors[2].Error(), Matches, invErr(errUserhost))
+	c.Check(conf.Errors[3].Error(), Matches, invErr(errRealname))
+	c.Check(conf.Errors[4].Error(), Matches, invErr(errChannel))
 }
 
 func (s *s) TestConfig_DisplayErrors(c *C) {
@@ -310,6 +419,8 @@ func (s *s) TestConfig_SetContext(c *C) {
 	c.Check(len(conf.Errors), Equals, 0)
 	conf.ServerContext("")
 	c.Check(len(conf.Errors), Equals, 1)
+	c.Check(conf.IsValid(), Equals, false)
+	c.Check(conf.Errors[0].Error(), Matches, fmtErrServerNotFound[:33]+".*")
 }
 
 func (s *s) TestValidNames(c *C) {
