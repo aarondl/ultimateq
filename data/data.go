@@ -75,7 +75,7 @@ func (s *Store) Protocaps(caps *irc.ProtoCaps) error {
 
 // GetUser returns the user if he exists.
 func (s *Store) GetUser(nickorhost string) *User {
-	nick := strings.ToLower(Mask(nickorhost).GetNick())
+	nick := strings.ToLower(irc.Mask(nickorhost).GetNick())
 	return s.users[nick]
 }
 
@@ -86,7 +86,7 @@ func (s *Store) GetChannel(channel string) *Channel {
 
 // GetUserByChannel fetches a user based
 func (s *Store) GetUsersChannelModes(nickorhost, channel string) *UserModes {
-	nick := strings.ToLower(Mask(nickorhost).GetNick())
+	nick := strings.ToLower(irc.Mask(nickorhost).GetNick())
 	channel = strings.ToLower(channel)
 
 	if nicks, ok := s.channelUsers[channel]; ok {
@@ -110,7 +110,7 @@ func (s *Store) GetNChannels() int {
 
 // GetNUserChans returns the number of channels for a user in the database.
 func (s *Store) GetNUserChans(nickorhost string) (n int) {
-	nick := strings.ToLower(Mask(nickorhost).GetNick())
+	nick := strings.ToLower(irc.Mask(nickorhost).GetNick())
 	if ucs, ok := s.userChannels[nick]; ok {
 		n = len(ucs)
 	}
@@ -142,7 +142,7 @@ func (s *Store) EachChannel(fn func(*Channel)) {
 
 // EachUserChan iterates through the channels a user is on.
 func (s *Store) EachUserChan(nickorhost string, fn func(*UserChannel)) {
-	nick := strings.ToLower(Mask(nickorhost).GetNick())
+	nick := strings.ToLower(irc.Mask(nickorhost).GetNick())
 	if ucs, ok := s.userChannels[nick]; ok {
 		for _, uc := range ucs {
 			fn(uc)
@@ -182,7 +182,7 @@ func (s *Store) GetChannels() []string {
 
 // GetUserChans returns a string array of the channels a user is on.
 func (s *Store) GetUserChans(nickorhost string) []string {
-	nick := strings.ToLower(Mask(nickorhost).GetNick())
+	nick := strings.ToLower(irc.Mask(nickorhost).GetNick())
 	if ucs, ok := s.userChannels[nick]; ok {
 		ret := make([]string, 0, len(ucs))
 		for _, uc := range ucs {
@@ -208,7 +208,7 @@ func (s *Store) GetChanUsers(channel string) []string {
 
 // IsOn checks if a user is on a specific channel.
 func (s *Store) IsOn(nickorhost, channel string) bool {
-	nick := strings.ToLower(Mask(nickorhost).GetNick())
+	nick := strings.ToLower(irc.Mask(nickorhost).GetNick())
 	channel = strings.ToLower(channel)
 
 	if chans, ok := s.userChannels[nick]; ok {
@@ -237,12 +237,12 @@ func (s *Store) addUser(nickorhost string) *User {
 		return nil
 	}
 
-	nick := strings.ToLower(Mask(nickorhost).GetNick())
+	nick := strings.ToLower(irc.Mask(nickorhost).GetNick())
 	var user *User
 	var ok bool
 	if user, ok = s.users[nick]; ok {
 		if excl && at && user.GetFullhost() != nickorhost {
-			user.mask = Mask(nickorhost)
+			user.mask = irc.Mask(nickorhost)
 		}
 	} else {
 		user = CreateUser(nickorhost)
@@ -253,7 +253,7 @@ func (s *Store) addUser(nickorhost string) *User {
 
 // removeUser deletes a user from the database.
 func (s *Store) removeUser(nickorhost string) {
-	nick := strings.ToLower(Mask(nickorhost).GetNick())
+	nick := strings.ToLower(irc.Mask(nickorhost).GetNick())
 	for _, cus := range s.channelUsers {
 		delete(cus, nick)
 	}
@@ -292,7 +292,7 @@ func (s *Store) addToChannel(nickorhost, channel string) {
 	var uc map[string]*UserChannel
 	var ok, cuhas, uchas bool
 
-	nick := strings.ToLower(Mask(nickorhost).GetNick())
+	nick := strings.ToLower(irc.Mask(nickorhost).GetNick())
 	channel = strings.ToLower(channel)
 
 	if user, ok = s.users[nick]; !ok {
@@ -332,7 +332,7 @@ func (s *Store) removeFromChannel(nickorhost, channel string) {
 	var uc map[string]*UserChannel
 	var ok bool
 
-	nick := strings.ToLower(Mask(nickorhost).GetNick())
+	nick := strings.ToLower(irc.Mask(nickorhost).GetNick())
 	channel = strings.ToLower(channel)
 
 	if cu, ok = s.channelUsers[channel]; ok {
@@ -383,9 +383,9 @@ func (s *Store) Update(m *irc.IrcMessage) {
 
 // nick alters the state of the database when a NICK message is received.
 func (s *Store) nick(m *irc.IrcMessage) {
-	nick, username, host := Mask(m.Sender).SplitFullhost()
+	nick, username, host := irc.Mask(m.Sender).SplitFullhost()
 	newnick := m.Args[0]
-	newuser := Mask(newnick + "!" + username + "@" + host)
+	newuser := irc.Mask(newnick + "!" + username + "@" + host)
 
 	nick = strings.ToLower(nick)
 	newnick = strings.ToLower(newnick)

@@ -1,6 +1,7 @@
 package data
 
 import (
+	"github.com/aarondl/ultimateq/irc"
 	"strings"
 )
 
@@ -44,13 +45,13 @@ func (c *Channel) GetTopic() string {
 }
 
 // IsBanned checks a mask to see if it's banned.
-func (c *Channel) IsBanned(mask Mask) bool {
+func (c *Channel) IsBanned(mask irc.Mask) bool {
 	if !strings.ContainsAny(string(mask), "!@") {
 		mask += "!@"
 	}
 	bans := c.GetAddresses(banMode)
 	for i := 0; i < len(bans); i++ {
-		if WildMask(bans[i]).Match(mask) {
+		if irc.WildMask(bans[i]).Match(mask) {
 			return true
 		}
 	}
@@ -98,7 +99,7 @@ func (c *Channel) String() string {
 }
 
 // DeleteBans deletes all bans that match a mask.
-func (c *Channel) DeleteBans(mask Mask) {
+func (c *Channel) DeleteBans(mask irc.Mask) {
 	bans := c.GetAddresses(banMode)
 	if 0 == len(bans) {
 		return
@@ -110,7 +111,7 @@ func (c *Channel) DeleteBans(mask Mask) {
 
 	toRemove := make([]string, 0, 1) // Assume only one ban will match.
 	for i := 0; i < len(bans); i++ {
-		if WildMask(bans[i]).Match(mask) {
+		if irc.WildMask(bans[i]).Match(mask) {
 			toRemove = append(toRemove, bans[i])
 		}
 	}

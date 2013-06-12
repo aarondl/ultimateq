@@ -741,8 +741,8 @@ func (s *s) TestStore_RplWhoReply(c *C) {
 		Name:   irc.RPL_WHOREPLY,
 		Sender: server,
 		Args: []string{
-			self.GetNick(), channels[0], Mask(users[0]).GetUsername(),
-			Mask(users[0]).GetHost(), "*.server.net", nicks[0], "Hx@d",
+			self.GetNick(), channels[0], irc.Mask(users[0]).GetUsername(),
+			irc.Mask(users[0]).GetHost(), "*.server.net", nicks[0], "Hx@d",
 			"3 real name",
 		},
 	}

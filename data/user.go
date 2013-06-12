@@ -1,8 +1,12 @@
 package data
 
+import (
+	"github.com/aarondl/ultimateq/irc"
+)
+
 // User encapsulates all the data associated with a user.
 type User struct {
-	mask Mask
+	mask irc.Mask
 	name string
 }
 
@@ -14,7 +18,7 @@ func CreateUser(nickorhost string) *User {
 
 	u := &User{}
 
-	u.mask = Mask(nickorhost)
+	u.mask = irc.Mask(nickorhost)
 
 	return u
 }
