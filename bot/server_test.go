@@ -9,48 +9,24 @@ import (
 	"net"
 )
 
-func (s *s) TestServerSender_Write(c *C) {
-	str := "PONG :msg\r\n"
-	fmt := "PONG :%v\r\n"
-	end := "PONG :test\r\n"
-
-	conn := mocks.CreateConn()
-	connProvider := func(srv string) (net.Conn, error) {
-		return conn, nil
-	}
-
-	b, err := createBot(fakeConfig, nil, connProvider, false)
+func (s *s) TestServerSender(c *C) {
+	b, err := createBot(fakeConfig, nil, nil, false)
 	c.Check(err, IsNil)
 	srv := b.servers[serverId]
-	srvsender := ServerSender{serverId, srv}
-	c.Check(srvsender.GetKey(), Equals, serverId)
-
-	ers := b.Connect()
-	c.Check(len(ers), Equals, 0)
-	b.start(true, false)
-	err = srvsender.Writeln(str)
-	c.Check(bytes.Compare(conn.Receive(len(str), nil), []byte(str)), Equals, 0)
-	c.Check(err, IsNil)
-	err = srvsender.Writef(fmt, "test")
-	c.Check(bytes.Compare(conn.Receive(len(end), nil), []byte(end)), Equals, 0)
-	c.Check(err, IsNil)
-	_, err = srvsender.Write([]byte(str))
-	c.Check(bytes.Compare(conn.Receive(len(str), nil), []byte(str)), Equals, 0)
-	c.Check(err, IsNil)
-	b.WaitForHalt()
-	b.Disconnect()
+	srvendpoint := createServerEndpoint(srv)
+	c.Check(srvendpoint.GetKey(), Equals, serverId)
 }
 
 func (s *s) TestServerSender_OpenStore(c *C) {
 	b, err := createBot(fakeConfig, nil, nil, false)
 	c.Check(err, IsNil)
 	srv := b.servers[serverId]
-	srvsender := ServerSender{serverId, srv}
+	srvendpoint := createServerEndpoint(srv)
 
-	c.Check(srvsender.GetKey(), Equals, serverId)
+	c.Check(srvendpoint.GetKey(), Equals, serverId)
 	called := false
 	reportCalled := false
-	reportCalled = srvsender.OpenStore(func(*data.Store) {
+	reportCalled = srvendpoint.OpenStore(func(*data.Store) {
 		called = true
 	})
 	c.Check(called, Equals, true)
@@ -59,7 +35,7 @@ func (s *s) TestServerSender_OpenStore(c *C) {
 	srv.store = nil
 	called = false
 	reportCalled = false
-	reportCalled = srvsender.OpenStore(func(*data.Store) {
+	reportCalled = srvendpoint.OpenStore(func(*data.Store) {
 		called = true
 	})
 	c.Check(called, Equals, false)

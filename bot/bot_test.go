@@ -20,10 +20,10 @@ type s struct{}
 var _ = Suite(&s{})
 
 type testHandler struct {
-	callback func(*irc.IrcMessage, irc.Sender)
+	callback func(*irc.IrcMessage, irc.Endpoint)
 }
 
-func (h testHandler) HandleRaw(m *irc.IrcMessage, send irc.Sender) {
+func (h testHandler) HandleRaw(m *irc.IrcMessage, send irc.Endpoint) {
 	if h.callback != nil {
 		h.callback(m, send)
 	}
@@ -247,7 +247,7 @@ func (s *s) TestBot_Dispatching(c *C) {
 	b, err := createBot(fakeConfig, nil, connProvider, false)
 
 	b.Register(irc.PRIVMSG, &testHandler{
-		func(m *irc.IrcMessage, send irc.Sender) {
+		func(m *irc.IrcMessage, _ irc.Endpoint) {
 			waiter.Done()
 		},
 	})

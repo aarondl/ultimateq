@@ -68,39 +68,25 @@ type Server struct {
 	protectStore sync.RWMutex
 }
 
-// ServerSender implements the server interface, and wraps the write method
-// of a server.
-type ServerSender struct {
-	id     string
+// ServerEndpoint implements the Endpoint interface.
+type ServerEndpoint struct {
+	*irc.Helper
 	server *Server
 }
 
+// createServerEndpoint creates a ServerEndpoint with a helper.
+func createServerEndpoint(srv *Server) *ServerEndpoint {
+	return &ServerEndpoint{&irc.Helper{srv}, srv}
+}
+
 // GetKey returns the server id of the current server.
-func (s ServerSender) GetKey() string {
-	return s.id
+func (s *ServerEndpoint) GetKey() string {
+	return s.server.name
 }
 
-// Writeln writes to the ServerSender's IrcClient.
-func (s ServerSender) Writeln(args ...interface{}) error {
-	_, err := s.server.Write([]byte(fmt.Sprint(args...)))
-	return err
-}
-
-// Writef writes to the ServerSender's IrcClient, using sprintf as a string
-// builder.
-func (s ServerSender) Writef(format string, args ...interface{}) error {
-	_, err := s.server.Write([]byte(fmt.Sprintf(format, args...)))
-	return err
-}
-
-// Write writes to the ServerSender's IrcClient.
-func (s ServerSender) Write(buf []byte) (int, error) {
-	return s.server.Write(buf)
-}
-
-// OpenStore calls a callback if this ServerSender can present a data store
+// OpenStore calls a callback if this ServerEndpoint can present a data store
 // object. The returned boolean is whether or not the function was called.
-func (s ServerSender) OpenStore(fn func(*data.Store)) bool {
+func (s *ServerEndpoint) OpenStore(fn func(*data.Store)) bool {
 	if s.server.store != nil {
 		s.server.protectStore.RLock()
 		fn(s.server.store)

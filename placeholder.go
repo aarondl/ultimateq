@@ -17,15 +17,15 @@ import (
 type Handler struct {
 }
 
-func (h Handler) PrivmsgUser(m *irc.Message, sender irc.Sender) {
-	if strings.Split(m.Raw.Sender, "!")[0] == "Aaron" {
-		sender.Writeln(m.Message())
+func (h Handler) PrivmsgUser(m *irc.Message, endpoint irc.Endpoint) {
+	if strings.Split(m.Sender, "!")[0] == "Aaron" {
+		endpoint.Send(m.Message())
 	}
 }
 
-func (h Handler) PrivmsgChannel(m *irc.Message, sender irc.Sender) {
+func (h Handler) PrivmsgChannel(m *irc.Message, endpoint irc.Endpoint) {
 	if m.Message() == "hello" {
-		sender.Writeln("PRIVMSG " + m.Target() + " :Hello to you too!")
+		endpoint.Privmsg(m.Target(), "Hello to you too!")
 	} else {
 		lock.Lock()
 		chain.Build(
@@ -33,7 +33,7 @@ func (h Handler) PrivmsgChannel(m *irc.Message, sender irc.Sender) {
 				[]byte(m.Message()),
 			),
 		)
-		sender.Writeln("PRIVMSG " + m.Target() + " :" + chain.Generate(100))
+		endpoint.Privmsg(m.Target(), chain.Generate(100))
 		lock.Unlock()
 	}
 }

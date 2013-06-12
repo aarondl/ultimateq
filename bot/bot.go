@@ -445,9 +445,9 @@ func (b *Bot) Writeln(server, message string) error {
 
 // dispatch sends a message to both the bot's dispatcher and the given servers
 func (b *Bot) dispatchMessage(s *Server, msg *irc.IrcMessage) {
-	sender := ServerSender{s.name, s}
-	b.dispatcher.Dispatch(msg, sender)
-	s.dispatcher.Dispatch(msg, sender)
+	endpoint := createServerEndpoint(s)
+	b.dispatcher.Dispatch(msg, endpoint)
+	s.dispatcher.Dispatch(msg, endpoint)
 }
 
 // createBot creates a bot from the given configuration, using the providers

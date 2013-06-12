@@ -5,7 +5,26 @@ and constants.
 */
 package irc
 
-import "strings"
+import (
+	"fmt"
+	"io"
+	"strings"
+)
+
+const (
+	// The maximum length for an irc message.
+	IRC_MAX_LENGTH = 510
+	// A format string to create privmsg headers.
+	fmtPrivmsgHeader = PRIVMSG + " %v :"
+	// A format string to create notice headers.
+	fmtNoticeHeader = NOTICE + " %v :"
+	// A format string to create joins.
+	fmtJoin = JOIN + " :%v"
+	// A format string to create parts.
+	fmtPart = PART + " :%v"
+	// A format string to create quits.
+	fmtQuit = QUIT + " :%v"
+)
 
 // IRC Messages, these messages are 1-1 constant to string lookups for ease of
 // use when registering handlers etc.
@@ -176,17 +195,41 @@ const (
 	DISCONNECT = "DISCONNECT"
 )
 
-// Sender is the sender of an event, and should allow replies on a writing
-// interface as well as a way to identify itself.
-type Sender interface {
-	// Writes a string to the endpoint contained in the sender.
-	Writeln(...interface{}) error
-	// Writes a formatted string to the endpoint contained in the sender.
-	Writef(string, ...interface{}) error
-	// Writes a buffer to the endpoint contained in the sender.
-	Write([]byte) (int, error)
-	// Retrieves a key to retrieve where this event was generated from.
+// Endpoint represents the source of an event, and should allow replies on a
+// writing interface as well as a way to identify itself.
+type Endpoint interface {
+	// An embedded io.Writer that can write back to the source of the event.
+	io.Writer
+	// Retrieves a key to identify the source of the event.
 	GetKey() string
+	// Send sends a string with spaces between non-strings.
+	Send(...interface{}) error
+	// Sendln sends a string with spaces between everything.
+	// Does not send newline.
+	Sendln(...interface{}) error
+	// Sendf sends a formatted string.
+	Sendf(string, ...interface{}) error
+
+	// Privmsg sends a string with spaces between non-strings.
+	Privmsg(string, ...interface{}) error
+	// Privmsgln sends a privmsg with spaces between everything.
+	// Does not send newline.
+	Privmsgln(string, ...interface{}) error
+	// Privmsgf sends a formatted privmsg.
+	Privmsgf(string, string, ...interface{}) error
+	// Notice sends a string with spaces between non-strings.
+	Notice(string, ...interface{}) error
+	// Noticeln sends a notice with spaces between everything.
+	// Does not send newline.
+	Noticeln(string, ...interface{}) error
+	// Noticef sends a formatted notice.
+	Noticef(string, string, ...interface{}) error
+	// Sends a join message to the endpoint.
+	Join(...string) error
+	// Sends a part message to the endpoint.
+	Part(...string) error
+	// Sends a quit message to the endpoint.
+	Quit(string) error
 }
 
 // IrcMessage contains all the information broken out of an irc message.
@@ -208,16 +251,141 @@ func (m *IrcMessage) Split(index int) []string {
 // Message type provides a view around an IrcMessage to access it's parts in a
 // more convenient way.
 type Message struct {
-	// Raw is the underlying irc message.
-	Raw *IrcMessage
+	// The underlying irc message.
+	*IrcMessage
 }
 
 // Target retrieves the channel or user this message was sent to.
 func (p *Message) Target() string {
-	return p.Raw.Args[0]
+	return p.Args[0]
 }
 
 // Message retrieves the message sent to the user or channel.
 func (p *Message) Message() string {
-	return p.Raw.Args[1]
+	return p.Args[1]
+}
+
+// Helper fullfills the Endpoint's many interface requirements.
+type Helper struct {
+	io.Writer
+}
+
+// Send sends a string with spaces between non-strings.
+func (h *Helper) Send(args ...interface{}) error {
+	_, err := fmt.Fprint(h, args...)
+	return err
+}
+
+// Sendln sends a string with spaces between everything. Does not send newline.
+func (h *Helper) Sendln(args ...interface{}) error {
+	str := fmt.Sprintln(args...)
+	_, err := h.Write([]byte(str[:len(str)-1]))
+	return err
+}
+
+// Sendf sends a formatted string.
+func (h *Helper) Sendf(format string, args ...interface{}) error {
+	_, err := fmt.Fprintf(h, format, args...)
+	return err
+}
+
+// Privmsg sends a string with spaces between non-strings.
+func (h *Helper) Privmsg(target string, args ...interface{}) error {
+	header := []byte(fmt.Sprintf(fmtPrivmsgHeader, target))
+	msg := []byte(fmt.Sprint(args...))
+	return h.splitSend(header, msg)
+}
+
+// Privmsgln sends a privmsg with spaces between everything.
+// Does not send newline.
+func (h *Helper) Privmsgln(target string, args ...interface{}) error {
+	header := []byte(fmt.Sprintf(fmtPrivmsgHeader, target))
+	str := fmt.Sprintln(args...)
+	str = str[:len(str)-1]
+	return h.splitSend(header, []byte(str))
+}
+
+// Privmsgf sends a formatted privmsg.
+func (h *Helper) Privmsgf(target, format string, args ...interface{}) error {
+	header := []byte(fmt.Sprintf(fmtPrivmsgHeader, target))
+	msg := []byte(fmt.Sprintf(format, args...))
+	return h.splitSend(header, msg)
+}
+
+// Notice sends a string with spaces between non-strings.
+func (h *Helper) Notice(target string, args ...interface{}) error {
+	header := []byte(fmt.Sprintf(fmtNoticeHeader, target))
+	msg := []byte(fmt.Sprint(args...))
+	return h.splitSend(header, msg)
+}
+
+// Noticeln sends a notice with spaces between everything.
+// Does not send newline.
+func (h *Helper) Noticeln(target string, args ...interface{}) error {
+	header := []byte(fmt.Sprintf(fmtNoticeHeader, target))
+	str := fmt.Sprintln(args...)
+	str = str[:len(str)-1]
+	return h.splitSend(header, []byte(str))
+}
+
+// Noticef sends a formatted notice.
+func (h *Helper) Noticef(target, format string, args ...interface{}) error {
+	header := []byte(fmt.Sprintf(fmtNoticeHeader, target))
+	msg := []byte(fmt.Sprintf(format, args...))
+	return h.splitSend(header, msg)
+}
+
+// Sends a join message to the endpoint.
+func (h *Helper) Join(targets ...string) error {
+	if len(targets) == 0 {
+		return nil
+	}
+	_, err := fmt.Fprintf(h, fmtJoin, strings.Join(targets, ","))
+	return err
+}
+
+// Sends a part message to the endpoint.
+func (h *Helper) Part(targets ...string) error {
+	if len(targets) == 0 {
+		return nil
+	}
+	_, err := fmt.Fprintf(h, fmtPart, strings.Join(targets, ","))
+	return err
+}
+
+// Sends a quit message to the endpoint.
+func (h *Helper) Quit(msg string) error {
+	_, err := fmt.Fprintf(h, fmtQuit, msg)
+	return err
+}
+
+// splitSend breaks a message down into irc-digestable chunks based on
+// IRC_MAX_LENGTH, and appends the header to each message.
+func (h *Helper) splitSend(header, msg []byte) error {
+	var err error
+	ln, lnh := len(msg), len(header)
+	msgMax := IRC_MAX_LENGTH - lnh
+	if ln <= msgMax {
+		_, err = h.Write(append(header, msg...))
+		return err
+	}
+
+	var size int
+	buf := make([]byte, IRC_MAX_LENGTH)
+	for ln > 0 {
+		size = msgMax
+		if ln < msgMax {
+			size = ln
+		}
+		copy(buf, header)
+		copy(buf[lnh:], msg[:size])
+		_, err = h.Write(buf[:lnh+size])
+		if err != nil {
+			return err
+		}
+		msg = msg[size:]
+		ln, lnh = len(msg), len(header)
+	}
+
+	return nil
 }

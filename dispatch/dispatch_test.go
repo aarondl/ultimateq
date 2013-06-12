@@ -12,39 +12,28 @@ type s struct{}
 var _ = Suite(&s{})
 
 //===========================================================
-// Set up a type that can be used to mock irc.Sender
+// Set up a type that can be used to mock irc.Endpoint
 //===========================================================
-type testSender struct {
+type testPoint struct {
+	*irc.Helper
 }
 
-func (tsender testSender) Writeln(_ ...interface{}) error {
-	return nil
-}
-
-func (tsender testSender) Writef(_ string, _ ...interface{}) error {
-	return nil
-}
-
-func (tsender testSender) Write(_ []byte) (int, error) {
-	return 0, nil
-}
-
-func (tsender testSender) GetKey() string {
+func (tsender testPoint) GetKey() string {
 	return ""
 }
 
 //===========================================================
 // Set up a type that can be used to mock a callback for raw.
 //===========================================================
-type testCallback func(msg *irc.IrcMessage, sender irc.Sender)
+type testCallback func(msg *irc.IrcMessage, ep irc.Endpoint)
 
 type testHandler struct {
 	callback testCallback
 }
 
-func (handler testHandler) HandleRaw(msg *irc.IrcMessage, sender irc.Sender) {
+func (handler testHandler) HandleRaw(msg *irc.IrcMessage, ep irc.Endpoint) {
 	if handler.callback != nil {
-		handler.callback(msg, sender)
+		handler.callback(msg, ep)
 	}
 }
 
@@ -79,22 +68,22 @@ func (s *s) TestDispatcher_Registration(c *C) {
 
 func (s *s) TestDispatcher_Dispatching(c *C) {
 	var msg1, msg2, msg3 *irc.IrcMessage
-	var s1, s2, s3 irc.Sender
-	h1 := testHandler{func(m *irc.IrcMessage, s irc.Sender) {
+	var s1, s2, s3 irc.Endpoint
+	h1 := testHandler{func(m *irc.IrcMessage, s irc.Endpoint) {
 		msg1 = m
 		s1 = s
 	}}
-	h2 := testHandler{func(m *irc.IrcMessage, s irc.Sender) {
+	h2 := testHandler{func(m *irc.IrcMessage, s irc.Endpoint) {
 		msg2 = m
 		s2 = s
 	}}
-	h3 := testHandler{func(m *irc.IrcMessage, s irc.Sender) {
+	h3 := testHandler{func(m *irc.IrcMessage, s irc.Endpoint) {
 		msg3 = m
 		s3 = s
 	}}
 
 	d := CreateDispatcher()
-	send := testSender{}
+	send := testPoint{&irc.Helper{}}
 
 	d.Register(irc.PRIVMSG, h1)
 	d.Register(irc.PRIVMSG, h2)
@@ -116,15 +105,15 @@ func (s *s) TestDispatcher_Dispatching(c *C) {
 
 func (s *s) TestDispatcher_RawDispatch(c *C) {
 	var msg1, msg2 *irc.IrcMessage
-	h1 := testHandler{func(m *irc.IrcMessage, send irc.Sender) {
+	h1 := testHandler{func(m *irc.IrcMessage, send irc.Endpoint) {
 		msg1 = m
 	}}
-	h2 := testHandler{func(m *irc.IrcMessage, send irc.Sender) {
+	h2 := testHandler{func(m *irc.IrcMessage, send irc.Endpoint) {
 		msg2 = m
 	}}
 
 	d := CreateDispatcher()
-	send := testSender{}
+	send := testPoint{&irc.Helper{}}
 	d.Register(irc.PRIVMSG, h1)
 	d.Register(irc.RAW, h2)
 
@@ -138,7 +127,7 @@ func (s *s) TestDispatcher_RawDispatch(c *C) {
 // ================================
 // Testing types
 // ================================
-type testCallbackMsg func(*irc.Message, irc.Sender)
+type testCallbackMsg func(*irc.Message, irc.Endpoint)
 
 type testPrivmsgHandler struct {
 	callback testCallbackMsg
@@ -168,61 +157,61 @@ type testNoticeAllHandler struct {
 // ================================
 // Testing Callbacks
 // ================================
-func (t testPrivmsgHandler) Privmsg(msg *irc.Message, sender irc.Sender) {
-	t.callback(msg, sender)
+func (t testPrivmsgHandler) Privmsg(msg *irc.Message, ep irc.Endpoint) {
+	t.callback(msg, ep)
 }
 func (t testPrivmsgUserHandler) PrivmsgUser(
-	msg *irc.Message, sender irc.Sender) {
+	msg *irc.Message, ep irc.Endpoint) {
 
-	t.callback(msg, sender)
+	t.callback(msg, ep)
 }
 func (t testPrivmsgChannelHandler) PrivmsgChannel(
-	msg *irc.Message, sender irc.Sender) {
+	msg *irc.Message, ep irc.Endpoint) {
 
-	t.callback(msg, sender)
+	t.callback(msg, ep)
 }
 func (t testPrivmsgAllHandler) Privmsg(
-	msg *irc.Message, sender irc.Sender) {
+	msg *irc.Message, ep irc.Endpoint) {
 
-	t.testCallbackNormal(msg, sender)
+	t.testCallbackNormal(msg, ep)
 }
 func (t testPrivmsgAllHandler) PrivmsgUser(
-	msg *irc.Message, sender irc.Sender) {
+	msg *irc.Message, ep irc.Endpoint) {
 
-	t.testCallbackUser(msg, sender)
+	t.testCallbackUser(msg, ep)
 }
 func (t testPrivmsgAllHandler) PrivmsgChannel(
-	msg *irc.Message, sender irc.Sender) {
+	msg *irc.Message, ep irc.Endpoint) {
 
-	t.testCallbackChannel(msg, sender)
+	t.testCallbackChannel(msg, ep)
 }
-func (t testNoticeHandler) Notice(msg *irc.Message, sender irc.Sender) {
-	t.callback(msg, sender)
+func (t testNoticeHandler) Notice(msg *irc.Message, ep irc.Endpoint) {
+	t.callback(msg, ep)
 }
 func (t testNoticeUserHandler) NoticeUser(
-	msg *irc.Message, sender irc.Sender) {
+	msg *irc.Message, ep irc.Endpoint) {
 
-	t.callback(msg, sender)
+	t.callback(msg, ep)
 }
 func (t testNoticeChannelHandler) NoticeChannel(
-	msg *irc.Message, sender irc.Sender) {
+	msg *irc.Message, ep irc.Endpoint) {
 
-	t.callback(msg, sender)
+	t.callback(msg, ep)
 }
 func (t testNoticeAllHandler) Notice(
-	msg *irc.Message, sender irc.Sender) {
+	msg *irc.Message, ep irc.Endpoint) {
 
-	t.testCallbackNormal(msg, sender)
+	t.testCallbackNormal(msg, ep)
 }
 func (t testNoticeAllHandler) NoticeUser(
-	msg *irc.Message, sender irc.Sender) {
+	msg *irc.Message, ep irc.Endpoint) {
 
-	t.testCallbackUser(msg, sender)
+	t.testCallbackUser(msg, ep)
 }
 func (t testNoticeAllHandler) NoticeChannel(
-	msg *irc.Message, sender irc.Sender) {
+	msg *irc.Message, ep irc.Endpoint) {
 
-	t.testCallbackChannel(msg, sender)
+	t.testCallbackChannel(msg, ep)
 }
 
 var privChanmsg = &irc.IrcMessage{
@@ -238,13 +227,13 @@ var privUsermsg = &irc.IrcMessage{
 
 func (s *s) TestDispatcher_Privmsg(c *C) {
 	var p, pu, pc *irc.Message
-	ph := testPrivmsgHandler{func(m *irc.Message, _ irc.Sender) {
+	ph := testPrivmsgHandler{func(m *irc.Message, _ irc.Endpoint) {
 		p = m
 	}}
-	puh := testPrivmsgUserHandler{func(m *irc.Message, _ irc.Sender) {
+	puh := testPrivmsgUserHandler{func(m *irc.Message, _ irc.Endpoint) {
 		pu = m
 	}}
-	pch := testPrivmsgChannelHandler{func(m *irc.Message, _ irc.Sender) {
+	pch := testPrivmsgChannelHandler{func(m *irc.Message, _ irc.Endpoint) {
 		pc = m
 	}}
 
@@ -257,25 +246,25 @@ func (s *s) TestDispatcher_Privmsg(c *C) {
 	d.Dispatch(privUsermsg, nil)
 	d.WaitForCompletion()
 	c.Check(p, NotNil)
-	c.Check(pu.Raw, Equals, p.Raw)
+	c.Check(pu.IrcMessage, Equals, p.IrcMessage)
 
 	p, pu, pc = nil, nil, nil
 	d.Dispatch(privChanmsg, nil)
 	d.WaitForCompletion()
 	c.Check(p, NotNil)
-	c.Check(pc.Raw, Equals, p.Raw)
+	c.Check(pc.IrcMessage, Equals, p.IrcMessage)
 }
 
 func (s *s) TestDispatcher_PrivmsgMultiple(c *C) {
 	var p, pu, pc *irc.Message
 	pall := testPrivmsgAllHandler{
-		func(m *irc.Message, _ irc.Sender) {
+		func(m *irc.Message, _ irc.Endpoint) {
 			p = m
 		},
-		func(m *irc.Message, _ irc.Sender) {
+		func(m *irc.Message, _ irc.Endpoint) {
 			pu = m
 		},
-		func(m *irc.Message, _ irc.Sender) {
+		func(m *irc.Message, _ irc.Endpoint) {
 			pc = m
 		},
 	}
@@ -323,13 +312,13 @@ var noticeUsermsg = &irc.IrcMessage{
 
 func (s *s) TestDispatcher_Notice(c *C) {
 	var n, nu, nc *irc.Message
-	nh := testNoticeHandler{func(m *irc.Message, _ irc.Sender) {
+	nh := testNoticeHandler{func(m *irc.Message, _ irc.Endpoint) {
 		n = m
 	}}
-	nuh := testNoticeUserHandler{func(m *irc.Message, _ irc.Sender) {
+	nuh := testNoticeUserHandler{func(m *irc.Message, _ irc.Endpoint) {
 		nu = m
 	}}
-	nch := testNoticeChannelHandler{func(m *irc.Message, _ irc.Sender) {
+	nch := testNoticeChannelHandler{func(m *irc.Message, _ irc.Endpoint) {
 		nc = m
 	}}
 
@@ -342,25 +331,25 @@ func (s *s) TestDispatcher_Notice(c *C) {
 	d.Dispatch(noticeUsermsg, nil)
 	d.WaitForCompletion()
 	c.Check(n, NotNil)
-	c.Check(nu.Raw, Equals, n.Raw)
+	c.Check(nu.IrcMessage, Equals, n.IrcMessage)
 
 	n, nu, nc = nil, nil, nil
 	d.Dispatch(noticeChanmsg, nil)
 	d.WaitForCompletion()
 	c.Check(n, NotNil)
-	c.Check(nc.Raw, Equals, n.Raw)
+	c.Check(nc.IrcMessage, Equals, n.IrcMessage)
 }
 
 func (s *s) TestDispatcher_NoticeMultiple(c *C) {
 	var n, nu, nc *irc.Message
 	nall := testNoticeAllHandler{
-		func(m *irc.Message, _ irc.Sender) {
+		func(m *irc.Message, _ irc.Endpoint) {
 			n = m
 		},
-		func(m *irc.Message, _ irc.Sender) {
+		func(m *irc.Message, _ irc.Endpoint) {
 			nu = m
 		},
-		func(m *irc.Message, _ irc.Sender) {
+		func(m *irc.Message, _ irc.Endpoint) {
 			nc = m
 		},
 	}
@@ -397,7 +386,7 @@ func (s *s) TestDispatcher_NoticeMultiple(c *C) {
 
 func (s *s) TestDispatcher_Sender(c *C) {
 	d := CreateDispatcher()
-	send := testSender{}
+	send := testPoint{&irc.Helper{}}
 
 	msg := &irc.IrcMessage{
 		Name:   irc.PRIVMSG,
@@ -405,9 +394,9 @@ func (s *s) TestDispatcher_Sender(c *C) {
 		Sender: "nick!user@host.com",
 	}
 
-	d.Register(irc.PRIVMSG, func(msg *irc.IrcMessage, sender irc.Sender) {
-		c.Check(sender.GetKey(), NotNil)
-		c.Check(sender.Writeln(""), IsNil)
+	d.Register(irc.PRIVMSG, func(msg *irc.IrcMessage, point irc.Endpoint) {
+		c.Check(point.GetKey(), NotNil)
+		c.Check(point.Sendln(""), IsNil)
 	})
 	d.Dispatch(msg, send)
 }
@@ -420,10 +409,10 @@ func (s *s) TestDispatcher_FilterPrivmsgChannels(c *C) {
 	}
 
 	var p, pc *irc.Message
-	ph := testPrivmsgHandler{func(m *irc.Message, _ irc.Sender) {
+	ph := testPrivmsgHandler{func(m *irc.Message, _ irc.Endpoint) {
 		p = m
 	}}
-	pch := testPrivmsgChannelHandler{func(m *irc.Message, _ irc.Sender) {
+	pch := testPrivmsgChannelHandler{func(m *irc.Message, _ irc.Endpoint) {
 		pc = m
 	}}
 
@@ -436,7 +425,7 @@ func (s *s) TestDispatcher_FilterPrivmsgChannels(c *C) {
 	d.Dispatch(privChanmsg, nil)
 	d.WaitForCompletion()
 	c.Check(p, NotNil)
-	c.Check(pc.Raw, Equals, p.Raw)
+	c.Check(pc.IrcMessage, Equals, p.IrcMessage)
 
 	p, pc = nil, nil
 	d.Dispatch(chanmsg2, nil)
@@ -453,10 +442,10 @@ func (s *s) TestDispatcher_FilterNoticeChannels(c *C) {
 	}
 
 	var u, uc *irc.Message
-	uh := testNoticeHandler{func(m *irc.Message, _ irc.Sender) {
+	uh := testNoticeHandler{func(m *irc.Message, _ irc.Endpoint) {
 		u = m
 	}}
-	uch := testNoticeChannelHandler{func(m *irc.Message, _ irc.Sender) {
+	uch := testNoticeChannelHandler{func(m *irc.Message, _ irc.Endpoint) {
 		uc = m
 	}}
 
@@ -469,7 +458,7 @@ func (s *s) TestDispatcher_FilterNoticeChannels(c *C) {
 	d.Dispatch(noticeChanmsg, nil)
 	d.WaitForCompletion()
 	c.Check(u, NotNil)
-	c.Check(uc.Raw, Equals, u.Raw)
+	c.Check(uc.IrcMessage, Equals, u.IrcMessage)
 
 	u, uc = nil, nil
 	d.Dispatch(chanmsg2, nil)

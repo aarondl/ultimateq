@@ -24,7 +24,7 @@ var (
 // as a raw IrcMessage event. However there are other message types are specific
 // to very common irc events that are more helpful than this interface.
 type EventHandler interface {
-	HandleRaw(event *irc.IrcMessage, sender irc.Sender)
+	HandleRaw(event *irc.IrcMessage, endpoint irc.Endpoint)
 }
 
 type (
@@ -227,14 +227,14 @@ func (d *Dispatcher) Unregister(event string, id int) bool {
 // Dispatch an IrcMessage to event handlers handling event also ensures all raw
 // handlers receive all messages. Returns false if no eventtable was found for
 // the primary sent event.
-func (d *Dispatcher) Dispatch(msg *irc.IrcMessage, sender irc.Sender) bool {
+func (d *Dispatcher) Dispatch(msg *irc.IrcMessage, ep irc.Endpoint) bool {
 	event := strings.ToUpper(msg.Name)
 
 	d.protect.RLock()
 	defer d.protect.RUnlock()
 
-	handled := d.dispatchHelper(event, msg, sender)
-	d.dispatchHelper(irc.RAW, msg, sender)
+	handled := d.dispatchHelper(event, msg, ep)
+	d.dispatchHelper(irc.RAW, msg, ep)
 
 	return handled
 }
@@ -248,12 +248,12 @@ func (d *Dispatcher) WaitForCompletion() {
 // dispatchHelper locates a handler and attempts to resolve it with
 // resolveHandler. It returns true if it was able to find an event table.
 func (d *Dispatcher) dispatchHelper(event string,
-	msg *irc.IrcMessage, sender irc.Sender) bool {
+	msg *irc.IrcMessage, ep irc.Endpoint) bool {
 
 	if evtable, ok := d.events[event]; ok {
 		for _, handler := range evtable {
 			d.waiter.Add(1)
-			go d.resolveHandler(handler, event, msg, sender)
+			go d.resolveHandler(handler, event, msg, ep)
 		}
 		return true
 	}
@@ -264,7 +264,7 @@ func (d *Dispatcher) dispatchHelper(event string,
 // real type, coerces the IrcMessage in whatever way necessary and then
 // calls that handlers primary dispatch method with the coerced message.
 func (d *Dispatcher) resolveHandler(
-	handler interface{}, event string, msg *irc.IrcMessage, sender irc.Sender) {
+	handler interface{}, event string, msg *irc.IrcMessage, ep irc.Endpoint) {
 
 	switch t := handler.(type) {
 	case PrivmsgHandler, PrivmsgUserHandler, PrivmsgChannelHandler:
@@ -272,13 +272,13 @@ func (d *Dispatcher) resolveHandler(
 		if channelHandler, ok := t.(PrivmsgChannelHandler); ok &&
 			d.shouldDispatch(true, msg) {
 
-			channelHandler.PrivmsgChannel(&irc.Message{msg}, sender)
+			channelHandler.PrivmsgChannel(&irc.Message{msg}, ep)
 		} else if userHandler, ok := t.(PrivmsgUserHandler); ok &&
 			d.shouldDispatch(false, msg) {
 
-			userHandler.PrivmsgUser(&irc.Message{msg}, sender)
+			userHandler.PrivmsgUser(&irc.Message{msg}, ep)
 		} else if privmsgHandler, ok := t.(PrivmsgHandler); ok {
-			privmsgHandler.Privmsg(&irc.Message{msg}, sender)
+			privmsgHandler.Privmsg(&irc.Message{msg}, ep)
 		}
 
 	case NoticeHandler, NoticeUserHandler, NoticeChannelHandler:
@@ -286,16 +286,16 @@ func (d *Dispatcher) resolveHandler(
 		if channelHandler, ok := t.(NoticeChannelHandler); ok &&
 			d.shouldDispatch(true, msg) {
 
-			channelHandler.NoticeChannel(&irc.Message{msg}, sender)
+			channelHandler.NoticeChannel(&irc.Message{msg}, ep)
 		} else if userHandler, ok := t.(NoticeUserHandler); ok &&
 			d.shouldDispatch(false, msg) {
 
-			userHandler.NoticeUser(&irc.Message{msg}, sender)
+			userHandler.NoticeUser(&irc.Message{msg}, ep)
 		} else if noticeHandler, ok := t.(NoticeHandler); ok {
-			noticeHandler.Notice(&irc.Message{msg}, sender)
+			noticeHandler.Notice(&irc.Message{msg}, ep)
 		}
 	case EventHandler:
-		t.HandleRaw(msg, sender)
+		t.HandleRaw(msg, ep)
 	}
 
 	d.waiter.Done()
