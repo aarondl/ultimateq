@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"io"
 	"log"
-	"math"
 	"net"
 	"sync"
 	"time"
@@ -19,11 +18,8 @@ const (
 	bufferSize = 16348
 	// nBufferedWrites is how many writes can succeed before blocking
 	nBufferedWrites = 25
-	// resetTicks is the number of timePerTick between messages required
-	// to bypass queueing.
-	resetTicks = 3
-	// defaultTimePerTick is the default scale of the sleeps and timeouts.
-	defaultTimePerTick = time.Second
+	// defaultTimeScale is the default scale of the sleeps and timeouts.
+	defaultTimeScale = time.Second
 )
 
 var (
@@ -62,9 +58,12 @@ type IrcClient struct {
 	name string
 
 	// write throttling
-	nThrottled  int
-	lastwrite   time.Time
-	timePerTick time.Duration
+	nThrottled int
+	lastwrite  time.Time
+	scale      time.Duration
+	burst      int
+	timeout    time.Duration
+	step       time.Duration
 
 	// buffering for io.Reader interface
 	readbuf []byte
@@ -79,9 +78,24 @@ func CreateIrcClient(conn net.Conn, name string) *IrcClient {
 		siphonchan:  make(chan []byte),
 		pumpchan:    make(chan []byte),
 		pumpservice: make(chan chan []byte),
-		timePerTick: defaultTimePerTick,
-		lastwrite:   time.Now().Truncate(resetTicks * defaultTimePerTick),
+		lastwrite:   time.Time{},
+		scale:       defaultTimeScale,
 	}
+}
+
+// CreateIrcClientFloodProtect creates an irc client and sets up the variables
+// required for flood protection. The timeout and step variables are in seconds.
+func CreateIrcClientFloodProtect(conn net.Conn, name string, burst, timeout,
+	step int, scale time.Duration) *IrcClient {
+
+	c := CreateIrcClient(conn, name)
+	if scale != 0 {
+		c.scale = scale
+	}
+	c.burst = burst
+	c.timeout = time.Duration(timeout) * c.scale
+	c.step = time.Duration(step) * c.scale
+	return c
 }
 
 // SpawnWorkers creates two goroutines, one that is constantly reading using
@@ -102,24 +116,28 @@ func (c *IrcClient) SpawnWorkers(pump, siphon bool) {
 	}
 }
 
-// calcSleepTime checks to ensure that if we've been writing in quick succession
-// we get some sleep time in between writes.
+// calcSleepTime calculates the sleep time required by the flood protection
+// given a time of write.
 func (c *IrcClient) calcSleepTime(t time.Time) time.Duration {
+	if c.timeout == 0 || c.step == 0 {
+		return 0
+	}
+
 	dur := t.Sub(c.lastwrite)
 	if dur < 0 {
 		dur = 0
 	}
 
-	if dur > (resetTicks * c.timePerTick) {
-		c.nThrottled = 0
-		return time.Duration(0)
+	if dur > c.timeout {
+		c.nThrottled = 1
 	} else {
-		sleep := c.timePerTick * time.Duration(
-			0.5+math.Max(0, math.Log2(float64(c.nThrottled)-3.0)),
-		)
-		c.nThrottled += 1
-		return sleep
+		if c.nThrottled >= c.burst {
+			return c.step
+		}
+		c.nThrottled++
 	}
+
+	return 0
 }
 
 // pump enqueues the messages given to Write and writes them to the connection.
@@ -339,11 +357,13 @@ func (c *IrcClient) Write(buf []byte) (int, error) {
 	}
 
 	write := func(msg []byte) bool {
+		copybuf := make([]byte, len(msg))
+		copy(copybuf, msg)
 		service, ok := <-c.pumpservice
 		if !ok {
 			return true
 		}
-		service <- msg
+		service <- copybuf
 		return false
 	}
 

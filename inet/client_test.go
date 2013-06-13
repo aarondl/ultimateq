@@ -96,8 +96,7 @@ func (s *s) TestIrcClient_PumpTimeouts(c *C) {
 	test1 := []byte("PRIVMSG :arg1 arg2\r\n")
 
 	conn := mocks.CreateConn()
-	client := CreateIrcClient(conn, "")
-	client.timePerTick = time.Millisecond
+	client := CreateIrcClientFloodProtect(conn, "", 5, 5, 5, time.Millisecond)
 	client.SpawnWorkers(true, false)
 
 	go func() {
@@ -284,19 +283,15 @@ func (s *s) TestIrcClient_Write(c *C) {
 }
 
 func (s *s) TestIrcClient_calcSleepTime(c *C) {
+	var sleep time.Duration
 	client := CreateIrcClient(nil, "")
 
-	// Check no-sleep and negative cases
-	sleep := client.calcSleepTime(time.Now().Truncate(5 * time.Hour))
-	c.Check(sleep, Equals, time.Duration(0))
-	sleep = client.calcSleepTime(time.Now().Add(5 * time.Second))
+	sleep = client.calcSleepTime(time.Now())
 	c.Check(sleep, Equals, time.Duration(0))
 
-	// It should take a few messages to get it to delay.
-	sleep = client.calcSleepTime(time.Now().Truncate(5 * time.Second))
-	c.Check(sleep, Equals, time.Duration(0))
-
-	for i := 1; i <= 4; i++ {
+	client = CreateIrcClientFloodProtect(nil, "", 5, 5, 5, time.Second)
+	client.lastwrite = time.Now()
+	for i := 1; i <= 5; i++ {
 		sleep = client.calcSleepTime(time.Now())
 		c.Check(sleep, Equals, time.Duration(0))
 	}
@@ -304,8 +299,14 @@ func (s *s) TestIrcClient_calcSleepTime(c *C) {
 	sleep = client.calcSleepTime(time.Now())
 	c.Check(sleep, Not(Equals), time.Duration(0))
 
-	sleep2 := client.calcSleepTime(time.Now())
-	c.Check(sleep2 > sleep, Equals, true)
+	// Check no-sleep and negative cases
+	client = CreateIrcClientFloodProtect(nil, "", 5, 5, 5, time.Second)
+	client.lastwrite = time.Now()
+	sleep = client.calcSleepTime(time.Time{})
+	c.Check(sleep, Equals, time.Duration(0))
+	sleep = client.calcSleepTime(time.Now().Add(5 * time.Hour))
+	c.Check(sleep, Equals, time.Duration(0))
+
 }
 
 func (s *s) TestfindChunks(c *C) {
