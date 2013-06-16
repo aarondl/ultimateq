@@ -17,7 +17,7 @@ func (s *s) TestServerSender(c *C) {
 	c.Check(srvendpoint.GetKey(), Equals, serverId)
 }
 
-func (s *s) TestServerSender_OpenStore(c *C) {
+func (s *s) TestServerSender_UsingState(c *C) {
 	b, err := createBot(fakeConfig, nil, nil, false)
 	c.Check(err, IsNil)
 	srv := b.servers[serverId]
@@ -26,20 +26,34 @@ func (s *s) TestServerSender_OpenStore(c *C) {
 	c.Check(srvendpoint.GetKey(), Equals, serverId)
 	called := false
 	reportCalled := false
-	reportCalled = srvendpoint.OpenStore(func(*data.Store) {
+	reportCalled = srvendpoint.UsingState(func(*data.State) {
 		called = true
 	})
 	c.Check(called, Equals, true)
 	c.Check(reportCalled, Equals, true)
 
-	srv.store = nil
+	srv.state = nil
 	called = false
 	reportCalled = false
-	reportCalled = srvendpoint.OpenStore(func(*data.Store) {
+	reportCalled = srvendpoint.UsingState(func(*data.State) {
 		called = true
 	})
 	c.Check(called, Equals, false)
 	c.Check(reportCalled, Equals, false)
+}
+
+func (s *s) TestServerSender_OpenState(c *C) {
+	b, err := createBot(fakeConfig, nil, nil, false)
+	c.Check(err, IsNil)
+	srv := b.servers[serverId]
+	srvendpoint := createServerEndpoint(srv)
+
+	c.Check(srvendpoint.OpenState(), Equals, srv.state)
+	srvendpoint.CloseState()
+
+	srv.protectState.Lock()
+	srv.protectState.Unlock()
+	c.Succeed()
 }
 
 func (s *s) TestServer_Write(c *C) {
@@ -78,7 +92,7 @@ func (s *s) TestServer_Protocaps(c *C) {
 	srv := &Server{
 		caps: caps,
 	}
-	err := srv.createStore()
+	err := srv.createState()
 	c.Check(err, IsNil)
 	err = srv.createDispatcher(nil)
 	c.Check(err, IsNil)

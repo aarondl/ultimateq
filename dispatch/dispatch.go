@@ -29,16 +29,16 @@ type EventHandler interface {
 
 type (
 	// eventTable is the storage used to keep id -> interface{} mappings in the
-	// eventTableStore map.
+	// eventTableState map.
 	eventTable map[int]interface{}
-	// eventTableStore is the map used to hold the event handlers for an event
-	eventTableStore map[string]eventTable
+	// eventTableState is the map used to hold the event handlers for an event
+	eventTableState map[string]eventTable
 )
 
 // Dispatcher is made for handling bot-local dispatching of irc
 // events.
 type Dispatcher struct {
-	events eventTableStore
+	events eventTableState
 	finder *irc.ChannelFinder
 	chans  []string
 	waiter sync.WaitGroup
@@ -50,7 +50,7 @@ type Dispatcher struct {
 // CreateDispatcher initializes an empty dispatcher ready to register events.
 func CreateDispatcher() *Dispatcher {
 	return &Dispatcher{
-		events: make(eventTableStore),
+		events: make(eventTableState),
 	}
 }
 
@@ -67,7 +67,7 @@ func CreateRichDispatcher(caps *irc.ProtoCaps,
 	}
 
 	d := &Dispatcher{
-		events: make(eventTableStore),
+		events: make(eventTableState),
 	}
 
 	err := d.protocaps(caps)

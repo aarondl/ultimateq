@@ -59,10 +59,10 @@ func (c *coreHandler) HandleRaw(msg *irc.IrcMessage, endpoint irc.Endpoint) {
 
 	case irc.JOIN:
 		server := c.getServer(endpoint)
-		server.protectStore.RLock()
-		defer server.protectStore.RUnlock()
-		if server.store != nil {
-			if msg.Sender == server.store.Self.GetFullhost() {
+		server.protectState.RLock()
+		defer server.protectState.RUnlock()
+		if server.state != nil {
+			if msg.Sender == server.state.Self.GetFullhost() {
 				endpoint.Send("WHO :", msg.Args[0])
 				endpoint.Send("MODE :", msg.Args[0])
 			}

@@ -75,6 +75,10 @@ func (s *s) TestUserModeKinds_Create(c *C) {
 	c.Check(u, IsNil)
 	c.Check(err, NotNil)
 
+	u, err = CreateUserModeKinds("(abcdefghi)!@#$%^&*_")
+	c.Check(u, IsNil)
+	c.Check(err, NotNil)
+
 	u, err = CreateUserModeKinds("(ov)@+")
 	c.Check(u, NotNil)
 	c.Check(err, IsNil)
@@ -102,7 +106,7 @@ func (s *s) TestUserModeKinds_Update(c *C) {
 	c.Check(u.GetModeBit('o'), Not(Equals), 0)
 	err = u.UpdateModes("(v)+")
 	c.Check(err, IsNil)
-	c.Check(u.GetModeBit('o'), Equals, 0)
+	c.Check(u.GetModeBit('o'), Equals, byte(0))
 
 	u, err = CreateUserModeKinds("(ov)@+")
 	err = u.UpdateModes("")

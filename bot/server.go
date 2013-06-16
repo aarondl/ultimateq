@@ -14,15 +14,15 @@ import (
 	"time"
 )
 
-// Server States
+// Server Statuses
 const (
-	STATE_NEW          = 0x0
-	STATE_CONNECTED    = 0x1
-	STATE_READING      = 0x2
-	STATE_WRITING      = 0x4
-	STATE_RECONNECTING = 0x8
+	STATUS_NEW          = byte(0x0)
+	STATUS_CONNECTED    = byte(0x1)
+	STATUS_READING      = byte(0x2)
+	STATUS_WRITING      = byte(0x4)
+	STATUS_RECONNECTING = byte(0x8)
 
-	MASK_STARTED = STATE_READING | STATE_WRITING
+	MASK_STARTED = STATUS_READING | STATUS_WRITING
 )
 
 const (
@@ -43,12 +43,12 @@ var (
 type Server struct {
 	bot        *Bot
 	name       string
-	state      int
+	status     byte
 	dispatcher *dispatch.Dispatcher
 	client     *inet.IrcClient
 	conf       *config.Server
 	caps       *irc.ProtoCaps
-	store      *data.Store
+	state      *data.State
 
 	reconnScale time.Duration
 
@@ -64,8 +64,8 @@ type Server struct {
 	// protects the caps from reading and writing.
 	protectCaps sync.RWMutex
 
-	// protects the store from reading and writing.
-	protectStore sync.RWMutex
+	// protects the state from reading and writing.
+	protectState sync.RWMutex
 }
 
 // ServerEndpoint implements the Endpoint interface.
@@ -84,17 +84,30 @@ func (s *ServerEndpoint) GetKey() string {
 	return s.server.name
 }
 
-// OpenStore calls a callback if this ServerEndpoint can present a data store
+// UsingState calls a callback if this ServerEndpoint can present a data state
 // object. The returned boolean is whether or not the function was called.
-func (s *ServerEndpoint) OpenStore(fn func(*data.Store)) bool {
-	if s.server.store != nil {
-		s.server.protectStore.RLock()
-		fn(s.server.store)
-		s.server.protectStore.RUnlock()
+func (s *ServerEndpoint) UsingState(fn func(*data.State)) bool {
+	if s.server.state != nil {
+		s.server.protectState.RLock()
+		fn(s.server.state)
+		s.server.protectState.RUnlock()
 		return true
 	} else {
 		return false
 	}
+}
+
+// OpenState locks the data state, and returns it. PutState must be called or
+// the lock will never be released and the bot will sieze up. The state must
+// be checked for nil.
+func (s *ServerEndpoint) OpenState() *data.State {
+	s.server.protectState.RLock()
+	return s.server.state
+}
+
+// CloseState unlocks the data state after use by GetState.
+func (s *ServerEndpoint) CloseState() {
+	s.server.protectState.RUnlock()
 }
 
 // Writeln writes to the server's IrcClient.
@@ -121,9 +134,9 @@ func (s *Server) createDispatcher(channels []string) (err error) {
 	return err
 }
 
-// createStore uses the server's current ProtoCaps to create a store.
-func (s *Server) createStore() (err error) {
-	s.store, err = data.CreateStore(s.caps)
+// createState uses the server's current ProtoCaps to create a state.
+func (s *Server) createState() (err error) {
+	s.state, err = data.CreateState(s.caps)
 	return err
 }
 
@@ -179,14 +192,14 @@ func (s *Server) rehashProtocaps() error {
 	if err = s.dispatcher.Protocaps(s.caps); err != nil {
 		return err
 	}
-	s.protectStore.Lock()
-	if s.store != nil {
-		err = s.store.Protocaps(s.caps)
+	s.protectState.Lock()
+	if s.state != nil {
+		err = s.state.Protocaps(s.caps)
 		if err != nil {
 			return err
 		}
 	}
-	s.protectStore.Unlock()
+	s.protectState.Unlock()
 	return nil
 }
 
@@ -200,7 +213,7 @@ func (s *Server) IsConnected() bool {
 
 // isConnected checks to see if the server is connected without locking
 func (s *Server) isConnected() bool {
-	return STATE_CONNECTED == s.state&STATE_CONNECTED
+	return STATUS_CONNECTED == s.status&STATUS_CONNECTED
 }
 
 // setConnected sets the server's connected flag.
@@ -211,9 +224,9 @@ func (s *Server) setConnected(value, lock bool) {
 	}
 
 	if value {
-		s.state |= STATE_CONNECTED
+		s.status |= STATUS_CONNECTED
 	} else {
-		s.state &= ^STATE_CONNECTED
+		s.status &= ^STATUS_CONNECTED
 	}
 }
 
@@ -228,7 +241,7 @@ func (s *Server) IsStarted() bool {
 // isStarted checks to see if the the server is currently reading or writing
 // without locking.
 func (s *Server) isStarted() bool {
-	return 0 != s.state&MASK_STARTED
+	return 0 != s.status&MASK_STARTED
 }
 
 // setStarted sets the server's reading and writing flags simultaneously.
@@ -239,9 +252,9 @@ func (s *Server) setStarted(value, lock bool) {
 	}
 
 	if value {
-		s.state |= MASK_STARTED
+		s.status |= MASK_STARTED
 	} else {
-		s.state &= ^MASK_STARTED
+		s.status &= ^MASK_STARTED
 	}
 }
 
@@ -256,7 +269,7 @@ func (s *Server) IsReading() bool {
 // isReading checks to see if the dispatcher read-loop is running on the server
 // without locking.
 func (s *Server) isReading() bool {
-	return STATE_READING == s.state&STATE_READING
+	return STATUS_READING == s.status&STATUS_READING
 }
 
 // setReading sets the server's reading flag.
@@ -267,9 +280,9 @@ func (s *Server) setReading(value, lock bool) {
 	}
 
 	if value {
-		s.state |= STATE_READING
+		s.status |= STATUS_READING
 	} else {
-		s.state &= ^STATE_READING
+		s.status &= ^STATUS_READING
 	}
 }
 
@@ -284,7 +297,7 @@ func (s *Server) IsWriting() bool {
 // isWriting checks to see if the server's write loop has been activated without
 // locking.
 func (s *Server) isWriting() bool {
-	return STATE_WRITING == s.state&STATE_WRITING
+	return STATUS_WRITING == s.status&STATUS_WRITING
 }
 
 // setWriting sets the server's writing flag.
@@ -295,9 +308,9 @@ func (s *Server) setWriting(value, lock bool) {
 	}
 
 	if value {
-		s.state |= STATE_WRITING
+		s.status |= STATUS_WRITING
 	} else {
-		s.state &= ^STATE_WRITING
+		s.status &= ^STATUS_WRITING
 	}
 }
 
@@ -313,7 +326,7 @@ func (s *Server) IsReconnecting() bool {
 // isReconnecting checks to see if the dispatcher is waiting to reconnect the
 // without locking.
 func (s *Server) isReconnecting() bool {
-	return STATE_RECONNECTING == s.state&STATE_RECONNECTING
+	return STATUS_RECONNECTING == s.status&STATUS_RECONNECTING
 }
 
 // setStarted sets the server's reconnecting flag.
@@ -324,8 +337,8 @@ func (s *Server) setReconnecting(value, lock bool) {
 	}
 
 	if value {
-		s.state |= STATE_RECONNECTING
+		s.status |= STATUS_RECONNECTING
 	} else {
-		s.state &= ^STATE_RECONNECTING
+		s.status &= ^STATUS_RECONNECTING
 	}
 }

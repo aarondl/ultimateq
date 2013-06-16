@@ -81,7 +81,7 @@ func NewChain(prefixLen int) *Chain {
 }
 
 // Build reads text from the provided Reader and
-// parses it into prefixes and suffixes that are stored in Chain.
+// parses it into prefixes and suffixes that are stated in Chain.
 func (c *Chain) Build(r io.Reader) {
 	br := bufio.NewReader(r)
 	p := make(Prefix, c.prefixLen)

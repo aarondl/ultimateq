@@ -20,6 +20,10 @@ const (
 	// fmtErrCouldNotParsePrefix is when the prefix string from 005 raw is not
 	// in the correct format.
 	fmtErrCouldNotParsePrefix = "data: Could not parse prefix (%v)"
+	// errMsgMoreThanEight happens when there is more than 8 in a prefix.
+	errMsgMoreThanEight = "data: UserModeKinds supports maximum 8 modes (%v)"
+	// BITS_IN_BYTE is to avoid pulling in unsafe and magic numbers.
+	BITS_IN_BYTE = 8
 )
 
 // UnknownMode is returned by apply helper when it encounters a mode it doesn't
@@ -72,6 +76,10 @@ func parsePrefixString(prefix string) ([][2]rune, error) {
 		return nil, errors.New(fmt.Sprintf(fmtErrCouldNotParsePrefix, prefix))
 	}
 
+	if split-1 > BITS_IN_BYTE {
+		return nil, errors.New(fmt.Sprintf(errMsgMoreThanEight, prefix))
+	}
+
 	modes := make([][2]rune, split-1)
 
 	for i := 1; i < split; i++ {
@@ -103,7 +111,7 @@ func (u *UserModeKinds) GetMode(symbol rune) rune {
 }
 
 // GetModeBit returns the bit of the mode character to set.
-func (u *UserModeKinds) GetModeBit(mode rune) int {
+func (u *UserModeKinds) GetModeBit(mode rune) byte {
 	for i := uint(0); i < uint(len(u.modeInfo)); i++ {
 		if u.modeInfo[i][0] == mode {
 			return 1 << i

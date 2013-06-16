@@ -313,7 +313,7 @@ func (s *s) TestBot_createServer(c *C) {
 	c.Check(err, IsNil)
 	srv := b.servers[serverId]
 	c.Check(srv.dispatcher, NotNil)
-	c.Check(srv.store, NotNil)
+	c.Check(srv.state, NotNil)
 	c.Check(srv.handler, NotNil)
 
 	cnf := fakeConfig.Clone()
@@ -322,7 +322,7 @@ func (s *s) TestBot_createServer(c *C) {
 	c.Check(err, IsNil)
 	srv = b.servers[serverId]
 	c.Check(srv.dispatcher, NotNil)
-	c.Check(srv.store, IsNil)
+	c.Check(srv.state, IsNil)
 	c.Check(srv.handler, IsNil)
 }
 

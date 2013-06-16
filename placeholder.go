@@ -49,7 +49,7 @@ func conf(c *config.Config) *config.Config {
 
 	c. // First server
 		Server("irc.gamesurge.net1").
-		Host("localhost").
+		Host("irc.gamesurge.net").
 		Nick("Aaron").
 		Altnick("nobody1").
 		ReconnectTimeout(5)

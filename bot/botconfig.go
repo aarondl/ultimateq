@@ -57,9 +57,9 @@ func (b *Bot) ReplaceConfig(newConfig *config.Config) []NewServer {
 				!elementsEquals(s.conf.GetChannels(), serverConf.GetChannels())
 
 			if !s.conf.GetNoState() && serverConf.GetNoState() {
-				s.protectStore.Lock()
-				s.store = nil
-				s.protectStore.Unlock()
+				s.protectState.Lock()
+				s.state = nil
+				s.protectState.Unlock()
 			}
 
 			s.conf = serverConf

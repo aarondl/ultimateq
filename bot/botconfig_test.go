@@ -88,7 +88,7 @@ func (s *s) TestBot_ReplaceConfig(c *C) {
 		Equals, true)
 	c.Check(elementsEquals(oldsrv2.dispatcher.GetChannels(), chans1),
 		Equals, true)
-	c.Check(oldsrv1.store, NotNil)
+	c.Check(oldsrv1.state, NotNil)
 
 	servers := b.ReplaceConfig(c3) // Invalid Config
 	c.Check(len(servers), Equals, 0)
@@ -105,7 +105,7 @@ func (s *s) TestBot_ReplaceConfig(c *C) {
 		Equals, true)
 	c.Check(elementsEquals(servers[0].server.dispatcher.GetChannels(), chans2),
 		Equals, true)
-	c.Check(oldsrv1.store, IsNil)
+	c.Check(oldsrv1.state, IsNil)
 
 	c.Check(servers[0].Err, IsNil)
 	c.Check(servers[0].ServerName, Equals, "anothernewserver")

@@ -14,9 +14,9 @@ type Self struct {
 	*ChannelModes
 }
 
-// Store is the main data container. It represents the state on a server
+// State is the main data container. It represents the state on a server
 // including all channels, users, and self.
-type Store struct {
+type State struct {
 	Self Self
 
 	channels map[string]*Channel
@@ -31,27 +31,27 @@ type Store struct {
 	cfinder   *irc.ChannelFinder
 }
 
-// CreateStore creates a store from an irc protocaps instance.
-func CreateStore(caps *irc.ProtoCaps) (*Store, error) {
-	store := &Store{}
-	err := store.Protocaps(caps)
+// CreateState creates a state from an irc protocaps instance.
+func CreateState(caps *irc.ProtoCaps) (*State, error) {
+	state := &State{}
+	err := state.Protocaps(caps)
 
 	if err != nil {
 		return nil, err
 	}
 
-	store.Self.ChannelModes = CreateChannelModes(store.selfkinds)
+	state.Self.ChannelModes = CreateChannelModes(state.selfkinds)
 
-	store.channels = make(map[string]*Channel)
-	store.users = make(map[string]*User)
-	store.channelUsers = make(map[string]map[string]*ChannelUser)
-	store.userChannels = make(map[string]map[string]*UserChannel)
+	state.channels = make(map[string]*Channel)
+	state.users = make(map[string]*User)
+	state.channelUsers = make(map[string]map[string]*ChannelUser)
+	state.userChannels = make(map[string]map[string]*UserChannel)
 
-	return store, nil
+	return state, nil
 }
 
-// Protocaps updates the protocaps of the store.
-func (s *Store) Protocaps(caps *irc.ProtoCaps) error {
+// Protocaps updates the protocaps of the state.
+func (s *State) Protocaps(caps *irc.ProtoCaps) error {
 	selfkinds := CreateChannelModeKinds("", "", "", caps.Usermodes())
 	kinds, err := CreateChannelModeKindsCSV(caps.Chanmodes())
 	if err != nil {
@@ -74,18 +74,18 @@ func (s *Store) Protocaps(caps *irc.ProtoCaps) error {
 }
 
 // GetUser returns the user if he exists.
-func (s *Store) GetUser(nickorhost string) *User {
+func (s *State) GetUser(nickorhost string) *User {
 	nick := strings.ToLower(irc.Mask(nickorhost).GetNick())
 	return s.users[nick]
 }
 
 // GetChannel returns the channel if it exists.
-func (s *Store) GetChannel(channel string) *Channel {
+func (s *State) GetChannel(channel string) *Channel {
 	return s.channels[strings.ToLower(channel)]
 }
 
 // GetUserByChannel fetches a user based
-func (s *Store) GetUsersChannelModes(nickorhost, channel string) *UserModes {
+func (s *State) GetUsersChannelModes(nickorhost, channel string) *UserModes {
 	nick := strings.ToLower(irc.Mask(nickorhost).GetNick())
 	channel = strings.ToLower(channel)
 
@@ -99,17 +99,17 @@ func (s *Store) GetUsersChannelModes(nickorhost, channel string) *UserModes {
 }
 
 // GetNUsers returns the number of users in the database.
-func (s *Store) GetNUsers() int {
+func (s *State) GetNUsers() int {
 	return len(s.users)
 }
 
 // GetNChannels returns the number of channels in the database.
-func (s *Store) GetNChannels() int {
+func (s *State) GetNChannels() int {
 	return len(s.channels)
 }
 
 // GetNUserChans returns the number of channels for a user in the database.
-func (s *Store) GetNUserChans(nickorhost string) (n int) {
+func (s *State) GetNUserChans(nickorhost string) (n int) {
 	nick := strings.ToLower(irc.Mask(nickorhost).GetNick())
 	if ucs, ok := s.userChannels[nick]; ok {
 		n = len(ucs)
@@ -118,7 +118,7 @@ func (s *Store) GetNUserChans(nickorhost string) (n int) {
 }
 
 // GetNChanUsers returns the number of users for a channel in the database.
-func (s *Store) GetNChanUsers(channel string) (n int) {
+func (s *State) GetNChanUsers(channel string) (n int) {
 	channel = strings.ToLower(channel)
 	if cus, ok := s.channelUsers[channel]; ok {
 		n = len(cus)
@@ -127,21 +127,21 @@ func (s *Store) GetNChanUsers(channel string) (n int) {
 }
 
 // EachUser iterates through the users.
-func (s *Store) EachUser(fn func(*User)) {
+func (s *State) EachUser(fn func(*User)) {
 	for _, u := range s.users {
 		fn(u)
 	}
 }
 
 // EachChannel iterates through the channels.
-func (s *Store) EachChannel(fn func(*Channel)) {
+func (s *State) EachChannel(fn func(*Channel)) {
 	for _, c := range s.channels {
 		fn(c)
 	}
 }
 
 // EachUserChan iterates through the channels a user is on.
-func (s *Store) EachUserChan(nickorhost string, fn func(*UserChannel)) {
+func (s *State) EachUserChan(nickorhost string, fn func(*UserChannel)) {
 	nick := strings.ToLower(irc.Mask(nickorhost).GetNick())
 	if ucs, ok := s.userChannels[nick]; ok {
 		for _, uc := range ucs {
@@ -152,7 +152,7 @@ func (s *Store) EachUserChan(nickorhost string, fn func(*UserChannel)) {
 }
 
 // EachChanUser iterates through the users on a channel.
-func (s *Store) EachChanUser(channel string, fn func(*ChannelUser)) {
+func (s *State) EachChanUser(channel string, fn func(*ChannelUser)) {
 	channel = strings.ToLower(channel)
 	if cus, ok := s.channelUsers[channel]; ok {
 		for _, cu := range cus {
@@ -163,7 +163,7 @@ func (s *Store) EachChanUser(channel string, fn func(*ChannelUser)) {
 }
 
 // GetUser returns a string array of all the users.
-func (s *Store) GetUsers() []string {
+func (s *State) GetUsers() []string {
 	ret := make([]string, 0, len(s.users))
 	for _, u := range s.users {
 		ret = append(ret, u.GetFullhost())
@@ -172,7 +172,7 @@ func (s *Store) GetUsers() []string {
 }
 
 // GetChannels returns a string array of all the channels.
-func (s *Store) GetChannels() []string {
+func (s *State) GetChannels() []string {
 	ret := make([]string, 0, len(s.channels))
 	for _, c := range s.channels {
 		ret = append(ret, c.GetName())
@@ -181,7 +181,7 @@ func (s *Store) GetChannels() []string {
 }
 
 // GetUserChans returns a string array of the channels a user is on.
-func (s *Store) GetUserChans(nickorhost string) []string {
+func (s *State) GetUserChans(nickorhost string) []string {
 	nick := strings.ToLower(irc.Mask(nickorhost).GetNick())
 	if ucs, ok := s.userChannels[nick]; ok {
 		ret := make([]string, 0, len(ucs))
@@ -194,7 +194,7 @@ func (s *Store) GetUserChans(nickorhost string) []string {
 }
 
 // GetChanUsers returns a string array of the users on a channel.
-func (s *Store) GetChanUsers(channel string) []string {
+func (s *State) GetChanUsers(channel string) []string {
 	channel = strings.ToLower(channel)
 	if cus, ok := s.channelUsers[channel]; ok {
 		ret := make([]string, 0, len(cus))
@@ -207,20 +207,19 @@ func (s *Store) GetChanUsers(channel string) []string {
 }
 
 // IsOn checks if a user is on a specific channel.
-func (s *Store) IsOn(nickorhost, channel string) bool {
+func (s *State) IsOn(nickorhost, channel string) bool {
 	nick := strings.ToLower(irc.Mask(nickorhost).GetNick())
 	channel = strings.ToLower(channel)
 
 	if chans, ok := s.userChannels[nick]; ok {
-		if _, ok = chans[channel]; ok {
-			return true
-		}
+		_, ok = chans[channel]
+		return ok
 	}
 	return false
 }
 
 // addUser adds a user to the database.
-func (s *Store) addUser(nickorhost string) *User {
+func (s *State) addUser(nickorhost string) *User {
 	excl, at, per := false, false, false
 	for i := 0; i < len(nickorhost); i++ {
 		switch nickorhost[i] {
@@ -252,7 +251,7 @@ func (s *Store) addUser(nickorhost string) *User {
 }
 
 // removeUser deletes a user from the database.
-func (s *Store) removeUser(nickorhost string) {
+func (s *State) removeUser(nickorhost string) {
 	nick := strings.ToLower(irc.Mask(nickorhost).GetNick())
 	for _, cus := range s.channelUsers {
 		delete(cus, nick)
@@ -263,7 +262,7 @@ func (s *Store) removeUser(nickorhost string) {
 }
 
 // addChannel adds a channel to the database.
-func (s *Store) addChannel(channel string) *Channel {
+func (s *State) addChannel(channel string) *Channel {
 	chankey := strings.ToLower(channel)
 	var ch *Channel
 	if ch, ok := s.channels[chankey]; !ok {
@@ -274,7 +273,7 @@ func (s *Store) addChannel(channel string) *Channel {
 }
 
 // removeChannel deletes a channel from the database.
-func (s *Store) removeChannel(channel string) {
+func (s *State) removeChannel(channel string) {
 	channel = strings.ToLower(channel)
 	for _, cus := range s.userChannels {
 		delete(cus, channel)
@@ -285,7 +284,7 @@ func (s *Store) removeChannel(channel string) {
 }
 
 // addToChannel adds a user by nick or fullhost to the channel
-func (s *Store) addToChannel(nickorhost, channel string) {
+func (s *State) addToChannel(nickorhost, channel string) {
 	var user *User
 	var ch *Channel
 	var cu map[string]*ChannelUser
@@ -327,7 +326,7 @@ func (s *Store) addToChannel(nickorhost, channel string) {
 }
 
 // removeFromChannel removes a user by nick or fullhost from the channel
-func (s *Store) removeFromChannel(nickorhost, channel string) {
+func (s *State) removeFromChannel(nickorhost, channel string) {
 	var cu map[string]*ChannelUser
 	var uc map[string]*UserChannel
 	var ok bool
@@ -345,7 +344,7 @@ func (s *Store) removeFromChannel(nickorhost, channel string) {
 }
 
 // Update uses the irc.IrcMessage to modify the database accordingly.
-func (s *Store) Update(m *irc.IrcMessage) {
+func (s *State) Update(m *irc.IrcMessage) {
 	s.addUser(m.Sender)
 	switch m.Name {
 	case irc.NICK:
@@ -382,7 +381,7 @@ func (s *Store) Update(m *irc.IrcMessage) {
 }
 
 // nick alters the state of the database when a NICK message is received.
-func (s *Store) nick(m *irc.IrcMessage) {
+func (s *State) nick(m *irc.IrcMessage) {
 	nick, username, host := irc.Mask(m.Sender).SplitFullhost()
 	newnick := m.Args[0]
 	newuser := irc.Mask(newnick + "!" + username + "@" + host)
@@ -390,20 +389,23 @@ func (s *Store) nick(m *irc.IrcMessage) {
 	nick = strings.ToLower(nick)
 	newnick = strings.ToLower(newnick)
 
-	var ok bool
-	if _, ok = s.users[nick]; !ok {
-		s.addUser(string(newuser))
-	} else {
-		newnicklow := strings.ToLower(newnick)
-		s.userChannels[newnicklow] = s.userChannels[nick]
+	if user, ok := s.users[nick]; ok {
+		user.mask = newuser
+		for _, cus := range s.channelUsers {
+			if _, ok := cus[nick]; ok {
+				cus[newnick] = cus[nick]
+				delete(cus, nick)
+			}
+		}
+		s.userChannels[newnick] = s.userChannels[nick]
 		delete(s.userChannels, nick)
-		s.users[newnicklow] = s.users[nick]
+		s.users[newnick] = s.users[nick]
 		delete(s.users, nick)
 	}
 }
 
 // join alters the state of the database when a JOIN message is received.
-func (s *Store) join(m *irc.IrcMessage) {
+func (s *State) join(m *irc.IrcMessage) {
 	if m.Sender == s.Self.GetFullhost() {
 		s.addChannel(m.Args[0])
 	}
@@ -411,7 +413,7 @@ func (s *Store) join(m *irc.IrcMessage) {
 }
 
 // part alters the state of the database when a PART message is received.
-func (s *Store) part(m *irc.IrcMessage) {
+func (s *State) part(m *irc.IrcMessage) {
 	if m.Sender == s.Self.GetFullhost() {
 		s.removeChannel(m.Args[0])
 	} else {
@@ -420,14 +422,14 @@ func (s *Store) part(m *irc.IrcMessage) {
 }
 
 // quit alters the state of the database when a QUIT message is received.
-func (s *Store) quit(m *irc.IrcMessage) {
+func (s *State) quit(m *irc.IrcMessage) {
 	if m.Sender != s.Self.GetFullhost() {
 		s.removeUser(m.Sender)
 	}
 }
 
 // kick alters the state of the database when a KICK message is received.
-func (s *Store) kick(m *irc.IrcMessage) {
+func (s *State) kick(m *irc.IrcMessage) {
 	if m.Args[1] == s.Self.GetNick() {
 		s.removeChannel(m.Args[0])
 	} else {
@@ -436,7 +438,7 @@ func (s *Store) kick(m *irc.IrcMessage) {
 }
 
 // mode alters the state of the database when a MODE message is received.
-func (s *Store) mode(m *irc.IrcMessage) {
+func (s *State) mode(m *irc.IrcMessage) {
 	target := strings.ToLower(m.Args[0])
 	if s.cfinder.IsChannel(target) {
 		if ch, ok := s.channels[target]; ok {
@@ -456,7 +458,7 @@ func (s *Store) mode(m *irc.IrcMessage) {
 }
 
 // topic alters the state of the database when a TOPIC message is received.
-func (s *Store) topic(m *irc.IrcMessage) {
+func (s *State) topic(m *irc.IrcMessage) {
 	chname := strings.ToLower(m.Args[0])
 	if ch, ok := s.channels[chname]; ok {
 		ch.Topic(m.Args[1])
@@ -465,7 +467,7 @@ func (s *Store) topic(m *irc.IrcMessage) {
 
 // rpl_topic alters the state of the database when a RPL_TOPIC message is
 // received.
-func (s *Store) rpl_topic(m *irc.IrcMessage) {
+func (s *State) rpl_topic(m *irc.IrcMessage) {
 	chname := strings.ToLower(m.Args[1])
 	if ch, ok := s.channels[chname]; ok {
 		ch.Topic(m.Args[2])
@@ -474,7 +476,7 @@ func (s *Store) rpl_topic(m *irc.IrcMessage) {
 
 // msg alters the state of the database when a PRIVMSG or NOTICE message is
 // received.
-func (s *Store) msg(m *irc.IrcMessage) {
+func (s *State) msg(m *irc.IrcMessage) {
 	if s.cfinder.IsChannel(m.Args[0]) {
 		s.addToChannel(m.Sender, m.Args[0])
 	}
@@ -482,7 +484,7 @@ func (s *Store) msg(m *irc.IrcMessage) {
 
 // rpl_welcome alters the state of the database when a RPL_WELCOME message is
 // received.
-func (s *Store) rpl_welcome(m *irc.IrcMessage) {
+func (s *State) rpl_welcome(m *irc.IrcMessage) {
 	splits := strings.Fields(m.Args[1])
 	host := splits[len(splits)-1]
 
@@ -496,7 +498,7 @@ func (s *Store) rpl_welcome(m *irc.IrcMessage) {
 
 // rpl_namereply alters the state of the database when a RPL_NAMEREPLY
 // message is received.
-func (s *Store) rpl_namereply(m *irc.IrcMessage) {
+func (s *State) rpl_namereply(m *irc.IrcMessage) {
 	channel := m.Args[2]
 	users := strings.Fields(m.Args[3])
 	for i := 0; i < len(users); i++ {
@@ -522,7 +524,7 @@ func (s *Store) rpl_namereply(m *irc.IrcMessage) {
 
 // rpl_whoreply alters the state of the database when a RPL_WHOREPLY message
 // is received.
-func (s *Store) rpl_whoreply(m *irc.IrcMessage) {
+func (s *State) rpl_whoreply(m *irc.IrcMessage) {
 	channel := m.Args[1]
 	fullhost := m.Args[5] + "!" + m.Args[2] + "@" + m.Args[3]
 	modes := m.Args[6]
@@ -540,7 +542,7 @@ func (s *Store) rpl_whoreply(m *irc.IrcMessage) {
 
 // rpl_channelmodeis alters the state of the database when a RPL_CHANNELMODEIS
 // message is received.
-func (s *Store) rpl_channelmodeis(m *irc.IrcMessage) {
+func (s *State) rpl_channelmodeis(m *irc.IrcMessage) {
 	channel := m.Args[1]
 	modes := strings.Join(m.Args[2:], " ")
 	s.GetChannel(channel).Apply(modes)
@@ -548,7 +550,7 @@ func (s *Store) rpl_channelmodeis(m *irc.IrcMessage) {
 
 // rpl_banlist alters the state of the database when a RPL_BANLIST message is
 // received.
-func (s *Store) rpl_banlist(m *irc.IrcMessage) {
+func (s *State) rpl_banlist(m *irc.IrcMessage) {
 	channel := m.Args[1]
 	s.GetChannel(channel).AddBan(m.Args[2])
 }

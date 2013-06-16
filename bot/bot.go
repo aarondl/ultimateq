@@ -364,11 +364,11 @@ func (b *Bot) dispatchMessages(s *Server) {
 			if err != nil {
 				log.Printf(errFmtParsingIrcMessage, err, msg)
 			} else {
-				s.protectStore.Lock()
-				if s.store != nil {
-					s.store.Update(ircMsg)
+				s.protectState.Lock()
+				if s.state != nil {
+					s.state.Update(ircMsg)
 				}
-				s.protectStore.Unlock()
+				s.protectState.Unlock()
 				b.dispatchMessage(s, ircMsg)
 			}
 		case <-s.killdispatch:
@@ -505,7 +505,7 @@ func (b *Bot) createServer(conf *config.Server) (*Server, error) {
 	}
 
 	if !conf.GetNoState() {
-		if err := s.createStore(); err != nil {
+		if err := s.createState(); err != nil {
 			return nil, err
 		}
 	}

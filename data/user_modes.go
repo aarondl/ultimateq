@@ -2,7 +2,7 @@ package data
 
 // UserModes provides basic modes for channels and users.
 type UserModes struct {
-	modes int
+	modes byte
 	*UserModeKinds
 }
 
