@@ -10,8 +10,19 @@ type Mask string
 // WildMask is an irc hostmask that contains wildcard characters ? and *
 type WildMask string
 
+// Match checks if the WildMask satisfies the given normal mask.
 func (w WildMask) Match(m Mask) bool {
-	ws, ms := string(w), string(m)
+	return isMatch(string(m), string(w))
+}
+
+// Match checks if a given wildmask is satisfied by the mask.
+func (m Mask) Match(w WildMask) bool {
+	return isMatch(string(m), string(w))
+}
+
+// isMatch is a matching function for a string, and a string with the wildcards
+// * and ? in it.
+func isMatch(ms, ws string) bool {
 	wl, ml := len(ws), len(ms)
 
 	if wl == 0 {

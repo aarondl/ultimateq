@@ -322,8 +322,8 @@ func (p *ProtoCaps) ParseMyInfo(m *IrcMessage) {
 	p.protect.Lock()
 	defer p.protect.Unlock()
 
-	p.serverName = m.Args[0]
-	p.ircdVersion = m.Args[1]
-	p.usermodes = m.Args[2]
-	p.lchanmodes = m.Args[3]
+	p.serverName = m.Args[1]
+	p.ircdVersion = m.Args[2]
+	p.usermodes = m.Args[3]
+	p.lchanmodes = m.Args[4]
 }
