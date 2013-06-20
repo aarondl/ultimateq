@@ -25,9 +25,9 @@ type State struct {
 	channelUsers map[string]map[string]*ChannelUser
 	userChannels map[string]map[string]*UserChannel
 
-	selfkinds *ChannelModeKinds
-	kinds     *ChannelModeKinds
-	umodes    *UserModeKinds
+	selfkinds ChannelModeKinds
+	kinds     ChannelModeKinds
+	umodes    UserModeKinds
 	cfinder   *irc.ChannelFinder
 }
 
@@ -40,7 +40,7 @@ func CreateState(caps *irc.ProtoCaps) (*State, error) {
 		return nil, err
 	}
 
-	state.Self.ChannelModes = CreateChannelModes(state.selfkinds)
+	state.Self.ChannelModes = CreateChannelModes(&state.selfkinds)
 
 	state.channels = make(map[string]*Channel)
 	state.users = make(map[string]*User)
@@ -66,9 +66,9 @@ func (s *State) Protocaps(caps *irc.ProtoCaps) error {
 		return err
 	}
 
-	s.selfkinds = selfkinds
-	s.kinds = kinds
-	s.umodes = modes
+	s.selfkinds = *selfkinds
+	s.kinds = *kinds
+	s.umodes = *modes
 	s.cfinder = cfinder
 	return nil
 }
@@ -266,7 +266,7 @@ func (s *State) addChannel(channel string) *Channel {
 	chankey := strings.ToLower(channel)
 	var ch *Channel
 	if ch, ok := s.channels[chankey]; !ok {
-		ch = CreateChannel(channel, s.kinds)
+		ch = CreateChannel(channel, &s.kinds)
 		s.channels[chankey] = ch
 	}
 	return ch
@@ -318,7 +318,7 @@ func (s *State) addToChannel(nickorhost, channel string) {
 		return
 	}
 
-	modes := CreateUserModes(s.umodes)
+	modes := CreateUserModes(&s.umodes)
 	cu[nick] = CreateChannelUser(user, modes)
 	uc[channel] = CreateUserChannel(ch, modes)
 	s.channelUsers[channel] = cu
@@ -345,7 +345,9 @@ func (s *State) removeFromChannel(nickorhost, channel string) {
 
 // Update uses the irc.IrcMessage to modify the database accordingly.
 func (s *State) Update(m *irc.IrcMessage) {
-	s.addUser(m.Sender)
+	if len(m.Sender) > 0 {
+		s.addUser(m.Sender)
+	}
 	switch m.Name {
 	case irc.NICK:
 		s.nick(m)

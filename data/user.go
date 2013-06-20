@@ -16,11 +16,9 @@ func CreateUser(nickorhost string) *User {
 		return nil
 	}
 
-	u := &User{}
-
-	u.mask = irc.Mask(nickorhost)
-
-	return u
+	return &User{
+		mask: irc.Mask(nickorhost),
+	}
 }
 
 // GetNick returns the nick of this user.

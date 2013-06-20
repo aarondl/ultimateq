@@ -64,7 +64,7 @@ func (s *s) TestState_UpdateProtoCaps(c *C) {
 		"NICK", "CHANTYPES=!", "PREFIX=(q)@", "CHANMODES=,,,q",
 	}})
 	fakeCaps.ParseMyInfo(&irc.IrcMessage{Args: []string{
-		"irc.test.net", "test-12", "q", "abc",
+		"nick", "irc.test.net", "test-12", "q", "abc",
 	}})
 
 	c.Assert(st.selfkinds.kinds['q'], Equals, 0)
