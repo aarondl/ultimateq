@@ -1,6 +1,7 @@
 package data
 
 import (
+	"code.google.com/p/go.crypto/bcrypt"
 	"github.com/aarondl/ultimateq/irc"
 	. "launchpad.net/gocheck"
 	"strings"
@@ -12,14 +13,24 @@ type s struct{}
 
 var _ = Suite(&s{})
 
-var server = "irc.server.net"
-var users = []string{"nick1!user1@host1", "nick2!user2@host2"}
-var nicks = []string{"nick1", "nick2"}
-var channels = []string{"#CHAN1", "#CHAN2"}
-
-var self = Self{
-	User: CreateUser("me!my@host.com"),
+func init() {
+	// Speed up bcrypt for tests.
+	userAccessPwdCost = bcrypt.MinCost
 }
+
+var (
+	uname    = "user"
+	password = "pass"
+	server   = "irc.server.net"
+	users    = []string{"nick1!user1@host1", "nick2!user2@host2"}
+	nicks    = []string{"nick1", "nick2"}
+	channels = []string{"#CHAN1", "#CHAN2"}
+	channel  = "#CHAN1"
+
+	self = Self{
+		User: CreateUser("me!my@host.com"),
+	}
+)
 
 func (s *s) TestState(c *C) {
 	st, err := CreateState(irc.CreateProtoCaps())

@@ -1,24 +1,64 @@
 package data
 
 import (
+	"bytes"
+	"code.google.com/p/go.crypto/bcrypt"
+	"encoding/gob"
+	"errors"
 	"github.com/aarondl/ultimateq/irc"
 )
 
-// UserAccess has Access on three different levels, as well as a mask that
-// needs to be matched.
+var (
+	buffer  = &bytes.Buffer{}
+	encoder = gob.NewEncoder(buffer)
+	decoder = gob.NewDecoder(buffer)
+
+	errMissingUnameOrPwd = errors.New("data: Missing username or password.")
+)
+
+// UserAccess provides access for a user to the bot, servers, and channels.
+// This information is protected by a username and crypted password combo.
 type UserAccess struct {
-	Masks   []irc.WildMask
-	Global  *Access
-	Server  map[string]*Access
-	Channel map[string]map[string]*Access
+	Username string
+	Password []byte
+	Masks    []irc.WildMask
+	Global   *Access
+	Server   map[string]*Access
+	Channel  map[string]map[string]*Access
 }
 
-// Initializes an access user.
-func CreateUserAccess(masks []irc.WildMask) *UserAccess {
+var userAccessPwdCost = bcrypt.DefaultCost
+
+// CreateUserAccess initializes an access user. Requires username and password,
+// but masks are optional.
+func CreateUserAccess(un, pw string,
+	masks ...irc.WildMask) (*UserAccess, error) {
+
+	if len(un) == 0 || len(pw) == 0 {
+		return nil, errMissingUnameOrPwd
+	}
+
+	pwd, err := bcrypt.GenerateFromPassword([]byte(pw), userAccessPwdCost)
+	if err != nil {
+		return nil, err
+	}
 
 	a := &UserAccess{
-		Masks: masks,
+		Username: un,
+		Password: pwd,
 	}
+	a.Masks = make([]irc.WildMask, len(masks))
+	copy(a.Masks, masks)
+
+	return a, nil
+}
+
+// createUserAccess creates a useraccess that doesn't care about security.
+// Mostly for testing.
+func createUserAccess(masks ...irc.WildMask) *UserAccess {
+	a := &UserAccess{}
+	a.Masks = make([]irc.WildMask, len(masks))
+	copy(a.Masks, masks)
 
 	return a
 }
@@ -52,21 +92,49 @@ func (a *UserAccess) ensureChannel(server, channel string) (access *Access) {
 	return
 }
 
-// AddMask adds a mask to this users list of wildcard masks.
-func (a *UserAccess) AddMask(mask irc.WildMask) {
-	if a.Masks == nil {
-		a.Masks = make([]irc.WildMask, 0, 1)
+// VerifyPassword checks to see if the given password matches the stored
+// password.
+func (a *UserAccess) VerifyPassword(password string) bool {
+	return nil == bcrypt.CompareHashAndPassword(a.Password, []byte(password))
+}
+
+// Serialize turns the useraccess into bytes for storage.
+func (a *UserAccess) Serialize() ([]byte, error) {
+	buffer.Reset()
+	err := encoder.Encode(a)
+	if err != nil {
+		return nil, err
 	}
-	a.Masks = append(a.Masks, mask)
+
+	return buffer.Bytes(), nil
+}
+
+// deserialize reverses the Serialize process.
+func deserialize(serialized []byte) (*UserAccess, error) {
+	buffer.Reset()
+	if _, err := buffer.Write(serialized); err != nil {
+		return nil, err
+	}
+
+	dec := &UserAccess{}
+	err := decoder.Decode(dec)
+	return dec, err
+}
+
+// AddMask adds a mask to this users list of wildcard masks.
+func (a *UserAccess) AddMasks(masks ...irc.WildMask) {
+	a.Masks = append(a.Masks, masks...)
 }
 
 // DelMask adds a mask to this users list of wildcard masks.
-func (a *UserAccess) DelMask(mask irc.WildMask) {
+func (a *UserAccess) DelMasks(masks ...irc.WildMask) {
 	for i := 0; i < len(a.Masks); i++ {
-		if mask == a.Masks[i] {
-			a.Masks[i], a.Masks[len(a.Masks)-1] =
-				a.Masks[len(a.Masks)-1], a.Masks[i]
-			a.Masks = a.Masks[:len(a.Masks)-1]
+		for j := 0; j < len(masks); j++ {
+			if masks[j] == a.Masks[i] {
+				a.Masks[i], a.Masks[len(a.Masks)-1] =
+					a.Masks[len(a.Masks)-1], a.Masks[i]
+				a.Masks = a.Masks[:len(a.Masks)-1]
+			}
 		}
 	}
 }

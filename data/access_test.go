@@ -131,19 +131,16 @@ func TestAccess_ClearAllFlags(t *T) {
 func TestAccess_getFlagBit(t *T) {
 	t.Parallel()
 	nAlphabet := uint(26)
-	var table = []struct {
-		flag rune
-		bit  uint64
-	}{
-		{'A', 0x1}, {'Z', 0x1 << (nAlphabet - 1)},
-		{'a', 0x1 << nAlphabet}, {'z', 0x1 << (nAlphabet*2 - 1)},
-		{'!', 0x0}, {'_', 0x0}, {'|', 0x0},
+	var table = map[rune]uint64{
+		'A': 0x1, 'Z': 0x1 << (nAlphabet - 1),
+		'a': 0x1 << nAlphabet, 'z': 0x1 << (nAlphabet*2 - 1),
+		'!': 0x0, '_': 0x0, '|': 0x0,
 	}
 
-	for _, expect := range table {
-		if bit := getFlagBit(expect.flag); bit != expect.bit {
+	for flag, expect := range table {
+		if bit := getFlagBit(flag); bit != expect {
 			t.Errorf("Flag did not match: %c, %X (%X)",
-				expect.flag, expect.bit, bit)
+				flag, expect, bit)
 		}
 	}
 }

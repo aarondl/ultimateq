@@ -1,48 +1,106 @@
 package data
 
 import (
+	"github.com/cznic/kv"
 	. "testing"
 )
 
 func TestStore(t *T) {
 	t.Parallel()
-	s := CreateStore()
-	if s == nil {
-		t.Error()
+	s, err := CreateStore(func() (*kv.DB, error) {
+		return kv.CreateMem(&kv.Options{})
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if s.cache == nil {
+		t.Error("Cache not instantiated.")
 	}
 }
 
+/*
 func TestStore_AddUser(t *T) {
 	t.Parallel()
-	t.SkipNow()
-	s := CreateStore()
-	u := s.AddUser("*!*@host", 100, "a", "b")
-	if u == nil {
-		t.Fatal("User wasn't added.")
+	s, err := CreateStore(func() (*kv.DB, error) {
+		return kv.CreateMem(&kv.Options{})
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	if u.Level != 100 || !u.HasFlag('a') || !u.HasFlag('b') {
-		t.Error("Initialization didn't take.")
+	ua := createUserAccess(irc.WildMask(`*!*@*`))
+
+	s.AddUser(ua)
+	if s.Users[0] != ua {
+		t.Error("The user was not added.")
+	}
+}
+
+/*
+func TestStore_RemoveUser(t *T) {
+	t.Parallel()
+	s := CreateStore()
+	ua := CreateUserAccess(irc.WildMask(`*!*@host`))
+
+	s.AddUser(ua)
+	if s.Users[0] != ua {
+		t.Error("The user was not added.")
+	}
+
+	removed := s.RemoveUser(`nick!user@host`)
+	if removed == nil || len(s.Users) > 0 {
+		t.Error("The user was not removed.")
 	}
 }
 
 func TestStore_AuthUser(t *T) {
 	t.Parallel()
-	t.SkipNow()
 	s := CreateStore()
-	s.AddUser("*!*@host", 100, "a", "b")
+	ua := CreateUserAccess(irc.WildMask(`*!*@host`))
 
-	a := s.AuthUser("nick!user@host", "server", "")
-	if a == nil {
-		t.Fatal("User was not authed.")
+	host := irc.Mask(`nick!user@host`)
+
+	auth := s.AuthUser(host)
+	if auth != nil {
+		t.Error("The user was somehow authed against nothing.")
 	}
 
-	if a.Level != 100 || !a.HasFlag('a') || !a.HasFlag('b') {
-		t.Error("Proper levels not returned.")
+	s.AddUser(ua)
+	auth = s.AuthUser(host)
+	if auth != ua {
+		t.Error("The user was not authed.")
+	}
+
+	if _, ok := s.cache[host]; !ok {
+		t.Error("The lookup was not cached.")
+	}
+
+	// Warmed cache
+	auth = s.AuthUser(host)
+	if auth != ua {
+		t.Error("The user was not authed.")
 	}
 }
 
 func TestStore_FindUser(t *T) {
 	t.Parallel()
-	t.SkipNow()
+	s := CreateStore()
+	ua := CreateUserAccess(irc.WildMask(`*!*@host`))
+
+	s.AddUser(ua)
+	if s.Users[0] != ua {
+		t.Error("The user was not added.")
+	}
+
+	found := s.FindUser(`nick!user@host`)
+	if found == nil {
+		t.Error("The user was not found.")
+	}
+
+	found = s.FindUser(`nick!user@host.com`)
+	if found != nil {
+		t.Error("A bad user was found.")
+	}
 }
+*/
