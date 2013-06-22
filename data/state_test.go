@@ -16,11 +16,14 @@ var _ = Suite(&s{})
 func init() {
 	// Speed up bcrypt for tests.
 	userAccessPwdCost = bcrypt.MinCost
+	// Invalidate the Store cache enough to be testable.
+	nMaxCache = 1
 }
 
 var (
 	uname    = "user"
 	password = "pass"
+	host     = `nick!user@host`
 	server   = "irc.server.net"
 	users    = []string{"nick1!user1@host1", "nick2!user2@host2"}
 	nicks    = []string{"nick1", "nick2"}

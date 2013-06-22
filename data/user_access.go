@@ -6,12 +6,14 @@ import (
 	"encoding/gob"
 	"errors"
 	"github.com/aarondl/ultimateq/irc"
+	"sync"
 )
 
 var (
-	buffer  = &bytes.Buffer{}
-	encoder = gob.NewEncoder(buffer)
-	decoder = gob.NewDecoder(buffer)
+	buffer     = &bytes.Buffer{}
+	encoder    = gob.NewEncoder(buffer)
+	decoder    = gob.NewDecoder(buffer)
+	bufferLock = sync.Mutex{}
 
 	errMissingUnameOrPwd = errors.New("data: Missing username or password.")
 )
@@ -100,17 +102,23 @@ func (a *UserAccess) VerifyPassword(password string) bool {
 
 // Serialize turns the useraccess into bytes for storage.
 func (a *UserAccess) Serialize() ([]byte, error) {
+	bufferLock.Lock()
+	defer bufferLock.Unlock()
 	buffer.Reset()
 	err := encoder.Encode(a)
 	if err != nil {
 		return nil, err
 	}
 
-	return buffer.Bytes(), nil
+	cpy := make([]byte, buffer.Len())
+	copy(cpy, buffer.Bytes())
+	return cpy, nil
 }
 
 // deserialize reverses the Serialize process.
 func deserialize(serialized []byte) (*UserAccess, error) {
+	bufferLock.Lock()
+	defer bufferLock.Unlock()
 	buffer.Reset()
 	if _, err := buffer.Write(serialized); err != nil {
 		return nil, err
