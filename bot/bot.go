@@ -500,12 +500,10 @@ func createBot(conf *config.Config, capsProv CapsProvider,
 		}
 
 		makeStore = makeStore || !srv.GetNoStore()
-		log.Println("SERVER:", name, srv.GetNoStore())
 
 		b.servers[name] = server
 	}
 
-	log.Println("MAKESTORE:", makeStore)
 	if makeStore {
 		if err = b.createStore(conf.GetStoreFile()); err != nil {
 			return nil, err

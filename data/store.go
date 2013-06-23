@@ -152,15 +152,13 @@ func (s *Store) checkCacheLimits() {
 func MakeFileStoreProvider(filename string) DbProvider {
 	return func() (db *kv.DB, err error) {
 		opts := &kv.Options{}
-		db, err = kv.Open(filename, opts)
-		if err == nil {
-			return
-		}
 
-		// If the file did not exist, we can ensure this is patherror to just
-		// try again, else return error.
-		if _, ok := err.(*os.PathError); ok {
+		_, err = os.Stat(filename)
+
+		if os.IsNotExist(err) {
 			db, err = kv.Create(filename, opts)
+		} else {
+			db, err = kv.Open(filename, opts)
 		}
 		return
 	}
