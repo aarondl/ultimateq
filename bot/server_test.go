@@ -10,18 +10,18 @@ import (
 )
 
 func (s *s) TestServerSender(c *C) {
-	b, err := createBot(fakeConfig, nil, nil, false)
+	b, err := createBot(fakeConfig, nil, nil, nil, false)
 	c.Check(err, IsNil)
 	srv := b.servers[serverId]
-	srvendpoint := createServerEndpoint(srv)
+	srvendpoint := createServerEndpoint(srv, nil)
 	c.Check(srvendpoint.GetKey(), Equals, serverId)
 }
 
 func (s *s) TestServerSender_UsingState(c *C) {
-	b, err := createBot(fakeConfig, nil, nil, false)
+	b, err := createBot(fakeConfig, nil, nil, nil, false)
 	c.Check(err, IsNil)
 	srv := b.servers[serverId]
-	srvendpoint := createServerEndpoint(srv)
+	srvendpoint := createServerEndpoint(srv, nil)
 
 	c.Check(srvendpoint.GetKey(), Equals, serverId)
 	called := false
@@ -42,17 +42,57 @@ func (s *s) TestServerSender_UsingState(c *C) {
 	c.Check(reportCalled, Equals, false)
 }
 
-func (s *s) TestServerSender_OpenState(c *C) {
-	b, err := createBot(fakeConfig, nil, nil, false)
+func (s *s) TestServerSender_UsingStore(c *C) {
+	b, err := createBot(fakeConfig, nil, nil, nil, false)
 	c.Check(err, IsNil)
 	srv := b.servers[serverId]
-	srvendpoint := createServerEndpoint(srv)
+	store, err := data.CreateStore(data.MemStoreProvider)
+	c.Check(err, IsNil)
+
+	srvendpoint := createServerEndpoint(srv, store)
+	called := false
+	reportCalled := false
+	reportCalled = srvendpoint.UsingStore(func(*data.Store) {
+		called = true
+	})
+	c.Check(called, Equals, true)
+	c.Check(reportCalled, Equals, true)
+
+	srvendpoint = createServerEndpoint(srv, nil)
+	called = false
+	reportCalled = false
+	reportCalled = srvendpoint.UsingStore(func(*data.Store) {
+		called = true
+	})
+	c.Check(called, Equals, false)
+	c.Check(reportCalled, Equals, false)
+}
+
+func (s *s) TestServerSender_OpenState(c *C) {
+	b, err := createBot(fakeConfig, nil, nil, nil, false)
+	c.Check(err, IsNil)
+	srv := b.servers[serverId]
+	srvendpoint := createServerEndpoint(srv, nil)
 
 	c.Check(srvendpoint.OpenState(), Equals, srv.state)
 	srvendpoint.CloseState()
 
 	srv.protectState.Lock()
 	srv.protectState.Unlock()
+	c.Succeed()
+}
+
+func (s *s) TestServerSender_OpenStore(c *C) {
+	b, err := createBot(fakeConfig, nil, nil, nil, false)
+	c.Check(err, IsNil)
+	srv := b.servers[serverId]
+	srvendpoint := createServerEndpoint(srv, nil)
+
+	c.Check(srvendpoint.OpenStore(), Equals, b.store)
+	srvendpoint.CloseStore()
+
+	b.protectStore.Lock()
+	b.protectStore.Unlock()
 	c.Succeed()
 }
 
@@ -64,7 +104,7 @@ func (s *s) TestServer_Write(c *C) {
 		return conn, nil
 	}
 
-	b, err := createBot(fakeConfig, nil, connProvider, false)
+	b, err := createBot(fakeConfig, nil, connProvider, nil, false)
 	c.Check(err, IsNil)
 	srv := b.servers[serverId]
 
@@ -107,7 +147,7 @@ func (s *s) TestServer_Protocaps(c *C) {
 		"NICK", "CHANTYPES=!", "PREFIX=(q)@", "CHANMODES=,,,q",
 	}})
 	fakeCaps.ParseMyInfo(&irc.IrcMessage{Args: []string{
-		"irc.test.net", "test-12", "q", "abc",
+		"NICK", "irc.test.net", "test-12", "q", "abc",
 	}})
 
 	err = srv.protocaps(fakeCaps)

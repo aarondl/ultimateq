@@ -1,15 +1,12 @@
 package data
 
 import (
-	"github.com/cznic/kv"
 	. "testing"
 )
 
 func TestStore(t *T) {
 	t.Parallel()
-	s, err := CreateStore(func() (*kv.DB, error) {
-		return kv.CreateMem(&kv.Options{})
-	})
+	s, err := CreateStore(MemStoreProvider)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,9 +23,7 @@ func TestStore(t *T) {
 
 func TestStore_AddUser(t *T) {
 	t.Parallel()
-	s, err := CreateStore(func() (*kv.DB, error) {
-		return kv.CreateMem(&kv.Options{})
-	})
+	s, err := CreateStore(MemStoreProvider)
 	defer s.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -78,9 +73,7 @@ func TestStore_AddUser(t *T) {
 
 func TestStore_RemoveUser(t *T) {
 	t.Parallel()
-	s, err := CreateStore(func() (*kv.DB, error) {
-		return kv.CreateMem(&kv.Options{})
-	})
+	s, err := CreateStore(MemStoreProvider)
 	defer s.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -123,9 +116,7 @@ func TestStore_RemoveUser(t *T) {
 
 func TestStore_AuthUser(t *T) {
 	t.Parallel()
-	s, err := CreateStore(func() (*kv.DB, error) {
-		return kv.CreateMem(&kv.Options{})
-	})
+	s, err := CreateStore(MemStoreProvider)
 	defer s.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -188,9 +179,7 @@ func TestStore_AuthUser(t *T) {
 
 func TestStore_AuthLogout(t *T) {
 	t.Parallel()
-	s, err := CreateStore(func() (*kv.DB, error) {
-		return kv.CreateMem(&kv.Options{})
-	})
+	s, err := CreateStore(MemStoreProvider)
 	defer s.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -231,9 +220,7 @@ func TestStore_AuthLogout(t *T) {
 
 func TestStore_Finding(t *T) {
 	t.Parallel()
-	s, err := CreateStore(func() (*kv.DB, error) {
-		return kv.CreateMem(&kv.Options{})
-	})
+	s, err := CreateStore(MemStoreProvider)
 	defer s.Close()
 	if err != nil {
 		t.Fatal(err)

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/aarondl/ultimateq/config"
+	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/dispatch"
 	"github.com/aarondl/ultimateq/irc"
 	"github.com/aarondl/ultimateq/parse"
@@ -52,6 +53,8 @@ type (
 	CapsProvider func() *irc.ProtoCaps
 	// ConnProvider transforms a "server:port" string into a net.Conn
 	ConnProvider func(string) (net.Conn, error)
+	// StoreProvider transforms an optional path into a store.
+	StoreProvider func(string) (*data.Store, error)
 )
 
 // Bot is a main type that joins together all the packages into a functioning
@@ -62,6 +65,9 @@ type Bot struct {
 
 	conf *config.Config
 
+	store        *data.Store
+	protectStore sync.RWMutex
+
 	caps       *irc.ProtoCaps
 	dispatcher *dispatch.Dispatcher
 
@@ -69,6 +75,7 @@ type Bot struct {
 	attachHandlers bool
 	capsProvider   CapsProvider
 	connProvider   ConnProvider
+	storeProvider  StoreProvider
 
 	msgDispatchers sync.WaitGroup
 	// servers
@@ -109,7 +116,7 @@ func CreateBot(conf *config.Config) (*Bot, error) {
 	if !CheckConfig(conf) {
 		return nil, errInvalidConfig
 	}
-	return createBot(conf, nil, nil, true)
+	return createBot(conf, nil, nil, nil, true)
 }
 
 // Connect creates the connections and the IrcClient objects, as well as
@@ -201,7 +208,7 @@ func (b *Bot) startServer(srv *Server, writing, reading bool) {
 		}
 		srv.client.SpawnWorkers(writing, reading)
 
-		b.dispatchMessage(srv, &irc.IrcMessage{Name: irc.CONNECT})
+		b.dispatchMessage(srv, nil, &irc.IrcMessage{Name: irc.CONNECT})
 
 		if reading {
 			b.msgDispatchers.Add(1)
@@ -347,6 +354,24 @@ func (b *Bot) UnregisterServer(
 // dispatchMessages is a constant read-dispatch from the server to the
 // dispatcher.
 func (b *Bot) dispatchMessages(s *Server) {
+	var reconnOnDisconnect bool
+	var scale time.Duration
+	var timeout uint
+	var store *data.Store
+	b.ReadConfig(func(c *config.Config) {
+		cserver := c.GetServer(s.name)
+		if cserver != nil {
+			reconnOnDisconnect = !cserver.GetNoReconnect()
+			scale = s.reconnScale
+			timeout = cserver.GetReconnectTimeout()
+			if !cserver.GetNoStore() {
+				b.protectStore.RLock()
+				store = b.store
+				b.protectStore.RUnlock()
+			}
+		}
+	})
+
 	s.protect.RLock()
 
 	read := s.client.ReadChannel()
@@ -356,7 +381,8 @@ func (b *Bot) dispatchMessages(s *Server) {
 		case msg, ok := <-read:
 			if !ok {
 				log.Printf(errFmtReaderClosed, s.name)
-				b.dispatchMessage(s, &irc.IrcMessage{Name: irc.DISCONNECT})
+				b.dispatchMessage(s, store,
+					&irc.IrcMessage{Name: irc.DISCONNECT})
 				stop, disconnect = true, true
 				break
 			}
@@ -369,7 +395,7 @@ func (b *Bot) dispatchMessages(s *Server) {
 					s.state.Update(ircMsg)
 				}
 				s.protectState.Unlock()
-				b.dispatchMessage(s, ircMsg)
+				b.dispatchMessage(s, store, ircMsg)
 			}
 		case <-s.killdispatch:
 			log.Printf(errFmtReaderClosed, s.name)
@@ -379,17 +405,7 @@ func (b *Bot) dispatchMessages(s *Server) {
 	}
 	s.protect.RUnlock()
 
-	var reconn bool
-	var scale time.Duration
-	var timeout uint
-	b.ReadConfig(func(c *config.Config) {
-		cserver := c.GetServer(s.name)
-		if cserver != nil {
-			reconn = disconnect && !cserver.GetNoReconnect()
-			scale = s.reconnScale
-			timeout = cserver.GetReconnectTimeout()
-		}
-	})
+	reconn := disconnect && reconnOnDisconnect
 
 	if !reconn {
 		b.msgDispatchers.Done()
@@ -444,8 +460,8 @@ func (b *Bot) Writeln(server, message string) error {
 }
 
 // dispatch sends a message to both the bot's dispatcher and the given servers
-func (b *Bot) dispatchMessage(s *Server, msg *irc.IrcMessage) {
-	endpoint := createServerEndpoint(s)
+func (b *Bot) dispatchMessage(s *Server, st *data.Store, msg *irc.IrcMessage) {
+	endpoint := createServerEndpoint(s, st)
 	b.dispatcher.Dispatch(msg, endpoint)
 	s.dispatcher.Dispatch(msg, endpoint)
 }
@@ -453,13 +469,15 @@ func (b *Bot) dispatchMessage(s *Server, msg *irc.IrcMessage) {
 // createBot creates a bot from the given configuration, using the providers
 // given to create connections and protocol caps.
 func createBot(conf *config.Config, capsProv CapsProvider,
-	connProv ConnProvider, attachHandlers bool) (*Bot, error) {
+	connProv ConnProvider, storeProv StoreProvider,
+	attachHandlers bool) (*Bot, error) {
 
 	b := &Bot{
 		conf:           conf,
 		servers:        make(map[string]*Server, nAssumedServers),
 		capsProvider:   capsProv,
 		connProvider:   connProv,
+		storeProvider:  storeProv,
 		attachHandlers: attachHandlers,
 	}
 
@@ -474,13 +492,24 @@ func createBot(conf *config.Config, capsProv CapsProvider,
 		return nil, err
 	}
 
+	makeStore := false
 	for name, srv := range conf.Servers {
 		server, err := b.createServer(srv)
 		if err != nil {
 			return nil, err
 		}
 
+		makeStore = makeStore || !srv.GetNoStore()
+		log.Println("SERVER:", name, srv.GetNoStore())
+
 		b.servers[name] = server
+	}
+
+	log.Println("MAKESTORE:", makeStore)
+	if makeStore {
+		if err = b.createStore(conf.GetStoreFile()); err != nil {
+			return nil, err
+		}
 	}
 
 	return b, nil
@@ -527,4 +556,14 @@ func (b *Bot) createDispatcher(channels []string) error {
 		return err
 	}
 	return nil
+}
+
+// createStore creates a store from a filename.
+func (b *Bot) createStore(filename string) (err error) {
+	if b.storeProvider == nil {
+		b.store, err = data.CreateStore(data.MakeFileStoreProvider(filename))
+	} else {
+		b.store, err = b.storeProvider(filename)
+	}
+	return
 }

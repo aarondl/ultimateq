@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/aarondl/ultimateq/irc"
 	"github.com/cznic/kv"
+	"os"
 )
 
 var (
@@ -14,6 +15,8 @@ var (
 	ErrUserBadHost     = errors.New("data: Host does not match stored hosts.")
 )
 
+type DbProvider func() (*kv.DB, error)
+
 // Store is used to store UserAccess objects, and cache their lookup.
 type Store struct {
 	db     *kv.DB
@@ -22,8 +25,8 @@ type Store struct {
 }
 
 // CreateStore initializes a store type.
-func CreateStore(dbCreate func() (*kv.DB, error)) (*Store, error) {
-	db, err := dbCreate()
+func CreateStore(prov DbProvider) (*Store, error) {
+	db, err := prov()
 	if err != nil {
 		return nil, err
 	}
@@ -142,4 +145,28 @@ func (s *Store) checkCacheLimits() {
 	if len(s.cache)+1 > nMaxCache {
 		s.cache = make(map[string]*UserAccess)
 	}
+}
+
+// MakeStoreProvider is the default way to create a store by using the
+// filename and trying to open it.
+func MakeFileStoreProvider(filename string) DbProvider {
+	return func() (db *kv.DB, err error) {
+		opts := &kv.Options{}
+		db, err = kv.Open(filename, opts)
+		if err == nil {
+			return
+		}
+
+		// If the file did not exist, we can ensure this is patherror to just
+		// try again, else return error.
+		if _, ok := err.(*os.PathError); ok {
+			db, err = kv.Create(filename, opts)
+		}
+		return
+	}
+}
+
+// MemStoreProvider provides memory-only database stores.
+func MemStoreProvider() (*kv.DB, error) {
+	return kv.CreateMem(&kv.Options{})
 }
