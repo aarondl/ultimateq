@@ -25,10 +25,9 @@ type State struct {
 	channelUsers map[string]map[string]*ChannelUser
 	userChannels map[string]map[string]*UserChannel
 
-	selfkinds ChannelModeKinds
-	kinds     ChannelModeKinds
-	umodes    UserModeKinds
-	cfinder   *irc.ChannelFinder
+	kinds   ChannelModeKinds
+	umodes  UserModeKinds
+	cfinder *irc.ChannelFinder
 }
 
 // CreateState creates a state from an irc protocaps instance.
@@ -40,7 +39,7 @@ func CreateState(caps *irc.ProtoCaps) (*State, error) {
 		return nil, err
 	}
 
-	state.Self.ChannelModes = CreateChannelModes(&state.selfkinds)
+	state.Self.ChannelModes = CreateChannelModes(&ChannelModeKinds{}, nil)
 
 	state.channels = make(map[string]*Channel)
 	state.users = make(map[string]*User)
@@ -52,7 +51,6 @@ func CreateState(caps *irc.ProtoCaps) (*State, error) {
 
 // Protocaps updates the protocaps of the state.
 func (s *State) Protocaps(caps *irc.ProtoCaps) error {
-	selfkinds := CreateChannelModeKinds("", "", "", caps.Usermodes())
 	kinds, err := CreateChannelModeKindsCSV(caps.Chanmodes())
 	if err != nil {
 		return err
@@ -66,7 +64,6 @@ func (s *State) Protocaps(caps *irc.ProtoCaps) error {
 		return err
 	}
 
-	s.selfkinds = *selfkinds
 	s.kinds = *kinds
 	s.umodes = *modes
 	s.cfinder = cfinder
@@ -266,7 +263,7 @@ func (s *State) addChannel(channel string) *Channel {
 	chankey := strings.ToLower(channel)
 	var ch *Channel
 	if ch, ok := s.channels[chankey]; !ok {
-		ch = CreateChannel(channel, &s.kinds)
+		ch = CreateChannel(channel, &s.kinds, &s.umodes)
 		s.channels[chankey] = ch
 	}
 	return ch

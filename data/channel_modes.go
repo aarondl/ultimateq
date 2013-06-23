@@ -15,18 +15,22 @@ type ChannelModes struct {
 	addressModes map[rune][]string
 
 	*ChannelModeKinds
+	userModeKinds *UserModeKinds
 
 	addresses int
 }
 
 // CreateChannelModes creates an empty ChannelModes.
-func CreateChannelModes(kinds *ChannelModeKinds) *ChannelModes {
+func CreateChannelModes(
+	kinds *ChannelModeKinds, userKinds *UserModeKinds) *ChannelModes {
+
 	return &ChannelModes{
 		modes:        make(map[rune]bool),
 		argModes:     make(map[rune]string),
 		addressModes: make(map[rune][]string),
 
 		ChannelModeKinds: kinds,
+		userModeKinds:    userKinds,
 	}
 }
 
@@ -34,7 +38,7 @@ func CreateChannelModes(kinds *ChannelModeKinds) *ChannelModes {
 // Assumes any modes not declared as part of ChannelModeKinds were not intended
 // for channel and are user-targeted (therefore taking an argument)
 // and returns them in two arrays, positive and negative modes respectively.
-func (m *ChannelModes) Apply(modestring string) ([]UnknownMode, []UnknownMode) {
+func (m *ChannelModes) Apply(modestring string) ([]UserMode, []UserMode) {
 	return apply(m, modestring)
 }
 
@@ -126,7 +130,7 @@ func (m *ChannelModes) IsSet(modestrs ...string) bool {
 			if !found {
 				return false
 			}
-		case ARGS_NONE:
+		default:
 			if !m.isModeSet(mode) {
 				return false
 			}
@@ -159,7 +163,7 @@ func (m *ChannelModes) Set(modestrs ...string) {
 			}
 			m.setAddress(mode, args[used])
 			used++
-		case ARGS_NONE:
+		default:
 			m.setMode(mode)
 		}
 	}
@@ -191,7 +195,7 @@ func (m *ChannelModes) Unset(modestrs ...string) {
 			used++
 		case ARGS_ONSET:
 			m.unsetArg(mode, "")
-		case ARGS_NONE:
+		default:
 			m.unsetMode(mode)
 		}
 	}
@@ -303,4 +307,12 @@ func (m *ChannelModes) unsetAddress(mode rune, address string) {
 			}
 		}
 	}
+}
+
+// isUserMode checks if the given mode belongs to the user mode kinds.
+func (m *ChannelModes) isUserMode(mode rune) (is bool) {
+	if m.userModeKinds != nil {
+		is = m.userModeKinds.GetModeBit(mode) > 0
+	}
+	return
 }

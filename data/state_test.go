@@ -81,12 +81,10 @@ func (s *s) TestState_UpdateProtoCaps(c *C) {
 		"nick", "irc.test.net", "test-12", "q", "abc",
 	}})
 
-	c.Assert(st.selfkinds.kinds['q'], Equals, 0)
 	c.Assert(st.kinds.kinds['q'], Equals, 0)
 	c.Assert(st.umodes.GetModeBit('q'), Equals, byte(0))
 	c.Assert(st.cfinder.IsChannel("!"), Equals, false)
 	st.Protocaps(fakeCaps)
-	c.Assert(st.selfkinds.kinds['q'], Not(Equals), 0)
 	c.Assert(st.kinds.kinds['q'], Not(Equals), 0)
 	c.Assert(st.umodes.GetModeBit('q'), Not(Equals), 0)
 	c.Assert(st.cfinder.IsChannel("!"), Equals, true)

@@ -4,6 +4,9 @@ import (
 	. "launchpad.net/gocheck"
 )
 
+var testUserKinds, _ = CreateUserModeKinds("(ov)@+")
+var testChannelKinds = CreateChannelModeKinds("b", "c", "d", "axyz")
+
 func (s *s) TestChannelModeKinds_Create(c *C) {
 	m := CreateChannelModeKinds("a", "b", "c", "d")
 	c.Check(m.kinds['a'], Equals, ARGS_ADDRESS)

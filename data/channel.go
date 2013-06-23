@@ -18,14 +18,16 @@ type Channel struct {
 }
 
 // CreateChannel instantiates a channel object.
-func CreateChannel(name string, kinds *ChannelModeKinds) *Channel {
+func CreateChannel(name string,
+	kinds *ChannelModeKinds, userKinds *UserModeKinds) *Channel {
+
 	if len(name) == 0 {
 		return nil
 	}
 
 	return &Channel{
 		name:         name,
-		ChannelModes: CreateChannelModes(kinds),
+		ChannelModes: CreateChannelModes(kinds, userKinds),
 	}
 }
 

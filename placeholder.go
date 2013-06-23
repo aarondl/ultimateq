@@ -9,21 +9,14 @@ import (
 	"log"
 	"math/rand"
 	"os"
-	"strings"
 	"sync"
 	"time"
 )
 
-type Handler struct {
+type ChatBot struct {
 }
 
-func (h Handler) PrivmsgUser(m *irc.Message, endpoint irc.Endpoint) {
-	if strings.Split(m.Sender, "!")[0] == "Aaron" {
-		endpoint.Send(m.Message())
-	}
-}
-
-func (h Handler) PrivmsgChannel(m *irc.Message, endpoint irc.Endpoint) {
+func (h ChatBot) PrivmsgChannel(m *irc.Message, endpoint irc.Endpoint) {
 	if m.Message() == "hello" {
 		endpoint.Privmsg(m.Target(), "Hello to you too!")
 	} else {
@@ -38,7 +31,7 @@ func (h Handler) PrivmsgChannel(m *irc.Message, endpoint irc.Endpoint) {
 	}
 }
 
-func conf(c *config.Config) *config.Config {
+func makeconf(c *config.Config) *config.Config {
 	c. // Defaults
 		Nick("nobody__").
 		Altnick("nobody_").
@@ -65,11 +58,11 @@ func conf(c *config.Config) *config.Config {
 var chain = NewChain(2)
 var lock = sync.Mutex{}
 
-func main() {
+func othermain() {
 	rand.Seed(time.Now().UnixNano()) // Seed the random number generator.
 	log.SetOutput(os.Stdout)
 
-	b, err := bot.CreateBot(bot.ConfigureFunction(conf))
+	b, err := bot.CreateBot(bot.ConfigureFunction(makeconf))
 	if err != nil {
 		log.Println(err)
 	}

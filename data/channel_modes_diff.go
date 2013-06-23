@@ -8,16 +8,20 @@ import (
 // change modes, and negative change modes.
 type ModeDiff struct {
 	*ChannelModeKinds
-	pos *ChannelModes
-	neg *ChannelModes
+	userModeKinds *UserModeKinds
+	pos           *ChannelModes
+	neg           *ChannelModes
 }
 
 // CreateModeDiff creates an empty ModeDiff.
-func CreateModeDiff(kinds *ChannelModeKinds) *ModeDiff {
+func CreateModeDiff(
+	kinds *ChannelModeKinds, userKinds *UserModeKinds) *ModeDiff {
+
 	return &ModeDiff{
 		ChannelModeKinds: kinds,
-		pos:              CreateChannelModes(kinds),
-		neg:              CreateChannelModes(kinds),
+		userModeKinds:    userKinds,
+		pos:              CreateChannelModes(kinds, userKinds),
+		neg:              CreateChannelModes(kinds, userKinds),
 	}
 }
 
@@ -35,7 +39,7 @@ func (d *ModeDiff) IsUnset(modestrs ...string) bool {
 // Assumes any modes not declared as part of ChannelModeKinds were not intended
 // for channel and are user-targeted (therefore taking an argument)
 // and returns them in two arrays, positive and negative modes respectively.
-func (d *ModeDiff) Apply(modestring string) ([]UnknownMode, []UnknownMode) {
+func (d *ModeDiff) Apply(modestring string) ([]UserMode, []UserMode) {
 	return apply(d, modestring)
 }
 
@@ -106,4 +110,12 @@ func (d *ModeDiff) setAddress(mode rune, address string) {
 func (d *ModeDiff) unsetAddress(mode rune, address string) {
 	d.pos.unsetAddress(mode, address)
 	d.neg.setAddress(mode, address)
+}
+
+// isUserMode checks if the given mode belongs to the user mode kinds.
+func (d *ModeDiff) isUserMode(mode rune) (is bool) {
+	if d.userModeKinds != nil {
+		is = d.userModeKinds.GetModeBit(mode) > 0
+	}
+	return
 }

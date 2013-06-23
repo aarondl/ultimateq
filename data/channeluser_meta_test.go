@@ -8,7 +8,7 @@ var modes *int = new(int)
 
 func (s *s) TestChannelUser(c *C) {
 	user := CreateUser("nick")
-	modes := CreateUserModes(testUserModes)
+	modes := CreateUserModes(testUserKinds)
 
 	cu := CreateChannelUser(
 		user,
@@ -21,8 +21,8 @@ func (s *s) TestChannelUser(c *C) {
 }
 
 func (s *s) TestUserChannel(c *C) {
-	ch := CreateChannel("", testKinds)
-	modes := CreateUserModes(testUserModes)
+	ch := CreateChannel("", testChannelKinds, testUserKinds)
+	modes := CreateUserModes(testUserKinds)
 
 	uc := CreateUserChannel(
 		ch,

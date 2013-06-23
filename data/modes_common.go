@@ -26,9 +26,8 @@ const (
 	BITS_IN_BYTE = 8
 )
 
-// UnknownMode is returned by apply helper when it encounters a mode it doesn't
-// know. This will regularily be a user mode, which takes an argument.
-type UnknownMode struct {
+// UserMode is returned by apply helper when it encounters a user mode
+type UserMode struct {
 	Mode rune
 	Arg  string
 }
@@ -222,16 +221,17 @@ type moder interface {
 	unsetArg(rune, string)
 	unsetAddress(rune, string)
 	getKind(rune) int
+	isUserMode(rune) bool
 }
 
 // apply parses a complex modestring and applies it to a moder interface. All
 // non-recognized modes are given back a positive and negative array of
 // UnknownMode.
-func apply(m moder, modestring string) (pos, neg []UnknownMode) {
+func apply(m moder, modestring string) (pos, neg []UserMode) {
 	adding := true
 	used := 0
-	pos = make([]UnknownMode, 0)
-	neg = make([]UnknownMode, 0)
+	pos = make([]UserMode, 0)
+	neg = make([]UserMode, 0)
 
 	splits := strings.Split(strings.TrimSpace(modestring), " ")
 	args := splits[1:]
@@ -272,22 +272,24 @@ func apply(m moder, modestring string) (pos, neg []UnknownMode) {
 				m.unsetAddress(mode, args[used])
 			}
 			used++
-		case ARGS_NONE:
-			if adding {
-				m.setMode(mode)
-			} else {
-				m.unsetMode(mode)
-			}
 		default:
-			if used >= len(args) {
-				break
-			}
-			if adding {
-				pos = append(pos, UnknownMode{mode, args[used]})
+			if isUserMode := m.isUserMode(mode); isUserMode {
+				if used >= len(args) {
+					break
+				}
+				if adding {
+					pos = append(pos, UserMode{mode, args[used]})
+				} else {
+					neg = append(neg, UserMode{mode, args[used]})
+				}
+				used++
 			} else {
-				neg = append(neg, UnknownMode{mode, args[used]})
+				if adding {
+					m.setMode(mode)
+				} else {
+					m.unsetMode(mode)
+				}
 			}
-			used++
 		}
 	}
 
