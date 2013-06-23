@@ -17,6 +17,9 @@ const (
 	nAssumedServers = 1
 	// defaultIrcPort is IRC Server's default tcp port.
 	defaultIrcPort = uint16(6667)
+	// defaultStoreFile is where the bot will store it's Store database if not
+	// overridden.
+	defaultStoreFile = "./store.db"
 	// defaultFloodProtectBurst is how many messages can be sent before spam
 	// filters set in.
 	defaultFloodProtectBurst = uint(3)
@@ -50,6 +53,8 @@ const (
 	errSsl                 = "ssl"
 	errVerifyCert          = "verifycert"
 	errNoState             = "nostate"
+	errNoStore             = "nostore"
+	errStoreFile           = "storefile"
 	errFloodProtectBurst   = "floodprotectburst"
 	errFloodProtectTimeout = "floodprotecttimeout"
 	errFloodProtectStep    = "floodprotectstep"
@@ -108,11 +113,12 @@ var (
 // Config holds all the information related to the bot including global settings
 // default settings, and server specific settings.
 type Config struct {
-	Servers  map[string]*Server
-	Global   *Server
-	context  *Server
-	filename string
-	Errors   []error "-"
+	Servers   map[string]*Server
+	Global    *Server
+	context   *Server
+	filename  string
+	Storefile string
+	Errors    []error "-"
 }
 
 // CreateConfig initializes a Config object.
@@ -186,6 +192,12 @@ func (c *Config) validateServer(s *Server, missingIsError bool) {
 	if len(s.NoState) != 0 {
 		if _, err := strconv.ParseBool(s.NoState); err != nil {
 			c.addError(fmtErrInvalid, name, errNoState, s.NoState)
+		}
+	}
+
+	if len(s.NoStore) != 0 {
+		if _, err := strconv.ParseBool(s.NoStore); err != nil {
+			c.addError(fmtErrInvalid, name, errNoStore, s.NoStore)
 		}
 	}
 
@@ -263,6 +275,10 @@ func (c *Config) validateServer(s *Server, missingIsError bool) {
 		}
 	} else if !rgxRealname.MatchString(realname) {
 		c.addError(fmtErrInvalid, name, errRealname, realname)
+	}
+
+	if prefix := s.GetPrefix(); len(prefix) != 1 {
+		c.addError(fmtErrInvalid, name, errPrefix, prefix)
 	}
 
 	for _, channel := range s.GetChannels() {
@@ -372,6 +388,13 @@ func (c *Config) NoState(nostate bool) *Config {
 	return c
 }
 
+// NoStore fluently sets reconnection for the current config context,
+// this turns off the irc state database (data package).
+func (c *Config) NoStore(nostore bool) *Config {
+	c.GetContext().NoStore = strconv.FormatBool(nostore)
+	return c
+}
+
 // FloodProtectBurst fluently sets flood burst for the current config context,
 // this is how many messages will be bursted through without enabling flood
 // protection.
@@ -475,6 +498,7 @@ type Server struct {
 
 	// State tracking
 	NoState string
+	NoStore string
 
 	// Flood Protection
 	FloodProtectBurst   string
@@ -502,6 +526,21 @@ func (c *Config) GetFilename() (filename string) {
 	filename = defaultConfigFileName
 	if len(c.filename) > 0 {
 		filename = c.filename
+	}
+	return
+}
+
+// StoreFile fluently sets the storefile for the global context.
+func (c *Config) StoreFile(storefile string) *Config {
+	c.Storefile = storefile
+	return c
+}
+
+// GetStoreFile gets the global storefile or defaultStoreFile.
+func (c *Config) GetStoreFile() (storefile string) {
+	storefile = defaultStoreFile
+	if len(c.Storefile) > 0 {
+		storefile = c.Storefile
 	}
 	return
 }
@@ -571,6 +610,22 @@ func (s *Server) GetNoState() (nostate bool) {
 
 	if err != nil {
 		nostate = false
+	}
+	return
+}
+
+// GetNoStore gets NoStore of the server, or the global nostore, or
+// false
+func (s *Server) GetNoStore() (nostore bool) {
+	var err error
+	if len(s.NoStore) != 0 {
+		nostore, err = strconv.ParseBool(s.NoStore)
+	} else if s.parent != nil && len(s.parent.Global.NoStore) != 0 {
+		nostore, err = strconv.ParseBool(s.parent.Global.NoStore)
+	}
+
+	if err != nil {
+		nostore = false
 	}
 	return
 }

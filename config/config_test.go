@@ -41,6 +41,7 @@ var srv1 = &Server{
 	Ssl:                 "true",
 	VerifyCert:          "false",
 	NoState:             "false",
+	NoStore:             "true",
 	FloodProtectBurst:   "5",
 	FloodProtectTimeout: "3.5",
 	FloodProtectStep:    "5.5",
@@ -51,7 +52,7 @@ var srv1 = &Server{
 	Username:            "u1",
 	Userhost:            "h1",
 	Realname:            "r1",
-	Prefix:              "p1",
+	Prefix:              "1",
 	Channels:            []string{"#chan1", "#chan2"},
 }
 
@@ -62,6 +63,7 @@ var srv2 = &Server{
 	Ssl:                 "false",
 	VerifyCert:          "true",
 	NoState:             "true",
+	NoStore:             "true",
 	FloodProtectBurst:   "6",
 	FloodProtectTimeout: "4.5",
 	FloodProtectStep:    "6.5",
@@ -72,7 +74,7 @@ var srv2 = &Server{
 	Username:            "u2",
 	Userhost:            "h2",
 	Realname:            "r2",
-	Prefix:              "p2",
+	Prefix:              "2",
 	Channels:            []string{"#chan2"},
 }
 
@@ -99,6 +101,7 @@ func (s *s) TestConfig_Fallbacks(c *C) {
 	c.Check(server.GetSsl(), Equals, config.Global.GetSsl())
 	c.Check(server.GetVerifyCert(), Equals, config.Global.GetVerifyCert())
 	c.Check(server.GetNoState(), Equals, config.Global.GetNoState())
+	c.Check(server.GetNoStore(), Equals, config.Global.GetNoStore())
 	c.Check(server.GetFloodProtectBurst(), Equals,
 		config.Global.GetFloodProtectBurst())
 	c.Check(server.GetFloodProtectTimeout(), Equals,
@@ -130,6 +133,7 @@ func (s *s) TestConfig_Fluent(c *C) {
 		Ssl(srv2.GetSsl()).
 		VerifyCert(srv2.GetVerifyCert()).
 		NoState(srv2.GetNoState()).
+		NoStore(srv2.GetNoStore()).
 		FloodProtectBurst(srv2.GetFloodProtectBurst()).
 		FloodProtectTimeout(srv2.GetFloodProtectTimeout()).
 		FloodProtectStep(srv2.GetFloodProtectStep()).
@@ -149,6 +153,7 @@ func (s *s) TestConfig_Fluent(c *C) {
 		Ssl(srv1.GetSsl()).
 		VerifyCert(srv1.GetVerifyCert()).
 		NoState(srv1.GetNoState()).
+		NoStore(srv1.GetNoStore()).
 		FloodProtectBurst(srv1.GetFloodProtectBurst()).
 		FloodProtectTimeout(srv1.GetFloodProtectTimeout()).
 		FloodProtectStep(srv1.GetFloodProtectStep()).
@@ -172,6 +177,7 @@ func (s *s) TestConfig_Fluent(c *C) {
 	c.Check(server.GetSsl(), Equals, srv1.GetSsl())
 	c.Check(server.GetVerifyCert(), Equals, srv1.GetVerifyCert())
 	c.Check(server.GetNoState(), Equals, srv1.GetNoState())
+	c.Check(server.GetNoStore(), Equals, srv1.GetNoStore())
 	c.Check(server.GetFloodProtectBurst(), Equals, srv1.GetFloodProtectBurst())
 	c.Check(server.GetFloodProtectTimeout(), Equals,
 		srv1.GetFloodProtectTimeout())
@@ -194,6 +200,7 @@ func (s *s) TestConfig_Fluent(c *C) {
 	c.Check(server2.GetSsl(), Equals, srv2.GetSsl())
 	c.Check(server2.GetVerifyCert(), Equals, srv2.GetVerifyCert())
 	c.Check(server2.GetNoState(), Equals, srv2.GetNoState())
+	c.Check(server2.GetNoStore(), Equals, srv2.GetNoStore())
 	c.Check(server2.GetFloodProtectBurst(), Equals, srv2.GetFloodProtectBurst())
 	c.Check(server2.GetFloodProtectTimeout(), Equals,
 		srv2.GetFloodProtectTimeout())
@@ -212,6 +219,19 @@ func (s *s) TestConfig_Fluent(c *C) {
 	}
 }
 
+func (s *s) TestConfig_Globals(c *C) {
+	conf := CreateConfig().
+		StoreFile("store").
+		Nick(srv1.Nick).
+		Realname(srv1.Realname).
+		Username(srv1.Username).
+		Userhost(srv1.Userhost).
+		Server(srv1.GetName())
+
+	c.Check(conf.GetStoreFile(), Equals, "store")
+	c.Check(conf.IsValid(), Equals, true)
+}
+
 func (s *s) TestConfig_Defaults(c *C) {
 	conf := CreateConfig().
 		Nick(srv1.Nick).
@@ -221,15 +241,18 @@ func (s *s) TestConfig_Defaults(c *C) {
 		Server(srv1.GetName())
 	srv := conf.GetServer(srv1.GetName())
 
+	c.Check(conf.GetStoreFile(), Equals, defaultStoreFile)
 	c.Check(srv.GetPort(), Equals, defaultIrcPort)
 	c.Check(srv.GetSsl(), Equals, false)
 	c.Check(srv.GetVerifyCert(), Equals, false)
 	c.Check(srv.GetNoState(), Equals, false)
+	c.Check(srv.GetNoStore(), Equals, false)
 	c.Check(srv.GetFloodProtectBurst(), Equals, defaultFloodProtectBurst)
 	c.Check(srv.GetFloodProtectTimeout(), Equals, defaultFloodProtectTimeout)
 	c.Check(srv.GetFloodProtectStep(), Equals, defaultFloodProtectStep)
 	c.Check(srv.GetNoReconnect(), Equals, false)
 	c.Check(srv.GetReconnectTimeout(), Equals, defaultReconnectTimeout)
+	c.Check(srv.GetPrefix(), Equals, defaultPrefix)
 }
 
 func (s *s) TestConfig_InvalidValues(c *C) {
@@ -246,12 +269,15 @@ func (s *s) TestConfig_InvalidValues(c *C) {
 	srv.FloodProtectTimeout = "x"
 	srv.VerifyCert = "x"
 	srv.NoState = "x"
+	srv.NoStore = "x"
 	srv.NoReconnect = "x"
 	srv.ReconnectTimeout = "x"
+	srv.Prefix = "xx"
 
 	c.Check(srv.GetSsl(), Equals, false)
 	c.Check(srv.GetVerifyCert(), Equals, false)
 	c.Check(srv.GetNoState(), Equals, false)
+	c.Check(srv.GetNoStore(), Equals, false)
 	c.Check(srv.GetFloodProtectBurst(), Equals, defaultFloodProtectBurst)
 	c.Check(srv.GetFloodProtectTimeout(), Equals, defaultFloodProtectTimeout)
 	c.Check(srv.GetFloodProtectStep(), Equals, defaultFloodProtectStep)
@@ -259,15 +285,17 @@ func (s *s) TestConfig_InvalidValues(c *C) {
 	c.Check(srv.GetReconnectTimeout(), Equals, defaultReconnectTimeout)
 
 	c.Check(conf.IsValid(), Equals, false)
-	c.Check(len(conf.Errors), Equals, 8)
+	c.Check(len(conf.Errors), Equals, 10)
 	c.Check(conf.Errors[0].Error(), Matches, invErr(errSsl))
 	c.Check(conf.Errors[1].Error(), Matches, invErr(errVerifyCert))
 	c.Check(conf.Errors[2].Error(), Matches, invErr(errNoState))
-	c.Check(conf.Errors[3].Error(), Matches, invErr(errFloodProtectBurst))
-	c.Check(conf.Errors[4].Error(), Matches, invErr(errFloodProtectTimeout))
-	c.Check(conf.Errors[5].Error(), Matches, invErr(errFloodProtectStep))
-	c.Check(conf.Errors[6].Error(), Matches, invErr(errNoReconnect))
-	c.Check(conf.Errors[7].Error(), Matches, invErr(errReconnectTimeout))
+	c.Check(conf.Errors[3].Error(), Matches, invErr(errNoStore))
+	c.Check(conf.Errors[4].Error(), Matches, invErr(errFloodProtectBurst))
+	c.Check(conf.Errors[5].Error(), Matches, invErr(errFloodProtectTimeout))
+	c.Check(conf.Errors[6].Error(), Matches, invErr(errFloodProtectStep))
+	c.Check(conf.Errors[7].Error(), Matches, invErr(errNoReconnect))
+	c.Check(conf.Errors[8].Error(), Matches, invErr(errReconnectTimeout))
+	c.Check(conf.Errors[9].Error(), Matches, invErr(errPrefix))
 }
 
 func (s *s) TestConfig_ValidationEmpty(c *C) {
