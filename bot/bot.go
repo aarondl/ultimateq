@@ -311,6 +311,18 @@ func (b *Bot) WaitForHalt() {
 	b.serversProtect.RUnlock()
 }
 
+// Close closes the store database.
+func (b *Bot) Close() error {
+	b.protectStore.Lock()
+	defer b.protectStore.Unlock()
+	if b.store != nil {
+		err := b.store.Close()
+		b.store = nil
+		return err
+	}
+	return nil
+}
+
 // Register adds an event handler to the bot's global dispatcher.
 func (b *Bot) Register(event string, handler interface{}) int {
 	return b.dispatcher.Register(event, handler)
