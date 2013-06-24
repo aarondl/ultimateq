@@ -127,54 +127,28 @@ func (s *s) TestServer_Write(c *C) {
 	b.Disconnect()
 }
 
-func (s *s) TestServer_Protocaps(c *C) {
-	caps := irc.CreateProtoCaps()
-	srv := &Server{
-		caps: caps,
-	}
-	err := srv.createState()
-	c.Check(err, IsNil)
-	err = srv.createDispatcher(nil)
-	c.Check(err, IsNil)
-
-	c.Check(srv.caps.Usermodes(), Not(Equals), "q")
-	c.Check(srv.caps.Chantypes(), Not(Equals), "!")
-	c.Check(srv.caps.Chanmodes(), Not(Equals), ",,,q")
-	c.Check(srv.caps.Prefix(), Not(Equals), "(q)@")
-
-	fakeCaps := &irc.ProtoCaps{}
-	fakeCaps.ParseISupport(&irc.IrcMessage{Args: []string{
-		"NICK", "CHANTYPES=!", "PREFIX=(q)@", "CHANMODES=,,,q",
-	}})
-	fakeCaps.ParseMyInfo(&irc.IrcMessage{Args: []string{
-		"NICK", "irc.test.net", "test-12", "q", "abc",
-	}})
-
-	err = srv.protocaps(fakeCaps)
-	c.Check(err, IsNil)
-
-	c.Check(srv.caps.Usermodes(), Equals, "q")
-	c.Check(srv.caps.Chantypes(), Equals, "!")
-	c.Check(srv.caps.Chanmodes(), Equals, ",,,q")
-	c.Check(srv.caps.Prefix(), Equals, "(q)@")
-
-	// Check that there's a copy
-	c.Check(srv.caps, Not(Equals), fakeCaps)
-
-	// Check errors
-	fakeCaps = &irc.ProtoCaps{}
-	fakeCaps.ParseISupport(&irc.IrcMessage{Args: []string{
-		"NICK", "CHANTYPES=H",
-	}})
-	err = srv.protocaps(fakeCaps)
-	c.Check(err, NotNil)
-
-	fakeCaps = &irc.ProtoCaps{}
-	fakeCaps.ParseISupport(&irc.IrcMessage{Args: []string{
+func (s *s) TestServer_rehashProtocaps(c *C) {
+	originalCaps := irc.CreateProtoCaps()
+	originalCaps.ParseISupport(&irc.IrcMessage{Args: []string{
 		"NICK", "CHANTYPES=!",
 	}})
-	err = srv.protocaps(fakeCaps)
-	c.Check(err, NotNil)
+	capsProv := func() *irc.ProtoCaps {
+		return originalCaps
+	}
+
+	b, err := createBot(fakeConfig, capsProv, nil, nil, false)
+	c.Check(err, IsNil)
+	srv := b.servers[serverId]
+
+	c.Check(srv.caps.Chantypes(), Equals, "!")
+
+	srv.caps.ParseISupport(&irc.IrcMessage{Args: []string{
+		"NICK", "CHANTYPES=#",
+	}})
+	err = srv.rehashProtocaps()
+	c.Check(err, IsNil)
+
+	c.Check(b.caps.Chantypes(), Equals, "!#")
 }
 
 func (s *s) TestServer_State(c *C) {

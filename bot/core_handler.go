@@ -70,16 +70,12 @@ func (c *coreHandler) HandleRaw(msg *irc.IrcMessage, endpoint irc.Endpoint) {
 
 	case irc.RPL_MYINFO:
 		server := c.getServer(endpoint)
-		server.protectCaps.RLock()
 		server.caps.ParseMyInfo(msg)
-		server.protectCaps.RUnlock()
 		server.rehashProtocaps()
 
 	case irc.RPL_ISUPPORT:
 		server := c.getServer(endpoint)
-		server.protectCaps.RLock()
 		server.caps.ParseISupport(msg)
-		server.protectCaps.RUnlock()
 		server.rehashProtocaps()
 	}
 }
@@ -91,7 +87,7 @@ func (c *coreHandler) getServer(endpoint irc.Endpoint) *Server {
 		return s.server
 	}
 
-	c.bot.serversProtect.RLock()
-	defer c.bot.serversProtect.RUnlock()
+	c.bot.protectServers.RLock()
+	defer c.bot.protectServers.RUnlock()
 	return c.bot.servers[endpoint.GetKey()]
 }

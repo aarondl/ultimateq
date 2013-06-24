@@ -16,16 +16,16 @@ type NewServer struct {
 // ReadConfig opens the config for reading, for the duration of the callback
 // the config is synchronized.
 func (b *Bot) ReadConfig(fn configCallback) {
-	b.configsProtect.RLock()
-	defer b.configsProtect.RUnlock()
+	b.protectConfig.RLock()
+	defer b.protectConfig.RUnlock()
 	fn(b.conf)
 }
 
 // WriteConfig opens the config for writing, for the duration of the callback
 // the config is synchronized.
 func (b *Bot) WriteConfig(fn configCallback) {
-	b.configsProtect.Lock()
-	defer b.configsProtect.Unlock()
+	b.protectConfig.Lock()
+	defer b.protectConfig.Unlock()
 	fn(b.conf)
 }
 
@@ -41,10 +41,10 @@ func (b *Bot) ReplaceConfig(newConfig *config.Config) []NewServer {
 
 	servers := make([]NewServer, 0)
 
-	b.serversProtect.Lock()
-	b.configsProtect.Lock()
-	defer b.serversProtect.Unlock() // LIFO
-	defer b.configsProtect.Unlock()
+	b.protectServers.Lock()
+	b.protectConfig.Lock()
+	defer b.protectServers.Unlock() // LIFO
+	defer b.protectConfig.Unlock()
 
 	for k, s := range b.servers {
 		if serverConf := newConfig.GetServer(k); nil == serverConf {
@@ -103,9 +103,9 @@ func (b *Bot) ReplaceConfig(newConfig *config.Config) []NewServer {
 // config file name if loaded from a file... If not it will use a default file
 // name. It then calls Bot.ReplaceConfig.
 func (b *Bot) Rehash() error {
-	b.configsProtect.RLock()
+	b.protectConfig.RLock()
 	name := b.conf.GetFilename()
-	b.configsProtect.RUnlock()
+	b.protectConfig.RUnlock()
 
 	conf := config.CreateConfigFromFile(name)
 	if !CheckConfig(conf) {
@@ -119,8 +119,8 @@ func (b *Bot) Rehash() error {
 // config file name if loaded from a file... If not it will use a default file
 // name.
 func (b *Bot) DumpConfig() (err error) {
-	b.configsProtect.RLock()
-	defer b.configsProtect.RUnlock()
+	b.protectConfig.RLock()
+	defer b.protectConfig.RUnlock()
 	err = config.FlushConfigToFile(b.conf, b.conf.GetFilename())
 	return
 }

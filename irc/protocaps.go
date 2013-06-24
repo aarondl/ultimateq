@@ -327,3 +327,16 @@ func (p *ProtoCaps) ParseMyInfo(m *IrcMessage) {
 	p.usermodes = m.Args[3]
 	p.lchanmodes = m.Args[4]
 }
+
+// Merge merges the given ProtoCaps information into the current one. Although
+// currently the only additive property is CHANTYPES.
+func (p *ProtoCaps) Merge(toMerge *ProtoCaps) {
+	types := toMerge.Chantypes()
+	p.protect.Lock()
+	defer p.protect.Unlock()
+	for _, chantype := range types {
+		if !strings.ContainsRune(p.chantypes, chantype) {
+			p.chantypes += string(chantype)
+		}
+	}
+}

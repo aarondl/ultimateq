@@ -61,9 +61,6 @@ type Server struct {
 	// protects client reading/writing
 	protect sync.RWMutex
 
-	// protects the caps from reading and writing.
-	protectCaps sync.RWMutex
-
 	// protects the state from reading and writing.
 	protectState sync.RWMutex
 }
@@ -201,19 +198,13 @@ func (s *Server) createIrcClient() error {
 	return nil
 }
 
-// protocaps sets the protocaps for the given server. If an error is returned
-// no update was done.
-func (s *Server) protocaps(caps *irc.ProtoCaps) error {
-	tmp := *caps
-	s.protectCaps.Lock()
-	s.caps = &tmp
-	s.protectCaps.Unlock()
-	return s.rehashProtocaps()
-}
-
-// rehashProtocaps rehashes protocaps from the servers current protocaps.
+// rehashProtocaps delivers updated protocaps to the server's components who
+// may need it.
 func (s *Server) rehashProtocaps() error {
 	var err error
+	if err = s.bot.mergeProtocaps(s.caps); err != nil {
+		return err
+	}
 	if err = s.dispatcher.Protocaps(s.caps); err != nil {
 		return err
 	}

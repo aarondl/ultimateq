@@ -65,8 +65,7 @@ type Bot struct {
 
 	conf *config.Config
 
-	store        *data.Store
-	protectStore sync.RWMutex
+	store *data.Store
 
 	caps       *irc.ProtoCaps
 	dispatcher *dispatch.Dispatcher
@@ -77,11 +76,13 @@ type Bot struct {
 	connProvider   ConnProvider
 	storeProvider  StoreProvider
 
+	// Synchronization
 	msgDispatchers sync.WaitGroup
-	// servers
-	serversProtect sync.RWMutex
-	// configs (including server configs)
-	configsProtect sync.RWMutex
+	protectStore   sync.RWMutex
+	protectServers sync.RWMutex
+	// protectConfig also provides locking for the server's config variables
+	// since they are the same config, just pointers to internal chunks.
+	protectConfig sync.RWMutex
 }
 
 // Configure starts a configuration by calling CreateConfig. Alias for
@@ -123,14 +124,14 @@ func CreateBot(conf *config.Config) (*Bot, error) {
 // connects the bot to all defined servers.
 func (b *Bot) Connect() []error {
 	var ers = make([]error, 0, nAssumedServers)
-	b.serversProtect.RLock()
+	b.protectServers.RLock()
 	for _, srv := range b.servers {
 		err := b.connectServer(srv)
 		if err != nil {
 			ers = append(ers, err)
 		}
 	}
-	b.serversProtect.RUnlock()
+	b.protectServers.RUnlock()
 
 	if len(ers) > 0 {
 		return ers
@@ -141,12 +142,12 @@ func (b *Bot) Connect() []error {
 // ConnectServer creates the connection and IrcClient object for the given
 // serverId.
 func (b *Bot) ConnectServer(serverId string) (found bool, err error) {
-	b.serversProtect.RLock()
+	b.protectServers.RLock()
 	if srv, ok := b.servers[serverId]; ok {
 		err = b.connectServer(srv)
 		found = true
 	}
-	b.serversProtect.RUnlock()
+	b.protectServers.RUnlock()
 	return
 }
 
@@ -172,22 +173,22 @@ func (b *Bot) Start() {
 
 // StartServer begins message pumps on a server by id.
 func (b *Bot) StartServer(serverId string) (found bool) {
-	b.serversProtect.RLock()
+	b.protectServers.RLock()
 	if srv, ok := b.servers[serverId]; ok {
 		b.startServer(srv, true, true)
 		found = true
 	}
-	b.serversProtect.RUnlock()
+	b.protectServers.RUnlock()
 	return
 }
 
 // start begins the called for routines on all servers
 func (b *Bot) start(writing, reading bool) {
-	b.serversProtect.RLock()
+	b.protectServers.RLock()
 	for _, srv := range b.servers {
 		b.startServer(srv, writing, reading)
 	}
-	b.serversProtect.RUnlock()
+	b.protectServers.RUnlock()
 }
 
 // startServer begins the called for routines on the specific server
@@ -219,21 +220,21 @@ func (b *Bot) startServer(srv *Server, writing, reading bool) {
 
 // Stop shuts down all dispatch routines.
 func (b *Bot) Stop() {
-	b.serversProtect.RLock()
+	b.protectServers.RLock()
 	for _, srv := range b.servers {
 		b.stopServer(srv)
 	}
-	b.serversProtect.RUnlock()
+	b.protectServers.RUnlock()
 }
 
 // StopServer shuts down the dispatch routine of the given server by id.
 func (b *Bot) StopServer(serverId string) (found bool) {
-	b.serversProtect.RLock()
+	b.protectServers.RLock()
 	if srv, ok := b.servers[serverId]; ok {
 		b.stopServer(srv)
 		found = true
 	}
-	b.serversProtect.RUnlock()
+	b.protectServers.RUnlock()
 	return
 }
 
@@ -247,21 +248,21 @@ func (b *Bot) stopServer(srv *Server) {
 
 // Disconnect closes all connections to the servers
 func (b *Bot) Disconnect() {
-	b.serversProtect.RLock()
+	b.protectServers.RLock()
 	for _, srv := range b.servers {
 		b.disconnectServer(srv)
 	}
-	b.serversProtect.RUnlock()
+	b.protectServers.RUnlock()
 }
 
 // DisconnectServer disconnects the given server by id.
 func (b *Bot) DisconnectServer(serverId string) (found bool) {
-	b.serversProtect.RLock()
+	b.protectServers.RLock()
 	if srv, ok := b.servers[serverId]; ok {
 		b.disconnectServer(srv)
 		found = true
 	}
-	b.serversProtect.RUnlock()
+	b.protectServers.RUnlock()
 	return
 }
 
@@ -284,12 +285,12 @@ func (b *Bot) disconnectServer(srv *Server) {
 
 // InterruptReconnect stops reconnecting the given server by id.
 func (b *Bot) InterruptReconnect(serverId string) (found bool) {
-	b.serversProtect.RLock()
+	b.protectServers.RLock()
 	if srv, ok := b.servers[serverId]; ok {
 		b.interruptReconnect(srv)
 		found = true
 	}
-	b.serversProtect.RUnlock()
+	b.protectServers.RUnlock()
 	return
 }
 
@@ -304,11 +305,11 @@ func (b *Bot) interruptReconnect(srv *Server) {
 func (b *Bot) WaitForHalt() {
 	b.msgDispatchers.Wait()
 	b.dispatcher.WaitForCompletion()
-	b.serversProtect.RLock()
+	b.protectServers.RLock()
 	for _, srv := range b.servers {
 		srv.dispatcher.WaitForCompletion()
 	}
-	b.serversProtect.RUnlock()
+	b.protectServers.RUnlock()
 }
 
 // Close closes the store database.
@@ -332,8 +333,8 @@ func (b *Bot) Register(event string, handler interface{}) int {
 func (b *Bot) RegisterServer(
 	server string, event string, handler interface{}) (int, error) {
 
-	b.serversProtect.RLock()
-	defer b.serversProtect.RUnlock()
+	b.protectServers.RLock()
+	defer b.protectServers.RUnlock()
 
 	if s, ok := b.servers[server]; ok {
 		s.protect.RLock()
@@ -352,8 +353,8 @@ func (b *Bot) Unregister(event string, id int) bool {
 func (b *Bot) UnregisterServer(
 	server string, event string, id int) (bool, error) {
 
-	b.serversProtect.RLock()
-	defer b.serversProtect.RUnlock()
+	b.protectServers.RLock()
+	defer b.protectServers.RUnlock()
 
 	if s, ok := b.servers[server]; ok {
 		s.protect.RLock()
@@ -461,8 +462,8 @@ func (b *Bot) dispatchMessages(s *Server) {
 
 // Writeln writes a string to the given server's IrcClient.
 func (b *Bot) Writeln(server, message string) error {
-	b.serversProtect.RLock()
-	defer b.serversProtect.RUnlock()
+	b.protectServers.RLock()
+	defer b.protectServers.RUnlock()
 
 	if srv, ok := b.servers[server]; !ok {
 		return errUnknownServerId
@@ -575,5 +576,14 @@ func (b *Bot) createStore(filename string) (err error) {
 	} else {
 		b.store, err = b.storeProvider(filename)
 	}
+	return
+}
+
+// mergeProtocaps merges a protocaps with the bot's current protocaps to ensure
+// the bot's main dispatcher still recognizes all channel types that the servers
+// currently recognize.
+func (b *Bot) mergeProtocaps(toMerge *irc.ProtoCaps) (err error) {
+	b.caps.Merge(toMerge)
+	err = b.dispatcher.Protocaps(b.caps)
 	return
 }

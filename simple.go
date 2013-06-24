@@ -18,7 +18,7 @@ type Handler struct {
 }
 
 func (h *Handler) PrivmsgUser(m *irc.Message, endpoint irc.Endpoint) {
-	if strings.Split(m.Sender, "!")[0] == "Aaron" {
+	if irc.Mask(m.Sender).GetNick() == "Aaron" {
 		endpoint.Send(m.Message())
 	}
 }
@@ -125,12 +125,12 @@ func conf(c *config.Config) *config.Config {
 		Userhost("friend").
 		NoReconnect(true)
 
-		c. // First server
-			Server("irc.gamesurge.net1").
-			Host("irc.gamesurge.net").
-			Nick("Aaron").
-			Altnick("nobody1").
-			ReconnectTimeout(5)
+	c. // First server
+		Server("irc.gamesurge.net1").
+		Host("irc.gamesurge.net").
+		Nick("Aaron").
+		Altnick("nobody1").
+		ReconnectTimeout(5)
 
 	c. // Second Server
 		Server("irc.gamesurge.net2").

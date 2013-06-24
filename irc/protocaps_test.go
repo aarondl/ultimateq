@@ -5,37 +5,40 @@ import (
 	"strings"
 )
 
-func (s *s) TestProtoCaps(c *C) {
-	p := CreateProtoCaps()
-	serverId := "irc.gamesurge.net"
+var (
+	serverId = "irc.gamesurge.net"
 
-	s0 := `NICK irc.test.net testircd-1.2 acCior abcde`
+	_s0 = `NICK irc.test.net testircd-1.2 acCior abcde`
 
-	s1 := `NICK RFC8812 IRCD=gIRCd CASEMAPPING=scii PREFIX=(v)+ ` +
+	_s1 = `NICK RFC8812 IRCD=gIRCd CASEMAPPING=scii PREFIX=(v)+ ` +
 		`CHANTYPES=#& CHANMODES=a,b,c,d CHANLIMIT=#&+:10`
 
-	s2 := `NICK CHANNELLEN=49 NICKLEN=8 TOPICLEN=489 AWAYLEN=126 KICKLEN=399 ` +
+	_s2 = `NICK CHANNELLEN=49 NICKLEN=8 TOPICLEN=489 AWAYLEN=126 KICKLEN=399 ` +
 		`MODES=4 MAXLIST=beI:49 EXCEPTS=e INVEX=I PENALTY`
 
-	msg0 := &IrcMessage{
+	capsTest0 = &IrcMessage{
 		Name:   RPL_MYINFO,
-		Args:   strings.Split(s0, " "),
+		Args:   strings.Split(_s0, " "),
 		Sender: serverId,
 	}
-	msg1 := &IrcMessage{
+	capsTest1 = &IrcMessage{
 		Name:   RPL_ISUPPORT,
-		Args:   append(strings.Split(s1, " "), "are supported by this server"),
+		Args:   append(strings.Split(_s1, " "), "are supported by this server"),
 		Sender: serverId,
 	}
-	msg2 := &IrcMessage{
+	capsTest2 = &IrcMessage{
 		Name:   RPL_ISUPPORT,
-		Args:   append(strings.Split(s2, " "), "are supported by this server"),
+		Args:   append(strings.Split(_s2, " "), "are supported by this server"),
 		Sender: serverId,
 	}
+)
 
-	p.ParseMyInfo(msg0)
-	p.ParseISupport(msg1)
-	p.ParseISupport(msg2)
+func (s *s) TestProtoCaps(c *C) {
+	p := CreateProtoCaps()
+
+	p.ParseMyInfo(capsTest0)
+	p.ParseISupport(capsTest1)
+	p.ParseISupport(capsTest2)
 
 	c.Check(p.ServerName(), Equals, "irc.test.net")
 	c.Check(p.IrcdVersion(), Equals, "testircd-1.2")
@@ -58,4 +61,23 @@ func (s *s) TestProtoCaps(c *C) {
 	c.Check(p.Extra("PENALTY"), Equals, "true")
 	c.Check(p.Extra("INVEX"), Equals, "I")
 	c.Check(p.Extra("NICK"), Equals, "")
+}
+
+func (s *s) TestProtoCaps_Merge(c *C) {
+	p1 := CreateProtoCaps()
+	p2 := CreateProtoCaps()
+
+	mergeTest1 := &IrcMessage{
+		Args: []string{"NICK", "CHANTYPES=#&"},
+	}
+	mergeTest2 := &IrcMessage{
+		Args: []string{"NICK", "CHANTYPES=~"},
+	}
+
+	p1.ParseISupport(mergeTest1)
+	p2.ParseISupport(mergeTest2)
+	c.Check(p1.Chantypes(), Equals, "#&")
+	c.Check(p2.Chantypes(), Equals, "~")
+	p1.Merge(p2)
+	c.Check(p1.Chantypes(), Equals, "#&~")
 }
