@@ -115,6 +115,16 @@ func CreateProtoCaps() *ProtoCaps {
 	return p
 }
 
+// Safely clones this protocaps instance.
+func (p *ProtoCaps) Clone() *ProtoCaps {
+	clone := *p
+	clone.extras = make(map[string]string)
+	for k, v := range p.extras {
+		clone.extras[k] = v
+	}
+	return &clone
+}
+
 // ServerName gets the servername from the ProtoCaps.
 func (p *ProtoCaps) ServerName() string {
 	p.protect.RLock()

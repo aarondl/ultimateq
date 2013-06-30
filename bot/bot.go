@@ -529,11 +529,10 @@ func createBot(conf *config.Config, capsProv CapsProvider,
 // createServer creates a dispatcher, and an irc client to connect to this
 // server.
 func (b *Bot) createServer(conf *config.Server) (*Server, error) {
-	var copyCaps irc.ProtoCaps = *b.caps
 	s := &Server{
 		bot:          b,
 		name:         conf.GetName(),
-		caps:         &copyCaps,
+		caps:         b.caps.Clone(),
 		conf:         conf,
 		killdispatch: make(chan int),
 		killreconn:   make(chan int),

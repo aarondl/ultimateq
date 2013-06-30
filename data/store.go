@@ -105,6 +105,11 @@ func (s *Store) AuthUser(
 	return user, nil
 }
 
+// GetAuthedUser looks up a user that was authenticated previously.
+func (s *Store) GetAuthedUser(server, host string) *UserAccess {
+	return s.authed[server+host]
+}
+
 // Logout deletes an authenticated host.
 func (s *Store) Logout(server, host string) {
 	delete(s.authed, server+host)

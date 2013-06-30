@@ -67,9 +67,8 @@ type Server struct {
 
 // ServerEndpoint implements the Endpoint interface.
 type ServerEndpoint struct {
-	*irc.Helper
+	*data.DataEndpoint
 	server *Server
-	store  *data.Store
 }
 
 // createServerEndpoint creates a ServerEndpoint with a helper.
@@ -80,56 +79,6 @@ func createServerEndpoint(srv *Server, store *data.Store) *ServerEndpoint {
 // GetKey returns the server id of the current server.
 func (s *ServerEndpoint) GetKey() string {
 	return s.server.name
-}
-
-// UsingState calls a callback if this ServerEndpoint can present a data state
-// object. The returned boolean is whether or not the function was called.
-func (s *ServerEndpoint) UsingState(fn func(*data.State)) (called bool) {
-	s.server.protectState.RLock()
-	defer s.server.protectState.RUnlock()
-	if s.server.state != nil {
-		fn(s.server.state)
-		called = true
-	}
-	return
-}
-
-// OpenState locks the data state, and returns it. PutState must be called or
-// the lock will never be released and the bot will sieze up. The state must
-// be checked for nil.
-func (s *ServerEndpoint) OpenState() *data.State {
-	s.server.protectState.RLock()
-	return s.server.state
-}
-
-// CloseState unlocks the data state after use by GetState.
-func (s *ServerEndpoint) CloseState() {
-	s.server.protectState.RUnlock()
-}
-
-// UsingStore calls a callback if this ServerEndpoint can present a data store
-// object. The returned boolean is whether or not the function was called.
-func (s *ServerEndpoint) UsingStore(fn func(*data.Store)) (called bool) {
-	if s.store != nil {
-		s.server.bot.protectStore.RLock()
-		fn(s.store)
-		s.server.bot.protectStore.RUnlock()
-		called = true
-	}
-	return
-}
-
-// OpenStore locks the data store, and returns it. PutStore must be called or
-// the lock will never be released and the bot will sieze up. The store must
-// be checked for nil.
-func (s *ServerEndpoint) OpenStore() *data.Store {
-	s.server.bot.protectStore.RLock()
-	return s.server.bot.store
-}
-
-// CloseStore unlocks the data store after use by GetStore.
-func (s *ServerEndpoint) CloseStore() {
-	s.server.bot.protectStore.RUnlock()
 }
 
 // Writeln writes to the server's IrcClient.

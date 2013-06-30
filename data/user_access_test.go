@@ -2,6 +2,7 @@ package data
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/aarondl/ultimateq/irc"
 	. "testing"
 )
@@ -145,6 +146,60 @@ func TestUserAccess_IsMatch(t *T) {
 	a = createUserAccess(wmasks...)
 	if !a.IsMatch(mask1) || !a.IsMatch(mask2) {
 		t.Error(mask1, "and", mask2, "should match")
+	}
+}
+
+func TestUserAccess_Has(t *T) {
+	t.Parallel()
+	a := createUserAccess()
+
+	var check = func(
+		level uint8, flags string, has, hasLevel, hasFlags bool) string {
+
+		if ret := a.Has(server, channel, level, flags); ret != has {
+			return fmt.Sprintf("Expected (%v, %v) to return: %v but got %v",
+				level, flags, has, ret)
+		}
+		if ret := a.HasLevel(server, channel, level); ret != hasLevel {
+			return fmt.Sprintf("Expected level (%v) to return: %v but got %v",
+				level, hasLevel, ret)
+		}
+		if ret := a.HasFlags(server, channel, flags); ret != hasFlags {
+			return fmt.Sprintf("Expected flags (%v) to return: %v but got %v",
+				flags, hasFlags, ret)
+		}
+		return ""
+	}
+
+	var s string
+	if s = check(1, "a", false, false, false); len(s) != 0 {
+		t.Error(s)
+	}
+	a.GrantChannelFlags(server, channel, "a")
+	if s = check(1, "a", false, false, true); len(s) != 0 {
+		t.Error(s)
+	}
+	a.GrantChannelLevel(server, channel, 1)
+	if s = check(1, "a", true, true, true); len(s) != 0 {
+		t.Error(s)
+	}
+
+	a.GrantServerFlags(server, "b")
+	if s = check(2, "ab", false, false, true); len(s) != 0 {
+		t.Error(s)
+	}
+	a.GrantServerLevel(server, 2)
+	if s = check(2, "ab", true, true, true); len(s) != 0 {
+		t.Error(s)
+	}
+
+	a.GrantGlobalFlags("c")
+	if s = check(3, "abc", false, false, true); len(s) != 0 {
+		t.Error(s)
+	}
+	a.GrantGlobalLevel(3)
+	if s = check(3, "abc", true, true, true); len(s) != 0 {
+		t.Error(s)
 	}
 }
 

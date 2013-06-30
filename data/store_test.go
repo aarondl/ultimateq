@@ -207,7 +207,7 @@ func TestStore_AuthLogout(t *T) {
 	if len(s.cache) == 0 {
 		t.Error("Auth is not using cache.")
 	}
-	if s.authed[server+host] == nil {
+	if s.GetAuthedUser(server, host) == nil {
 		t.Error("User is not authenticated.")
 	}
 

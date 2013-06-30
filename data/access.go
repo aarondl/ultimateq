@@ -28,11 +28,7 @@ func (a *Access) SetAccess(level uint8, flags ...string) {
 
 // SetFlags sets many flags at once.
 func (a *Access) SetFlags(flags ...string) {
-	for i := 0; i < len(flags); i++ {
-		for _, f := range flags[i] {
-			a.SetFlag(f)
-		}
-	}
+	a.Flags |= getFlagBits(flags...)
 }
 
 // ClearFlags clears many flags at once.
@@ -80,6 +76,16 @@ func (a *Access) ClearFlag(flag rune) {
 // ClearAllFlags clears all flags.
 func (a *Access) ClearAllFlags() {
 	a.Flags = 0
+}
+
+// getFlagBits creates a mask containing all the modes.
+func getFlagBits(flags ...string) (bits uint64) {
+	for i := 0; i < len(flags); i++ {
+		for _, f := range flags[i] {
+			bits |= getFlagBit(f)
+		}
+	}
+	return
 }
 
 // getFlagBit maps a-zA-Z to bits in a uint64

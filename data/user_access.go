@@ -147,6 +147,80 @@ func (a *UserAccess) DelMasks(masks ...irc.WildMask) {
 	}
 }
 
+// Has checks if a user has the given level and flags. Where his access is
+// overridden thusly: Global > Server > Channel
+func (a *UserAccess) Has(server, channel string,
+	level uint8, flags ...string) bool {
+
+	var searchBits = getFlagBits(flags...)
+	var hasFlags, hasLevel bool
+
+	var check = func(access *Access) bool {
+		if access != nil {
+			hasLevel = hasLevel || access.HasLevel(level)
+			searchBits &= ^access.Flags
+			hasFlags = hasFlags || searchBits == 0
+		}
+		return hasLevel && hasFlags
+	}
+
+	if check(a.Global) {
+		return true
+	}
+	if check(a.Server[server]) {
+		return true
+	}
+	if chans, ok := a.Channel[server]; ok {
+		if check(chans[channel]) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// HasLevel checks if a user has a given level of access. Where his access is
+// overridden thusly: Global > Server > Channel
+func (a *UserAccess) HasLevel(server, channel string, level uint8) bool {
+	if a.HasGlobalLevel(level) {
+		return true
+	}
+	if a.HasServerLevel(server, level) {
+		return true
+	}
+	if a.HasChannelLevel(server, channel, level) {
+		return true
+	}
+	return false
+}
+
+// HasFlags checks if a user has a given level of access. Where his access is
+// overridden thusly: Global > Server > Channel
+func (a *UserAccess) HasFlags(server, channel string, flags ...string) bool {
+	var searchBits = getFlagBits(flags...)
+
+	var check = func(access *Access) bool {
+		if access != nil {
+			searchBits &= ^access.Flags
+		}
+		return searchBits == 0
+	}
+
+	if check(a.Global) {
+		return true
+	}
+	if check(a.Server[server]) {
+		return true
+	}
+	if chans, ok := a.Channel[server]; ok {
+		if check(chans[channel]) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // IsMatch checks to see if this UserAccess has a wildmask that will satisfy
 // the given mask.
 func (a *UserAccess) IsMatch(mask irc.Mask) bool {

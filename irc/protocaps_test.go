@@ -63,6 +63,17 @@ func (s *s) TestProtoCaps(c *C) {
 	c.Check(p.Extra("NICK"), Equals, "")
 }
 
+func (s *s) TestProtoCaps_Clone(c *C) {
+	p1 := CreateProtoCaps()
+	p2 := p1.Clone()
+	other := "other"
+	p1.chantypes = other
+	p1.extras[other] = other
+
+	c.Check(p2.chantypes, Not(Equals), other)
+	c.Check(p2.extras[other], Not(Equals), other)
+}
+
 func (s *s) TestProtoCaps_Merge(c *C) {
 	p1 := CreateProtoCaps()
 	p2 := CreateProtoCaps()
