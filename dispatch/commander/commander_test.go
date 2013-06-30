@@ -10,46 +10,66 @@ import (
 	. "testing"
 )
 
-type basicCommands struct {
-	called  bool
-	msg     *irc.Message
-	end     irc.Endpoint
-	user    *data.User
-	channel *data.Channel
+type commandHandler struct {
+	called       bool
+	cmd          string
+	msg          *irc.Message
+	end          irc.Endpoint
+	user         *data.User
+	channel      *data.Channel
+	usrchanmodes *data.UserModes
+	access       *data.UserAccess
 }
 
-func (b *basicCommands) HandleCommand(msg *irc.Message,
-	end *data.DataEndpoint, user *data.User, ch *data.Channel) {
+func (b *commandHandler) Command(cmd string, msg *irc.Message,
+	end *data.DataEndpoint, data *CommandData) {
 
 	b.called = true
+	b.cmd = cmd
 	b.msg = msg
 	b.end = end
-	b.user = user
-	b.channel = ch
-}
-
-type authCommands struct {
-	*basicCommands
-	access *data.UserAccess
-}
-
-func (a *authCommands) HandleAuthedCommand(msg *irc.Message,
-	end *data.DataEndpoint, user *data.User, access *data.UserAccess,
-	ch *data.Channel) {
-
-	a.HandleCommand(msg, end, user, ch)
-	a.access = access
+	b.user = data.User
+	b.channel = data.Channel
+	b.access = data.UserAccess
+	b.usrchanmodes = data.UserChannelModes
 }
 
 var (
 	server  = "irc.test.net"
+	host    = "nick!user@host"
+	self    = "self!self@self.com"
 	cmd     = "cmd"
 	channel = "#chan"
 	nick    = "nick"
 )
 
-func setup() (store *data.Store, user *data.UserAccess) {
+func setup() (state *data.State, store *data.Store) {
 	var err error
+	state, err = data.CreateState(irc.CreateProtoCaps())
+	if err != nil {
+		panic(err)
+	}
+
+	state.Update(&irc.IrcMessage{
+		Sender: server, Name: irc.RPL_WELCOME,
+		Args: []string{"welcome", self},
+	})
+	state.Update(&irc.IrcMessage{
+		Sender: self, Name: irc.JOIN,
+		Args: []string{channel},
+	})
+	state.Update(&irc.IrcMessage{
+		Sender: host, Name: irc.JOIN,
+		Args: []string{channel},
+	})
+	return
+}
+
+func setupForAuth() (state *data.State, store *data.Store,
+	user *data.UserAccess) {
+
+	var err error
+	state, _ = setup()
 	store, err = data.CreateStore(data.MemStoreProvider)
 	if err != nil {
 		panic(err)
@@ -89,7 +109,7 @@ func TestCommander(t *T) {
 func TestCommander_Register(t *T) {
 	c := CreateCommander(prefix, core)
 
-	handler := &basicCommands{}
+	var handler = &commandHandler{}
 
 	var success bool
 	var err error
@@ -121,7 +141,7 @@ func TestCommander_Register(t *T) {
 func TestCommander_RegisterProtected(t *T) {
 	c := CreateCommander(prefix, core)
 
-	handler := &basicCommands{}
+	handler := &commandHandler{}
 	var success bool
 	var err error
 	err = c.RegisterAuthed(GLOBAL, cmd, nil, ALL, ALL, 100, "ab")
@@ -161,12 +181,11 @@ func TestCommander_Dispatch(t *T) {
 	}
 
 	var buffer = &bytes.Buffer{}
-	var storeMutex sync.RWMutex
-	store, _ := setup()
-	var dataEndpoint = data.CreateDataEndpoint(server, buffer, nil, store,
-		nil, &storeMutex)
+	var stateMutex, storeMutex sync.RWMutex
+	state, store := setup()
+	var dataEndpoint = data.CreateDataEndpoint(server, buffer, state, store,
+		&stateMutex, &storeMutex)
 
-	handler := &basicCommands{}
 	cmsg := []string{channel, string(c.prefix) + cmd}
 	badcmsg := []string{"#otherchan", string(c.prefix) + cmd}
 	umsg := []string{nick, cmd}
@@ -231,6 +250,7 @@ func TestCommander_Dispatch(t *T) {
 	}
 
 	for _, test := range table {
+		handler := &commandHandler{}
 		err := c.Register(GLOBAL, cmd, handler, test.MsgType, test.Scope,
 			test.CmdArgs...)
 		if err != nil {
@@ -238,14 +258,44 @@ func TestCommander_Dispatch(t *T) {
 			continue
 		}
 
-		handler.called = false
-		msg := &irc.IrcMessage{Name: test.Name, Args: test.MsgArgs}
+		msg := &irc.IrcMessage{
+			Sender: host,
+			Name:   test.Name,
+			Args:   test.MsgArgs,
+		}
 		err = c.Dispatch(msg, dataEndpoint)
+		c.WaitForHandlers()
 		if handler.called != test.Called {
 			if handler.called {
 				t.Errorf("Test erroneously called: %v", test)
 			} else {
 				t.Errorf("Test erroneously skipped: %v", test)
+			}
+		}
+
+		if handler.called {
+			if handler.cmd == "" {
+				t.Error("The command was not passed to the handler.")
+			}
+			if handler.user == nil {
+				t.Error("The sender was not passed to the handler.")
+			}
+			if handler.access != nil {
+				t.Error("Permless commands should not verify access.")
+			}
+			if test.MsgArgs[0][0] == '#' {
+				if handler.channel == nil {
+					t.Error("The channel was not passed to the handler.")
+				}
+				if handler.usrchanmodes == nil {
+					t.Error("The user modes were not passed to the handler.")
+				}
+			}
+			if handler.msg == nil {
+				t.Error("The message was not passed to the handler.")
+			}
+			if handler.end == nil {
+				t.Error("The endpoint was not passed to the handler.")
 			}
 		}
 
@@ -270,8 +320,6 @@ func TestCommander_Dispatch(t *T) {
 func TestCommander_DispatchAuthed(t *T) {
 	c := CreateCommander(prefix, core)
 
-	handler := &authCommands{&basicCommands{}, nil}
-
 	var table = []struct {
 		Sender   string
 		LevelReq uint8
@@ -279,21 +327,23 @@ func TestCommander_DispatchAuthed(t *T) {
 		Called   bool
 		ErrMsg   string
 	}{
-		{"nick!user@host", 250, "a", false, "Access Denied: Level"},
-		{"nick!user@host", 100, "ab", false, "Access Denied: ab flag(s)"},
+		{host, 250, "a", false, "Access Denied: Level"},
+		{host, 100, "ab", false, "Access Denied: ab flag(s)"},
 		{"nick!user@diffhost", 100, "ab", false, "not authenticated"},
-		{"nick!user@host", 100, "a", true, ""},
+		{host, 100, "a", true, ""},
 	}
 
 	var buffer = &bytes.Buffer{}
-	var storeMutex sync.RWMutex
-	store, user := setup()
+	var stateMutex, storeMutex sync.RWMutex
+	state, store, user := setupForAuth()
 	user.GrantGlobal(100, "a")
 
-	var dataEndpoint = data.CreateDataEndpoint(server, buffer, nil, store,
-		nil, &storeMutex)
+	var dataEndpoint = data.CreateDataEndpoint(server, buffer, state, store,
+		&stateMutex, &storeMutex)
 
 	for _, test := range table {
+		handler := &commandHandler{}
+
 		err := c.RegisterAuthed(GLOBAL, cmd, handler, ALL, ALL,
 			test.LevelReq, test.Flags)
 		if err != nil {
@@ -301,7 +351,6 @@ func TestCommander_DispatchAuthed(t *T) {
 			continue
 		}
 
-		handler.called = false
 		msg := &irc.IrcMessage{
 			Sender: test.Sender,
 			Name:   irc.PRIVMSG,
@@ -309,11 +358,36 @@ func TestCommander_DispatchAuthed(t *T) {
 		}
 
 		err = c.Dispatch(msg, dataEndpoint)
+		c.WaitForHandlers()
 		if handler.called != test.Called {
 			if handler.called {
 				t.Errorf("Test erroneously called: %v", test)
 			} else {
 				t.Errorf("Test erroneously skipped: %v", test)
+			}
+		}
+
+		if handler.called {
+			if handler.cmd == "" {
+				t.Error("The command was not passed to the handler.")
+			}
+			if handler.user == nil {
+				t.Error("The sender was not passed to the handler.")
+			}
+			if handler.usrchanmodes == nil {
+				t.Error("The user modes were not passed to the handler.")
+			}
+			if handler.access == nil {
+				t.Error("The access was not passed to the handler.")
+			}
+			if handler.channel == nil {
+				t.Error("The channel was not passed to the handler.")
+			}
+			if handler.msg == nil {
+				t.Error("The message was not passed to the handler.")
+			}
+			if handler.end == nil {
+				t.Error("The endpoint was not passed to the handler.")
 			}
 		}
 

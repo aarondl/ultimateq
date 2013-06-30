@@ -86,15 +86,35 @@ var (
 	protectGlobalReg sync.RWMutex
 )
 
-// CommandHandler is an interface for basic command handling.
-type CommandHandler interface {
-	HandleCommand(*irc.Message, *data.DataEndpoint, *data.User, *data.Channel)
+// CommandData is a convenience structure to gather all the variables that
+// come back as well as offer a closing mechanism to close up the opened
+// handles to the State and Store.
+type CommandData struct {
+	ep               *data.DataEndpoint
+	User             *data.User
+	UserAccess       *data.UserAccess
+	UserChannelModes *data.UserModes
+	Channel          *data.Channel
+	once             sync.Once
 }
 
-// AuthedCommandHandler is an interface that deals with authentication.
-type AuthedCommandHandler interface {
-	HandleAuthedCommand(*irc.Message, *data.DataEndpoint, *data.User,
-		*data.UserAccess, *data.Channel)
+// Close closes the handles to the internal structures. Close will never return
+// an error so it should be ignored.
+func (db *CommandData) Close() error {
+	db.once.Do(func() {
+		db.User = nil
+		db.UserAccess = nil
+		db.UserChannelModes = nil
+		db.Channel = nil
+		db.ep.CloseState()
+		db.ep.CloseStore()
+	})
+	return nil
+}
+
+// CommandHandler is an interface for command handling.
+type CommandHandler interface {
+	Command(string, *irc.Message, *data.DataEndpoint, *CommandData)
 }
 
 // command holds all the information about a registered command handler.
@@ -105,7 +125,7 @@ type command struct {
 	Callscope int
 	ReqLevel  uint8
 	ReqFlags  string
-	Handler   interface{}
+	Handler   CommandHandler
 }
 
 // setArgs sets the arguments cleanly. Forgoes error handling
@@ -182,9 +202,8 @@ func (c *Commander) Register(server, cmd string, handler CommandHandler,
 }
 
 // RegisterAuthed creates an authenticated command with the bot.
-func (c *Commander) RegisterAuthed(server, cmd string,
-	handler AuthedCommandHandler, msgtype, scope int, level uint8, flags string,
-	args ...string) error {
+func (c *Commander) RegisterAuthed(server, cmd string, handler CommandHandler,
+	msgtype, scope int, level uint8, flags string, args ...string) error {
 
 	globalCmd := makeIdentifier(server, cmd)
 
@@ -205,7 +224,7 @@ func (c *Commander) RegisterAuthed(server, cmd string,
 }
 
 // register creates a command with the bot.
-func (c *Commander) createCommand(globalCmd, cmd string, handler interface{},
+func (c *Commander) createCommand(globalCmd, cmd string, handler CommandHandler,
 	msgtype, scope int, args ...string) (*command, error) {
 
 	if handler == nil {
@@ -295,17 +314,30 @@ func (c *Commander) Dispatch(msg *irc.IrcMessage, ep *data.DataEndpoint) error {
 		return err
 	}
 
-	if err := filterAccess(command, ch, ep, msg); err != nil {
+	var data = CommandData{ep: ep}
+	state := ep.OpenState()
+	store := ep.OpenStore()
+
+	if access, err := filterAccess(store, command, ch, ep, msg); err != nil {
 		return err
+	} else {
+		data.UserAccess = access
 	}
 
-	// Dispatch
-	switch t := command.Handler.(type) {
-	case CommandHandler:
-		t.HandleCommand(&irc.Message{msg}, nil, nil, nil)
-	case AuthedCommandHandler:
-		t.HandleAuthedCommand(&irc.Message{msg}, nil, nil, nil, nil)
+	if state != nil {
+		data.User = state.GetUser(msg.Sender)
+		if isChan {
+			data.Channel = state.GetChannel(ch)
+			data.UserChannelModes = state.GetUsersChannelModes(msg.Sender, ch)
+		}
 	}
+
+	c.HandlerStarted()
+	go func() {
+		defer data.Close()
+		command.Handler.Command(cmd, &irc.Message{msg}, ep, &data)
+		c.HandlerFinished()
+	}()
 
 	return nil
 }
@@ -340,34 +372,31 @@ func filterArgs(command *command, msg *irc.IrcMessage) error {
 
 // filterAccess ensures that a user has the correct access to perform the given
 // command.
-func filterAccess(command *command, channel string,
-	ep *data.DataEndpoint, msg *irc.IrcMessage) error {
+func filterAccess(store *data.Store, command *command, channel string,
+	ep *data.DataEndpoint, msg *irc.IrcMessage) (*data.UserAccess, error) {
 
 	hasLevel := command.ReqLevel != 0
 	hasFlags := len(command.ReqFlags) != 0
 	if !hasLevel && !hasFlags {
-		return nil
+		return nil, nil
 	}
 
-	var access *data.UserAccess
-	store := ep.OpenStore()
-	defer store.Close()
 	if store == nil {
-		return errors.New(ErrMsgStoreDisabled)
+		return nil, errors.New(ErrMsgStoreDisabled)
 	}
 
-	access = store.GetAuthedUser(ep.GetKey(), msg.Sender)
+	var access = store.GetAuthedUser(ep.GetKey(), msg.Sender)
 	if access == nil {
-		return errors.New(ErrMsgNotAuthed)
+		return nil, errors.New(ErrMsgNotAuthed)
 	}
 	if hasLevel && !access.HasLevel(server, channel, command.ReqLevel) {
-		return errors.New(fmt.Sprintf(ErrFmtInsuffLevel, command.ReqLevel))
+		return nil, errors.New(fmt.Sprintf(ErrFmtInsuffLevel, command.ReqLevel))
 	}
 	if hasFlags && !access.HasFlags(server, channel, command.ReqFlags) {
-		return errors.New(fmt.Sprintf(ErrFmtInsuffFlags, command.ReqFlags))
+		return nil, errors.New(fmt.Sprintf(ErrFmtInsuffFlags, command.ReqFlags))
 	}
 
-	return nil
+	return access, nil
 }
 
 // makeIdentifier creates an identifier from a server and a command for
