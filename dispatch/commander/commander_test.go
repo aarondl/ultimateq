@@ -19,22 +19,47 @@ type commandHandler struct {
 	channel      *data.Channel
 	usrchanmodes *data.UserModes
 	access       *data.UserAccess
+	args         map[string]string
+	state        *data.State
+	store        *data.Store
 }
 
 func (b *commandHandler) Command(cmd string, msg *irc.Message,
-	end *data.DataEndpoint, data *CommandData) {
+	end *data.DataEndpoint, cmdata *CommandData) (err error) {
 
 	b.called = true
 	b.cmd = cmd
 	b.msg = msg
 	b.end = end
-	b.user = data.User
-	b.channel = data.Channel
-	b.access = data.UserAccess
-	b.usrchanmodes = data.UserChannelModes
+	b.user = cmdata.User
+	b.channel = cmdata.Channel
+	b.access = cmdata.UserAccess
+	b.usrchanmodes = cmdata.UserChannelModes
+	b.args = cmdata.args
+	b.state = cmdata.State
+	b.store = cmdata.Store
+
+	// Test Coverage obviously will work.
+	for k, v := range cmdata.args {
+		if cmdata.GetArg(k) != v {
+			panic("Something is incredibly wrong.")
+		}
+	}
+
+	return
 }
 
-var (
+type errorHandler struct {
+	Error error
+}
+
+func (e *errorHandler) Command(_ string, _ *irc.Message, _ *data.DataEndpoint,
+	_ *CommandData) error {
+
+	return e.Error
+}
+
+const (
 	server  = "irc.test.net"
 	host    = "nick!user@host"
 	self    = "self!self@self.com"
@@ -118,6 +143,26 @@ func TestCommander_Register(t *T) {
 		t.Error("Should not register nil event handlers.")
 	}
 
+	err = c.Register(GLOBAL, cmd, handler, ALL, ALL, "!!!")
+	if !strings.Contains(err.Error(), "Arguments must look like") {
+		t.Error("Bad arguments should give an error about form.")
+	}
+
+	err = c.Register(GLOBAL, cmd, handler, ALL, ALL, "[opt]", "req")
+	if !strings.Contains(err.Error(), "Required arguments must come before") {
+		t.Error("Badly ordered arguments should give an error.")
+	}
+
+	err = c.Register(GLOBAL, cmd, handler, ALL, ALL, "req...", "[opt]")
+	if !strings.Contains(err.Error(), "Optional arguments must come before") {
+		t.Error("Badly ordered arguments should give an error.")
+	}
+
+	err = c.Register(GLOBAL, cmd, handler, ALL, ALL, "vargs...", "vargs2...")
+	if !strings.Contains(err.Error(), "Only one varargs is allowed") {
+		t.Error("Duplicate varargs should not be allowed.")
+	}
+
 	err = c.Register(GLOBAL, cmd, handler, ALL, ALL)
 	if err != nil {
 		t.Error("Registration failed:", err)
@@ -187,16 +232,18 @@ func TestCommander_Dispatch(t *T) {
 		&stateMutex, &storeMutex)
 
 	cmsg := []string{channel, string(c.prefix) + cmd}
+	notcmd := []string{nick, "not", "a", "command"}
 	badcmsg := []string{"#otherchan", string(c.prefix) + cmd}
 	umsg := []string{nick, cmd}
 	uargmsg := []string{nick, cmd, "arg1", "arg2"}
 	uargvargs := []string{nick, cmd, "arg1", "arg2", "arg3", "arg4"}
 
-	arg1req := []string{"arg1"}
-	arg1opt := []string{"[opt1]"}
+	arg1req := []string{"arg"}
+	arg1opt := []string{"[opt]"}
+	arg1opt1var := []string{"[opt]", "opts..."}
 	argvar := []string{"opts..."}
 	arg1req1opt := []string{"arg", "[opt]"}
-	argreq1var := []string{"arg1", "opts..."}
+	argreq1var := []string{"arg", "opts..."}
 
 	var table = []struct {
 		CmdArgs []string
@@ -209,7 +256,10 @@ func TestCommander_Dispatch(t *T) {
 	}{
 		// Args
 		{nil, ALL, ALL, irc.PRIVMSG, umsg, true, ""},
+		{nil, ALL, ALL, irc.PRIVMSG, notcmd, false, ""},
+		{nil, ALL, ALL, irc.PRIVMSG, uargmsg, false, "No arguments"},
 		{arg1opt, ALL, ALL, irc.PRIVMSG, umsg, true, ""},
+		{arg1opt1var, ALL, ALL, irc.PRIVMSG, uargvargs, true, ""},
 		{arg1req, ALL, ALL, irc.PRIVMSG, umsg, false, "arguments"},
 
 		{arg1req, ALL, ALL, irc.PRIVMSG, uargmsg, false, "arguments"},
@@ -250,6 +300,7 @@ func TestCommander_Dispatch(t *T) {
 	}
 
 	for _, test := range table {
+		buffer.Reset()
 		handler := &commandHandler{}
 		err := c.Register(GLOBAL, cmd, handler, test.MsgType, test.Scope,
 			test.CmdArgs...)
@@ -263,7 +314,7 @@ func TestCommander_Dispatch(t *T) {
 			Name:   test.Name,
 			Args:   test.MsgArgs,
 		}
-		err = c.Dispatch(msg, dataEndpoint)
+		err = c.Dispatch(server, msg, dataEndpoint)
 		c.WaitForHandlers()
 		if handler.called != test.Called {
 			if handler.called {
@@ -276,6 +327,23 @@ func TestCommander_Dispatch(t *T) {
 		if handler.called {
 			if handler.cmd == "" {
 				t.Error("The command was not passed to the handler.")
+			}
+			if len(test.CmdArgs) != 0 {
+				if handler.args == nil {
+					t.Errorf("No arguments passed in to the handler\n%v",
+						test)
+				} else {
+					for i, arg := range test.CmdArgs {
+						req := !strings.ContainsAny(arg, ".[")
+						arg = strings.Trim(arg, ".[]")
+						if handler.args[arg] == "" {
+							if req || i < len(test.MsgArgs)-2 {
+								t.Errorf("The argument was not present: %v\n%v",
+									arg, test)
+							}
+						}
+					}
+				}
 			}
 			if handler.user == nil {
 				t.Error("The sender was not passed to the handler.")
@@ -297,6 +365,12 @@ func TestCommander_Dispatch(t *T) {
 			if handler.end == nil {
 				t.Error("The endpoint was not passed to the handler.")
 			}
+			if handler.state == nil {
+				t.Error("The state was not set in the command data.")
+			}
+			if handler.store != nil {
+				t.Error("The store was set to not nil, but it doesn't exist!")
+			}
 		}
 
 		if err != nil {
@@ -304,6 +378,10 @@ func TestCommander_Dispatch(t *T) {
 				t.Errorf("Unexpected User Error: %v\n%v", err, test)
 			} else if !strings.Contains(err.Error(), test.ErrMsg) {
 				t.Errorf("Expected: %v but got: %v\n%v", test.ErrMsg, err, test)
+			}
+
+			if !strings.Contains(string(buffer.Bytes()), test.ErrMsg) {
+				t.Errorf("Expected error to be sent to user.")
 			}
 		} else if test.ErrMsg != "" {
 			t.Errorf("Expected user Error matching '%v' but none occurred.\n%v",
@@ -357,7 +435,7 @@ func TestCommander_DispatchAuthed(t *T) {
 			Args:   []string{channel, string(prefix) + cmd},
 		}
 
-		err = c.Dispatch(msg, dataEndpoint)
+		err = c.Dispatch(server, msg, dataEndpoint)
 		c.WaitForHandlers()
 		if handler.called != test.Called {
 			if handler.called {
@@ -389,6 +467,12 @@ func TestCommander_DispatchAuthed(t *T) {
 			if handler.end == nil {
 				t.Error("The endpoint was not passed to the handler.")
 			}
+			if handler.state == nil {
+				t.Error("The state was not set in the command data.")
+			}
+			if handler.store == nil {
+				t.Error("The store was not set in the command data.")
+			}
 		}
 
 		if err != nil {
@@ -396,6 +480,10 @@ func TestCommander_DispatchAuthed(t *T) {
 				t.Errorf("Unexpected User Error: %v\n%v", err, test)
 			} else if !strings.Contains(err.Error(), test.ErrMsg) {
 				t.Errorf("Expected: %v but got: %v\n%v", test.ErrMsg, err, test)
+			}
+
+			if !strings.Contains(string(buffer.Bytes()), test.ErrMsg) {
+				t.Errorf("Expected error to be sent to user.")
 			}
 		} else if test.ErrMsg != "" {
 			t.Errorf("Expected user Error matching '%v' but none occurred.\n%v",
@@ -406,5 +494,90 @@ func TestCommander_DispatchAuthed(t *T) {
 		if !success {
 			t.Errorf("Failed to unregister test: %v", test)
 		}
+	}
+}
+
+func TestCommander_DispatchNils(t *T) {
+	c := CreateCommander(prefix, core)
+	var buffer = &bytes.Buffer{}
+	var stateMutex, storeMutex sync.RWMutex
+
+	var dataEndpoint = data.CreateDataEndpoint(server, buffer, nil, nil,
+		&stateMutex, &storeMutex)
+
+	msg := &irc.IrcMessage{
+		Sender: host,
+		Name:   irc.PRIVMSG,
+		Args:   []string{channel, string(prefix) + cmd},
+	}
+
+	handler := &commandHandler{}
+
+	err := c.RegisterAuthed(GLOBAL, cmd, handler, ALL, ALL, 100, "a")
+	if err != nil {
+		t.Error("Unexpected error:", err)
+	}
+	err = c.Dispatch(server, msg, dataEndpoint)
+	c.WaitForHandlers()
+	if !strings.Contains(err.Error(), "disabled store") {
+		t.Error("Store being disabled should issue a warning.")
+	}
+	if !c.Unregister(GLOBAL, cmd) {
+		t.Error("Problem unregistering.")
+	}
+
+	err = c.Register(GLOBAL, cmd, handler, ALL, ALL)
+	if err != nil {
+		t.Error("Unexpected error:", err)
+	}
+	err = c.Dispatch(server, msg, dataEndpoint)
+	c.WaitForHandlers()
+	if handler.channel != nil {
+		t.Error("Channel should just be nil when state is disabled.")
+	}
+	if handler.user != nil {
+		t.Error("User should be nil when state is disabled.")
+	}
+	if handler.usrchanmodes != nil {
+		t.Error("User chan modes should just be nil when state is disabled.")
+	}
+	if !c.Unregister(GLOBAL, cmd) {
+		t.Error("Unregistration failed.")
+	}
+}
+
+func TestCommander_DispatchReturns(t *T) {
+	c := CreateCommander(prefix, core)
+	var buffer = &bytes.Buffer{}
+	var stateMutex, storeMutex sync.RWMutex
+
+	var dataEndpoint = data.CreateDataEndpoint(server, buffer, nil, nil,
+		&stateMutex, &storeMutex)
+
+	msg := &irc.IrcMessage{
+		Sender: host,
+		Name:   irc.PRIVMSG,
+		Args:   []string{channel, string(prefix) + cmd},
+	}
+
+	handler := &errorHandler{}
+
+	err := c.Register(GLOBAL, cmd, handler, ALL, ALL)
+	if err != nil {
+		t.Error("Unexpected error:", err)
+	}
+
+	handler.Error = MakeLevelError(100)
+	err = c.Dispatch(server, msg, dataEndpoint)
+	c.WaitForHandlers()
+	if !strings.Contains(string(buffer.Bytes()), "Access Denied: Level 100") {
+		t.Errorf("Expected error to be sent to user.")
+	}
+
+	handler.Error = MakeFlagsError("a")
+	err = c.Dispatch(server, msg, dataEndpoint)
+	c.WaitForHandlers()
+	if !strings.Contains(string(buffer.Bytes()), "Access Denied: a flag(s)") {
+		t.Errorf("Expected error to be sent to user.")
 	}
 }
