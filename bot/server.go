@@ -6,6 +6,7 @@ import (
 	"github.com/aarondl/ultimateq/config"
 	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/dispatch"
+	"github.com/aarondl/ultimateq/dispatch/commander"
 	"github.com/aarondl/ultimateq/inet"
 	"github.com/aarondl/ultimateq/irc"
 	"net"
@@ -41,22 +42,29 @@ var (
 // Server is all the details around a specific server connection. Also contains
 // the connection and configuration for the specific server.
 type Server struct {
-	bot        *Bot
-	name       string
-	status     byte
-	dispatcher *dispatch.Dispatcher
-	client     *inet.IrcClient
-	conf       *config.Server
-	caps       *irc.ProtoCaps
-	state      *data.State
+	bot    *Bot
+	name   string
+	status byte
 
-	reconnScale time.Duration
+	// Configuration
+	conf *config.Server
+	caps *irc.ProtoCaps
 
-	killdispatch chan int
-	killreconn   chan int
+	// Dispatching
+	dispatchCore *dispatch.DispatchCore
+	dispatcher   *dispatch.Dispatcher
+	commander    *commander.Commander
+	endpoint     *ServerEndpoint
 
 	handlerId int
 	handler   *coreHandler
+
+	// State and Connection
+	client       *inet.IrcClient
+	state        *data.State
+	reconnScale  time.Duration
+	killdispatch chan int
+	killreconn   chan int
 
 	// protects client reading/writing
 	protect sync.RWMutex
@@ -69,11 +77,6 @@ type Server struct {
 type ServerEndpoint struct {
 	*data.DataEndpoint
 	server *Server
-}
-
-// createServerEndpoint creates a ServerEndpoint with a helper.
-func createServerEndpoint(srv *Server, store *data.Store) *ServerEndpoint {
-	return &ServerEndpoint{&irc.Helper{srv}, srv, store}
 }
 
 // GetKey returns the server id of the current server.
@@ -99,10 +102,31 @@ func (s *Server) Write(buf []byte) (int, error) {
 	return 0, errNotConnected
 }
 
+// createServerEndpoint creates a ServerEndpoint with an embedded DataEndpoint.
+func (s *Server) createServerEndpoint(store *data.Store, mutex *sync.RWMutex) {
+	s.endpoint = &ServerEndpoint{
+		DataEndpoint: data.CreateDataEndpoint(
+			s.name,
+			s,
+			s.state,
+			store,
+			&s.protectState,
+			mutex,
+		),
+		server: s,
+	}
+}
+
 // createDispatcher uses the server's current ProtoCaps to create a dispatcher.
-func (s *Server) createDispatcher(channels []string) (err error) {
-	s.dispatcher, err = dispatch.CreateRichDispatcher(s.caps, channels)
-	return err
+func (s *Server) createDispatching(prefix rune, channels []string) error {
+	var err error
+	s.dispatchCore, err = dispatch.CreateDispatchCore(s.caps, channels...)
+	if err != nil {
+		return err
+	}
+	s.dispatcher = dispatch.CreateDispatcher(s.dispatchCore)
+	s.commander = commander.CreateCommander(prefix, s.dispatchCore)
+	return nil
 }
 
 // createState uses the server's current ProtoCaps to create a state.

@@ -10,6 +10,7 @@ import (
 	"github.com/aarondl/ultimateq/config"
 	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/dispatch"
+	"github.com/aarondl/ultimateq/dispatch/commander"
 	"github.com/aarondl/ultimateq/irc"
 	"github.com/aarondl/ultimateq/parse"
 	"log"
@@ -67,8 +68,10 @@ type Bot struct {
 
 	store *data.Store
 
-	caps       *irc.ProtoCaps
-	dispatcher *dispatch.Dispatcher
+	caps         *irc.ProtoCaps
+	dispatchCore *dispatch.DispatchCore
+	dispatcher   *dispatch.Dispatcher
+	commander    *commander.Commander
 
 	// IoC and DI components mostly for testing.
 	attachHandlers bool
@@ -209,7 +212,7 @@ func (b *Bot) startServer(srv *Server, writing, reading bool) {
 		}
 		srv.client.SpawnWorkers(writing, reading)
 
-		b.dispatchMessage(srv, nil, &irc.IrcMessage{Name: irc.CONNECT})
+		b.dispatchMessage(srv, &irc.IrcMessage{Name: irc.CONNECT})
 
 		if reading {
 			b.msgDispatchers.Add(1)
@@ -304,10 +307,10 @@ func (b *Bot) interruptReconnect(srv *Server) {
 // WaitForHalt waits for all servers to halt.
 func (b *Bot) WaitForHalt() {
 	b.msgDispatchers.Wait()
-	b.dispatcher.WaitForCompletion()
+	b.dispatchCore.WaitForHandlers()
 	b.protectServers.RLock()
 	for _, srv := range b.servers {
-		srv.dispatcher.WaitForCompletion()
+		srv.dispatchCore.WaitForHandlers()
 	}
 	b.protectServers.RUnlock()
 }
@@ -337,8 +340,6 @@ func (b *Bot) RegisterServer(
 	defer b.protectServers.RUnlock()
 
 	if s, ok := b.servers[server]; ok {
-		s.protect.RLock()
-		defer s.protect.RUnlock()
 		return s.dispatcher.Register(event, handler), nil
 	}
 	return 0, errUnknownServerId
@@ -357,11 +358,76 @@ func (b *Bot) UnregisterServer(
 	defer b.protectServers.RUnlock()
 
 	if s, ok := b.servers[server]; ok {
-		s.protect.RLock()
-		defer s.protect.RUnlock()
 		return s.dispatcher.Unregister(event, id), nil
 	}
 	return false, errUnknownServerId
+}
+
+// RegisterCommand registers a command with the bot.
+// See Commander.Register for in-depth documentation.
+func (b *Bot) RegisterCommand(cmd string, handler commander.CommandHandler,
+	msgtype, scope int, args ...string) error {
+
+	return b.commander.Register(commander.GLOBAL, cmd, handler, msgtype,
+		scope, args...)
+}
+
+// RegisterServerCommand registers a command with the server.
+// See Commander.Register for in-depth documentation.
+func (b *Bot) RegisterServerCommand(server, cmd string,
+	handler commander.CommandHandler, msgtype,
+	scope int, args ...string) error {
+
+	b.protectServers.RLock()
+	defer b.protectServers.RUnlock()
+
+	if s, ok := b.servers[server]; ok {
+		return s.commander.Register(server, cmd, handler, msgtype,
+			scope, args...)
+	}
+	return errUnknownServerId
+}
+
+// RegisterAuthedCommand registers an authed command with the bot.
+// See Commander.Register for in-depth documentation.
+func (b *Bot) RegisterAuthedCommand(cmd string,
+	handler commander.CommandHandler, msgtype, scope int,
+	reqlevel uint8, reqflags string, args ...string) error {
+
+	return b.commander.RegisterAuthed(commander.GLOBAL, cmd, handler, msgtype,
+		scope, reqlevel, reqflags, args...)
+}
+
+// RegisterAuthedServerCommand registers an authed command with the server.
+// See Commander.Register for in-depth documentation.
+func (b *Bot) RegisterAuthedServerCommand(server, cmd string,
+	handler commander.CommandHandler, msgtype, scope int,
+	reqlevel uint8, reqflags string, args ...string) error {
+
+	b.protectServers.RLock()
+	defer b.protectServers.RUnlock()
+
+	if s, ok := b.servers[server]; ok {
+		return s.commander.RegisterAuthed(server, cmd, handler, msgtype, scope,
+			reqlevel, reqflags, args...)
+	}
+	return errUnknownServerId
+}
+
+// UnregisterCommand unregister's a command from the bot.
+func (b *Bot) UnregisterCommand(cmd string) bool {
+	return b.commander.Unregister(commander.GLOBAL, cmd)
+}
+
+// UnregisterServerCommand unregister's a command from the server.
+func (b *Bot) UnregisterServerCommand(server, cmd string) bool {
+	b.protectServers.RLock()
+	defer b.protectServers.RUnlock()
+
+	if s, ok := b.servers[server]; ok {
+		return s.commander.Unregister(server, cmd)
+	}
+	return false
 }
 
 // dispatchMessages is a constant read-dispatch from the server to the
@@ -370,18 +436,12 @@ func (b *Bot) dispatchMessages(s *Server) {
 	var reconnOnDisconnect bool
 	var scale time.Duration
 	var timeout uint
-	var store *data.Store
 	b.ReadConfig(func(c *config.Config) {
 		cserver := c.GetServer(s.name)
 		if cserver != nil {
 			reconnOnDisconnect = !cserver.GetNoReconnect()
 			scale = s.reconnScale
 			timeout = cserver.GetReconnectTimeout()
-			if !cserver.GetNoStore() {
-				b.protectStore.RLock()
-				store = b.store
-				b.protectStore.RUnlock()
-			}
 		}
 	})
 
@@ -394,8 +454,7 @@ func (b *Bot) dispatchMessages(s *Server) {
 		case msg, ok := <-read:
 			if !ok {
 				log.Printf(errFmtReaderClosed, s.name)
-				b.dispatchMessage(s, store,
-					&irc.IrcMessage{Name: irc.DISCONNECT})
+				b.dispatchMessage(s, &irc.IrcMessage{Name: irc.DISCONNECT})
 				stop, disconnect = true, true
 				break
 			}
@@ -408,7 +467,7 @@ func (b *Bot) dispatchMessages(s *Server) {
 					s.state.Update(ircMsg)
 				}
 				s.protectState.Unlock()
-				b.dispatchMessage(s, store, ircMsg)
+				b.dispatchMessage(s, ircMsg)
 			}
 		case <-s.killdispatch:
 			log.Printf(errFmtReaderClosed, s.name)
@@ -473,10 +532,11 @@ func (b *Bot) Writeln(server, message string) error {
 }
 
 // dispatch sends a message to both the bot's dispatcher and the given servers
-func (b *Bot) dispatchMessage(s *Server, st *data.Store, msg *irc.IrcMessage) {
-	endpoint := createServerEndpoint(s, st)
-	b.dispatcher.Dispatch(msg, endpoint)
-	s.dispatcher.Dispatch(msg, endpoint)
+func (b *Bot) dispatchMessage(s *Server, msg *irc.IrcMessage) {
+	b.dispatcher.Dispatch(msg, s.endpoint)
+	s.dispatcher.Dispatch(msg, s.endpoint)
+	b.commander.Dispatch(s.name, msg, s.endpoint.DataEndpoint)
+	s.commander.Dispatch(s.name, msg, s.endpoint.DataEndpoint)
 }
 
 // createBot creates a bot from the given configuration, using the providers
@@ -501,7 +561,9 @@ func createBot(conf *config.Config, capsProv CapsProvider,
 	}
 
 	var err error
-	if err = b.createDispatcher(conf.Global.GetChannels()); err != nil {
+	if err = b.createDispatching(
+		conf.Global.GetPrefix(), conf.Global.GetChannels()); err != nil {
+
 		return nil, err
 	}
 
@@ -539,7 +601,9 @@ func (b *Bot) createServer(conf *config.Server) (*Server, error) {
 		reconnScale:  defaultReconnScale,
 	}
 
-	if err := s.createDispatcher(conf.GetChannels()); err != nil {
+	if err := s.createDispatching(
+		conf.GetPrefix(), conf.GetChannels()); err != nil {
+
 		return nil, err
 	}
 
@@ -548,6 +612,8 @@ func (b *Bot) createServer(conf *config.Server) (*Server, error) {
 			return nil, err
 		}
 	}
+
+	s.createServerEndpoint(b.store, &b.protectStore)
 
 	if b.attachHandlers {
 		s.handler = &coreHandler{bot: b}
@@ -559,12 +625,14 @@ func (b *Bot) createServer(conf *config.Server) (*Server, error) {
 }
 
 // createDispatcher uses the bot's current ProtoCaps to create a dispatcher.
-func (b *Bot) createDispatcher(channels []string) error {
+func (b *Bot) createDispatching(prefix rune, channels []string) error {
 	var err error
-	b.dispatcher, err = dispatch.CreateRichDispatcher(b.caps, channels)
+	b.dispatchCore, err = dispatch.CreateDispatchCore(b.caps, channels...)
 	if err != nil {
 		return err
 	}
+	b.dispatcher = dispatch.CreateDispatcher(b.dispatchCore)
+	b.commander = commander.CreateCommander(prefix, b.dispatchCore)
 	return nil
 }
 
@@ -583,6 +651,6 @@ func (b *Bot) createStore(filename string) (err error) {
 // currently recognize.
 func (b *Bot) mergeProtocaps(toMerge *irc.ProtoCaps) (err error) {
 	b.caps.Merge(toMerge)
-	err = b.dispatcher.Protocaps(b.caps)
+	err = b.dispatchCore.Protocaps(b.caps)
 	return
 }

@@ -13,29 +13,28 @@ func (s *s) TestServerSender(c *C) {
 	b, err := createBot(fakeConfig, nil, nil, nil, false)
 	c.Check(err, IsNil)
 	srv := b.servers[serverId]
-	srvendpoint := createServerEndpoint(srv, nil)
-	c.Check(srvendpoint.GetKey(), Equals, serverId)
+	c.Check(srv.endpoint.GetKey(), Equals, serverId)
 }
 
 func (s *s) TestServerSender_UsingState(c *C) {
 	b, err := createBot(fakeConfig, nil, nil, nil, false)
 	c.Check(err, IsNil)
 	srv := b.servers[serverId]
-	srvendpoint := createServerEndpoint(srv, nil)
 
-	c.Check(srvendpoint.GetKey(), Equals, serverId)
+	c.Check(srv.endpoint.GetKey(), Equals, serverId)
 	called := false
 	reportCalled := false
-	reportCalled = srvendpoint.UsingState(func(*data.State) {
+	reportCalled = srv.endpoint.UsingState(func(*data.State) {
 		called = true
 	})
 	c.Check(called, Equals, true)
 	c.Check(reportCalled, Equals, true)
 
 	srv.state = nil
+	srv.createServerEndpoint(nil, nil)
 	called = false
 	reportCalled = false
-	reportCalled = srvendpoint.UsingState(func(*data.State) {
+	reportCalled = srv.endpoint.UsingState(func(*data.State) {
 		called = true
 	})
 	c.Check(called, Equals, false)
@@ -47,21 +46,21 @@ func (s *s) TestServerSender_UsingStore(c *C) {
 	c.Check(err, IsNil)
 	srv := b.servers[serverId]
 	store, err := data.CreateStore(data.MemStoreProvider)
+	srv.createServerEndpoint(store, &b.protectStore)
 	c.Check(err, IsNil)
 
-	srvendpoint := createServerEndpoint(srv, store)
 	called := false
 	reportCalled := false
-	reportCalled = srvendpoint.UsingStore(func(*data.Store) {
+	reportCalled = srv.endpoint.UsingStore(func(*data.Store) {
 		called = true
 	})
 	c.Check(called, Equals, true)
 	c.Check(reportCalled, Equals, true)
 
-	srvendpoint = createServerEndpoint(srv, nil)
+	srv.createServerEndpoint(nil, &b.protectStore)
 	called = false
 	reportCalled = false
-	reportCalled = srvendpoint.UsingStore(func(*data.Store) {
+	reportCalled = srv.endpoint.UsingStore(func(*data.Store) {
 		called = true
 	})
 	c.Check(called, Equals, false)
@@ -72,10 +71,10 @@ func (s *s) TestServerSender_OpenState(c *C) {
 	b, err := createBot(fakeConfig, nil, nil, nil, false)
 	c.Check(err, IsNil)
 	srv := b.servers[serverId]
-	srvendpoint := createServerEndpoint(srv, nil)
+	srv.createServerEndpoint(nil, nil)
 
-	c.Check(srvendpoint.OpenState(), Equals, srv.state)
-	srvendpoint.CloseState()
+	c.Check(srv.endpoint.OpenState(), Equals, srv.state)
+	srv.endpoint.CloseState()
 
 	srv.protectState.Lock()
 	srv.protectState.Unlock()
@@ -86,10 +85,12 @@ func (s *s) TestServerSender_OpenStore(c *C) {
 	b, err := createBot(fakeConfig, nil, nil, nil, false)
 	c.Check(err, IsNil)
 	srv := b.servers[serverId]
-	srvendpoint := createServerEndpoint(srv, nil)
+	store, err := data.CreateStore(data.MemStoreProvider)
+	c.Check(err, IsNil)
+	srv.createServerEndpoint(store, &b.protectStore)
 
-	c.Check(srvendpoint.OpenStore(), Equals, b.store)
-	srvendpoint.CloseStore()
+	c.Check(srv.endpoint.OpenStore(), Equals, b.store)
+	srv.endpoint.CloseStore()
 
 	b.protectStore.Lock()
 	b.protectStore.Unlock()

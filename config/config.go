@@ -32,7 +32,7 @@ const (
 	// defaultReconnectTimeout is how many seconds to wait between reconns.
 	defaultReconnectTimeout = uint(20)
 	// botDefaultPrefix is the command prefix by default
-	defaultPrefix = "."
+	defaultPrefix = '.'
 	// maxHostSize is the biggest hostname possible
 	maxHostSize = 255
 )
@@ -275,10 +275,6 @@ func (c *Config) validateServer(s *Server, missingIsError bool) {
 		}
 	} else if !rgxRealname.MatchString(realname) {
 		c.addError(fmtErrInvalid, name, errRealname, realname)
-	}
-
-	if prefix := s.GetPrefix(); len(prefix) != 1 {
-		c.addError(fmtErrInvalid, name, errPrefix, prefix)
 	}
 
 	for _, channel := range s.GetChannels() {
@@ -785,12 +781,12 @@ func (s *Server) GetRealname() (realname string) {
 }
 
 // GetPrefix gets Prefix of the server, or the global prefix, or defaultPrefix.
-func (s *Server) GetPrefix() (prefix string) {
+func (s *Server) GetPrefix() (prefix rune) {
 	prefix = defaultPrefix
 	if len(s.Prefix) > 0 {
-		prefix = s.Prefix
+		prefix = rune(s.Prefix[0])
 	} else if s.parent != nil && len(s.parent.Global.Prefix) > 0 {
-		prefix = s.parent.Global.Prefix
+		prefix = rune(s.parent.Global.Prefix[0])
 	}
 	return
 }

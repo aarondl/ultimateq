@@ -144,7 +144,7 @@ func (s *s) TestConfig_Fluent(c *C) {
 		Username(srv2.GetUsername()).
 		Userhost(srv2.GetUserhost()).
 		Realname(srv2.GetRealname()).
-		Prefix(srv2.GetPrefix()).
+		Prefix(string(srv2.GetPrefix())).
 		Channels(srv2.GetChannels()...).
 		// Server 1
 		Server(srv1.GetName()).
@@ -164,7 +164,7 @@ func (s *s) TestConfig_Fluent(c *C) {
 		Username(srv1.GetUsername()).
 		Userhost(srv1.GetUserhost()).
 		Realname(srv1.GetRealname()).
-		Prefix(srv1.GetPrefix()).
+		Prefix(string(srv1.GetPrefix())).
 		Channels(srv1.GetChannels()...).
 		// Server 2 using defaults
 		Server(srv2host)
@@ -285,7 +285,7 @@ func (s *s) TestConfig_InvalidValues(c *C) {
 	c.Check(srv.GetReconnectTimeout(), Equals, defaultReconnectTimeout)
 
 	c.Check(conf.IsValid(), Equals, false)
-	c.Check(len(conf.Errors), Equals, 10)
+	c.Check(len(conf.Errors), Equals, 9)
 	c.Check(conf.Errors[0].Error(), Matches, invErr(errSsl))
 	c.Check(conf.Errors[1].Error(), Matches, invErr(errVerifyCert))
 	c.Check(conf.Errors[2].Error(), Matches, invErr(errNoState))
@@ -295,7 +295,6 @@ func (s *s) TestConfig_InvalidValues(c *C) {
 	c.Check(conf.Errors[6].Error(), Matches, invErr(errFloodProtectStep))
 	c.Check(conf.Errors[7].Error(), Matches, invErr(errNoReconnect))
 	c.Check(conf.Errors[8].Error(), Matches, invErr(errReconnectTimeout))
-	c.Check(conf.Errors[9].Error(), Matches, invErr(errPrefix))
 }
 
 func (s *s) TestConfig_ValidationEmpty(c *C) {

@@ -3,6 +3,7 @@ package bot
 import (
 	"github.com/aarondl/ultimateq/config"
 	"github.com/aarondl/ultimateq/data"
+	"github.com/aarondl/ultimateq/dispatch/commander"
 	"github.com/aarondl/ultimateq/irc"
 	"github.com/aarondl/ultimateq/mocks"
 	"io"
@@ -29,6 +30,20 @@ func (h testHandler) HandleRaw(m *irc.IrcMessage, send irc.Endpoint) {
 	if h.callback != nil {
 		h.callback(m, send)
 	}
+}
+
+type testCommand struct {
+	callback func(string, *irc.Message,
+		*data.DataEndpoint, *commander.CommandData) error
+}
+
+func (h testCommand) Command(cmd string, msg *irc.Message,
+	ep *data.DataEndpoint, cdata *commander.CommandData) error {
+
+	if h.callback != nil {
+		return h.callback(cmd, msg, ep, cdata)
+	}
+	return nil
 }
 
 func init() {
@@ -238,7 +253,7 @@ func (s *s) TestBot_InterruptReconnect(c *C) {
 }
 
 func (s *s) TestBot_Dispatching(c *C) {
-	str := []byte("PRIVMSG #chan :msg\r\n#\r\n")
+	str := []byte(":user!host@chan PRIVMSG chan :msg\r\n#\r\n")
 
 	conn := mocks.CreateConn()
 	connProvider := func(srv string) (net.Conn, error) {
@@ -246,14 +261,21 @@ func (s *s) TestBot_Dispatching(c *C) {
 	}
 
 	waiter := sync.WaitGroup{}
-	waiter.Add(1)
+	waiter.Add(2)
 	b, err := createBot(fakeConfig, nil, connProvider, nil, false)
 
 	b.Register(irc.PRIVMSG, &testHandler{
-		func(m *irc.IrcMessage, _ irc.Endpoint) {
+		func(_ *irc.IrcMessage, _ irc.Endpoint) {
 			waiter.Done()
 		},
 	})
+	err = b.RegisterCommand("msg", &testCommand{
+		func(_ string, _ *irc.Message, _ *data.DataEndpoint,
+			_ *commander.CommandData) error {
+			waiter.Done()
+			return nil
+		},
+	}, commander.PRIVMSG, commander.PRIVATE)
 
 	c.Check(err, IsNil)
 	ers := b.Connect()
@@ -266,15 +288,12 @@ func (s *s) TestBot_Dispatching(c *C) {
 	b.Stop()
 	b.WaitForHalt()
 	b.Disconnect()
+
+	b.UnregisterCommand("msg")
 }
 
 func (s *s) TestBot_Register(c *C) {
-	conn := mocks.CreateConn()
-	connProvider := func(srv string) (net.Conn, error) {
-		return conn, nil
-	}
-
-	b, err := createBot(fakeConfig, nil, connProvider, nil, false)
+	b, err := createBot(fakeConfig, nil, nil, nil, false)
 	gid := b.Register(irc.PRIVMSG, &coreHandler{})
 	id, err := b.RegisterServer(serverId, irc.PRIVMSG, &coreHandler{})
 	c.Check(err, IsNil)
@@ -291,6 +310,48 @@ func (s *s) TestBot_Register(c *C) {
 	c.Check(err, Equals, errUnknownServerId)
 	_, err = b.UnregisterServer("", "", 0)
 	c.Check(err, Equals, errUnknownServerId)
+}
+
+func (s *s) TestBot_RegisterCommand(c *C) {
+	var err error
+	var success bool
+	b, err := createBot(fakeConfig, nil, nil, nil, false)
+	cmd := "cmd"
+	err = b.RegisterCommand(cmd, &testCommand{}, commander.ALL,
+		commander.ALL)
+
+	err = b.RegisterCommand(cmd, &testCommand{}, commander.ALL,
+		commander.ALL)
+	c.Check(err, NotNil) // Duplicate
+	success = b.UnregisterCommand(cmd)
+	c.Check(success, Equals, true)
+
+	err = b.RegisterAuthedCommand(cmd, &testCommand{}, commander.ALL,
+		commander.ALL, 100, "a")
+	c.Check(err, IsNil)
+	success = b.UnregisterCommand(cmd)
+	c.Check(success, Equals, true)
+
+	err = b.RegisterServerCommand(serverId, cmd, &testCommand{},
+		commander.ALL, commander.ALL)
+	c.Check(err, IsNil)
+	success = b.UnregisterServerCommand(serverId, cmd)
+	c.Check(success, Equals, true)
+
+	err = b.RegisterAuthedServerCommand(serverId, cmd, &testCommand{},
+		commander.ALL, commander.ALL, 100, "a")
+	c.Check(err, IsNil)
+	success = b.UnregisterServerCommand(serverId, cmd)
+	c.Check(success, Equals, true)
+
+	err = b.RegisterServerCommand("badServer", cmd, &testCommand{},
+		commander.ALL, commander.ALL)
+	c.Check(err, Equals, errUnknownServerId)
+	err = b.RegisterAuthedServerCommand("badServer", cmd, &testCommand{},
+		commander.ALL, commander.ALL, 100, "a")
+	c.Check(err, Equals, errUnknownServerId)
+
+	success = b.UnregisterServerCommand("badServer", cmd)
 }
 
 func (s *s) TestBot_createBot(c *C) {
@@ -316,6 +377,8 @@ func (s *s) TestBot_createServer(c *C) {
 	c.Check(err, IsNil)
 	srv := b.servers[serverId]
 	c.Check(srv.dispatcher, NotNil)
+	c.Check(srv.commander, NotNil)
+	c.Check(srv.dispatchCore, NotNil)
 	c.Check(srv.state, NotNil)
 	c.Check(srv.handler, NotNil)
 

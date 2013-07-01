@@ -211,8 +211,9 @@ type commandTable map[string]*command
 // and provides rich programming interface for command handling.
 type Commander struct {
 	*dispatch.DispatchCore
-	prefix   rune
-	commands commandTable
+	prefix          rune
+	commands        commandTable
+	protectCommands sync.RWMutex
 }
 
 // CreateCommander initializes a commander.
@@ -251,7 +252,9 @@ func (c *Commander) Register(server, cmd string, handler CommandHandler,
 	}
 
 	protectGlobalReg.Lock()
+	c.protectCommands.Lock()
 	defer protectGlobalReg.Unlock()
+	defer c.protectCommands.Unlock()
 	globalCommandRegistry[globalCmd] = true
 	c.commands[cmd] = command
 	return nil
@@ -280,7 +283,9 @@ func (c *Commander) RegisterAuthed(server, cmd string, handler CommandHandler,
 	command.ReqFlags = flags
 
 	protectGlobalReg.Lock()
+	c.protectCommands.Lock()
 	defer protectGlobalReg.Unlock()
+	defer c.protectCommands.Unlock()
 	globalCommandRegistry[globalCmd] = true
 	c.commands[cmd] = command
 	return nil
@@ -316,6 +321,8 @@ func (c *Commander) createCommand(globalCmd, cmd string, handler CommandHandler,
 // of a server, or the GLOBAL constant.
 func (c *Commander) Unregister(server, cmd string) (found bool) {
 	protectGlobalReg.Lock()
+	c.protectCommands.Lock()
+	defer c.protectCommands.Unlock()
 	defer protectGlobalReg.Unlock()
 
 	globalCmd := makeIdentifier(server, cmd)
@@ -364,6 +371,8 @@ func (c *Commander) Dispatch(server string, msg *irc.IrcMessage,
 
 	var command *command
 	var ok bool
+	c.protectCommands.RLock()
+	defer c.protectCommands.RUnlock()
 	if command, ok = c.commands[cmd]; !ok {
 		return nil
 	}
