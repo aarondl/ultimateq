@@ -354,9 +354,14 @@ func (c *Commander) Dispatch(server string, msg *irc.IrcMessage,
 		return nil
 	}
 
+	fields := strings.Fields(msg.Args[1])
+	if len(fields) == 0 {
+		return nil
+	}
+	cmd := fields[0]
+
 	ch := ""
 	msgscope := PRIVATE
-	cmd := msg.Args[1]
 	isChan, hasChan := c.CheckTarget(msg.Args[0])
 
 	if isChan {
@@ -385,7 +390,11 @@ func (c *Commander) Dispatch(server string, msg *irc.IrcMessage,
 		ep: ep,
 	}
 
-	if cmdata.args, err = filterArgs(command, msg); err != nil {
+	var args []string
+	if len(fields) > 1 {
+		args = fields[1:]
+	}
+	if cmdata.args, err = filterArgs(command, args); err != nil {
 		ep.Notice(irc.Mask(msg.Sender).GetNick(), err.Error())
 		return
 	}
@@ -395,11 +404,11 @@ func (c *Commander) Dispatch(server string, msg *irc.IrcMessage,
 	cmdata.State = state
 	cmdata.Store = store
 
-	if a, err := filterAccess(store, command, server, ch, ep, msg); err != nil {
+	if cmdata.UserAccess, err = filterAccess(store, command,
+		server, ch, ep, msg); err != nil {
+
 		ep.Notice(irc.Mask(msg.Sender).GetNick(), err.Error())
-		return err
-	} else {
-		cmdata.UserAccess = a
+		return
 	}
 
 	if state != nil {
@@ -425,31 +434,34 @@ func (c *Commander) Dispatch(server string, msg *irc.IrcMessage,
 
 // filterArgs checks to ensure a command has exactly the right number of
 // arguments and makes an argError message if not.
-func filterArgs(cmd *command, msg *irc.IrcMessage) (map[string]string, error) {
-	nArgs := len(msg.Args) - 2
+func filterArgs(cmd *command, args []string) (map[string]string, error) {
+	nArgs := len(args)
+	if nArgs > 0 && cmd.ReqArgs == 0 && cmd.OptArgs == 0 {
+		return nil, errors.New(errMsgUnexpectedArgument)
+	}
+
 	minArgs, maxArgs := cmd.ReqArgs, cmd.ReqArgs+cmd.OptArgs
 	isVargs := cmd.OptArgs == varArgs
 	if nArgs >= minArgs && (isVargs || nArgs <= maxArgs) {
 		if minArgs == 0 && maxArgs == 0 {
 			return nil, nil
 		}
-		return parseArgs(cmd.Args, cmd.Argnames, msg.Args[2:]), nil
-	}
-
-	if nArgs > 0 && cmd.ReqArgs == 0 && cmd.OptArgs == 0 {
-		return nil, errors.New(errMsgUnexpectedArgument)
+		return parseArgs(cmd.Args, cmd.Argnames, args), nil
 	}
 
 	var errStr string
-	switch cmd.OptArgs {
-	case 0:
+	var errArgs = cmd.ReqArgs
+	switch true {
+	case cmd.OptArgs == 0:
 		errStr = errExactly
-	case varArgs:
+	case isVargs, nArgs < minArgs:
 		errStr = errAtLeast
-	default:
+	case nArgs > maxArgs:
 		errStr = errAtMost
+		errArgs = maxArgs
 	}
-	return nil, formatError(errFmtNArguments, errStr, maxArgs, cmd.Args)
+	return nil, formatError(errFmtNArguments, errStr, errArgs,
+		strings.Join(cmd.Args, " "))
 }
 
 // parseArgs parses the arguments in the command into a map. This function

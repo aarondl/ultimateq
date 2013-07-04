@@ -10,6 +10,10 @@ import (
 	. "testing"
 )
 
+func init() {
+	data.UserAccessPwdCost = 4 // See constant for bcrypt.MinCost
+}
+
 type commandHandler struct {
 	called       bool
 	cmd          string
@@ -232,11 +236,12 @@ func TestCommander_Dispatch(t *T) {
 		&stateMutex, &storeMutex)
 
 	cmsg := []string{channel, string(c.prefix) + cmd}
-	notcmd := []string{nick, "not", "a", "command"}
+	notcmd := []string{nick, "not a command"}
 	badcmsg := []string{"#otherchan", string(c.prefix) + cmd}
 	umsg := []string{nick, cmd}
-	uargmsg := []string{nick, cmd, "arg1", "arg2"}
-	uargvargs := []string{nick, cmd, "arg1", "arg2", "arg3", "arg4"}
+	uargmsg := []string{nick, "cmd arg1 arg2"}
+	uargvargs := []string{nick, "cmd arg1 arg2 arg3 arg4"}
+	unil := []string{nick, ""}
 
 	arg1req := []string{"arg"}
 	arg1opt := []string{"[opt]"}
@@ -255,12 +260,17 @@ func TestCommander_Dispatch(t *T) {
 		ErrMsg  string
 	}{
 		// Args
+		{nil, ALL, ALL, irc.PRIVMSG, unil, false, ""},
+		{arg1opt, ALL, ALL, irc.PRIVMSG, unil, false, ""},
+		{arg1opt1var, ALL, ALL, irc.PRIVMSG, unil, false, ""},
+
 		{nil, ALL, ALL, irc.PRIVMSG, umsg, true, ""},
 		{nil, ALL, ALL, irc.PRIVMSG, notcmd, false, ""},
 		{nil, ALL, ALL, irc.PRIVMSG, uargmsg, false, "No arguments"},
 		{arg1opt, ALL, ALL, irc.PRIVMSG, umsg, true, ""},
 		{arg1opt1var, ALL, ALL, irc.PRIVMSG, uargvargs, true, ""},
 		{arg1req, ALL, ALL, irc.PRIVMSG, umsg, false, "arguments"},
+		{arg1req1opt, ALL, ALL, irc.PRIVMSG, umsg, false, "arguments"},
 
 		{arg1req, ALL, ALL, irc.PRIVMSG, uargmsg, false, "arguments"},
 		{arg1opt, ALL, ALL, irc.PRIVMSG, uargmsg, false, "arguments"},

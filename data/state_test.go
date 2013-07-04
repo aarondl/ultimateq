@@ -15,7 +15,7 @@ var _ = Suite(&s{})
 
 func init() {
 	// Speed up bcrypt for tests.
-	userAccessPwdCost = bcrypt.MinCost
+	UserAccessPwdCost = bcrypt.MinCost
 	// Invalidate the Store cache enough to be testable.
 	nMaxCache = 1
 }

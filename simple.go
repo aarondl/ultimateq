@@ -6,6 +6,7 @@ import (
 	"github.com/aarondl/ultimateq/bot"
 	"github.com/aarondl/ultimateq/config"
 	"github.com/aarondl/ultimateq/data"
+	"github.com/aarondl/ultimateq/dispatch/commander"
 	"github.com/aarondl/ultimateq/irc"
 	"log"
 	"os"
@@ -17,9 +18,17 @@ import (
 type Handler struct {
 }
 
+func (h *Handler) Command(cmd string, msg *irc.Message,
+	endpoint *data.DataEndpoint, cdata *commander.CommandData) error {
+
+	endpoint.Notice(cdata.User.GetNick(), "hello")
+	return nil
+}
+
 func (h *Handler) PrivmsgUser(m *irc.Message, endpoint irc.Endpoint) {
-	if irc.Mask(m.Sender).GetNick() == "Aaron" {
-		endpoint.Send(m.Message())
+	flds := strings.Fields(m.Message())
+	if irc.Mask(m.Sender).GetNick() == "Aaron" && flds[0] == "do" {
+		endpoint.Send(strings.Join(flds[1:], " "))
 	}
 }
 

@@ -51,7 +51,7 @@ func (s *s) TestCoreHandler_Ping(c *C) {
 }
 
 func (s *s) TestCoreHandler_Connect(c *C) {
-	b, err := createBot(fakeConfig, nil, nil, nil, false)
+	b, err := createBot(fakeConfig, nil, nil, nil, false, false)
 	c.Check(err, IsNil)
 	cnf := fakeConfig.GetServer(serverId)
 	handler := coreHandler{bot: b}
@@ -66,7 +66,7 @@ func (s *s) TestCoreHandler_Connect(c *C) {
 }
 
 func (s *s) TestCoreHandler_Nick(c *C) {
-	b, err := createBot(fakeConfig, nil, nil, nil, false)
+	b, err := createBot(fakeConfig, nil, nil, nil, false, false)
 	c.Check(err, IsNil)
 	cnf := fakeConfig.GetServer(serverId)
 	handler := coreHandler{bot: b}
@@ -94,7 +94,7 @@ func (s *s) TestCoreHandler_Caps(c *C) {
 		return nil, nil
 	}
 
-	b, err := createBot(fakeConfig, nil, connProvider, nil, true)
+	b, err := createBot(fakeConfig, nil, connProvider, nil, true, false)
 	c.Check(err, IsNil)
 
 	msg1 := &irc.IrcMessage{
@@ -122,7 +122,7 @@ func (s *s) TestCoreHandler_Join(c *C) {
 		return nil, nil
 	}
 
-	b, err := createBot(fakeConfig, nil, connProvider, nil, true)
+	b, err := createBot(fakeConfig, nil, connProvider, nil, true, false)
 	srv := b.servers[serverId]
 	c.Check(err, IsNil)
 

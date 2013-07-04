@@ -1,27 +1,66 @@
 package data
 
 import (
-	"errors"
+	"fmt"
 	"github.com/aarondl/ultimateq/irc"
 	"github.com/cznic/kv"
 	"os"
 )
 
-var (
-	nMaxCache = 1000
-
-	ErrUserNotFound    = errors.New("data: User not found.")
-	ErrUserBadPassword = errors.New("data: User password does not match.")
-	ErrUserBadHost     = errors.New("data: Host does not match stored hosts.")
+// These errors are in the AuthError.FailureType field.
+const (
+	AuthErrBadPassword = iota + 1
+	AuthErrHostNotFound
+	AuthErrUserNotFound
 )
 
+// These error messages are put into the AuthError's string field and will
+// appear when receiving an auth error.
+const (
+	// errFmtUserNotFound occurs when the database lookup fails.
+	errFmtUserNotFound = "User [%v] not found."
+	// errMsgBadPassword occurs when the user provides a password that does
+	// not match.
+	errMsgBadPassword = "Password does not match for user [%v]."
+	// errFmtBadHost occurs when a user has hosts defined, and the user's
+	// current host is not a match.
+	errFmtBadHost = "Host [%v] does not match stored hosts for user [%v]"
+)
+
+// AuthError is returned when a user failure occurs (bad password etc.) during
+// authentication.
+type AuthError struct {
+	str         string
+	fmtArgs     []interface{}
+	FailureType int
+}
+
+// Error builds the error string for an AuthError.
+func (a AuthError) Error() string {
+	if len(a.fmtArgs) > 0 {
+		return fmt.Sprintf(a.str, a.fmtArgs...)
+	} else {
+		return a.str
+	}
+}
+
+var (
+	// nMaxCache is the number of users to store in the cache.
+	nMaxCache = 1000
+	// isIninitialized is a key into the database that checks if the first
+	// user has been set.
+	isInitialized = []byte{0}
+)
+
+// DbProvider is a function that provides an internal database.
 type DbProvider func() (*kv.DB, error)
 
 // Store is used to store UserAccess objects, and cache their lookup.
 type Store struct {
-	db     *kv.DB
-	cache  map[string]*UserAccess
-	authed map[string]*UserAccess
+	db           *kv.DB
+	cache        map[string]*UserAccess
+	authed       map[string]*UserAccess
+	checkedFirst bool
 }
 
 // CreateStore initializes a store type.
@@ -84,21 +123,33 @@ func (s *Store) AuthUser(
 		return user, nil
 	}
 
-	user, err = s.findUser(username)
+	user, err = s.FindUser(username)
 	if err != nil {
 		return nil, err
 	}
 
 	if user == nil {
-		return nil, ErrUserNotFound
+		return nil, AuthError{
+			errFmtUserNotFound,
+			[]interface{}{username},
+			AuthErrUserNotFound,
+		}
 	}
 
 	if len(user.Masks) > 0 && !user.IsMatch(irc.Mask(host)) {
-		return nil, ErrUserBadHost
+		return nil, AuthError{
+			errFmtUserNotFound,
+			[]interface{}{host, username},
+			AuthErrHostNotFound,
+		}
 	}
 
 	if !user.VerifyPassword(password) {
-		return nil, ErrUserBadPassword
+		return nil, AuthError{
+			errMsgBadPassword,
+			[]interface{}{username},
+			AuthErrBadPassword,
+		}
 	}
 
 	s.authed[server+host] = user
@@ -115,8 +166,8 @@ func (s *Store) Logout(server, host string) {
 	delete(s.authed, server+host)
 }
 
-// findUser looks up a user based on username. It caches the result if found.
-func (s *Store) findUser(username string) (user *UserAccess, err error) {
+// FindUser looks up a user based on username. It caches the result if found.
+func (s *Store) FindUser(username string) (user *UserAccess, err error) {
 	if cached, ok := s.cache[username]; ok {
 		user = cached
 		return
@@ -150,6 +201,28 @@ func (s *Store) checkCacheLimits() {
 	if len(s.cache)+1 > nMaxCache {
 		s.cache = make(map[string]*UserAccess)
 	}
+}
+
+// IsFirst checks to see if the user is the first one in. Returns true if
+// so, false if not. Note that this also sets the value immediately, so all
+// subsequent calls to IsFirst will return false.
+func (s *Store) IsFirst() (isFirst bool, err error) {
+	if s.checkedFirst {
+		return
+	}
+
+	_, isFirst, err = s.db.Put(nil, isInitialized,
+		func(key, old []byte) (upd []byte, write bool, err error) {
+			if old == nil {
+				upd = isInitialized
+				write = true
+			}
+			return
+		},
+	)
+
+	s.checkedFirst = true
+	return
 }
 
 // MakeStoreProvider is the default way to create a store by using the

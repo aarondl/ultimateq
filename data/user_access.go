@@ -29,7 +29,7 @@ type UserAccess struct {
 	Channel  map[string]map[string]*Access
 }
 
-var userAccessPwdCost = bcrypt.DefaultCost
+var UserAccessPwdCost = bcrypt.DefaultCost
 
 // CreateUserAccess initializes an access user. Requires username and password,
 // but masks are optional.
@@ -40,7 +40,7 @@ func CreateUserAccess(un, pw string,
 		return nil, errMissingUnameOrPwd
 	}
 
-	pwd, err := bcrypt.GenerateFromPassword([]byte(pw), userAccessPwdCost)
+	pwd, err := bcrypt.GenerateFromPassword([]byte(pw), UserAccessPwdCost)
 	if err != nil {
 		return nil, err
 	}

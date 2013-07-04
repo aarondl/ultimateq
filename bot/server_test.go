@@ -10,14 +10,14 @@ import (
 )
 
 func (s *s) TestServerSender(c *C) {
-	b, err := createBot(fakeConfig, nil, nil, nil, false)
+	b, err := createBot(fakeConfig, nil, nil, nil, false, false)
 	c.Check(err, IsNil)
 	srv := b.servers[serverId]
 	c.Check(srv.endpoint.GetKey(), Equals, serverId)
 }
 
 func (s *s) TestServerSender_UsingState(c *C) {
-	b, err := createBot(fakeConfig, nil, nil, nil, false)
+	b, err := createBot(fakeConfig, nil, nil, nil, false, false)
 	c.Check(err, IsNil)
 	srv := b.servers[serverId]
 
@@ -42,7 +42,7 @@ func (s *s) TestServerSender_UsingState(c *C) {
 }
 
 func (s *s) TestServerSender_UsingStore(c *C) {
-	b, err := createBot(fakeConfig, nil, nil, nil, false)
+	b, err := createBot(fakeConfig, nil, nil, nil, false, false)
 	c.Check(err, IsNil)
 	srv := b.servers[serverId]
 	store, err := data.CreateStore(data.MemStoreProvider)
@@ -68,7 +68,7 @@ func (s *s) TestServerSender_UsingStore(c *C) {
 }
 
 func (s *s) TestServerSender_OpenState(c *C) {
-	b, err := createBot(fakeConfig, nil, nil, nil, false)
+	b, err := createBot(fakeConfig, nil, nil, nil, false, false)
 	c.Check(err, IsNil)
 	srv := b.servers[serverId]
 	srv.createServerEndpoint(nil, nil)
@@ -82,7 +82,7 @@ func (s *s) TestServerSender_OpenState(c *C) {
 }
 
 func (s *s) TestServerSender_OpenStore(c *C) {
-	b, err := createBot(fakeConfig, nil, nil, nil, false)
+	b, err := createBot(fakeConfig, nil, nil, nil, false, false)
 	c.Check(err, IsNil)
 	srv := b.servers[serverId]
 	store, err := data.CreateStore(data.MemStoreProvider)
@@ -105,7 +105,7 @@ func (s *s) TestServer_Write(c *C) {
 		return conn, nil
 	}
 
-	b, err := createBot(fakeConfig, nil, connProvider, nil, false)
+	b, err := createBot(fakeConfig, nil, connProvider, nil, false, false)
 	c.Check(err, IsNil)
 	srv := b.servers[serverId]
 
@@ -137,7 +137,7 @@ func (s *s) TestServer_rehashProtocaps(c *C) {
 		return originalCaps
 	}
 
-	b, err := createBot(fakeConfig, capsProv, nil, nil, false)
+	b, err := createBot(fakeConfig, capsProv, nil, nil, false, false)
 	c.Check(err, IsNil)
 	srv := b.servers[serverId]
 

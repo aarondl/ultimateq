@@ -15,7 +15,7 @@ var zeroConnProvider = func(srv string) (net.Conn, error) {
 }
 
 func (s *s) TestBot_ReadConfig(c *C) {
-	b, err := createBot(fakeConfig, nil, nil, nil, false)
+	b, err := createBot(fakeConfig, nil, nil, nil, false, false)
 	c.Check(err, IsNil)
 
 	b.ReadConfig(func(conf *config.Config) {
@@ -28,7 +28,7 @@ func (s *s) TestBot_ReadConfig(c *C) {
 }
 
 func (s *s) TestBot_WriteConfig(c *C) {
-	b, err := createBot(fakeConfig, nil, nil, nil, false)
+	b, err := createBot(fakeConfig, nil, nil, nil, false, false)
 	c.Check(err, IsNil)
 
 	b.WriteConfig(func(conf *config.Config) {
@@ -70,7 +70,7 @@ func (s *s) TestBot_ReplaceConfig(c *C) {
 
 	c3 := &config.Config{}
 
-	b, err := createBot(c1, nil, connProvider, nil, false)
+	b, err := createBot(c1, nil, connProvider, nil, false, false)
 	c.Check(err, IsNil)
 	c.Check(len(b.servers), Equals, 2)
 

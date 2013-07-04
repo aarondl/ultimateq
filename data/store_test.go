@@ -132,27 +132,39 @@ func TestStore_AuthUser(t *T) {
 	}
 
 	user, err := s.AuthUser(server, host, uname+uname, password)
-	if user != nil {
+	if user != nil || err == nil {
 		t.Error("Failed to reject bad authentication.")
 	}
-	if err != ErrUserNotFound {
-		t.Errorf("Expected error %v but got %v", ErrUserNotFound, err)
+	if autherr, ok := err.(AuthError); ok {
+		if autherr.FailureType != AuthErrUserNotFound {
+			t.Error("Wrong failure type:", autherr.FailureType)
+		}
+	} else {
+		t.Error("Error was not an AuthError:", err)
 	}
 
 	user, err = s.AuthUser(server, `nick!user@host.com`, uname, password)
-	if user != nil {
+	if user != nil || err == nil {
 		t.Error("Failed to reject bad authentication.")
 	}
-	if err != ErrUserBadHost {
-		t.Errorf("Expected error %v but got %v", ErrUserBadHost, err)
+	if autherr, ok := err.(AuthError); ok {
+		if autherr.FailureType != AuthErrHostNotFound {
+			t.Error("Wrong failure type:", autherr.FailureType)
+		}
+	} else {
+		t.Error("Error was not an AuthError:", err)
 	}
 
 	user, err = s.AuthUser(server, host, uname, password+password)
 	if user != nil {
 		t.Error("Failed to reject bad authentication.")
 	}
-	if err != ErrUserBadPassword {
-		t.Errorf("Expected error %v but got %v", ErrUserBadPassword, err)
+	if autherr, ok := err.(AuthError); ok {
+		if autherr.FailureType != AuthErrBadPassword {
+			t.Error("Wrong failure type:", autherr.FailureType)
+		}
+	} else {
+		t.Error("Error was not an AuthError:", err)
 	}
 
 	user, err = s.AuthUser(server, host, uname, password)
@@ -263,7 +275,7 @@ func TestStore_Finding(t *T) {
 		t.Error("Cache should not be warmed by fetchUser.")
 	}
 
-	found, err = s.findUser(ua1.Username)
+	found, err = s.FindUser(ua1.Username)
 	if err != nil {
 		t.Fatal("Unexpected error:", err)
 	}
@@ -271,14 +283,14 @@ func TestStore_Finding(t *T) {
 		t.Error("User should have been found.")
 	}
 	// Cached lookup, for test coverage.
-	found, err = s.findUser(ua1.Username)
+	found, err = s.FindUser(ua1.Username)
 	if err != nil {
 		t.Fatal("Unexpected error:", err)
 	}
 	if found == nil {
 		t.Error("User should have been found.")
 	}
-	found, err = s.findUser(ua2.Username)
+	found, err = s.FindUser(ua2.Username)
 	if err != nil {
 		t.Fatal("Unexpected error:", err)
 	}
@@ -288,5 +300,44 @@ func TestStore_Finding(t *T) {
 
 	if len(s.cache) != nMaxCache {
 		t.Error("Cache should be being used.")
+	}
+}
+
+func TestStore_IsFirst(t *T) {
+	t.Parallel()
+	s, err := CreateStore(MemStoreProvider)
+	defer s.Close()
+	if err != nil {
+		t.Error("Unexpected error:", err)
+	}
+
+	var isFirst bool
+
+	isFirst, err = s.IsFirst()
+	if err != nil {
+		t.Error("Unexpected error:", err)
+	}
+	if isFirst != true {
+		t.Error("The first call to isFirst should return true.")
+	}
+
+	isFirst, err = s.IsFirst()
+	if err != nil {
+		t.Error("Unexpected error:", err)
+	}
+	if isFirst != false {
+		t.Error("The subsequent calls to IsFirst should return false.")
+	}
+}
+
+func TestStore_AuthError(t *T) {
+	var err error = AuthError{
+		errFmtBadHost,
+		[]interface{}{"h", "u"},
+		AuthErrHostNotFound,
+	}
+
+	if err.Error() != "Host [h] does not match stored hosts for user [u]" {
+		t.Error("The error message builder is not working correctly.")
 	}
 }

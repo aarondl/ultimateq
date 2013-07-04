@@ -63,15 +63,15 @@ type (
 // need through it's exported functions.
 type Bot struct {
 	servers map[string]*Server
+	conf    *config.Config
+	store   *data.Store
 
-	conf *config.Config
-
-	store *data.Store
-
+	// Dispatching
 	caps         *irc.ProtoCaps
 	dispatchCore *dispatch.DispatchCore
 	dispatcher   *dispatch.Dispatcher
 	commander    *commander.Commander
+	coreCommands *coreCommands
 
 	// IoC and DI components mostly for testing.
 	attachHandlers bool
@@ -120,7 +120,7 @@ func CreateBot(conf *config.Config) (*Bot, error) {
 	if !CheckConfig(conf) {
 		return nil, errInvalidConfig
 	}
-	return createBot(conf, nil, nil, nil, true)
+	return createBot(conf, nil, nil, nil, true, true)
 }
 
 // Connect creates the connections and the IrcClient objects, as well as
@@ -543,7 +543,7 @@ func (b *Bot) dispatchMessage(s *Server, msg *irc.IrcMessage) {
 // given to create connections and protocol caps.
 func createBot(conf *config.Config, capsProv CapsProvider,
 	connProv ConnProvider, storeProv StoreProvider,
-	attachHandlers bool) (*Bot, error) {
+	attachHandlers, attachCommands bool) (*Bot, error) {
 
 	b := &Bot{
 		conf:           conf,
@@ -568,19 +568,27 @@ func createBot(conf *config.Config, capsProv CapsProvider,
 	}
 
 	makeStore := false
+	for _, srv := range conf.Servers {
+		makeStore = makeStore || !srv.GetNoStore()
+	}
+
+	if makeStore {
+		if err = b.createStore(conf.GetStoreFile()); err != nil {
+			return nil, err
+		}
+	}
+
 	for name, srv := range conf.Servers {
 		server, err := b.createServer(srv)
 		if err != nil {
 			return nil, err
 		}
-
-		makeStore = makeStore || !srv.GetNoStore()
-
 		b.servers[name] = server
 	}
 
-	if makeStore {
-		if err = b.createStore(conf.GetStoreFile()); err != nil {
+	if attachCommands && !conf.Global.GetNoStore() {
+		b.coreCommands, err = CreateCoreCommands(b)
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -617,8 +625,7 @@ func (b *Bot) createServer(conf *config.Server) (*Server, error) {
 
 	if b.attachHandlers {
 		s.handler = &coreHandler{bot: b}
-		s.handlerId =
-			s.dispatcher.Register(irc.RAW, s.handler)
+		s.handlerId = s.dispatcher.Register(irc.RAW, s.handler)
 	}
 
 	return s, nil
