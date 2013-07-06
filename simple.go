@@ -134,12 +134,14 @@ func conf(c *config.Config) *config.Config {
 		Userhost("friend").
 		NoReconnect(true)
 
-	c. // First server
-		Server("irc.gamesurge.net1").
-		Host("irc.gamesurge.net").
-		Nick("Aaron").
-		Altnick("nobody1").
-		ReconnectTimeout(5)
+	/*
+		c. // First server
+			Server("irc.gamesurge.net1").
+			Host("irc.gamesurge.net").
+			Nick("Aaron").
+			Altnick("nobody1").
+			ReconnectTimeout(5)
+	*/
 
 	c. // Second Server
 		Server("irc.gamesurge.net2").

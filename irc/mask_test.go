@@ -28,35 +28,76 @@ func (s *s) TestMask(c *C) {
 func (s *s) TestMask_SplitHost(c *C) {
 	var nick, user, host string
 
-	nick, user, host = Mask("").SplitFullhost()
-	c.Check(nick, Equals, "")
-	c.Check(user, Equals, "")
-	c.Check(host, Equals, "")
-
-	nick, user, host = Mask("nick").SplitFullhost()
-	c.Check(nick, Equals, "nick")
-	c.Check(user, Equals, "")
-	c.Check(host, Equals, "")
-
-	nick, user, host = Mask("nick!").SplitFullhost()
-	c.Check(nick, Equals, "nick")
-	c.Check(user, Equals, "")
-	c.Check(host, Equals, "")
-
-	nick, user, host = Mask("nick@").SplitFullhost()
-	c.Check(nick, Equals, "nick")
-	c.Check(user, Equals, "")
-	c.Check(host, Equals, "")
-
-	nick, user, host = Mask("nick@host!user").SplitFullhost()
-	c.Check(nick, Equals, "nick")
-	c.Check(user, Equals, "")
-	c.Check(host, Equals, "")
-
-	nick, user, host = Mask("nick!user@host").SplitFullhost()
+	nick, user, host = Mask("nick!user@host").Split()
 	c.Check(nick, Equals, "nick")
 	c.Check(user, Equals, "user")
 	c.Check(host, Equals, "host")
+
+	nick, user, host = WildMask("ni ck!user@host").Split()
+	c.Check(nick, Equals, "")
+	c.Check(user, Equals, "")
+	c.Check(host, Equals, "")
+}
+
+func (s *s) TestMask_IsValid(c *C) {
+	var isValid bool
+	isValid = Mask("").IsValid()
+	c.Check(isValid, Equals, false)
+
+	isValid = Mask("!@").IsValid()
+	c.Check(isValid, Equals, false)
+
+	isValid = Mask("nick").IsValid()
+	c.Check(isValid, Equals, false)
+
+	isValid = Mask("nick!").IsValid()
+	c.Check(isValid, Equals, false)
+
+	isValid = Mask("nick@").IsValid()
+	c.Check(isValid, Equals, false)
+
+	isValid = Mask("nick@host!user").IsValid()
+	c.Check(isValid, Equals, false)
+
+	isValid = Mask("nick!user@host").IsValid()
+	c.Check(isValid, Equals, true)
+}
+
+func (s *s) TestWildMask_Split(c *C) {
+	var nick, user, host string
+	nick, user, host = WildMask("n?i*ck!u*ser@h*o?st").Split()
+	c.Check(nick, Equals, "n?i*ck")
+	c.Check(user, Equals, "u*ser")
+	c.Check(host, Equals, "h*o?st")
+
+	nick, user, host = WildMask("n?i* ck!u*ser@h*o?st").Split()
+	c.Check(nick, Equals, "")
+	c.Check(user, Equals, "")
+	c.Check(host, Equals, "")
+}
+
+func (s *s) TestWildMask_IsValid(c *C) {
+	var isValid bool
+	isValid = WildMask("").IsValid()
+	c.Check(isValid, Equals, false)
+
+	isValid = WildMask("!@").IsValid()
+	c.Check(isValid, Equals, false)
+
+	isValid = WildMask("n?i*ck").IsValid()
+	c.Check(isValid, Equals, false)
+
+	isValid = WildMask("n?i*ck!").IsValid()
+	c.Check(isValid, Equals, false)
+
+	isValid = WildMask("n?i*ck@").IsValid()
+	c.Check(isValid, Equals, false)
+
+	isValid = WildMask("n*i?ck@h*o?st!u*ser").IsValid()
+	c.Check(isValid, Equals, false)
+
+	isValid = WildMask("n?i*ck!u*ser@h*o?st").IsValid()
+	c.Check(isValid, Equals, true)
 }
 
 func (s *s) TestWildMask_Match(c *C) {
@@ -91,6 +132,9 @@ func (s *s) TestWildMask_Match(c *C) {
 		if !positiveMasks[i].Match(mask) {
 			c.Errorf("Expected: %v to match %v", positiveMasks[i], mask)
 		}
+		if !mask.Match(positiveMasks[i]) {
+			c.Errorf("Expected: %v to match %v", mask, positiveMasks[i])
+		}
 	}
 
 	negativeMasks := []WildMask{
@@ -100,6 +144,9 @@ func (s *s) TestWildMask_Match(c *C) {
 	for i := 0; i < len(negativeMasks); i++ {
 		if negativeMasks[i].Match(mask) {
 			c.Errorf("Expected: %v not to match %v", negativeMasks[i], mask)
+		}
+		if mask.Match(negativeMasks[i]) {
+			c.Errorf("Expected: %v to match %v", mask, negativeMasks[i])
 		}
 	}
 

@@ -40,15 +40,15 @@ func CreateUserAccess(un, pw string,
 		return nil, errMissingUnameOrPwd
 	}
 
-	pwd, err := bcrypt.GenerateFromPassword([]byte(pw), UserAccessPwdCost)
+	a := &UserAccess{
+		Username: un,
+	}
+
+	err := a.SetPassword(pw)
 	if err != nil {
 		return nil, err
 	}
 
-	a := &UserAccess{
-		Username: un,
-		Password: pwd,
-	}
 	a.Masks = make([]irc.WildMask, len(masks))
 	copy(a.Masks, masks)
 
@@ -94,6 +94,17 @@ func (a *UserAccess) ensureChannel(server, channel string) (access *Access) {
 	return
 }
 
+// SetPassword encrypts the password string, and sets the Password property.
+func (a *UserAccess) SetPassword(password string) (err error) {
+	var pwd []byte
+	pwd, err = bcrypt.GenerateFromPassword([]byte(password), UserAccessPwdCost)
+	if err != nil {
+		return
+	}
+	a.Password = pwd
+	return
+}
+
 // VerifyPassword checks to see if the given password matches the stored
 // password.
 func (a *UserAccess) VerifyPassword(password string) bool {
@@ -129,22 +140,34 @@ func deserialize(serialized []byte) (*UserAccess, error) {
 	return dec, err
 }
 
-// AddMask adds a mask to this users list of wildcard masks.
-func (a *UserAccess) AddMasks(masks ...irc.WildMask) {
+// AddMasks adds masks to this users list of wildcard masks. If a duplicate is
+// given, the entire update set is rejected.
+func (a *UserAccess) AddMasks(masks ...irc.WildMask) bool {
+	for i := 0; i < len(a.Masks); i++ {
+		for j := 0; j < len(masks); j++ {
+			if masks[j] == a.Masks[i] {
+				return false
+			}
+		}
+	}
 	a.Masks = append(a.Masks, masks...)
+	return true
 }
 
-// DelMask adds a mask to this users list of wildcard masks.
-func (a *UserAccess) DelMasks(masks ...irc.WildMask) {
+// DelMasks deletes masks to this users list of wildcard masks. If a single mask
+// is deleted, it returns true, even if other masks failed to delete.
+func (a *UserAccess) DelMasks(masks ...irc.WildMask) (deleted bool) {
 	for i := 0; i < len(a.Masks); i++ {
 		for j := 0; j < len(masks); j++ {
 			if masks[j] == a.Masks[i] {
 				a.Masks[i], a.Masks[len(a.Masks)-1] =
 					a.Masks[len(a.Masks)-1], a.Masks[i]
 				a.Masks = a.Masks[:len(a.Masks)-1]
+				deleted = true
 			}
 		}
 	}
+	return
 }
 
 // Has checks if a user has the given level and flags. Where his access is

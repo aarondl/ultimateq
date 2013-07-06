@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/irc"
+	"regexp"
 	"strings"
 	. "testing"
 )
@@ -16,12 +17,19 @@ const (
 	user1host = "nick1!user1@host1"
 	user2host = "nick2!user2@host2"
 	user1user = "user"
+	user2user = "user2"
+	user2nick = "nick2"
 	channel   = "#chan"
+	password  = "password"
 )
 
 var (
 	channelKinds = data.CreateChannelModeKinds("a", "b", "c", "d")
 	userKinds, _ = data.CreateUserModeKinds("(ov)@+")
+	rgxCreator   = strings.NewReplacer(
+		`(`, `\(`, `)`, `\)`, `]`, `\]`, `[`,
+		`\[`, `\`, `\\`, `/`, `\/`, `%v`, `.*`,
+	)
 )
 
 func commandsSetup(t *T) (*Bot, *data.DataEndpoint, *data.State, *data.Store,
@@ -66,6 +74,35 @@ func commandsTeardown(b *Bot, t *T) {
 	b.coreCommands.unregisterCoreCommands()
 }
 
+func dispatchResultCheck(msg *irc.IrcMessage, expected string,
+	bot *Bot, ep *data.DataEndpoint, buffer *bytes.Buffer, t *T) error {
+
+	buffer.Reset()
+	err := bot.commander.Dispatch(serverId, msg, ep)
+	bot.commander.WaitForHandlers()
+
+	if s := buffer.String(); len(s) == 0 {
+		if err != nil {
+			return fmt.Errorf("Buffer not full and error returned: %v", err)
+		}
+		return fmt.Errorf("Everything should generate a response.")
+	} else {
+		rgx := `^NOTICE [A-Za-z0-9]+ :` + rgxCreator.Replace(expected) + `$`
+		match, err := regexp.MatchString(rgx, s)
+		if err != nil {
+			t.Fatalf("Error making pattern: \n\t%s\n\t%s",
+				expected, rgx,
+			)
+		}
+		if !match {
+			return fmt.Errorf("\nUnexpected Response: \n\t%s\n\t%s",
+				s, rgx,
+			)
+		}
+	}
+	return nil
+}
+
 func TestCoreCommands(t *T) {
 	conf := Configure().Nick("nobody").Altnick("nobody1").Username("nobody").
 		Userhost("bitforge.ca").Realname("ultimateq").NoReconnect(true).
@@ -97,14 +134,14 @@ func TestCoreCommands_Register(t *T) {
 
 	msg1 := &irc.IrcMessage{Name: irc.PRIVMSG,
 		Sender: user1host,
-		Args:   []string{botnick, "register password " + user1user},
+		Args:   []string{botnick, register + " " + password + " " + user1user},
 	}
 	msg2 := &irc.IrcMessage{Name: irc.PRIVMSG,
 		Sender: user2host,
-		Args:   []string{botnick, "register password"},
+		Args:   []string{botnick, register + " " + password},
 	}
 
-	err = dispatchResultCheck(msg1, "registered [user] suc", bot, ep, buffer, t)
+	err = dispatchResultCheck(msg1, registerSuccessFirst, bot, ep, buffer, t)
 	if err != nil {
 		t.Error(err)
 	}
@@ -121,7 +158,7 @@ func TestCoreCommands_Register(t *T) {
 		}
 	}
 
-	dispatchResultCheck(msg2, "Registered [user2] success", bot, ep, buffer, t)
+	dispatchResultCheck(msg2, registerSuccess, bot, ep, buffer, t)
 
 	access = store.GetAuthedUser(serverId, user2host)
 	if access == nil {
@@ -136,8 +173,7 @@ func TestCoreCommands_Register(t *T) {
 	}
 
 	store.Logout(serverId, user2host)
-	dispatchResultCheck(msg2, "username [user2] is already registered",
-		bot, ep, buffer, t)
+	dispatchResultCheck(msg2, registerFailure, bot, ep, buffer, t)
 }
 
 func TestCoreCommands_Auth(t *T) {
@@ -148,18 +184,18 @@ func TestCoreCommands_Auth(t *T) {
 
 	msg1 := &irc.IrcMessage{Name: irc.PRIVMSG,
 		Sender: user1host,
-		Args:   []string{botnick, "register password"},
+		Args:   []string{botnick, register + " " + password},
 	}
 	msg2 := &irc.IrcMessage{Name: irc.PRIVMSG,
 		Sender: user1host,
-		Args:   []string{botnick, "logout"},
+		Args:   []string{botnick, logout},
 	}
 	msg3 := &irc.IrcMessage{Name: irc.PRIVMSG,
 		Sender: user1host,
-		Args:   []string{botnick, "auth password"},
+		Args:   []string{botnick, auth + " " + password},
 	}
 
-	err = dispatchResultCheck(msg1, "registered", bot, ep, buffer, t)
+	err = dispatchResultCheck(msg1, registerSuccessFirst, bot, ep, buffer, t)
 	if err != nil {
 		t.Error(err)
 	}
@@ -167,7 +203,7 @@ func TestCoreCommands_Auth(t *T) {
 	if access == nil {
 		t.Error("User was not authenticated.")
 	}
-	err = dispatchResultCheck(msg2, "logged out", bot, ep, buffer, t)
+	err = dispatchResultCheck(msg2, logoutSuccess, bot, ep, buffer, t)
 	if err != nil {
 		t.Error(err)
 	}
@@ -175,11 +211,11 @@ func TestCoreCommands_Auth(t *T) {
 	if access != nil {
 		t.Error("User was not logged out.")
 	}
-	err = dispatchResultCheck(msg3, "Successfully auth", bot, ep, buffer, t)
+	err = dispatchResultCheck(msg3, authSuccess, bot, ep, buffer, t)
 	if err != nil {
 		t.Error(err)
 	}
-	err = dispatchResultCheck(msg3, "already authenticated", bot, ep, buffer, t)
+	err = dispatchResultCheck(msg3, errMsgAuthed, bot, ep, buffer, t)
 	if err != nil {
 		t.Error(err)
 	}
@@ -198,18 +234,22 @@ func TestCoreCommands_Logout(t *T) {
 
 	msg1 := &irc.IrcMessage{Name: irc.PRIVMSG,
 		Sender: user1host,
-		Args:   []string{botnick, "register password"},
+		Args:   []string{botnick, register + " " + password},
 	}
 	msg2 := &irc.IrcMessage{Name: irc.PRIVMSG,
 		Sender: user1host,
-		Args:   []string{botnick, "logout"},
+		Args:   []string{botnick, logout},
 	}
 
-	err = dispatchResultCheck(msg1, "registered", bot, ep, buffer, t)
+	err = dispatchResultCheck(msg1, registerSuccessFirst, bot, ep, buffer, t)
 	if err != nil {
 		t.Error(err)
 	}
-	err = dispatchResultCheck(msg2, "logged out", bot, ep, buffer, t)
+	err = dispatchResultCheck(msg2, logoutSuccess, bot, ep, buffer, t)
+	if err != nil {
+		t.Error(err)
+	}
+	err = dispatchResultCheck(msg2, ".*not authenticated.*", bot, ep, buffer, t)
 	if err != nil {
 		t.Error(err)
 	}
@@ -220,20 +260,368 @@ func TestCoreCommands_Logout(t *T) {
 	}
 }
 
-func dispatchResultCheck(msg *irc.IrcMessage, expected string,
-	bot *Bot, ep *data.DataEndpoint, buffer *bytes.Buffer, t *T) error {
+func TestCoreCommands_Access(t *T) {
+	bot, ep, _, _, buffer := commandsSetup(t)
+	defer commandsTeardown(bot, t)
+	var err error
 
-	buffer.Reset()
-	err := bot.commander.Dispatch(serverId, msg, ep)
-	bot.commander.WaitForHandlers()
+	msg1 := &irc.IrcMessage{Name: irc.PRIVMSG,
+		Sender: user1host,
+		Args:   []string{botnick, register + " " + password + " " + user1user},
+	}
+	msg2 := &irc.IrcMessage{Name: irc.PRIVMSG,
+		Sender: user2host,
+		Args:   []string{botnick, register + " " + password},
+	}
+	msg3 := &irc.IrcMessage{Name: irc.PRIVMSG,
+		Sender: user1host,
+		Args:   []string{botnick, access},
+	}
+	msg4 := &irc.IrcMessage{Name: irc.PRIVMSG,
+		Sender: user1host,
+		Args:   []string{botnick, access + " " + user2user},
+	}
+	msg5 := &irc.IrcMessage{Name: irc.PRIVMSG,
+		Sender: user1host,
+		Args:   []string{botnick, access + " " + user2nick},
+	}
+	msg6 := &irc.IrcMessage{Name: irc.PRIVMSG,
+		Sender: user2host,
+		Args:   []string{botnick, access},
+	}
 
+	err = dispatchResultCheck(msg1, registerSuccessFirst, bot, ep, buffer, t)
 	if err != nil {
-		return fmt.Errorf("Error from dispatch:", err)
+		t.Error(err)
 	}
-	if s := buffer.String(); len(s) == 0 {
-		return fmt.Errorf("Everything should generate a response.")
-	} else if !strings.Contains(s, expected) {
-		return fmt.Errorf("\nUnexpected Response: \n\t%s\n\t%s", s, expected)
+
+	err = dispatchResultCheck(msg2, registerSuccess, bot, ep, buffer, t)
+	if err != nil {
+		t.Error(err)
 	}
-	return nil
+
+	err = dispatchResultCheck(msg3, registerSuccess, bot, ep, buffer, t)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = dispatchResultCheck(msg4, registerSuccess, bot, ep, buffer, t)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = dispatchResultCheck(msg5, registerSuccess, bot, ep, buffer, t)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = dispatchResultCheck(msg6, registerSuccess, bot, ep, buffer, t)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestCoreCommands_Deluser(t *T) {
+	bot, ep, _, store, buffer := commandsSetup(t)
+	defer commandsTeardown(bot, t)
+
+	var err error
+
+	msg1 := &irc.IrcMessage{Name: irc.PRIVMSG,
+		Sender: user1host,
+		Args:   []string{botnick, register + " " + password + " " + user1user},
+	}
+	msg2 := &irc.IrcMessage{Name: irc.PRIVMSG,
+		Sender: user2host,
+		Args:   []string{botnick, register + " " + password},
+	}
+	msg3 := &irc.IrcMessage{Name: irc.PRIVMSG,
+		Sender: user2host,
+		Args:   []string{botnick, deluser + " " + user1user},
+	}
+	msg4 := &irc.IrcMessage{Name: irc.PRIVMSG,
+		Sender: user1host,
+		Args:   []string{botnick, deluser + " " + user2nick},
+	}
+	msg5 := &irc.IrcMessage{Name: irc.PRIVMSG,
+		Sender: user1host,
+		Args:   []string{botnick, deluser + " *" + user2user},
+	}
+	msg6 := &irc.IrcMessage{Name: irc.PRIVMSG,
+		Sender: user1host,
+		Args:   []string{botnick, deluser + " noexist"},
+	}
+	msg7 := &irc.IrcMessage{Name: irc.PRIVMSG,
+		Sender: user1host,
+		Args:   []string{botnick, deluser + " *noexist"},
+	}
+	msg8 := &irc.IrcMessage{Name: irc.PRIVMSG,
+		Sender: user1host,
+		Args:   []string{botnick, deluser + " *"},
+	}
+
+	err = dispatchResultCheck(msg1, registerSuccessFirst, bot, ep, buffer, t)
+	if err != nil {
+		t.Error(err)
+	}
+	err = dispatchResultCheck(msg2, registerSuccess, bot, ep, buffer, t)
+	if err != nil {
+		t.Error(err)
+	}
+
+	access1 := store.GetAuthedUser(serverId, user1host)
+	access2 := store.GetAuthedUser(serverId, user1host)
+	if access1 == nil || access2 == nil {
+		t.Error("User's were not authenticated.")
+	}
+
+	err = dispatchResultCheck(msg3, ".*[A] flag(s) required.*", bot, ep,
+		buffer, t)
+	if err != nil {
+		t.Error(err)
+	}
+	err = dispatchResultCheck(msg4, deluserSuccess, bot, ep, buffer, t)
+	if err != nil {
+		t.Error(err)
+	}
+
+	access2 = store.GetAuthedUser(serverId, user2host)
+	if access2 != nil {
+		t.Error("User was not logged out.")
+	}
+	access2, err = store.FindUser(user2user)
+	if err != nil {
+		t.Error("Unexpected error:", err)
+	}
+	if access2 != nil {
+		t.Error("User was not deleted.")
+	}
+
+	err = dispatchResultCheck(msg2, registerSuccess, bot, ep, buffer, t)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = dispatchResultCheck(msg5, deluserSuccess, bot, ep, buffer, t)
+	if err != nil {
+		t.Error(err)
+	}
+
+	access2 = store.GetAuthedUser(serverId, user2host)
+	if access2 != nil {
+		t.Error("User was not logged out.")
+	}
+	access2, err = store.FindUser(user2user)
+	if err != nil {
+		t.Error("Unexpected error:", err)
+	}
+	if access2 != nil {
+		t.Error("User was not deleted.")
+	}
+
+	err = dispatchResultCheck(msg6, errFmtUserNotFound, bot, ep, buffer, t)
+	if err != nil {
+		t.Error(err)
+	}
+	err = dispatchResultCheck(msg7, deluserFailure, bot, ep, buffer, t)
+	if err != nil {
+		t.Error(err)
+	}
+	err = dispatchResultCheck(msg8, errFmtUserNotFound, bot, ep, buffer, t)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestCoreCommands_Delme(t *T) {
+	bot, ep, _, store, buffer := commandsSetup(t)
+	defer commandsTeardown(bot, t)
+
+	var err error
+
+	msg1 := &irc.IrcMessage{Name: irc.PRIVMSG,
+		Sender: user1host,
+		Args:   []string{botnick, register + " " + password + " " + user1user},
+	}
+	msg2 := &irc.IrcMessage{Name: irc.PRIVMSG,
+		Sender: user1host,
+		Args:   []string{botnick, delme},
+	}
+
+	err = dispatchResultCheck(msg1, registerSuccessFirst, bot, ep, buffer, t)
+	if err != nil {
+		t.Error(err)
+	}
+
+	access := store.GetAuthedUser(serverId, user1host)
+	if access == nil {
+		t.Error("User was not authenticated.")
+	}
+
+	err = dispatchResultCheck(msg2, delmeSuccess, bot, ep, buffer, t)
+	if err != nil {
+		t.Error(err)
+	}
+
+	access = store.GetAuthedUser(serverId, user1host)
+	if access != nil {
+		t.Error("User was not logged out.")
+	}
+	access, err = store.FindUser(user1user)
+	if err != nil {
+		t.Error("Unexpected error:", err)
+	}
+	if access != nil {
+		t.Error("User was not deleted.")
+	}
+
+	err = dispatchResultCheck(msg2, ".*not authenticated.*", bot, ep, buffer, t)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestCoreCommands_Passwd(t *T) {
+	bot, ep, _, store, buffer := commandsSetup(t)
+	defer commandsTeardown(bot, t)
+
+	var err error
+	var access *data.UserAccess
+
+	newpasswd := "newpasswd"
+
+	msg1 := &irc.IrcMessage{Name: irc.PRIVMSG,
+		Sender: user1host,
+		Args:   []string{botnick, register + " " + password + " " + user1user},
+	}
+	msg2 := &irc.IrcMessage{Name: irc.PRIVMSG,
+		Sender: user1host,
+		Args:   []string{botnick, passwd + " " + password + " " + newpasswd},
+	}
+
+	err = dispatchResultCheck(msg2, ".*not authenticated.*", bot, ep, buffer, t)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = dispatchResultCheck(msg1, registerSuccessFirst, bot, ep, buffer, t)
+	if err != nil {
+		t.Error(err)
+	}
+
+	access = store.GetAuthedUser(serverId, user1host)
+	if access == nil {
+		t.Error("User was not authenticatd.")
+	}
+	oldPwd := access.Password
+
+	err = dispatchResultCheck(msg2, passwdSuccess, bot, ep, buffer, t)
+	if err != nil {
+		t.Error(err)
+	}
+
+	access = store.GetAuthedUser(serverId, user1host)
+	if access == nil {
+		t.Error("User was not authenticatd.")
+	}
+	if bytes.Compare(access.Password, oldPwd) == 0 {
+		t.Error("Password was not changed.")
+	}
+
+	err = dispatchResultCheck(msg2, passwdFailure, bot, ep, buffer, t)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestCoreCommands_Masks(t *T) {
+	bot, ep, _, store, buffer := commandsSetup(t)
+	defer commandsTeardown(bot, t)
+
+	var err error
+	var access *data.UserAccess
+
+	msg1 := &irc.IrcMessage{Name: irc.PRIVMSG,
+		Sender: user1host,
+		Args:   []string{botnick, register + " " + password + " " + user1user},
+	}
+	msg2 := &irc.IrcMessage{Name: irc.PRIVMSG,
+		Sender: user1host,
+		Args:   []string{botnick, addmask + " " + user1host},
+	}
+	msg3 := &irc.IrcMessage{Name: irc.PRIVMSG,
+		Sender: user2host,
+		Args:   []string{botnick, auth + " " + password + " " + user1user},
+	}
+	msg4 := &irc.IrcMessage{Name: irc.PRIVMSG,
+		Sender: user1host,
+		Args:   []string{botnick, delmask + " " + user1host},
+	}
+	msg5 := &irc.IrcMessage{Name: irc.PRIVMSG,
+		Sender: user1host,
+		Args:   []string{botnick, masks},
+	}
+
+	err = dispatchResultCheck(msg2, ".*not authenticated.*", bot, ep, buffer, t)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = dispatchResultCheck(msg1, registerSuccessFirst, bot, ep, buffer, t)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = dispatchResultCheck(msg2, addmaskSuccess, bot, ep, buffer, t)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = dispatchResultCheck(msg2, addmaskFailure, bot, ep, buffer, t)
+	if err != nil {
+		t.Error(err)
+	}
+
+	access = store.GetAuthedUser(serverId, user1host)
+	if access == nil {
+		t.Fatal("User was not authed.")
+	}
+	if len(access.Masks) != 1 || access.Masks[0] != user1host {
+		t.Error("Mask not set correctly.")
+	}
+
+	err = dispatchResultCheck(msg3, "Host [.*] does not match.*",
+		bot, ep, buffer, t)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = dispatchResultCheck(msg5, ".*"+user1host+".*",
+		bot, ep, buffer, t)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = dispatchResultCheck(msg4, delmaskSuccess, bot, ep, buffer, t)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = dispatchResultCheck(msg4, delmaskFailure, bot, ep, buffer, t)
+	if err != nil {
+		t.Error(err)
+	}
+
+	access = store.GetAuthedUser(serverId, user1host)
+	if access == nil {
+		t.Fatal("User was not authed.")
+	}
+	if len(access.Masks) != 0 {
+		t.Error("Mask not removed correctly.")
+	}
+
+	err = dispatchResultCheck(msg5, masksFailure, bot, ep, buffer, t)
+	if err != nil {
+		t.Error(err)
+	}
 }

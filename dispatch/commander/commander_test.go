@@ -416,8 +416,9 @@ func TestCommander_DispatchAuthed(t *T) {
 		ErrMsg   string
 	}{
 		{host, 250, "a", false, "Access Denied: Level"},
-		{host, 100, "ab", false, "Access Denied: ab flag(s)"},
+		{host, 100, "ab", false, "Access Denied: [ab] flag(s)"},
 		{"nick!user@diffhost", 100, "ab", false, "not authenticated"},
+		{"nick!user@diffhost", 0, "", false, "not authenticated"},
 		{host, 100, "a", true, ""},
 	}
 
@@ -587,7 +588,7 @@ func TestCommander_DispatchReturns(t *T) {
 	handler.Error = MakeFlagsError("a")
 	err = c.Dispatch(server, msg, dataEndpoint)
 	c.WaitForHandlers()
-	if !strings.Contains(string(buffer.Bytes()), "Access Denied: a flag(s)") {
+	if !strings.Contains(string(buffer.Bytes()), "Access Denied: [a] flag(s)") {
 		t.Errorf("Expected error to be sent to user.")
 	}
 }

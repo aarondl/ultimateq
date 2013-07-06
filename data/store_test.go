@@ -97,9 +97,13 @@ func TestStore_RemoveUser(t *T) {
 		t.Error("Error fetching user.")
 	}
 
-	err = s.RemoveUser(ua1.Username)
+	var removed bool
+	removed, err = s.RemoveUser(ua1.Username)
 	if err != nil {
 		t.Fatal("Error removing user:", err)
+	}
+	if !removed {
+		t.Error("User was not reported as removed.")
 	}
 	if s.cache[ua1.Username] != nil {
 		t.Error("User is still cached.")
@@ -228,6 +232,20 @@ func TestStore_AuthLogout(t *T) {
 	if s.authed[server+host] != nil {
 		t.Error("User is still authenticated.")
 	}
+
+	user, err = s.AuthUser(server, host, uname, password)
+	if err != nil {
+		t.Error("Unexpected error:", err)
+	}
+	if user == nil {
+		t.Error("Rejected good authentication.")
+	}
+
+	s.LogoutByUsername(uname)
+
+	if s.authed[server+host] != nil {
+		t.Error("User is still authenticated.")
+	}
 }
 
 func TestStore_Finding(t *T) {
@@ -337,7 +355,7 @@ func TestStore_AuthError(t *T) {
 		AuthErrHostNotFound,
 	}
 
-	if err.Error() != "Host [h] does not match stored hosts for user [u]" {
+	if err.Error() != "Host [h] does not match stored hosts for user [u]." {
 		t.Error("The error message builder is not working correctly.")
 	}
 }

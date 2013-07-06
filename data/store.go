@@ -24,7 +24,7 @@ const (
 	errMsgBadPassword = "Password does not match for user [%v]."
 	// errFmtBadHost occurs when a user has hosts defined, and the user's
 	// current host is not a match.
-	errFmtBadHost = "Host [%v] does not match stored hosts for user [%v]"
+	errFmtBadHost = "Host [%v] does not match stored hosts for user [%v]."
 )
 
 // AuthError is returned when a user failure occurs (bad password etc.) during
@@ -104,10 +104,21 @@ func (s *Store) AddUser(ua *UserAccess) error {
 	return nil
 }
 
-// RemoveUser removes a user from the database, returning the removed user.
-func (s *Store) RemoveUser(username string) error {
+// RemoveUser removes a user from the database, returns true if successful.
+func (s *Store) RemoveUser(username string) (removed bool, err error) {
+	var exists *UserAccess
+	exists, err = s.FindUser(username)
+	if err != nil || exists == nil {
+		return
+	}
+
 	delete(s.cache, username)
-	return s.db.Delete([]byte(username))
+	err = s.db.Delete([]byte(username))
+	if err != nil {
+		return
+	}
+	removed = true
+	return
 }
 
 // AuthUser authenticates a user. UserAccess will be not nil iff the user
@@ -138,7 +149,7 @@ func (s *Store) AuthUser(
 
 	if len(user.Masks) > 0 && !user.IsMatch(irc.Mask(host)) {
 		return nil, AuthError{
-			errFmtUserNotFound,
+			errFmtBadHost,
 			[]interface{}{host, username},
 			AuthErrHostNotFound,
 		}
@@ -161,9 +172,23 @@ func (s *Store) GetAuthedUser(server, host string) *UserAccess {
 	return s.authed[server+host]
 }
 
-// Logout deletes an authenticated host.
+// Logout logs an authenticated host out.
 func (s *Store) Logout(server, host string) {
 	delete(s.authed, server+host)
+}
+
+// Logout logs an authenticated username out.
+func (s *Store) LogoutByUsername(username string) {
+	hosts := make([]string, 0, 1)
+	for host, user := range s.authed {
+		if user.Username == username {
+			hosts = append(hosts, host)
+		}
+	}
+
+	for i := range hosts {
+		delete(s.authed, hosts[i])
+	}
 }
 
 // FindUser looks up a user based on username. It caches the result if found.

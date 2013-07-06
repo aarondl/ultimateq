@@ -54,10 +54,9 @@ const (
 
 	errMsgStoreDisabled = "Access Denied: Permissions required but cannot " +
 		"check them due to a disabled store."
-	errMsgNotAuthed = "Access Denied: Permissions required but you are not " +
-		"authenticated."
+	errMsgNotAuthed     = "Access Denied: You are not authenticated."
 	errFmtInsuffLevel        = "Access Denied: Level %v required."
-	errFmtInsuffFlags        = "Access Denied: %v flag(s) required."
+	errFmtInsuffFlags        = "Access Denied: [%v] flag(s) required."
 	errMsgUnexpectedArgument = "Error: No arguments expected."
 	errFmtNArguments         = "Error: Expected %v %v arguments. (%v)"
 	errAtLeast               = "at least"
@@ -161,6 +160,7 @@ type command struct {
 	Callscope int
 	ReqLevel  uint8
 	ReqFlags  string
+	Authed    bool
 	Handler   CommandHandler
 }
 
@@ -281,6 +281,7 @@ func (c *Commander) RegisterAuthed(server, cmd string, handler CommandHandler,
 
 	command.ReqLevel = level
 	command.ReqFlags = flags
+	command.Authed = true
 
 	protectGlobalReg.Lock()
 	c.protectCommands.Lock()
@@ -404,11 +405,13 @@ func (c *Commander) Dispatch(server string, msg *irc.IrcMessage,
 	cmdata.State = state
 	cmdata.Store = store
 
-	if cmdata.UserAccess, err = filterAccess(store, command,
-		server, ch, ep, msg); err != nil {
+	if command.Authed {
+		if cmdata.UserAccess, err = filterAccess(store, command,
+			server, ch, ep, msg); err != nil {
 
-		ep.Notice(irc.Mask(msg.Sender).GetNick(), err.Error())
-		return
+			ep.Notice(irc.Mask(msg.Sender).GetNick(), err.Error())
+			return
+		}
 	}
 
 	if state != nil {
@@ -492,9 +495,6 @@ func filterAccess(store *data.Store, command *command, server, channel string,
 
 	hasLevel := command.ReqLevel != 0
 	hasFlags := len(command.ReqFlags) != 0
-	if !hasLevel && !hasFlags {
-		return nil, nil
-	}
 
 	if store == nil {
 		return nil, errors.New(errMsgStoreDisabled)
