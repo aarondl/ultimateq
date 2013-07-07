@@ -54,7 +54,7 @@ const (
 
 	errMsgStoreDisabled = "Access Denied: Permissions required but cannot " +
 		"check them due to a disabled store."
-	errMsgNotAuthed     = "Access Denied: You are not authenticated."
+	errMsgNotAuthed          = "Access Denied: You are not authenticated."
 	errFmtInsuffLevel        = "Access Denied: Level %v required."
 	errFmtInsuffFlags        = "Access Denied: [%v] flag(s) required."
 	errMsgUnexpectedArgument = "Error: No arguments expected."

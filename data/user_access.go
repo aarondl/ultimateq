@@ -23,18 +23,20 @@ var (
 type UserAccess struct {
 	Username string
 	Password []byte
-	Masks    []irc.WildMask
+	Masks    []string
 	Global   *Access
 	Server   map[string]*Access
 	Channel  map[string]map[string]*Access
 }
 
+// UserAccessPwdCost is the cost factor for bcrypt. It should not be set
+// unless the reasoning is good and the consequences are known.
 var UserAccessPwdCost = bcrypt.DefaultCost
 
 // CreateUserAccess initializes an access user. Requires username and password,
 // but masks are optional.
 func CreateUserAccess(un, pw string,
-	masks ...irc.WildMask) (*UserAccess, error) {
+	masks ...string) (*UserAccess, error) {
 
 	if len(un) == 0 || len(pw) == 0 {
 		return nil, errMissingUnameOrPwd
@@ -49,7 +51,7 @@ func CreateUserAccess(un, pw string,
 		return nil, err
 	}
 
-	a.Masks = make([]irc.WildMask, len(masks))
+	a.Masks = make([]string, len(masks))
 	copy(a.Masks, masks)
 
 	return a, nil
@@ -57,9 +59,9 @@ func CreateUserAccess(un, pw string,
 
 // createUserAccess creates a useraccess that doesn't care about security.
 // Mostly for testing.
-func createUserAccess(masks ...irc.WildMask) *UserAccess {
+func createUserAccess(masks ...string) *UserAccess {
 	a := &UserAccess{}
-	a.Masks = make([]irc.WildMask, len(masks))
+	a.Masks = make([]string, len(masks))
 	copy(a.Masks, masks)
 
 	return a
@@ -142,7 +144,7 @@ func deserialize(serialized []byte) (*UserAccess, error) {
 
 // AddMasks adds masks to this users list of wildcard masks. If a duplicate is
 // given, the entire update set is rejected.
-func (a *UserAccess) AddMasks(masks ...irc.WildMask) bool {
+func (a *UserAccess) AddMasks(masks ...string) bool {
 	for i := 0; i < len(a.Masks); i++ {
 		for j := 0; j < len(masks); j++ {
 			if masks[j] == a.Masks[i] {
@@ -156,7 +158,7 @@ func (a *UserAccess) AddMasks(masks ...irc.WildMask) bool {
 
 // DelMasks deletes masks to this users list of wildcard masks. If a single mask
 // is deleted, it returns true, even if other masks failed to delete.
-func (a *UserAccess) DelMasks(masks ...irc.WildMask) (deleted bool) {
+func (a *UserAccess) DelMasks(masks ...string) (deleted bool) {
 	for i := 0; i < len(a.Masks); i++ {
 		for j := 0; j < len(masks); j++ {
 			if masks[j] == a.Masks[i] {
@@ -248,7 +250,7 @@ func (a *UserAccess) HasFlags(server, channel string, flags ...string) bool {
 // the given mask.
 func (a *UserAccess) IsMatch(mask irc.Mask) bool {
 	for i := 0; i < len(a.Masks); i++ {
-		if a.Masks[i].Match(mask) {
+		if irc.WildMask(a.Masks[i]).Match(mask) {
 			return true
 		}
 	}
@@ -482,6 +484,52 @@ func (a *UserAccess) HasChannelFlag(server, channel string,
 		if access, ok := chans[channel]; ok {
 			has = access.HasFlag(flag)
 		}
+	}
+	return
+}
+
+// String turns UserAccess into a user consumable format.
+func (a *UserAccess) String(server, channel string) (str string) {
+	var wrote bool
+
+	if a.Global != nil && (a.Global.Level > 0 || a.Global.Flags > 0) {
+		str += "G(" + a.Global.String() + ")"
+		wrote = true
+	}
+
+	if srv, ok := a.Server[server]; ok && (srv.Level > 0 || srv.Flags > 0) {
+		if wrote {
+			str += " "
+		}
+		str += "S(" + srv.String() + ")"
+		wrote = true
+	}
+
+	if chsrv, ok := a.Channel[server]; ok {
+		if len(channel) != 0 {
+			if ch, ok := chsrv[channel]; ok && (ch.Level > 0 || ch.Flags > 0) {
+				if wrote {
+					str += " "
+				}
+				str += channel + "(" + ch.String() + ")"
+				wrote = true
+			}
+		} else {
+			for channel, ch := range chsrv {
+				if ch.Level == 0 && ch.Flags == 0 {
+					continue
+				}
+				if wrote {
+					str += " "
+				}
+				str += channel + "(" + ch.String() + ")"
+				wrote = true
+			}
+		}
+	}
+
+	if !wrote {
+		return none
 	}
 	return
 }

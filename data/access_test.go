@@ -128,12 +128,50 @@ func TestAccess_ClearAllFlags(t *T) {
 	}
 }
 
-func TestAccess_getFlagBit(t *T) {
+func TestAccess_String(t *T) {
 	t.Parallel()
-	nAlphabet := uint(26)
+
+	var table = []struct {
+		Level  uint8
+		Flags  string
+		Expect string
+	}{
+		{100, "aBCd", "100 BCad"},
+		{0, "BCad", "BCad"},
+		{100, "", "100"},
+		{0, "", none},
+	}
+
+	for _, test := range table {
+		a := CreateAccess(test.Level, test.Flags)
+		if was := a.String(); was != test.Expect {
+			t.Errorf("Expected: %s, was: %s", test.Expect, was)
+		}
+	}
+}
+
+func Test_getFlagBits(t *T) {
+	t.Parallel()
+	bits := getFlagBits("Aab")
+	aFlag, bFlag, AFlag := getFlagBit('a'), getFlagBit('b'), getFlagBit('A')
+	if aFlag != aFlag&bits {
+		t.Error("The correct bit was not set.")
+	}
+	if bFlag != bFlag&bits {
+		t.Error("The correct bit was not set.")
+	}
+	if AFlag != AFlag&bits {
+		t.Error("The correct bit was not set.")
+	}
+}
+
+func Test_getFlagBit(t *T) {
+	t.Parallel()
 	var table = map[rune]uint64{
-		'A': 0x1, 'Z': 0x1 << (nAlphabet - 1),
-		'a': 0x1 << nAlphabet, 'z': 0x1 << (nAlphabet*2 - 1),
+		'A': 0x1,
+		'Z': 0x1 << (nAlphabet - 1),
+		'a': 0x1 << nAlphabet,
+		'z': 0x1 << (nAlphabet*2 - 1),
 		'!': 0x0, '_': 0x0, '|': 0x0,
 	}
 
@@ -142,5 +180,29 @@ func TestAccess_getFlagBit(t *T) {
 			t.Errorf("Flag did not match: %c, %X (%X)",
 				flag, expect, bit)
 		}
+	}
+}
+
+func Test_getFlagString(t *T) {
+	t.Parallel()
+	var table = map[uint64]string{
+		0x1: "A",
+		0x1 << (nAlphabet - 1):   "Z",
+		0x1 << nAlphabet:         "a",
+		0x1 << (nAlphabet*2 - 1): "z",
+	}
+
+	for bit, expect := range table {
+		if flag := getFlagString(bit); flag != expect {
+			t.Errorf("Flag did not match: %X, %s (%s)",
+				bit, expect, flag)
+		}
+	}
+
+	bits := getFlagBit('a') | getFlagBit('b') | getFlagBit('A') |
+		1<<(nAlphabet*2+1)
+	should := "Aab"
+	if was := getFlagString(bits); was != should {
+		t.Errorf("Flag string should be: (%s) was: (%s)", should, was)
 	}
 }

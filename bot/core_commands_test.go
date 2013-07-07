@@ -11,16 +11,18 @@ import (
 )
 
 const (
-	server    = "irc.test.net"
-	bothost   = "bot!botuser@bothost"
-	botnick   = "bot"
-	u1host = "nick1!user1@host1"
-	u2host = "nick2!user2@host2"
-	u1user = "user"
-	u2user = "user2"
-	u2nick = "nick2"
-	channel   = "#chan"
-	password  = "password"
+	server   = "irc.test.net"
+	bothost  = "bot!botuser@bothost"
+	botnick  = "bot"
+	u1host   = "nick1!user1@host1"
+	u1nick   = "nick1"
+	u1user   = "user"
+	u2host   = "nick2!user2@host2"
+	u2nick   = "nick2"
+	u2user   = "user2"
+	channel  = "#chan"
+	password = "password"
+	prefix   = "."
 )
 
 var (
@@ -33,18 +35,18 @@ var (
 )
 
 type tSetup struct {
-	b *Bot
-	ep *data.DataEndpoint
-	state *data.State
-	store *data.Store
+	b      *Bot
+	ep     *data.DataEndpoint
+	state  *data.State
+	store  *data.Store
 	buffer *bytes.Buffer
-	t *T
+	t      *T
 }
 
-func commandsSetup(t *T) (*tSetup) {
+func commandsSetup(t *T) *tSetup {
 	conf := Configure().Nick("nobody").Altnick("nobody1").Username("nobody").
-		Userhost("bitforge.ca").Realname("ultimateq").NoReconnect(true).
-		Ssl(true).Server(serverId)
+		Userhost("host.com").Realname("ultimateq").NoReconnect(true).
+		Ssl(true).Prefix(prefix).Server(serverId)
 
 	b, err := createBot(conf, nil, nil, func(_ string) (*data.Store, error) {
 		return data.CreateStore(data.MemStoreProvider)
@@ -84,12 +86,19 @@ func commandsTeardown(s *tSetup, t *T) {
 	s.b.coreCommands.unregisterCoreCommands()
 }
 
-func rspChk(ts *tSetup, expected, sender string, args ...string) error {
+func pubRspChk(ts *tSetup, expected, sender string, args ...string) error {
+	return prvRspChk(ts, expected, channel, sender, args...)
+}
 
+func rspChk(ts *tSetup, expected, sender string, args ...string) error {
+	return prvRspChk(ts, expected, botnick, sender, args...)
+}
+
+func prvRspChk(ts *tSetup, expected, to, sender string, args ...string) error {
 	ts.buffer.Reset()
 	err := ts.b.commander.Dispatch(serverId, &irc.IrcMessage{
 		Name: irc.PRIVMSG, Sender: sender,
-		Args: []string{botnick, strings.Join(args, " ")},
+		Args: []string{to, strings.Join(args, " ")},
 	}, ts.ep)
 	ts.b.commander.WaitForHandlers()
 
@@ -262,22 +271,42 @@ func TestCoreCommands_Access(t *T) {
 		t.Error(err)
 	}
 
-	err = rspChk(ts, registerSuccess, u1host, access)
+	err = rspChk(ts, accessSuccess, u1host, access)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = rspChk(ts, registerSuccess, u1host, access, u2user)
+	err = pubRspChk(ts, accessSuccess, u1host, prefix+access)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = rspChk(ts, registerSuccess, u1host, access, u2nick)
+	err = rspChk(ts, accessSuccess, u1host, access, "*"+u2user)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = rspChk(ts, registerSuccess, u2host, access)
+	err = rspChk(ts, accessSuccess, u1host, access, u2nick)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = rspChk(ts, logoutSuccess, u2host, logout)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = rspChk(ts, accessSuccess, u1host, access, "*"+u2user)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = rspChk(ts, errFmtUserNotAuthed, u1host, access, u2nick)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = rspChk(ts, errFmtUserNotFound, u1host, access, "*")
 	if err != nil {
 		t.Error(err)
 	}
@@ -330,7 +359,7 @@ func TestCoreCommands_Deluser(t *T) {
 		t.Error(err)
 	}
 
-	err = rspChk(ts, deluserSuccess, u1host, deluser, "*" + u2user)
+	err = rspChk(ts, deluserSuccess, u1host, deluser, "*"+u2user)
 	if err != nil {
 		t.Error(err)
 	}

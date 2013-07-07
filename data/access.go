@@ -1,10 +1,16 @@
 package data
 
+import (
+	"strconv"
+)
+
 const (
-	ascA = 65
-	ascZ = 90
-	asca = 97
-	ascz = 122
+	ascA      = 65
+	ascZ      = 90
+	asca      = 97
+	ascz      = 122
+	nAlphabet = 26
+	none      = "none"
 )
 
 // Access defines an access level and flags a-zA-Z for a user.
@@ -78,6 +84,26 @@ func (a *Access) ClearAllFlags() {
 	a.Flags = 0
 }
 
+// String transforms the Access into a human-readable format.
+func (a *Access) String() (str string) {
+	hasLevel := a.Level != 0
+	hasFlags := a.Flags != 0
+	if !hasLevel && !hasFlags {
+		return none
+	}
+	if hasLevel {
+		str += strconv.Itoa(int(a.Level))
+	}
+	if hasFlags {
+		if hasLevel {
+			str += " "
+		}
+		str += getFlagString(a.Flags)
+	}
+
+	return
+}
+
 // getFlagBits creates a mask containing all the modes.
 func getFlagBits(flags ...string) (bits uint64) {
 	for i := 0; i < len(flags); i++ {
@@ -88,7 +114,7 @@ func getFlagBits(flags ...string) (bits uint64) {
 	return
 }
 
-// getFlagBit maps a-zA-Z to bits in a uint64
+// getFlagBit maps A-Za-z to bits in a uint64
 func getFlagBit(flag rune) (bit uint64) {
 	asc := uint64(flag)
 	if asc >= ascA && asc <= ascZ {
@@ -97,6 +123,24 @@ func getFlagBit(flag rune) (bit uint64) {
 	} else if asc >= asca && asc <= ascz {
 		asc -= ascA + (asca - ascZ - 1)
 		bit = 1 << asc
+	}
+	return
+}
+
+// getFlagString maps the bits in a uint64 to A-Za-z
+func getFlagString(bits uint64) (flags string) {
+	var bit uint64 = 1
+	var n int = nAlphabet * 2
+	for i := 0; i < n; i, bit = i+1, bit<<1 {
+		if bit&bits != bit {
+			continue
+		}
+
+		if i < nAlphabet {
+			flags += string(i + ascA)
+		} else {
+			flags += string(i - nAlphabet + asca)
+		}
 	}
 	return
 }

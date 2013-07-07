@@ -11,7 +11,7 @@ func TestUserAccess(t *T) {
 	t.Parallel()
 	var a *UserAccess
 	var err error
-	var masks = []irc.WildMask{`*!*@host`, `*!user@*`}
+	var masks = []string{`*!*@host`, `*!user@*`}
 
 	a = &UserAccess{}
 	a, err = CreateUserAccess(uname, password, masks...)
@@ -53,7 +53,7 @@ func TestUserAccess_VerifyPassword(t *T) {
 }
 
 func TestUserAccess_SerializeDeserialize(t *T) {
-	var masks = []irc.WildMask{`*!*@host`, `*!user@*`}
+	var masks = []string{`*!*@host`, `*!user@*`}
 	a, err := CreateUserAccess(uname, password, masks...)
 	if err != nil {
 		t.Fatal("Unexpected error:", err)
@@ -103,7 +103,7 @@ func TestUserAccess_SerializeDeserialize(t *T) {
 
 func TestUserAccess_AddMasks(t *T) {
 	t.Parallel()
-	masks := []irc.WildMask{`*!*@host`, `*!user@*`}
+	masks := []string{`*!*@host`, `*!user@*`}
 	a := createUserAccess()
 	if len(a.Masks) != 0 {
 		t.Error("Masks should be empty.")
@@ -116,7 +116,7 @@ func TestUserAccess_AddMasks(t *T) {
 
 func TestUserAccess_DelMasks(t *T) {
 	t.Parallel()
-	masks := []irc.WildMask{`*!*@host`, `*!user@*`, `nick!*@*`}
+	masks := []string{`*!*@host`, `*!user@*`, `nick!*@*`}
 	a := createUserAccess(masks...)
 	if len(a.Masks) != 3 {
 		t.Error("Masks should have:", masks)
@@ -136,7 +136,7 @@ func TestUserAccess_DelMasks(t *T) {
 
 func TestUserAccess_IsMatch(t *T) {
 	t.Parallel()
-	var wmasks = []irc.WildMask{"*!*@host1", "*!user2@*"}
+	var wmasks = []string{"*!*@host1", "*!user2@*"}
 	var mask1, mask2 irc.Mask = "nick1!user1@host1", "nick2!user2@host2"
 	a := createUserAccess()
 	if a.IsMatch(mask1) || a.IsMatch(mask2) {
@@ -472,5 +472,71 @@ func TestUserAccess_HasChannelFlags(t *T) {
 	}
 	if a.HasChannelFlag(server, channel, 'c') {
 		t.Error("Should not have c flag.")
+	}
+}
+
+func TestUserAccess_String(t *T) {
+	var table = []struct {
+		HasGlobal       bool
+		GlobalLevel     uint8
+		GlobalFlags     string
+		HasServer       bool
+		ServerLevel     uint8
+		ServerFlags     string
+		HasChannel      bool
+		ChannelLevel    uint8
+		ChannelFlags    string
+		ExpectChannel   string
+		ExpectNoChannel string
+	}{
+		{true, 100, "abc", true, 150, "abc", true, 200, "abc",
+			"G(100 abc) S(150 abc) #chan1(200 abc)",
+			"G(100 abc) S(150 abc) #chan1(200 abc) #chan2(200 abc)"},
+		{false, 100, "abc", true, 150, "abc", true, 200, "abc",
+			"S(150 abc) #chan1(200 abc)",
+			"S(150 abc) #chan1(200 abc) #chan2(200 abc)"},
+		{false, 0, "", false, 0, "", true, 200, "abc",
+			"#chan1(200 abc)",
+			"#chan1(200 abc) #chan2(200 abc)"},
+		{false, 0, "", false, 0, "", false, 0, "", "none", "none"},
+	}
+
+	for _, test := range table {
+		a := createUserAccess()
+		if test.HasGlobal {
+			a.GrantGlobal(test.GlobalLevel, test.GlobalFlags)
+		}
+		if test.HasServer {
+			a.GrantServer(server, test.ServerLevel, test.ServerFlags)
+			a.GrantServer("other", test.ServerLevel, test.ServerFlags)
+		}
+		if test.HasChannel {
+			a.GrantChannel(server, "#chan1",
+				test.ChannelLevel, test.ChannelFlags)
+			a.GrantChannel(server, "#chan2",
+				test.ChannelLevel, test.ChannelFlags)
+		}
+
+		if was := a.String(server, "#chan1"); was != test.ExpectChannel {
+			t.Errorf("Wrong output:\n\twant:'%s'\n\twas: '%s'",
+				test.ExpectChannel, was)
+			t.Error(a.Global)
+			t.Error(a.Server)
+			t.Error(a.Channel)
+		}
+		if was := a.String(server, ""); was != test.ExpectNoChannel {
+			t.Errorf("Wrong output:\n\twant:'%s'\n\twas: '%s'",
+				test.ExpectNoChannel, was)
+			t.Error(a.Global)
+			t.Error(a.Server)
+			t.Error(a.Channel)
+		}
+
+		/*if was := a.String(server, "#chan1"); was != test.ExpectChannel {
+			t.Errorf(`Expected: "%s", but was "%s"`, test.ExpectChannel, was)
+		}
+		if was := a.String(server, ""); was != test.ExpectNoChannel {
+			t.Errorf(`Expected: "%s", but was "%s"`, test.ExpectNoChannel, was)
+		}*/
 	}
 }

@@ -38,13 +38,15 @@ const (
 	registerFailure = `The username [%v] is already registered.`
 	authSuccess     = `Successfully authenticated [%v].`
 	logoutSuccess   = `Successfully logged out.`
+	accessSuccess   = `Access for [%v]: %v`
 	deluserSuccess  = `Removed user [%v].`
 	deluserFailure  = `User [%v] does not exist.`
 	delmeSuccess    = `Removed your user account [%v].`
 	delmeFailure    = `User account could not be removed.`
 	passwdSuccess   = `Successfully updated your password.`
 	passwdFailure   = `Old password did not match, try again.`
-	masksFailure    = "No masks set."
+	masksSuccess    = `Masks: %v`
+	masksFailure    = `No masks set.`
 	addmaskSuccess  = `Host [%v] added successfully.`
 	addmaskFailure  = `Host [%v] already exists.`
 	delmaskSuccess  = `Host [%v] removed successfully.`
@@ -56,20 +58,21 @@ type argv []string
 var commands = []struct {
 	Name   string
 	Authed bool
+	Public bool
 	Level  uint8
 	Flags  string
 	Args   []string
 }{
-	{register, false, 0, ``, argv{`password`, `[username]`}},
-	{auth, false, 0, ``, argv{`password`, `[username]`}},
-	{logout, true, 0, ``, nil},
-	{access, true, 0, ``, argv{`[user]`}},
-	{deluser, true, 0, `A`, argv{`user`}},
-	{delme, true, 0, ``, nil},
-	{passwd, true, 0, ``, argv{`oldpassword`, `newpassword`}},
-	{masks, true, 0, ``, nil},
-	{addmask, true, 0, ``, argv{`mask`}},
-	{delmask, true, 0, ``, argv{`mask`}},
+	{register, false, false, 0, ``, argv{`password`, `[username]`}},
+	{auth, false, false, 0, ``, argv{`password`, `[username]`}},
+	{logout, true, false, 0, ``, nil},
+	{access, true, true, 0, ``, argv{`[user]`}},
+	{deluser, true, false, 0, `A`, argv{`user`}},
+	{delme, true, false, 0, ``, nil},
+	{passwd, true, false, 0, ``, argv{`oldpassword`, `newpassword`}},
+	{masks, true, false, 0, ``, nil},
+	{addmask, true, false, 0, ``, argv{`mask`}},
+	{delmask, true, false, 0, ``, argv{`mask`}},
 }
 
 // coreCommands is the bot's command handling struct. The bot itself uses
@@ -85,11 +88,15 @@ func CreateCoreCommands(b *Bot) (*coreCommands, error) {
 
 	var err error
 	for _, cmd := range commands {
+		privacy := cmds.PRIVATE
+		if cmd.Public {
+			privacy = cmds.ALL
+		}
 		if cmd.Authed {
 			err = b.RegisterAuthedCommand(cmd.Name, c, cmds.PRIVMSG,
-				cmds.PRIVATE, cmd.Level, cmd.Flags, cmd.Args...)
+				privacy, cmd.Level, cmd.Flags, cmd.Args...)
 		} else {
-			err = b.RegisterCommand(cmd.Name, c, cmds.PRIVMSG, cmds.PRIVATE,
+			err = b.RegisterCommand(cmd.Name, c, cmds.PRIVMSG, privacy,
 				cmd.Args...)
 		}
 		if err != nil {
@@ -206,9 +213,9 @@ func (c *coreCommands) register(d *data.DataEndpoint,
 
 	nick := cd.User.GetNick()
 	if isFirst {
-		d.Notice(nick, fmt.Sprintf(registerSuccessFirst, uname))
+		d.Noticef(nick, registerSuccessFirst, uname)
 	} else {
-		d.Notice(nick, fmt.Sprintf(registerSuccess, uname))
+		d.Noticef(nick, registerSuccess, uname)
 	}
 
 	return
@@ -244,7 +251,7 @@ func (c *coreCommands) auth(d *data.DataEndpoint, cd *cmds.CommandData) (
 		return
 	}
 
-	d.Notice(cd.User.GetNick(), fmt.Sprintf(authSuccess, uname))
+	d.Noticef(cd.User.GetNick(), authSuccess, uname)
 	return
 }
 
@@ -258,9 +265,27 @@ func (c *coreCommands) logout(d *data.DataEndpoint, cd *cmds.CommandData) (
 	return
 }
 
-// access outputs the access for the current user.
+// access outputs the access for the user.
 func (c *coreCommands) access(d *data.DataEndpoint, cd *cmds.CommandData) (
 	internal, external error) {
+
+	uname := cd.GetArg("user")
+	var access *data.UserAccess
+	if len(uname) == 0 {
+		access = cd.UserAccess
+	} else {
+		access, internal, external = getUser(uname, d.GetKey(), cd)
+		if external != nil || internal != nil {
+			return
+		}
+	}
+
+	ch := ""
+	if cd.Channel != nil {
+		ch = cd.Channel.GetName()
+	}
+	d.Noticef(cd.User.GetNick(), accessSuccess,
+		access.Username, access.String(d.GetKey(), ch))
 
 	return
 }
@@ -270,7 +295,6 @@ func (c *coreCommands) deluser(d *data.DataEndpoint, cd *cmds.CommandData) (
 	internal, external error) {
 
 	uname := cd.GetArg("user")
-
 	uname, external = getUsername(uname, d.GetKey(), cd)
 	if external != nil {
 		return
@@ -285,9 +309,9 @@ func (c *coreCommands) deluser(d *data.DataEndpoint, cd *cmds.CommandData) (
 	}
 
 	if removed {
-		d.Notice(cd.User.GetNick(), fmt.Sprintf(deluserSuccess, uname))
+		d.Noticef(cd.User.GetNick(), deluserSuccess, uname)
 	} else {
-		d.Notice(cd.User.GetNick(), fmt.Sprintf(deluserFailure, uname))
+		d.Noticef(cd.User.GetNick(), deluserFailure, uname)
 	}
 
 	return
@@ -308,7 +332,7 @@ func (c *coreCommands) delme(d *data.DataEndpoint, cd *cmds.CommandData) (
 		internal = errors.New(delmeFailure)
 		return
 	}
-	d.Notice(cd.User.GetNick(), fmt.Sprintf(delmeSuccess, access.Username))
+	d.Noticef(cd.User.GetNick(), delmeSuccess, access.Username)
 	return
 }
 
@@ -335,6 +359,14 @@ func (c *coreCommands) passwd(d *data.DataEndpoint, cd *cmds.CommandData) (
 func (c *coreCommands) masks(d *data.DataEndpoint, cd *cmds.CommandData) (
 	internal, external error) {
 
+	access := cd.UserAccess
+	if len(access.Masks) > 0 {
+		d.Noticef(cd.User.GetNick(), masksSuccess,
+			strings.Join(access.Masks, " "))
+	} else {
+		d.Notice(cd.User.GetNick(), masksFailure)
+	}
+
 	return
 }
 
@@ -345,11 +377,11 @@ func (c *coreCommands) addmask(d *data.DataEndpoint, cd *cmds.CommandData) (
 	mask := cd.GetArg("mask")
 
 	access := cd.UserAccess
-	if access.AddMasks(irc.WildMask(mask)) {
+	if access.AddMasks(mask) {
 		cd.AddUser(access)
-		d.Notice(cd.User.GetNick(), fmt.Sprintf(addmaskSuccess, mask))
+		d.Noticef(cd.User.GetNick(), addmaskSuccess, mask)
 	} else {
-		d.Notice(cd.User.GetNick(), fmt.Sprintf(addmaskFailure, mask))
+		d.Noticef(cd.User.GetNick(), addmaskFailure, mask)
 	}
 
 	return
@@ -362,11 +394,11 @@ func (c *coreCommands) delmask(d *data.DataEndpoint, cd *cmds.CommandData) (
 	mask := cd.GetArg("mask")
 
 	access := cd.UserAccess
-	if access.DelMasks(irc.WildMask(mask)) {
+	if access.DelMasks(mask) {
 		cd.AddUser(access)
-		d.Notice(cd.User.GetNick(), fmt.Sprintf(delmaskSuccess, mask))
+		d.Noticef(cd.User.GetNick(), delmaskSuccess, mask)
 	} else {
-		d.Notice(cd.User.GetNick(), fmt.Sprintf(delmaskFailure, mask))
+		d.Noticef(cd.User.GetNick(), delmaskFailure, mask)
 	}
 
 	return
@@ -397,17 +429,33 @@ func getUsername(user, key string, cd *cmds.CommandData) (string, error) {
 	}
 }
 
-// getUser looks up a user based on nickname. The error returned by this
-// function should be sent to the user.
-func getUser(user, key string, cd *cmds.CommandData) (*data.UserAccess, error) {
+// getUser looks up a user based on nickname. If user is in the form *user, the
+// user parameter is assumed to be a username and is looked up by that.
+func getUser(user, key string, cd *cmds.CommandData) (
+	access *data.UserAccess, internal, external error) {
+
+	if strings.HasPrefix(user, "*") {
+		user = user[1:]
+		if len(user) == 0 {
+			external = fmt.Errorf(errFmtUserNotFound, user)
+			return
+		}
+		access, internal = cd.FindUser(user)
+		if access == nil {
+			external = fmt.Errorf(errFmtUserNotFound, user)
+		}
+		return
+	}
 	if stateUser := cd.GetUser(user); stateUser != nil {
 		host := stateUser.GetFullhost()
-		access := cd.GetAuthedUser(key, host)
+		access = cd.GetAuthedUser(key, host)
 		if access == nil {
-			return nil, fmt.Errorf(errFmtUserNotAuthed, user)
+			external = fmt.Errorf(errFmtUserNotAuthed, user)
+			return
 		}
-		return access, nil
+		return
 	} else {
-		return nil, fmt.Errorf(errFmtUserNotFound, user)
+		external = fmt.Errorf(errFmtUserNotFound, user)
+		return
 	}
 }
