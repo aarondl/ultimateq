@@ -148,8 +148,9 @@ func conf(c *config.Config) *config.Config {
 		FloodProtectBurst(5).
 		FloodProtectTimeout(5).
 		FloodProtectStep(2.5).
-		Host("localhost").
-		Nick("nobody2")
+		Host("zkpq.ca").
+		Nick("nobody2").
+		Ssl(true).NoVerifyCert(false).SslCertificate("kniocert.pem")
 
 	return c
 }

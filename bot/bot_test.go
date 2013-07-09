@@ -420,10 +420,13 @@ func (s *s) TestBot_Providers(c *C) {
 }
 
 func (s *s) TestBot_createIrcClient(c *C) {
-	b, err := createBot(fakeConfig, nil, nil, nil, false, false)
+	connProv := func(server string) (net.Conn, error) {
+		return nil, errFailedToLoadCertificate
+	}
+	b, err := createBot(fakeConfig, nil, connProv, nil, false, false)
 	c.Check(err, IsNil)
 	ers := b.Connect()
-	c.Check(ers[0], Equals, errSslNotImplemented)
+	c.Check(ers[0], Equals, errFailedToLoadCertificate)
 }
 
 func (s *s) TestBot_createDispatcher(c *C) {

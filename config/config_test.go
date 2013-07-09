@@ -39,7 +39,8 @@ var srv1 = &Server{
 	Host:                "irc.gamesurge.net",
 	Port:                5555,
 	Ssl:                 "true",
-	VerifyCert:          "false",
+	SslCert:             "file1",
+	NoVerifyCert:        "false",
 	NoState:             "false",
 	NoStore:             "true",
 	FloodProtectBurst:   "5",
@@ -61,7 +62,8 @@ var srv2 = &Server{
 	Host:                "irc.gamesurge.com",
 	Port:                6666,
 	Ssl:                 "false",
-	VerifyCert:          "true",
+	SslCert:             "file2",
+	NoVerifyCert:        "true",
 	NoState:             "true",
 	NoStore:             "true",
 	FloodProtectBurst:   "6",
@@ -99,7 +101,8 @@ func (s *s) TestConfig_Fallbacks(c *C) {
 	c.Check(server.GetName(), Equals, name)
 	c.Check(server.GetPort(), Equals, config.Global.GetPort())
 	c.Check(server.GetSsl(), Equals, config.Global.GetSsl())
-	c.Check(server.GetVerifyCert(), Equals, config.Global.GetVerifyCert())
+	c.Check(server.GetSslCert(), Equals, config.Global.GetSslCert())
+	c.Check(server.GetNoVerifyCert(), Equals, config.Global.GetNoVerifyCert())
 	c.Check(server.GetNoState(), Equals, config.Global.GetNoState())
 	c.Check(server.GetNoStore(), Equals, config.Global.GetNoStore())
 	c.Check(server.GetFloodProtectBurst(), Equals,
@@ -131,7 +134,8 @@ func (s *s) TestConfig_Fluent(c *C) {
 		Host(""). // Should not break anything
 		Port(srv2.GetPort()).
 		Ssl(srv2.GetSsl()).
-		VerifyCert(srv2.GetVerifyCert()).
+		SslCert(srv2.GetSslCert()).
+		NoVerifyCert(srv2.GetNoVerifyCert()).
 		NoState(srv2.GetNoState()).
 		NoStore(srv2.GetNoStore()).
 		FloodProtectBurst(srv2.GetFloodProtectBurst()).
@@ -151,7 +155,8 @@ func (s *s) TestConfig_Fluent(c *C) {
 		Host(srv1.GetHost()).
 		Port(srv1.GetPort()).
 		Ssl(srv1.GetSsl()).
-		VerifyCert(srv1.GetVerifyCert()).
+		SslCert(srv1.GetSslCert()).
+		NoVerifyCert(srv1.GetNoVerifyCert()).
 		NoState(srv1.GetNoState()).
 		NoStore(srv1.GetNoStore()).
 		FloodProtectBurst(srv1.GetFloodProtectBurst()).
@@ -175,7 +180,8 @@ func (s *s) TestConfig_Fluent(c *C) {
 	c.Check(server.GetName(), Equals, srv1.GetName())
 	c.Check(server.GetPort(), Equals, srv1.GetPort())
 	c.Check(server.GetSsl(), Equals, srv1.GetSsl())
-	c.Check(server.GetVerifyCert(), Equals, srv1.GetVerifyCert())
+	c.Check(server.GetSslCert(), Equals, srv1.GetSslCert())
+	c.Check(server.GetNoVerifyCert(), Equals, srv1.GetNoVerifyCert())
 	c.Check(server.GetNoState(), Equals, srv1.GetNoState())
 	c.Check(server.GetNoStore(), Equals, srv1.GetNoStore())
 	c.Check(server.GetFloodProtectBurst(), Equals, srv1.GetFloodProtectBurst())
@@ -198,7 +204,8 @@ func (s *s) TestConfig_Fluent(c *C) {
 	c.Check(server2.GetHost(), Equals, srv2host)
 	c.Check(server2.GetPort(), Equals, srv2.GetPort())
 	c.Check(server2.GetSsl(), Equals, srv2.GetSsl())
-	c.Check(server2.GetVerifyCert(), Equals, srv2.GetVerifyCert())
+	c.Check(server2.GetSslCert(), Equals, srv2.GetSslCert())
+	c.Check(server2.GetNoVerifyCert(), Equals, srv2.GetNoVerifyCert())
 	c.Check(server2.GetNoState(), Equals, srv2.GetNoState())
 	c.Check(server2.GetNoStore(), Equals, srv2.GetNoStore())
 	c.Check(server2.GetFloodProtectBurst(), Equals, srv2.GetFloodProtectBurst())
@@ -244,7 +251,7 @@ func (s *s) TestConfig_Defaults(c *C) {
 	c.Check(conf.GetStoreFile(), Equals, defaultStoreFile)
 	c.Check(srv.GetPort(), Equals, defaultIrcPort)
 	c.Check(srv.GetSsl(), Equals, false)
-	c.Check(srv.GetVerifyCert(), Equals, false)
+	c.Check(srv.GetNoVerifyCert(), Equals, false)
 	c.Check(srv.GetNoState(), Equals, false)
 	c.Check(srv.GetNoStore(), Equals, false)
 	c.Check(srv.GetFloodProtectBurst(), Equals, defaultFloodProtectBurst)
@@ -267,7 +274,7 @@ func (s *s) TestConfig_InvalidValues(c *C) {
 	srv.FloodProtectBurst = "x"
 	srv.FloodProtectStep = "x"
 	srv.FloodProtectTimeout = "x"
-	srv.VerifyCert = "x"
+	srv.NoVerifyCert = "x"
 	srv.NoState = "x"
 	srv.NoStore = "x"
 	srv.NoReconnect = "x"
@@ -275,7 +282,7 @@ func (s *s) TestConfig_InvalidValues(c *C) {
 	srv.Prefix = "xx"
 
 	c.Check(srv.GetSsl(), Equals, false)
-	c.Check(srv.GetVerifyCert(), Equals, false)
+	c.Check(srv.GetNoVerifyCert(), Equals, false)
 	c.Check(srv.GetNoState(), Equals, false)
 	c.Check(srv.GetNoStore(), Equals, false)
 	c.Check(srv.GetFloodProtectBurst(), Equals, defaultFloodProtectBurst)
@@ -287,7 +294,7 @@ func (s *s) TestConfig_InvalidValues(c *C) {
 	c.Check(conf.IsValid(), Equals, false)
 	c.Check(len(conf.Errors), Equals, 9)
 	c.Check(conf.Errors[0].Error(), Matches, invErr(errSsl))
-	c.Check(conf.Errors[1].Error(), Matches, invErr(errVerifyCert))
+	c.Check(conf.Errors[1].Error(), Matches, invErr(errNoVerifyCert))
 	c.Check(conf.Errors[2].Error(), Matches, invErr(errNoState))
 	c.Check(conf.Errors[3].Error(), Matches, invErr(errNoStore))
 	c.Check(conf.Errors[4].Error(), Matches, invErr(errFloodProtectBurst))

@@ -1,6 +1,8 @@
 package bot
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"github.com/aarondl/ultimateq/config"
@@ -9,7 +11,9 @@ import (
 	"github.com/aarondl/ultimateq/dispatch/commander"
 	"github.com/aarondl/ultimateq/inet"
 	"github.com/aarondl/ultimateq/irc"
+	"io/ioutil"
 	"net"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -35,8 +39,8 @@ const (
 var (
 	// errNotConnected happens when a write occurs to a disconnected server.
 	errNotConnected = errors.New("bot: Server not connected")
-	// temporary error until ssl is fixed.
-	errSslNotImplemented = errors.New("bot: Ssl not implemented")
+	// errFailedToLoadCertificate happens when we fail to parse the certificate
+	errFailedToLoadCertificate = errors.New("bot: Failed to load certificate")
 )
 
 // Server is all the details around a specific server connection. Also contains
@@ -150,8 +154,23 @@ func (s *Server) createIrcClient() error {
 
 	if s.bot.connProvider == nil {
 		if s.conf.GetSsl() {
-			//TODO: Implement SSL
-			return errSslNotImplemented
+			conf := &tls.Config{}
+
+			if s.conf.GetNoVerifyCert() == true {
+				conf.InsecureSkipVerify = true
+			}
+
+			if len(s.conf.GetSslCert()) > 0 {
+				conf.RootCAs, err = readCert(s.conf.GetSslCert())
+				if err != nil {
+					return err
+				}
+			}
+
+			conn, err = tls.Dial("tcp", server, conf)
+			if err != nil {
+				return err
+			}
 		} else {
 			if conn, err = net.Dial("tcp", server); err != nil {
 				return err
@@ -330,4 +349,29 @@ func (s *Server) setReconnecting(value, lock bool) {
 	} else {
 		s.status &= ^STATUS_RECONNECTING
 	}
+}
+
+// readCert returns a CertPool containing the client certificate specified
+// in filename.
+func readCert(filename string) (certpool *x509.CertPool, err error) {
+	var pem []byte
+	var file *os.File
+
+	if file, err = os.Open(filename); err != nil {
+		return
+	}
+
+	defer file.Close()
+
+	pem, err = ioutil.ReadAll(file)
+	if err != nil {
+		return
+	}
+
+	certpool = x509.NewCertPool()
+	ok := certpool.AppendCertsFromPEM(pem)
+	if !ok {
+		err = errFailedToLoadCertificate
+	}
+	return
 }

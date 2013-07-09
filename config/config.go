@@ -51,7 +51,7 @@ const (
 	errHost                = "host"
 	errPort                = "port"
 	errSsl                 = "ssl"
-	errVerifyCert          = "verifycert"
+	errNoVerifyCert        = "noverifycert"
 	errNoState             = "nostate"
 	errNoStore             = "nostore"
 	errStoreFile           = "storefile"
@@ -183,9 +183,9 @@ func (c *Config) validateServer(s *Server, missingIsError bool) {
 		}
 	}
 
-	if len(s.VerifyCert) != 0 {
-		if _, err := strconv.ParseBool(s.VerifyCert); err != nil {
-			c.addError(fmtErrInvalid, name, errVerifyCert, s.VerifyCert)
+	if len(s.NoVerifyCert) != 0 {
+		if _, err := strconv.ParseBool(s.NoVerifyCert); err != nil {
+			c.addError(fmtErrInvalid, name, errNoVerifyCert, s.NoVerifyCert)
 		}
 	}
 
@@ -371,9 +371,16 @@ func (c *Config) Ssl(ssl bool) *Config {
 	return c
 }
 
-// VerifyCert fluently sets the verifyCert for the current config context
-func (c *Config) VerifyCert(verifyCert bool) *Config {
-	c.GetContext().VerifyCert = strconv.FormatBool(verifyCert)
+// SslCert sets a filename that will be read in (pem format)
+// to verify the server's certificate.
+func (c *Config) SslCert(cert string) *Config {
+	c.GetContext().SslCert = cert
+	return c
+}
+
+// NoVerifyCert fluently sets the noverifyCert for the current config context
+func (c *Config) NoVerifyCert(noverifycert bool) *Config {
+	c.GetContext().NoVerifyCert = strconv.FormatBool(noverifycert)
 	return c
 }
 
@@ -385,7 +392,7 @@ func (c *Config) NoState(nostate bool) *Config {
 }
 
 // NoStore fluently sets reconnection for the current config context,
-// this turns off the irc state database (data package).
+// this turns off the irc store database (data package).
 func (c *Config) NoStore(nostore bool) *Config {
 	c.GetContext().NoStore = strconv.FormatBool(nostore)
 	return c
@@ -487,10 +494,13 @@ type Server struct {
 	Name string
 
 	// Irc Server connection info
-	Host       string
-	Port       uint16
-	Ssl        string
-	VerifyCert string
+	Host string
+	Port uint16
+
+	// Ssl configuration
+	Ssl          string
+	SslCert      string
+	NoVerifyCert string
 
 	// State tracking
 	NoState string
@@ -578,18 +588,28 @@ func (s *Server) GetSsl() (ssl bool) {
 	return
 }
 
-// GetVerifyCert gets VerifyCert of the server, or the global verifyCert, or
+// GetSslCert returns the path to the certificate used when connecting.
+func (s *Server) GetSslCert() (cert string) {
+	if len(s.SslCert) > 0 {
+		cert = s.SslCert
+	} else if s.parent != nil && len(s.parent.Global.SslCert) > 0 {
+		cert = s.parent.Global.SslCert
+	}
+	return
+}
+
+// GetNoVerifyCert gets NoVerifyCert of the server, or the global verifyCert, or
 // false
-func (s *Server) GetVerifyCert() (verifyCert bool) {
+func (s *Server) GetNoVerifyCert() (noverifyCert bool) {
 	var err error
-	if len(s.VerifyCert) != 0 {
-		verifyCert, err = strconv.ParseBool(s.VerifyCert)
-	} else if s.parent != nil && len(s.parent.Global.VerifyCert) != 0 {
-		verifyCert, err = strconv.ParseBool(s.parent.Global.VerifyCert)
+	if len(s.NoVerifyCert) != 0 {
+		noverifyCert, err = strconv.ParseBool(s.NoVerifyCert)
+	} else if s.parent != nil && len(s.parent.Global.NoVerifyCert) != 0 {
+		noverifyCert, err = strconv.ParseBool(s.parent.Global.NoVerifyCert)
 	}
 
 	if err != nil {
-		verifyCert = false
+		noverifyCert = false
 	}
 	return
 }
