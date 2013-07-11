@@ -16,7 +16,6 @@ import (
 	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/dispatch"
 	"github.com/aarondl/ultimateq/irc"
-	"regexp"
 	"strings"
 	"sync"
 )
@@ -51,9 +50,9 @@ const (
 	errMsgHandlerRequired = `commander: ` +
 		`Handler required for command registration.`
 
-	errMsgStoreDisabled = "Access Denied: Cannot use authenticated commands " +
-		"or access parameters when store is disabled."
-	errMsgStateDisabled = "Error: Cannot use user parameter commands " +
+	errMsgStoreDisabled = "Access Denied: Cannot use authenticated commands, " +
+		"nick or user parameters when store is disabled."
+	errMsgStateDisabled = "Error: Cannot use nick or user parameter commands " +
 		"when state is disabled."
 	errMsgNotAuthed          = "Access Denied: You are not authenticated."
 	errFmtInsuffLevel        = "Access Denied: [%v] level required."
@@ -85,20 +84,7 @@ const (
 		`allowed (given: %v)`
 )
 
-// Internal constants.
-const (
-	attribUser = iota + 1
-	attribAuthed
-	varArgs            = -1
-	argNamesStripChars = "#*~[]."
-)
-
 var (
-	// commandArgRegexp checks a single argument to see if it matches the
-	// forms: arg #arg [arg] or arg...
-	commandArgRegexp = regexp.MustCompile(
-		`(?i)^(\[[~\*]?[a-z0-9]+\]|[~\*]?[a-z0-9]+(\.\.\.)?|#[a-z0-9]+)$`)
-
 	// globalCommandRegistry is a singleton throughout the entire bot, and
 	// ensures that a command can only be registered once for each server.
 	globalCommandRegistry = make(map[string]*Command)
@@ -207,6 +193,7 @@ func (c *Commander) Unregister(server, cmd string) (found bool) {
 func (c *Commander) Dispatch(server string, msg *irc.IrcMessage,
 	ep *data.DataEndpoint) (err error) {
 
+	// Filter non privmsg/notice
 	msgtype := 0
 	switch msg.Name {
 	case irc.PRIVMSG:
@@ -219,6 +206,7 @@ func (c *Commander) Dispatch(server string, msg *irc.IrcMessage,
 		return nil
 	}
 
+	// Get command name or die trying
 	fields := strings.Fields(msg.Args[1])
 	if len(fields) == 0 {
 		return nil
@@ -229,6 +217,8 @@ func (c *Commander) Dispatch(server string, msg *irc.IrcMessage,
 	msgscope := PRIVATE
 	isChan, hasChan := c.CheckTarget(msg.Args[0])
 
+	// If it's a channel message, ensure we're active on the channel and
+	// that the user has supplied the prefix in his command.
 	if isChan {
 		if !hasChan || rune(cmd[0]) != c.prefix {
 			return nil
@@ -251,7 +241,7 @@ func (c *Commander) Dispatch(server string, msg *irc.IrcMessage,
 		return nil
 	}
 
-	var cmdata = CommandData{
+	var cmdata = &CommandData{
 		ep: ep,
 	}
 
@@ -260,53 +250,18 @@ func (c *Commander) Dispatch(server string, msg *irc.IrcMessage,
 		args = fields[1:]
 	}
 
-	cmdArgs, cmdArgnames := command.Args, command.argnames
-	reqArgs, optArgs := command.reqArgs, command.optArgs
-	cmdArgAttribs := command.argAttrib
-	reqAdj, optAdj := 0, 0
-
-	var chanArg string
-	if command.chanArg {
-		if chanArg, err = c.filterChanArgs(command, args, isChan); err != nil {
-			ep.Notice(irc.Mask(msg.Sender).GetNick(), err.Error())
-			return
-		} else if len(chanArg) > 0 {
-			args = args[1:]
-		} else {
-			chanArg = ch
-		}
-
-		cmdArgs = cmdArgs[1:]
-		cmdArgnames = cmdArgnames[1:]
-		cmdArgAttribs = cmdArgAttribs[1:]
-		if isChan {
-			optAdj = 1
-		} else {
-			reqAdj = 1
-		}
-	}
-
-	cmdata.args, err = filterArgs(cmdArgs, cmdArgnames, reqArgs, optArgs,
-		reqAdj, optAdj, args)
-
-	if err != nil {
-		ep.Notice(irc.Mask(msg.Sender).GetNick(), err.Error())
-		return
-	}
-	if command.chanArg {
-		if cmdata.args == nil {
-			cmdata.args = map[string]string{
-				command.argnames[0]: chanArg,
-			}
-		} else {
-			cmdata.args[command.argnames[0]] = chanArg
-		}
-	}
-
 	state := ep.OpenState()
 	store := ep.OpenStore()
 	cmdata.State = state
 	cmdata.Store = store
+
+	if err = c.filterArgs(server, command, ch, isChan, args, cmdata, state,
+		store); err != nil {
+
+		cmdata.Close()
+		ep.Notice(irc.Mask(msg.Sender).GetNick(), err.Error())
+		return
+	}
 
 	if command.RequireAuth {
 		if cmdata.UserAccess, err = filterAccess(store, command,
@@ -320,26 +275,18 @@ func (c *Commander) Dispatch(server string, msg *irc.IrcMessage,
 
 	if state != nil {
 		cmdata.User = state.GetUser(msg.Sender)
-		if command.chanArg {
-			cmdata.TargetChannel = state.GetChannel(chanArg)
-		}
 		if isChan {
-			cmdata.Channel = state.GetChannel(ch)
+			if cmdata.Channel == nil {
+				cmdata.Channel = state.GetChannel(ch)
+			}
 			cmdata.UserChannelModes = state.GetUsersChannelModes(msg.Sender, ch)
 		}
-	}
-
-	if err = populateUserArgs(server, cmdArgs, cmdArgnames, args, cmdArgAttribs,
-		&cmdata, state, store); err != nil {
-		cmdata.Close()
-		ep.Notice(irc.Mask(msg.Sender).GetNick(), err.Error())
-		return
 	}
 
 	c.HandlerStarted()
 	go func() {
 		defer cmdata.Close()
-		err := command.Handler.Command(cmd, &irc.Message{msg}, ep, &cmdata)
+		err := command.Handler.Command(cmd, &irc.Message{msg}, ep, cmdata)
 		if err != nil {
 			ep.Notice(irc.Mask(msg.Sender).GetNick(), err.Error())
 		}
@@ -347,101 +294,6 @@ func (c *Commander) Dispatch(server string, msg *irc.IrcMessage,
 	}()
 
 	return nil
-}
-
-// filterChanArgs checks for a channel argument.
-func (c *Commander) filterChanArgs(cmd *Command, args []string, isChan bool) (
-	channel string, err error) {
-
-	if !cmd.chanArg {
-		return
-	}
-	if isChan {
-		if len(args) == 0 {
-			return
-		}
-		if isFirstChan, _ := c.CheckTarget(args[0]); isFirstChan {
-			channel = args[0]
-		}
-	} else {
-		if len(args) == 0 {
-			errStr := errExactly
-			if cmd.optArgs != 0 {
-				errStr = errAtLeast
-			}
-			err = fmt.Errorf(errFmtNArguments, errStr, cmd.reqArgs+1,
-				strings.Join(cmd.Args, " "))
-			return
-		}
-		if isFirstChan, _ := c.CheckTarget(args[0]); isFirstChan {
-			channel = args[0]
-		} else {
-			err = fmt.Errorf(errFmtArgumentNotChannel, args[0])
-			return
-		}
-	}
-
-	return
-}
-
-// filterArgs checks to ensure a command has exactly the right number of
-// arguments and makes an argError message if not.
-func filterArgs(args, argNames []string, reqArgs, optArgs int,
-	reqAdj, optAdj int, msgArgs []string) (map[string]string, error) {
-
-	nArgs := len(msgArgs)
-	if nArgs > 0 && reqArgs == 0 && optArgs == 0 {
-		return nil, errors.New(errMsgUnexpectedArgument)
-	}
-
-	minArgs, maxArgs := reqArgs, reqArgs+optArgs
-	isVargs := optArgs == varArgs
-	if nArgs >= minArgs && (isVargs || nArgs <= maxArgs) {
-		if minArgs == 0 && maxArgs == 0 {
-			return nil, nil
-		}
-		return parseArgs(args, argNames, msgArgs), nil
-	}
-
-	var errStr string
-	var errArgs = reqArgs
-	if optArgs >= 0 {
-		optArgs += optAdj
-	} else {
-		reqArgs += reqAdj
-	}
-	switch true {
-	case optArgs == 0:
-		errStr = errExactly
-	case isVargs, nArgs < minArgs:
-		errStr = errAtLeast
-	case nArgs > maxArgs:
-		errStr = errAtMost
-		errArgs = maxArgs
-	}
-	return nil, fmt.Errorf(errFmtNArguments, errStr, errArgs,
-		strings.Join(args, " "))
-}
-
-// parseArgs parses the arguments in the command into a map. This function
-// does no checking, it should have been lined up before hand.
-func parseArgs(args, argNames, msgArgs []string) (retargs map[string]string) {
-	retargs = make(map[string]string, len(args))
-	used := 0
-	for i, arg := range args {
-		if used >= len(msgArgs) {
-			return
-		}
-		name := argNames[i]
-		switch arg[len(arg)-1] {
-		case '.':
-			retargs[name] = strings.Join(msgArgs[used:], " ")
-		default:
-			retargs[name] = msgArgs[used]
-			used++
-		}
-	}
-	return
 }
 
 // filterAccess ensures that a user has the correct access to perform the given
@@ -470,61 +322,178 @@ func filterAccess(store *data.Store, command *Command, server, channel string,
 	return access, nil
 }
 
-// populateUserArgs uses the store and state to look up any ~user or *user
-// type parameters in the arguments.
-func populateUserArgs(server string, args, argNames, msgArgs []string,
-	argAttrib []int, cmdata *CommandData,
-	state *data.State, store *data.Store) error {
+// filterArgs parses all the arguments. It looks up channel and user arguments
+// using the state and store, and generally populates the CommandData struct
+// with argument information.
+func (c *Commander) filterArgs(server string, command *Command, channel string,
+	isChan bool, msgArgs []string, cmdata *CommandData,
+	state *data.State, store *data.Store) (err error) {
 
-	for i, arg := range args {
-		attrib := argAttrib[i]
-		if attrib == 0 {
-			continue
+	cmdata.args = make(map[string]string)
+	i, j := 0, 0
+	for i = 0; i < len(command.args); i, j = i+1, j+1 {
+		arg := &command.args[i]
+		req, opt, varg, ch, nick, user := REQUIRED&arg.Type != 0,
+			OPTIONAL&arg.Type != 0, VARIADIC&arg.Type != 0,
+			CHANNEL&arg.Type != 0, NICK&arg.Type != 0, USER&arg.Type != 0
+
+		switch {
+		case ch:
+			if state == nil {
+				return errors.New(errMsgStateDisabled)
+			}
+			var consumed bool
+			if consumed, err = c.parseChanArg(command, cmdata, state, j,
+				msgArgs, channel, isChan); err != nil {
+				return
+			} else if !consumed {
+				j--
+			}
+		case req:
+			if j >= len(msgArgs) {
+				return fmt.Errorf(errFmtNArguments, errAtLeast, command.reqArgs,
+					strings.Join(command.Args, " "))
+			}
+			cmdata.args[arg.Name] = msgArgs[j]
+		case opt:
+			if j >= len(msgArgs) {
+				return
+			}
+			cmdata.args[arg.Name] = msgArgs[j]
+		case varg:
+			if j >= len(msgArgs) {
+				return
+			}
+			cmdata.args[arg.Name] = strings.Join(msgArgs[j:], " ")
 		}
 
-		j, vIndex, vargs := 1, i, false
-		argname := ""
-		if vargs = '.' == arg[len(arg)-1]; !vargs {
-			argname = argNames[i]
-			if i >= len(msgArgs) {
-				return nil
+		if nick || user {
+			if varg {
+				err = c.parseUserArg(cmdata, state, store, server, arg.Name,
+					arg.Type, msgArgs[j:]...)
+			} else {
+				err = c.parseUserArg(cmdata, state, store, server, arg.Name,
+					arg.Type, msgArgs[j])
 			}
+			if err != nil {
+				return
+			}
+		}
+
+		if varg {
+			j = len(msgArgs)
+			break
+		}
+	}
+
+	if j < len(msgArgs) {
+		if j == 0 {
+			return errors.New(errMsgUnexpectedArgument)
 		} else {
-			if j = len(msgArgs) - i; j <= 0 {
-				return nil
-			}
-			switch attrib {
-			case attribUser:
-				cmdata.TargetVarUsers = make([]*data.User, j)
-			case attribAuthed:
-				cmdata.TargetVarUsers = make([]*data.User, j)
-				cmdata.TargetVarUserAccess = make([]*data.UserAccess, j)
+			return fmt.Errorf(errFmtNArguments, errAtMost,
+				command.reqArgs+command.optArgs,
+				strings.Join(command.Args, " "))
+		}
+	}
+	return nil
+}
+
+// parseChanArg checks the argument provided and ensures it's a valid situation
+// for the channel arg to be in (isChan & validChan) | (isChan & missing) |
+// (!isChan & validChan)
+func (c *Commander) parseChanArg(command *Command, cmdata *CommandData,
+	state *data.State,
+	index int, msgArgs []string, channel string, isChan bool) (bool, error) {
+
+	var isFirstChan bool
+	if index < len(msgArgs) {
+		isFirstChan, _ = c.CheckTarget(msgArgs[index])
+	} else if !isChan {
+		return false, fmt.Errorf(errFmtNArguments, errAtLeast,
+			1+command.reqArgs, strings.Join(command.Args, " "))
+	}
+
+	name := command.args[index].Name
+	if isChan {
+		if !isFirstChan {
+			cmdata.args[name] = channel
+			cmdata.Channel = state.GetChannel(channel)
+			cmdata.TargetChannel = cmdata.Channel
+			return false, nil
+		} else {
+			cmdata.args[name] = msgArgs[index]
+			cmdata.TargetChannel = state.GetChannel(msgArgs[index])
+			return true, nil
+		}
+	} else if isFirstChan {
+		cmdata.args[name] = msgArgs[index]
+		cmdata.TargetChannel = state.GetChannel(msgArgs[index])
+		return true, nil
+	}
+
+	return false, fmt.Errorf(errFmtArgumentNotChannel, msgArgs[index])
+}
+
+// parseUserArg takes user arguments and assigns them to the correct structures
+// in a command data struct.
+func (c *Commander) parseUserArg(cmdata *CommandData, state *data.State,
+	store *data.Store, srv, name string, t argType, users ...string) error {
+
+	vargs := (t & VARIADIC) != 0
+	nUsers := len(users)
+
+	var access *data.UserAccess
+	var user *data.User
+	var err error
+
+	addData := func(index int) {
+		if access != nil {
+			if vargs {
+				cmdata.TargetVarUserAccess[index] = access
+			} else {
+				cmdata.TargetUserAccess[name] = access
 			}
 		}
-
-		for ; j > 0; j-- {
-			mArg := msgArgs[i]
-			index := i - vIndex
+		if user != nil {
 			if vargs {
-				i++
+				cmdata.TargetVarUsers[index] = user
+			} else {
+				cmdata.TargetUsers[name] = user
 			}
-			switch attrib {
-			case attribUser:
-				user, err := cmdata.FindUserByNick(mArg)
-				if err != nil {
-					return err
-				}
-				cmdata.addUser(argname, index, vargs, user)
-			case attribAuthed:
-				access, user, err := cmdata.FindAccessByUser(server, mArg)
-				if err != nil {
-					return err
-				}
-				if user != nil {
-					cmdata.addUser(argname, index, vargs, user)
-				}
-				cmdata.addUserAccess(argname, index, vargs, access)
+		}
+	}
+
+	if vargs {
+		cmdata.TargetVarUsers = make([]*data.User, nUsers)
+	} else {
+		if cmdata.TargetUsers == nil {
+			cmdata.TargetUsers = make(map[string]*data.User)
+		}
+	}
+
+	switch t & USERMASK {
+	case USER:
+		if vargs {
+			cmdata.TargetVarUserAccess = make([]*data.UserAccess, nUsers)
+		} else {
+			if cmdata.TargetUserAccess == nil {
+				cmdata.TargetUserAccess = make(map[string]*data.UserAccess)
 			}
+		}
+		for i, u := range users {
+			access, user, err = cmdata.FindAccessByUser(srv, u)
+			if err != nil {
+				return err
+			}
+			addData(i)
+		}
+	case NICK:
+		for i, u := range users {
+			user, err = cmdata.FindUserByNick(u)
+			if err != nil {
+				return err
+			}
+			addData(i)
 		}
 	}
 

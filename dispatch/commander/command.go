@@ -2,8 +2,39 @@ package commander
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 )
+
+var (
+	// rgxArgs checks a single argument to see if it matches the
+	// forms: arg #arg [arg] or arg...
+	rgxArgs = regexp.MustCompile(
+		`(?i)^(\[[~\*]?[a-z0-9]+\]|[~\*]?[a-z0-9]+(\.\.\.)?|#[a-z0-9]+)$`)
+)
+
+type argType int
+
+const (
+	REQUIRED argType = 1 << iota
+	OPTIONAL
+	VARIADIC
+	CHANNEL
+	NICK
+	USER
+
+	TYPEMASK = REQUIRED | OPTIONAL | VARIADIC | CHANNEL
+	USERMASK = NICK | USER
+
+	argStripChars = `#~*[].`
+)
+
+// argument is a type to hold argument information.
+type argument struct {
+	Original string
+	Name     string
+	Type     argType
+}
 
 // Command holds all the information about a command.
 type Command struct {
@@ -58,12 +89,11 @@ type Command struct {
 	// ReqFlags is the required flags for use.
 	ReqFlags string
 	// Handler the handler structure that will handle events for this command.
-	Handler   CommandHandler
-	argnames  []string
-	argAttrib []int
-	chanArg   bool
-	reqArgs   int
-	optArgs   int
+	Handler CommandHandler
+	// args stores data about each argument after it's parsed.
+	args    []argument
+	reqArgs int
+	optArgs int
 }
 
 // MkCmd is a helper method to easily create a Command. See the documentation
@@ -101,12 +131,23 @@ func (c *Command) parseArgs() error {
 		return nil
 	}
 
-	c.argAttrib = make([]int, nArgs)
+	c.args = make([]argument, nArgs)
+
+	var chanArg, required, optional, variadic bool
 
 	for i := 0; i < nArgs; i++ {
 		arg := strings.ToLower(c.Args[i])
-		if !commandArgRegexp.MatchString(arg) {
+		if !rgxArgs.MatchString(arg) {
 			return fmt.Errorf(errFmtArgumentForm, arg)
+		}
+
+		argMeta := &c.args[i]
+		argMeta.Original = arg
+		argMeta.Name = strings.Trim(c.Args[i], argStripChars)
+		for j := 0; j < i; j++ {
+			if c.args[j].Name == argMeta.Name {
+				return fmt.Errorf(errFmtArgumentDupName, argMeta.Name)
+			}
 		}
 
 		modifier := arg[0]
@@ -115,46 +156,42 @@ func (c *Command) parseArgs() error {
 		}
 		switch modifier {
 		case '#':
-			if c.chanArg {
+			if chanArg {
 				return fmt.Errorf(errFmtArgumentDupChan, arg)
-			} else if c.reqArgs != 0 || c.optArgs != 0 {
+			} else if required || optional || variadic {
 				return fmt.Errorf(errFmtArgumentOrderChan, arg)
 			}
-			c.chanArg = true
-			continue
+			argMeta.Type = CHANNEL
+			chanArg = true
 		case '~':
-			c.argAttrib[i] = attribUser
+			argMeta.Type = NICK
 		case '*':
-			c.argAttrib[i] = attribAuthed
+			argMeta.Type = USER
 		}
 
 		switch arg[len(arg)-1] {
 		case ']':
-			if c.optArgs == varArgs {
+			if variadic {
 				return fmt.Errorf(errFmtArgumentOrderOpt, arg)
 			}
+			argMeta.Type |= OPTIONAL
+			optional = true
 			c.optArgs++
 		case '.':
-			if c.optArgs == varArgs {
+			if variadic {
 				return fmt.Errorf(errFmtArgumentDupVargs, arg)
 			}
-			c.optArgs = varArgs
+			argMeta.Type |= VARIADIC
+			variadic = true
 		default:
-			if c.optArgs != 0 {
+			if optional {
 				return fmt.Errorf(errFmtArgumentOrderReq, arg)
 			}
+			argMeta.Type |= REQUIRED
+			required = true
 			c.reqArgs++
 		}
 	}
 
-	c.argnames = make([]string, nArgs)
-	for i := 0; i < len(c.Args); i++ {
-		c.argnames[i] = strings.Trim(c.Args[i], argNamesStripChars)
-		for j := 0; j < i; j++ {
-			if c.argnames[j] == c.argnames[i] {
-				return fmt.Errorf(errFmtArgumentDupName, c.argnames[i])
-			}
-		}
-	}
 	return nil
 }

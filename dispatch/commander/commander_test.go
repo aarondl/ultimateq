@@ -193,6 +193,30 @@ func TestCommander_Register(t *T) {
 		return MkCmd(ext, dsc, cmd, handler, ALL, ALL, args...)
 	}
 
+	brokenCmd := helper()
+	brokenCmd.Cmd = ""
+	err = c.Register(GLOBAL, brokenCmd)
+	err = chkErr(err, errMsgCmdRequired)
+	if err != nil {
+		t.Error(err)
+	}
+
+	brokenCmd = helper()
+	brokenCmd.Extension = ""
+	err = c.Register(GLOBAL, brokenCmd)
+	err = chkErr(err, errMsgExtRequired)
+	if err != nil {
+		t.Error(err)
+	}
+
+	brokenCmd = helper()
+	brokenCmd.Description = ""
+	err = c.Register(GLOBAL, brokenCmd)
+	err = chkErr(err, errMsgDescRequired)
+	if err != nil {
+		t.Error(err)
+	}
+
 	err = c.Register(GLOBAL, helper("!!!"))
 	err = chkErr(err, errFmtArgumentForm)
 	if err != nil {
@@ -453,7 +477,7 @@ func TestCommander_Dispatch(t *T) {
 				} else {
 					for i, arg := range test.CmdArgs {
 						req := !strings.ContainsAny(arg, ".[")
-						arg = strings.Trim(arg, argNamesStripChars)
+						arg = strings.Trim(arg, argStripChars)
 						if handler.args[arg] == "" {
 							if req || i < len(test.MsgArgs)-2 {
 								t.Errorf("The argument was not present: %v\n%v",
@@ -779,6 +803,16 @@ func TestCommander_DispatchChannel(t *T) {
 		t.Error(err)
 	}
 
+	msg.Args = []string{nick, cmd + " " + channel}
+	noState := data.CreateDataEndpoint(server, buffer, nil, store,
+		&stateMutex, &storeMutex)
+	err = c.Dispatch(server, msg, noState)
+	c.WaitForHandlers()
+	err = chkErr(err, errMsgStateDisabled)
+	if err != nil {
+		t.Error(err)
+	}
+
 	handler.targChan = nil
 	handler.args = nil
 	msg.Args = []string{nick, cmd + " " + channel}
@@ -892,6 +926,33 @@ func TestCommander_DispatchUsers(t *T) {
 		t.Error("Unexpected number of users:", len(u))
 	}
 
+	success := c.Unregister(GLOBAL, cmd)
+	if !success {
+		t.Error("Handler could not be unregistered.")
+	}
+}
+
+func TestCommander_DispatchErrors(t *T) {
+	c := CreateCommander(prefix, core)
+	var buffer = &bytes.Buffer{}
+	var stateMutex, storeMutex sync.RWMutex
+
+	state, store, _ := setupForAuth()
+	var dataEndpoint = data.CreateDataEndpoint(server, buffer, state, store,
+		&stateMutex, &storeMutex)
+
+	msg := &irc.IrcMessage{
+		Sender: host, Name: irc.PRIVMSG,
+	}
+
+	handler := &commandHandler{}
+	err := c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALL, ALL,
+		"*user1", "~user2", "[*user3]", "~users..."),
+	)
+	if err != nil {
+		t.Error("Unexpected error:", err)
+	}
+
 	msg.Args = []string{nick, cmd + " *baduser nick"}
 	err = c.Dispatch(server, msg, dataEndpoint)
 	c.WaitForHandlers()
@@ -932,16 +993,6 @@ func TestCommander_DispatchUsers(t *T) {
 		t.Error(err)
 	}
 
-	disableStateEp := data.CreateDataEndpoint(server, buffer, nil, store,
-		&stateMutex, &storeMutex)
-	msg.Args = []string{nick, cmd + " nick nick"}
-	err = c.Dispatch(server, msg, disableStateEp)
-	c.WaitForHandlers()
-	err = chkErr(err, errMsgStateDisabled)
-	if err != nil {
-		t.Error(err)
-	}
-
 	disableStoreEp := data.CreateDataEndpoint(server, buffer, state, nil,
 		&stateMutex, &storeMutex)
 	msg.Args = []string{nick, cmd + " *user nick"}
@@ -952,11 +1003,55 @@ func TestCommander_DispatchUsers(t *T) {
 		t.Error(err)
 	}
 
+	disableStateEp := data.CreateDataEndpoint(server, buffer, nil, store,
+		&stateMutex, &storeMutex)
+	msg.Args = []string{nick, cmd + " nick nick"}
+	err = c.Dispatch(server, msg, disableStateEp)
+	c.WaitForHandlers()
+	err = chkErr(err, errMsgStateDisabled)
+	if err != nil {
+		t.Error(err)
+	}
+
 	success := c.Unregister(GLOBAL, cmd)
 	if !success {
 		t.Error("Handler could not be unregistered.")
 	}
 
+	err = c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALL, ALL, "~user1"))
+	if err != nil {
+		t.Error("Unexpected error:", err)
+	}
+
+	msg.Args = []string{nick, cmd + " nick"}
+	err = c.Dispatch(server, msg, disableStateEp)
+	c.WaitForHandlers()
+	err = chkErr(err, errMsgStateDisabled)
+	if err != nil {
+		t.Error(err)
+	}
+
+	success = c.Unregister(GLOBAL, cmd)
+	if !success {
+		t.Error("Handler could not be unregistered.")
+	}
+}
+
+func TestCommander_DispatchVariadicUsers(t *T) {
+	c := CreateCommander(prefix, core)
+	var buffer = &bytes.Buffer{}
+	var stateMutex, storeMutex sync.RWMutex
+
+	state, store, _ := setupForAuth()
+	var dataEndpoint = data.CreateDataEndpoint(server, buffer, state, store,
+		&stateMutex, &storeMutex)
+
+	msg := &irc.IrcMessage{
+		Sender: host, Name: irc.PRIVMSG,
+	}
+
+	handler := &commandHandler{}
+	var err error
 	err = c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALL, ALL,
 		"*users..."),
 	)
@@ -1021,11 +1116,27 @@ func TestCommander_DispatchUsers(t *T) {
 		t.Error(err)
 	}
 
-	success = c.Unregister(GLOBAL, cmd)
+	success := c.Unregister(GLOBAL, cmd)
 	if !success {
 		t.Error("Handler could not be unregistered.")
 	}
+}
 
+func TestCommander_DispatchMixUserAndChan(t *T) {
+	c := CreateCommander(prefix, core)
+	var buffer = &bytes.Buffer{}
+	var stateMutex, storeMutex sync.RWMutex
+
+	state, store, _ := setupForAuth()
+	var dataEndpoint = data.CreateDataEndpoint(server, buffer, state, store,
+		&stateMutex, &storeMutex)
+
+	msg := &irc.IrcMessage{
+		Sender: host, Name: irc.PRIVMSG,
+	}
+
+	handler := &commandHandler{}
+	var err error
 	err = c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALL, ALL,
 		"#chan", "~user"),
 	)
@@ -1042,5 +1153,10 @@ func TestCommander_DispatchUsers(t *T) {
 
 	if handler.targUsers["user"] == nil {
 		t.Error("The user argument was nil.")
+	}
+
+	success := c.Unregister(GLOBAL, cmd)
+	if !success {
+		t.Error("Handler could not be unregistered.")
 	}
 }

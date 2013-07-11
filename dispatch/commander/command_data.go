@@ -130,34 +130,6 @@ func (cd *CommandData) FindAccessByUser(server, nickOrUser string) (
 	return
 }
 
-// addUser adds the user to the command data.
-func (cd *CommandData) addUser(name string, index int, vargs bool,
-	user *data.User) {
-
-	if vargs {
-		cd.TargetVarUsers[index] = user
-	} else {
-		if cd.TargetUsers == nil {
-			cd.TargetUsers = make(map[string]*data.User)
-		}
-		cd.TargetUsers[name] = user
-	}
-}
-
-// addUserAccess adds the user access to the command data.
-func (cd *CommandData) addUserAccess(name string, index int, vargs bool,
-	user *data.UserAccess) {
-
-	if vargs {
-		cd.TargetVarUserAccess[index] = user
-	} else {
-		if cd.TargetUserAccess == nil {
-			cd.TargetUserAccess = make(map[string]*data.UserAccess)
-		}
-		cd.TargetUserAccess[name] = user
-	}
-}
-
 // Close closes the handles to the internal structures. Calling Close is not
 // required. See CommandData's documentation for when to call this method.
 // All CommandData's methods and fields become invalid after a call to Close.
