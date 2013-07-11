@@ -365,51 +365,19 @@ func (b *Bot) UnregisterServer(
 
 // RegisterCommand registers a command with the bot.
 // See Commander.Register for in-depth documentation.
-func (b *Bot) RegisterCommand(cmd string, handler commander.CommandHandler,
-	msgtype, scope int, args ...string) error {
-
-	return b.commander.Register(commander.GLOBAL, cmd, handler, msgtype,
-		scope, args...)
+func (b *Bot) RegisterCommand(cmd *commander.Command) error {
+	return b.commander.Register(commander.GLOBAL, cmd)
 }
 
 // RegisterServerCommand registers a command with the server.
 // See Commander.Register for in-depth documentation.
-func (b *Bot) RegisterServerCommand(server, cmd string,
-	handler commander.CommandHandler, msgtype,
-	scope int, args ...string) error {
+func (b *Bot) RegisterServerCommand(srv string, cmd *commander.Command) error {
 
 	b.protectServers.RLock()
 	defer b.protectServers.RUnlock()
 
-	if s, ok := b.servers[server]; ok {
-		return s.commander.Register(server, cmd, handler, msgtype,
-			scope, args...)
-	}
-	return errUnknownServerId
-}
-
-// RegisterAuthedCommand registers an authed command with the bot.
-// See Commander.Register for in-depth documentation.
-func (b *Bot) RegisterAuthedCommand(cmd string,
-	handler commander.CommandHandler, msgtype, scope int,
-	reqlevel uint8, reqflags string, args ...string) error {
-
-	return b.commander.RegisterAuthed(commander.GLOBAL, cmd, handler, msgtype,
-		scope, reqlevel, reqflags, args...)
-}
-
-// RegisterAuthedServerCommand registers an authed command with the server.
-// See Commander.Register for in-depth documentation.
-func (b *Bot) RegisterAuthedServerCommand(server, cmd string,
-	handler commander.CommandHandler, msgtype, scope int,
-	reqlevel uint8, reqflags string, args ...string) error {
-
-	b.protectServers.RLock()
-	defer b.protectServers.RUnlock()
-
-	if s, ok := b.servers[server]; ok {
-		return s.commander.RegisterAuthed(server, cmd, handler, msgtype, scope,
-			reqlevel, reqflags, args...)
+	if s, ok := b.servers[srv]; ok {
+		return s.commander.Register(srv, cmd)
 	}
 	return errUnknownServerId
 }

@@ -271,13 +271,13 @@ func (s *s) TestBot_Dispatching(c *C) {
 			waiter.Done()
 		},
 	})
-	err = b.RegisterCommand("msg", &testCommand{
+	err = b.RegisterCommand(commander.MkCmd("ext", "dsc", "msg", &testCommand{
 		func(_ string, _ *irc.Message, _ *data.DataEndpoint,
 			_ *commander.CommandData) error {
 			waiter.Done()
 			return nil
 		},
-	}, commander.PRIVMSG, commander.PRIVATE)
+	}, commander.PRIVMSG, commander.PRIVATE))
 
 	c.Check(err, IsNil)
 	ers := b.Connect()
@@ -319,41 +319,27 @@ func (s *s) TestBot_RegisterCommand(c *C) {
 	var success bool
 	b, err := createBot(fakeConfig, nil, nil, nil, false, false)
 	cmd := "cmd"
-	err = b.RegisterCommand(cmd, &testCommand{}, commander.ALL,
-		commander.ALL)
+	err = b.RegisterCommand(commander.MkCmd("ext", "desc", cmd, &testCommand{},
+		commander.ALL, commander.ALL))
 
-	err = b.RegisterCommand(cmd, &testCommand{}, commander.ALL,
-		commander.ALL)
+	err = b.RegisterCommand(commander.MkCmd("ext", "desc", cmd, &testCommand{},
+		commander.ALL, commander.ALL))
 	c.Check(err, NotNil) // Duplicate
 	success = b.UnregisterCommand(cmd)
 	c.Check(success, Equals, true)
 
-	err = b.RegisterAuthedCommand(cmd, &testCommand{}, commander.ALL,
-		commander.ALL, 100, "a")
-	c.Check(err, IsNil)
-	success = b.UnregisterCommand(cmd)
-	c.Check(success, Equals, true)
-
-	err = b.RegisterServerCommand(serverId, cmd, &testCommand{},
-		commander.ALL, commander.ALL)
+	err = b.RegisterServerCommand(serverId, commander.MkCmd("e", "d", cmd,
+		&testCommand{}, commander.ALL, commander.ALL))
 	c.Check(err, IsNil)
 	success = b.UnregisterServerCommand(serverId, cmd)
 	c.Check(success, Equals, true)
 
-	err = b.RegisterAuthedServerCommand(serverId, cmd, &testCommand{},
-		commander.ALL, commander.ALL, 100, "a")
-	c.Check(err, IsNil)
-	success = b.UnregisterServerCommand(serverId, cmd)
-	c.Check(success, Equals, true)
-
-	err = b.RegisterServerCommand("badServer", cmd, &testCommand{},
-		commander.ALL, commander.ALL)
-	c.Check(err, Equals, errUnknownServerId)
-	err = b.RegisterAuthedServerCommand("badServer", cmd, &testCommand{},
-		commander.ALL, commander.ALL, 100, "a")
+	err = b.RegisterServerCommand("badServer", commander.MkCmd("e", "d", cmd,
+		&testCommand{}, commander.ALL, commander.ALL))
 	c.Check(err, Equals, errUnknownServerId)
 
 	success = b.UnregisterServerCommand("badServer", cmd)
+	c.Check(success, Equals, false)
 }
 
 func (s *s) TestBot_createBot(c *C) {

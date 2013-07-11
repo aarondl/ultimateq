@@ -22,6 +22,8 @@ const (
 	addmask  = `addmask`
 	delmask  = `delmask`
 
+	extension = `core`
+
 	errFmtCommandRegister = `bot: A core command registration failed: %v`
 	errMsgInternal        = `There was an internal error, try again later.`
 	errFmtInternal        = `commander: Error processing command %v (%v)`
@@ -30,25 +32,35 @@ const (
 	errFmtUserNotFound  = `The user [%v] could not be found.`
 	errFmtUserNotAuthed = `The user [%v] is not authenticated.`
 
+	registerDesc    = `Registers an account.`
 	registerSuccess = `Registered [%v] successfully. You have been ` +
 		`automatically authenticated.`
 	registerSuccessFirst = `Registered [%v] successfully. ` +
 		`As the first user, you have been given all permissions and ` +
 		`privileges as well as being automatically authenticated. \o/`
 	registerFailure = `The username [%v] is already registered.`
+	authDesc        = `Authenticate a user to an account.`
 	authSuccess     = `Successfully authenticated [%v].`
+	logoutDesc      = `Logs the user out of the account.`
 	logoutSuccess   = `Successfully logged out.`
+	accessDesc      = `Access retrieves the access for the user.`
 	accessSuccess   = `Access for [%v]: %v`
+	deluserDesc     = `Deletes a user account from the bot.`
 	deluserSuccess  = `Removed user [%v].`
 	deluserFailure  = `User [%v] does not exist.`
+	delmeDesc       = `Deletes the current user's account.`
 	delmeSuccess    = `Removed your user account [%v].`
 	delmeFailure    = `User account could not be removed.`
+	passwdDesc      = `Change the current user's account password.`
 	passwdSuccess   = `Successfully updated your password.`
 	passwdFailure   = `Old password did not match, try again.`
+	masksDesc       = `Retrieves the current user's mask list.`
 	masksSuccess    = `Masks: %v`
 	masksFailure    = `No masks set.`
+	addmaskDesc     = `Adds a mask to the current user.`
 	addmaskSuccess  = `Host [%v] added successfully.`
 	addmaskFailure  = `Host [%v] already exists.`
+	delmaskDesc     = `Deletes a mask from the current user.`
 	delmaskSuccess  = `Host [%v] removed successfully.`
 	delmaskFailure  = `Host [%v] not found.`
 )
@@ -57,22 +69,25 @@ type argv []string
 
 var commands = []struct {
 	Name   string
+	Desc   string
 	Authed bool
 	Public bool
 	Level  uint8
 	Flags  string
 	Args   []string
 }{
-	{register, false, false, 0, ``, argv{`password`, `[username]`}},
-	{auth, false, false, 0, ``, argv{`password`, `[username]`}},
-	{logout, true, false, 0, ``, nil},
-	{access, true, true, 0, ``, argv{`[user]`}},
-	{deluser, true, false, 0, `A`, argv{`user`}},
-	{delme, true, false, 0, ``, nil},
-	{passwd, true, false, 0, ``, argv{`oldpassword`, `newpassword`}},
-	{masks, true, false, 0, ``, nil},
-	{addmask, true, false, 0, ``, argv{`mask`}},
-	{delmask, true, false, 0, ``, argv{`mask`}},
+	{register, registerDesc, false, false, 0, ``,
+		argv{`password`, `[username]`}},
+	{auth, authDesc, false, false, 0, ``, argv{`password`, `[username]`}},
+	{logout, logoutDesc, true, false, 0, ``, nil},
+	{access, accessDesc, true, true, 0, ``, argv{`[user]`}},
+	{deluser, deluserDesc, true, false, 0, `A`, argv{`user`}},
+	{delme, delmeDesc, true, false, 0, ``, nil},
+	{passwd, passwdDesc, true, false, 0, ``,
+		argv{`oldpassword`, `newpassword`}},
+	{masks, masksDesc, true, false, 0, ``, nil},
+	{addmask, addmaskDesc, true, false, 0, ``, argv{`mask`}},
+	{delmask, delmaskDesc, true, false, 0, ``, argv{`mask`}},
 }
 
 // coreCommands is the bot's command handling struct. The bot itself uses
@@ -85,20 +100,23 @@ type coreCommands struct {
 // bot.
 func CreateCoreCommands(b *Bot) (*coreCommands, error) {
 	c := &coreCommands{b}
-
-	var err error
 	for _, cmd := range commands {
 		privacy := cmds.PRIVATE
 		if cmd.Public {
 			privacy = cmds.ALL
 		}
-		if cmd.Authed {
-			err = b.RegisterAuthedCommand(cmd.Name, c, cmds.PRIVMSG,
-				privacy, cmd.Level, cmd.Flags, cmd.Args...)
-		} else {
-			err = b.RegisterCommand(cmd.Name, c, cmds.PRIVMSG, privacy,
-				cmd.Args...)
-		}
+		err := b.RegisterCommand(&cmds.Command{
+			Cmd:         cmd.Name,
+			Extension:   extension,
+			Description: cmd.Desc,
+			Handler:     c,
+			Msgtype:     cmds.PRIVMSG,
+			Msgscope:    privacy,
+			Args:        cmd.Args,
+			RequireAuth: cmd.Authed,
+			ReqLevel:    cmd.Level,
+			ReqFlags:    cmd.Flags,
+		})
 		if err != nil {
 			return nil, fmt.Errorf(errFmtCommandRegister, err)
 		}
