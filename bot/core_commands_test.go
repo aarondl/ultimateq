@@ -301,12 +301,12 @@ func TestCoreCommands_Access(t *T) {
 		t.Error(err)
 	}
 
-	err = rspChk(ts, errFmtUserNotAuthed, u1host, access, u2nick)
+	err = rspChk(ts, ".*not authenticated.*", u1host, access, u2nick)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = rspChk(ts, errFmtUserNotFound, u1host, access, "*")
+	err = rspChk(ts, ".*Username must follow.*", u1host, access, "*")
 	if err != nil {
 		t.Error(err)
 	}
@@ -376,15 +376,15 @@ func TestCoreCommands_Deluser(t *T) {
 		t.Error("User was not deleted.")
 	}
 
-	err = rspChk(ts, errFmtUserNotFound, u1host, deluser, "noexist")
+	err = rspChk(ts, ".*could not be found.*", u1host, deluser, "noexist")
 	if err != nil {
 		t.Error(err)
 	}
-	err = rspChk(ts, deluserFailure, u1host, deluser, "*noexist")
+	err = rspChk(ts, ".*is not registered.*", u1host, deluser, "*noexist")
 	if err != nil {
 		t.Error(err)
 	}
-	err = rspChk(ts, errFmtUserNotFound, u1host, deluser, "*")
+	err = rspChk(ts, ".*Username must follow.*", u1host, deluser, "*")
 	if err != nil {
 		t.Error(err)
 	}

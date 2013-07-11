@@ -255,14 +255,6 @@ func (c *Commander) Dispatch(server string, msg *irc.IrcMessage,
 	cmdata.State = state
 	cmdata.Store = store
 
-	if err = c.filterArgs(server, command, ch, isChan, args, cmdata, state,
-		store); err != nil {
-
-		cmdata.Close()
-		ep.Notice(irc.Mask(msg.Sender).GetNick(), err.Error())
-		return
-	}
-
 	if command.RequireAuth {
 		if cmdata.UserAccess, err = filterAccess(store, command,
 			server, ch, ep, msg); err != nil {
@@ -271,6 +263,14 @@ func (c *Commander) Dispatch(server string, msg *irc.IrcMessage,
 			ep.Notice(irc.Mask(msg.Sender).GetNick(), err.Error())
 			return
 		}
+	}
+
+	if err = c.filterArgs(server, command, ch, isChan, args, cmdata, state,
+		store); err != nil {
+
+		cmdata.Close()
+		ep.Notice(irc.Mask(msg.Sender).GetNick(), err.Error())
+		return
 	}
 
 	if state != nil {

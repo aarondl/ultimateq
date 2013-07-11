@@ -80,8 +80,8 @@ var commands = []struct {
 		argv{`password`, `[username]`}},
 	{auth, authDesc, false, false, 0, ``, argv{`password`, `[username]`}},
 	{logout, logoutDesc, true, false, 0, ``, nil},
-	{access, accessDesc, true, true, 0, ``, argv{`[user]`}},
-	{deluser, deluserDesc, true, false, 0, `A`, argv{`user`}},
+	{access, accessDesc, true, true, 0, ``, argv{`[*user]`}},
+	{deluser, deluserDesc, true, false, 0, `A`, argv{`*user`}},
 	{delme, delmeDesc, true, false, 0, ``, nil},
 	{passwd, passwdDesc, true, false, 0, ``,
 		argv{`oldpassword`, `newpassword`}},
@@ -287,15 +287,9 @@ func (c *coreCommands) logout(d *data.DataEndpoint, cd *cmds.CommandData) (
 func (c *coreCommands) access(d *data.DataEndpoint, cd *cmds.CommandData) (
 	internal, external error) {
 
-	uname := cd.GetArg("user")
-	var access *data.UserAccess
-	if len(uname) == 0 {
+	access := cd.TargetUserAccess["user"]
+	if access == nil {
 		access = cd.UserAccess
-	} else {
-		access, internal, external = getUser(uname, d.GetKey(), cd)
-		if external != nil || internal != nil {
-			return
-		}
 	}
 
 	ch := ""
@@ -312,11 +306,8 @@ func (c *coreCommands) access(d *data.DataEndpoint, cd *cmds.CommandData) (
 func (c *coreCommands) deluser(d *data.DataEndpoint, cd *cmds.CommandData) (
 	internal, external error) {
 
-	uname := cd.GetArg("user")
-	uname, external = getUsername(uname, d.GetKey(), cd)
-	if external != nil {
-		return
-	}
+	param := cd.GetArg("user")
+	uname := cd.TargetUserAccess["user"].Username
 
 	cd.LogoutByUsername(uname)
 
@@ -327,9 +318,9 @@ func (c *coreCommands) deluser(d *data.DataEndpoint, cd *cmds.CommandData) (
 	}
 
 	if removed {
-		d.Noticef(cd.User.GetNick(), deluserSuccess, uname)
+		d.Noticef(cd.User.GetNick(), deluserSuccess, param)
 	} else {
-		d.Noticef(cd.User.GetNick(), deluserFailure, uname)
+		d.Noticef(cd.User.GetNick(), deluserFailure, param)
 	}
 
 	return
