@@ -723,6 +723,7 @@ func TestCommander_DispatchReturns(t *T) {
 		{MakeFlagsError("a"), errFmtInsuffFlags},
 		{MakeUserNotAuthedError("user"), errFmtUserNotAuthed},
 		{MakeUserNotFoundError("user"), errFmtUserNotFound},
+		{MakeUserNotRegisteredError("user"), errFmtUserNotRegistered},
 	}
 
 	for _, test := range errors {

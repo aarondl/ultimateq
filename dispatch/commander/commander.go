@@ -214,6 +214,7 @@ func (c *Commander) Dispatch(server string, msg *irc.IrcMessage,
 	cmd := fields[0]
 
 	ch := ""
+	nick := irc.Mask(msg.Sender).GetNick()
 	msgscope := PRIVATE
 	isChan, hasChan := c.CheckTarget(msg.Args[0])
 
@@ -260,7 +261,7 @@ func (c *Commander) Dispatch(server string, msg *irc.IrcMessage,
 			server, ch, ep, msg); err != nil {
 
 			cmdata.Close()
-			ep.Notice(irc.Mask(msg.Sender).GetNick(), err.Error())
+			ep.Notice(nick, err.Error())
 			return
 		}
 	}
@@ -269,7 +270,7 @@ func (c *Commander) Dispatch(server string, msg *irc.IrcMessage,
 		store); err != nil {
 
 		cmdata.Close()
-		ep.Notice(irc.Mask(msg.Sender).GetNick(), err.Error())
+		ep.Notice(nick, err.Error())
 		return
 	}
 
@@ -288,7 +289,7 @@ func (c *Commander) Dispatch(server string, msg *irc.IrcMessage,
 		defer cmdata.Close()
 		err := command.Handler.Command(cmd, &irc.Message{msg}, ep, cmdata)
 		if err != nil {
-			ep.Notice(irc.Mask(msg.Sender).GetNick(), err.Error())
+			ep.Notice(nick, err.Error())
 		}
 		c.HandlerFinished()
 	}()
@@ -526,4 +527,10 @@ func MakeUserNotAuthedError(user string) error {
 // target user not being found.
 func MakeUserNotFoundError(user string) error {
 	return fmt.Errorf(errFmtUserNotFound, user)
+}
+
+// MakeUserNotRegisteredError creates an error to be shown to the user about
+// the target user not being registered.
+func MakeUserNotRegisteredError(user string) error {
+	return fmt.Errorf(errFmtUserNotRegistered, user)
 }

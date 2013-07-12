@@ -24,9 +24,11 @@ const (
 
 	extension = `core`
 
-	errFmtCommandRegister = `bot: A core command registration failed: %v`
-	errMsgInternal        = `There was an internal error, try again later.`
-	errFmtInternal        = `commander: Error processing command %v (%v)`
+	errFmtRegister = `bot: A core command registration failed: %v`
+	errMsgInternal = `There was an internal error, try again later.`
+	errFmtInternal = `commander: Error processing command %v (%v)`
+	errFmtExpired  = `commander: Data expired between locks. ` +
+		`Could not find user [%v]`
 
 	errMsgAuthed        = `You are already authenticated.`
 	errFmtUserNotFound  = `The user [%v] could not be found.`
@@ -53,7 +55,7 @@ const (
 	delmeFailure    = `User account could not be removed.`
 	passwdDesc      = `Change the current user's account password.`
 	passwdSuccess   = `Successfully updated your password.`
-	passwdFailure   = `Old password did not match, try again.`
+	passwdFailure   = `Old password did not match the current password.`
 	masksDesc       = `Retrieves the current user's mask list.`
 	masksSuccess    = `Masks: %v`
 	masksFailure    = `No masks set.`
@@ -118,7 +120,7 @@ func CreateCoreCommands(b *Bot) (*coreCommands, error) {
 			ReqFlags:    cmd.Flags,
 		})
 		if err != nil {
-			return nil, fmt.Errorf(errFmtCommandRegister, err)
+			return nil, fmt.Errorf(errFmtRegister, err)
 		}
 	}
 
@@ -206,12 +208,19 @@ func (c *coreCommands) register(d *data.DataEndpoint,
 		return nil, fmt.Errorf(registerFailure, uname)
 	}
 
-	isFirst, internal := cd.IsFirst()
+	access, internal = data.CreateUserAccess(uname, pwd)
 	if internal != nil {
 		return
 	}
 
-	access, internal = data.CreateUserAccess(uname, pwd)
+	host, nick := cd.User.GetFullhost(), cd.User.GetNick()
+
+	cd.Close()
+	c.b.protectStore.Lock()
+	defer c.b.protectStore.Unlock()
+	store := c.b.store
+
+	isFirst, internal := store.IsFirst()
 	if internal != nil {
 		return
 	}
@@ -219,17 +228,16 @@ func (c *coreCommands) register(d *data.DataEndpoint,
 		access.Global = &data.Access{^uint8(0), ^uint64(0)}
 	}
 
-	internal = cd.AddUser(access)
+	internal = store.AddUser(access)
 	if internal != nil {
 		return
 	}
 
-	_, internal = cd.AuthUser(d.GetKey(), cd.User.GetFullhost(), uname, pwd)
+	_, internal = store.AuthUser(d.GetKey(), host, uname, pwd)
 	if internal != nil {
 		return
 	}
 
-	nick := cd.User.GetNick()
 	if isFirst {
 		d.Noticef(nick, registerSuccessFirst, uname)
 	} else {
@@ -250,26 +258,33 @@ func (c *coreCommands) auth(d *data.DataEndpoint, cd *cmds.CommandData) (
 		uname = cd.User.GetUsername()
 	}
 
+	host, nick := cd.User.GetFullhost(), cd.User.GetNick()
+
 	access = cd.UserAccess
 	if access == nil {
-		access = cd.GetAuthedUser(d.GetKey(), cd.User.GetFullhost())
+		access = cd.GetAuthedUser(d.GetKey(), host)
 	}
 	if access != nil {
 		external = errors.New(errMsgAuthed)
 		return
 	}
 
-	_, err := cd.AuthUser(d.GetKey(), cd.User.GetFullhost(), uname, pwd)
+	cd.Close()
+	c.b.protectStore.Lock()
+	defer c.b.protectStore.Unlock()
+	store := c.b.store
+
+	_, err := store.AuthUser(d.GetKey(), host, uname, pwd)
 	if err != nil {
 		if authErr, ok := err.(data.AuthError); ok {
 			external = authErr
 		} else {
-			internal = authErr
+			internal = err
 		}
 		return
 	}
 
-	d.Noticef(cd.User.GetNick(), authSuccess, uname)
+	d.Noticef(nick, authSuccess, uname)
 	return
 }
 
@@ -277,8 +292,14 @@ func (c *coreCommands) auth(d *data.DataEndpoint, cd *cmds.CommandData) (
 func (c *coreCommands) logout(d *data.DataEndpoint, cd *cmds.CommandData) (
 	internal, external error) {
 
-	cd.Logout(d.GetKey(), cd.User.GetFullhost())
-	d.Notice(cd.User.GetNick(), logoutSuccess)
+	host, nick := cd.User.GetFullhost(), cd.User.GetNick()
+	cd.Close()
+	c.b.protectStore.Lock()
+	defer c.b.protectStore.Unlock()
+	store := c.b.store
+
+	store.Logout(d.GetKey(), host)
+	d.Notice(nick, logoutSuccess)
 
 	return
 }
@@ -309,18 +330,24 @@ func (c *coreCommands) deluser(d *data.DataEndpoint, cd *cmds.CommandData) (
 	param := cd.GetArg("user")
 	uname := cd.TargetUserAccess["user"].Username
 
-	cd.LogoutByUsername(uname)
+	nick := cd.User.GetNick()
+	cd.Close()
+	c.b.protectStore.Lock()
+	defer c.b.protectStore.Unlock()
+	store := c.b.store
+
+	store.LogoutByUsername(uname)
 
 	var removed bool
-	removed, internal = cd.RemoveUser(uname)
+	removed, internal = store.RemoveUser(uname)
 	if internal != nil {
 		return
 	}
 
 	if removed {
-		d.Noticef(cd.User.GetNick(), deluserSuccess, param)
+		d.Noticef(nick, deluserSuccess, param)
 	} else {
-		d.Noticef(cd.User.GetNick(), deluserFailure, param)
+		d.Noticef(nick, deluserFailure, param)
 	}
 
 	return
@@ -330,10 +357,16 @@ func (c *coreCommands) deluser(d *data.DataEndpoint, cd *cmds.CommandData) (
 func (c *coreCommands) delme(d *data.DataEndpoint, cd *cmds.CommandData) (
 	internal, external error) {
 
+	host, nick := cd.User.GetFullhost(), cd.User.GetNick()
+	uname := cd.UserAccess.Username
+	cd.Close()
+	c.b.protectStore.Lock()
+	defer c.b.protectStore.Unlock()
+	store := c.b.store
+
 	removed := false
-	access := cd.UserAccess
-	cd.Logout(d.GetKey(), cd.User.GetFullhost())
-	removed, internal = cd.RemoveUser(access.Username)
+	store.Logout(d.GetKey(), host)
+	removed, internal = store.RemoveUser(uname)
 	if internal != nil {
 		return
 	}
@@ -341,7 +374,7 @@ func (c *coreCommands) delme(d *data.DataEndpoint, cd *cmds.CommandData) (
 		internal = errors.New(delmeFailure)
 		return
 	}
-	d.Noticef(cd.User.GetNick(), delmeSuccess, access.Username)
+	d.Noticef(nick, delmeSuccess, uname)
 	return
 }
 
@@ -349,17 +382,32 @@ func (c *coreCommands) delme(d *data.DataEndpoint, cd *cmds.CommandData) (
 func (c *coreCommands) passwd(d *data.DataEndpoint, cd *cmds.CommandData) (
 	internal, external error) {
 
-	access := cd.UserAccess
 	oldpasswd := cd.GetArg("oldpassword")
 	newpasswd := cd.GetArg("newpassword")
-
-	if access.VerifyPassword(oldpasswd) {
-		access.SetPassword(newpasswd)
-		cd.AddUser(access)
-		d.Notice(cd.User.GetNick(), passwdSuccess)
-	} else {
-		d.Notice(cd.User.GetNick(), passwdFailure)
+	nick := cd.User.GetNick()
+	uname := cd.UserAccess.Username
+	if !cd.UserAccess.VerifyPassword(oldpasswd) {
+		d.Notice(nick, passwdFailure)
+		return
 	}
+
+	cd.Close()
+	c.b.protectStore.Lock()
+	defer c.b.protectStore.Unlock()
+	store := c.b.store
+
+	var access *data.UserAccess
+	access, internal = store.FindUser(uname)
+	if internal != nil {
+		return
+	}
+	if access == nil {
+		internal = fmt.Errorf(errFmtExpired, uname)
+		return
+	}
+	access.SetPassword(newpasswd)
+	store.AddUser(access)
+	d.Notice(nick, passwdSuccess)
 
 	return
 }
@@ -384,13 +432,29 @@ func (c *coreCommands) addmask(d *data.DataEndpoint, cd *cmds.CommandData) (
 	internal, external error) {
 
 	mask := cd.GetArg("mask")
+	nick := cd.User.GetNick()
+	uname := cd.UserAccess.Username
 
-	access := cd.UserAccess
+	cd.Close()
+	c.b.protectStore.Lock()
+	defer c.b.protectStore.Unlock()
+	store := c.b.store
+
+	var access *data.UserAccess
+	access, internal = store.FindUser(uname)
+	if internal != nil {
+		return
+	}
+	if access == nil {
+		internal = fmt.Errorf(errFmtExpired, uname)
+		return
+	}
+
 	if access.AddMasks(mask) {
-		cd.AddUser(access)
-		d.Noticef(cd.User.GetNick(), addmaskSuccess, mask)
+		store.AddUser(access)
+		d.Noticef(nick, addmaskSuccess, mask)
 	} else {
-		d.Noticef(cd.User.GetNick(), addmaskFailure, mask)
+		d.Noticef(nick, addmaskFailure, mask)
 	}
 
 	return
@@ -401,70 +465,30 @@ func (c *coreCommands) delmask(d *data.DataEndpoint, cd *cmds.CommandData) (
 	internal, external error) {
 
 	mask := cd.GetArg("mask")
+	nick := cd.User.GetNick()
+	uname := cd.UserAccess.Username
 
-	access := cd.UserAccess
+	cd.Close()
+	c.b.protectStore.Lock()
+	defer c.b.protectStore.Unlock()
+	store := c.b.store
+
+	var access *data.UserAccess
+	access, internal = store.FindUser(uname)
+	if internal != nil {
+		return
+	}
+	if access == nil {
+		internal = fmt.Errorf(errFmtExpired, uname)
+		return
+	}
+
 	if access.DelMasks(mask) {
-		cd.AddUser(access)
-		d.Noticef(cd.User.GetNick(), delmaskSuccess, mask)
+		store.AddUser(access)
+		d.Noticef(nick, delmaskSuccess, mask)
 	} else {
-		d.Noticef(cd.User.GetNick(), delmaskFailure, mask)
+		d.Noticef(nick, delmaskFailure, mask)
 	}
 
 	return
-}
-
-// getUsername looks up a username. If user is in the form *user, the user part
-// is assumed to be a username, it's trimmed and returned. Otherwise, the user
-// is assumed to be a nickname. The error returned by this function should be
-// sent to the user.
-func getUsername(user, key string, cd *cmds.CommandData) (string, error) {
-	if strings.HasPrefix(user, "*") {
-		user = user[1:]
-		if len(user) == 0 {
-			return "", fmt.Errorf(errFmtUserNotFound, user)
-		}
-		return user, nil
-	} else {
-		if stateUser := cd.GetUser(user); stateUser != nil {
-			host := stateUser.GetFullhost()
-			access := cd.GetAuthedUser(key, host)
-			if access == nil {
-				return "", fmt.Errorf(errFmtUserNotAuthed, user)
-			}
-			return access.Username, nil
-		} else {
-			return "", fmt.Errorf(errFmtUserNotFound, user)
-		}
-	}
-}
-
-// getUser looks up a user based on nickname. If user is in the form *user, the
-// user parameter is assumed to be a username and is looked up by that.
-func getUser(user, key string, cd *cmds.CommandData) (
-	access *data.UserAccess, internal, external error) {
-
-	if strings.HasPrefix(user, "*") {
-		user = user[1:]
-		if len(user) == 0 {
-			external = fmt.Errorf(errFmtUserNotFound, user)
-			return
-		}
-		access, internal = cd.FindUser(user)
-		if access == nil {
-			external = fmt.Errorf(errFmtUserNotFound, user)
-		}
-		return
-	}
-	if stateUser := cd.GetUser(user); stateUser != nil {
-		host := stateUser.GetFullhost()
-		access = cd.GetAuthedUser(key, host)
-		if access == nil {
-			external = fmt.Errorf(errFmtUserNotAuthed, user)
-			return
-		}
-		return
-	} else {
-		external = fmt.Errorf(errFmtUserNotFound, user)
-		return
-	}
 }

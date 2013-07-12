@@ -5,6 +5,7 @@ import (
 	"github.com/aarondl/ultimateq/irc"
 	"github.com/cznic/kv"
 	"os"
+	"sync"
 )
 
 // These errors are in the AuthError.FailureType field.
@@ -59,6 +60,7 @@ type DbProvider func() (*kv.DB, error)
 type Store struct {
 	db           *kv.DB
 	cache        map[string]*UserAccess
+	protectCache sync.Mutex
 	authed       map[string]*UserAccess
 	checkedFirst bool
 }
@@ -193,6 +195,11 @@ func (s *Store) LogoutByUsername(username string) {
 
 // FindUser looks up a user based on username. It caches the result if found.
 func (s *Store) FindUser(username string) (user *UserAccess, err error) {
+	// We're writing to cache in a method that should be considered safe by
+	// read-only locked friends, so we have to protect the cache.
+	s.protectCache.Lock()
+	defer s.protectCache.Unlock()
+
 	if cached, ok := s.cache[username]; ok {
 		user = cached
 		return

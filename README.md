@@ -1,5 +1,7 @@
 #ultimateq
 
+[![Build Status](https://drone.io/github.com/aarondl/ultimateq/status.png)](https://drone.io/github.com/aarondl/ultimateq/latest)
+
 An irc bot written in Go.
 
 ultimateq is designed as a distributed irc bot framework. Where a bot can be
