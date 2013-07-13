@@ -6,8 +6,14 @@ import (
 	"encoding/gob"
 	"errors"
 	"github.com/aarondl/ultimateq/irc"
+	"math/rand"
 	"sync"
+	"time"
 )
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 var (
 	buffer     = &bytes.Buffer{}
@@ -16,6 +22,16 @@ var (
 	bufferLock = sync.Mutex{}
 
 	errMissingUnameOrPwd = errors.New("data: Missing username or password.")
+)
+
+const (
+	nNewPasswordLen          = 10
+	newPasswordStart         = 48
+	newPasswordEnd           = 122
+	digitSpecialCharsStart   = 58
+	digitSpecialCharsEnd     = 64
+	lettersSpecialCharsStart = 91
+	lettersSpecialCharsEnd   = 96
 )
 
 // UserAccess provides access for a user to the bot, servers, and channels.
@@ -104,6 +120,24 @@ func (a *UserAccess) SetPassword(password string) (err error) {
 		return
 	}
 	a.Password = pwd
+	return
+}
+
+// ResetPassword generates a new random password, and sets the user's password
+// to that.
+func (a *UserAccess) ResetPassword() (newpasswd string, err error) {
+	b := make([]byte, nNewPasswordLen)
+	for i := 0; i < nNewPasswordLen; i++ {
+		r := newPasswordStart + rand.Intn(newPasswordEnd-newPasswordStart)
+		if r >= digitSpecialCharsStart && r <= digitSpecialCharsEnd {
+			r -= digitSpecialCharsEnd - digitSpecialCharsStart + 1
+		} else if r >= lettersSpecialCharsStart && r <= lettersSpecialCharsEnd {
+			r -= lettersSpecialCharsEnd - lettersSpecialCharsStart + 1
+		}
+		b[i] = byte(r)
+	}
+	newpasswd = string(b)
+	err = a.SetPassword(newpasswd)
 	return
 }
 

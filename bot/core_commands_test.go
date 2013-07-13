@@ -241,6 +241,10 @@ func TestCoreCommands_Logout(t *T) {
 	if err != nil {
 		t.Error(err)
 	}
+	err = rspChk(ts, registerSuccess, u2host, register, password)
+	if err != nil {
+		t.Error(err)
+	}
 	err = rspChk(ts, logoutSuccess, u1host, logout)
 	if err != nil {
 		t.Error(err)
@@ -254,6 +258,20 @@ func TestCoreCommands_Logout(t *T) {
 	if access != nil {
 		t.Error("User was not logged out.")
 	}
+
+	err = rspChk(ts, authSuccess, u1host, auth, password)
+	if err != nil {
+		t.Error(err)
+	}
+	err = rspChk(ts, ".*[A] flag(s) required.*", u2host, logout, u1nick)
+	if err != nil {
+		t.Error(err)
+	}
+	err = rspChk(ts, logoutSuccess, u1host, logout, u2nick)
+	if err != nil {
+		t.Error(err)
+	}
+
 }
 
 func TestCoreCommands_Access(t *T) {
@@ -479,20 +497,37 @@ func TestCoreCommands_Masks(t *T) {
 	ts := commandsSetup(t)
 	defer commandsTeardown(ts, t)
 
+	other := "other!other@other"
+	ts.state.Update(&irc.IrcMessage{
+		Name: irc.PRIVMSG, Sender: other,
+		Args: []string{botnick}},
+	)
+
 	var err error
 	var access *data.UserAccess
-
-	err = rspChk(ts, ".*not authenticated.*", u1host, addmask, u1host)
-	if err != nil {
-		t.Error(err)
-	}
 
 	err = rspChk(ts, registerSuccessFirst, u1host, register, password, u1user)
 	if err != nil {
 		t.Error(err)
 	}
 
+	err = rspChk(ts, registerSuccess, u2host, register, password)
+	if err != nil {
+		t.Error(err)
+	}
+
 	err = rspChk(ts, addmaskSuccess, u1host, addmask, u1host)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = rspChk(ts, ".*[A] flag(s) required.*", u2host, addmask,
+		u1host, u1nick)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = rspChk(ts, addmaskSuccess, u1host, addmask, u2host, u2nick)
 	if err != nil {
 		t.Error(err)
 	}
@@ -510,13 +545,39 @@ func TestCoreCommands_Masks(t *T) {
 		t.Error("Mask not set correctly.")
 	}
 
-	err = rspChk(ts, "Host [.*] does not match.*", u2host, auth, password,
-		u1user)
+	err = rspChk(ts, "Host [.*] does not match.*", "other!other@other",
+		auth, password, u1user)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = rspChk(ts, ".*[A] flag(s) required.*", u2host, masks, u1nick)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = rspChk(ts, ".*"+u2host+".*", u1host, masks, u2nick)
 	if err != nil {
 		t.Error(err)
 	}
 
 	err = rspChk(ts, ".*"+u1host+".*", u1host, masks)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = rspChk(ts, ".*"+u1host+".*", u1host, masks)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = rspChk(ts, ".*[A] flag(s) required.*", u2host, delmask,
+		u1host, u1nick)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = rspChk(ts, delmaskSuccess, u1host, delmask, u2host, u2nick)
 	if err != nil {
 		t.Error(err)
 	}
@@ -542,5 +603,43 @@ func TestCoreCommands_Masks(t *T) {
 	err = rspChk(ts, masksFailure, u1host, masks)
 	if err != nil {
 		t.Error(err)
+	}
+}
+
+func TestCoreCommands_Resetpasswd(t *T) {
+	ts := commandsSetup(t)
+	defer commandsTeardown(ts, t)
+	var err error
+	var access *data.UserAccess
+
+	err = rspChk(ts, registerSuccessFirst, u1host, register, password, u1user)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = rspChk(ts, registerSuccess, u2host, register, password)
+	if err != nil {
+		t.Error(err)
+	}
+
+	access = ts.store.GetAuthedUser(serverId, u2host)
+	if access == nil {
+		t.Fatal("User was not authenticatd.")
+	}
+	oldPwd := access.Password
+
+	doubleMessage := resetpasswdSuccess + "NOTICE " +
+		u2nick + " :" + resetpasswdSuccessTarget
+	err = rspChk(ts, doubleMessage, u1host, resetpasswd, u2nick, "*"+u2user)
+	if err != nil {
+		t.Error(err)
+	}
+
+	access = ts.store.GetAuthedUser(serverId, u2host)
+	if access == nil {
+		t.Fatal("User was not authenticatd.")
+	}
+	if bytes.Compare(access.Password, oldPwd) == 0 {
+		t.Error("Password was not changed.")
 	}
 }

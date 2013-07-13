@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/aarondl/ultimateq/irc"
+	"regexp"
 	. "testing"
 )
 
@@ -520,23 +521,34 @@ func TestUserAccess_String(t *T) {
 		if was := a.String(server, "#chan1"); was != test.ExpectChannel {
 			t.Errorf("Wrong output:\n\twant:'%s'\n\twas: '%s'",
 				test.ExpectChannel, was)
-			t.Error(a.Global)
-			t.Error(a.Server)
-			t.Error(a.Channel)
 		}
 		if was := a.String(server, ""); was != test.ExpectNoChannel {
 			t.Errorf("Wrong output:\n\twant:'%s'\n\twas: '%s'",
 				test.ExpectNoChannel, was)
-			t.Error(a.Global)
-			t.Error(a.Server)
-			t.Error(a.Channel)
 		}
+	}
+}
 
-		/*if was := a.String(server, "#chan1"); was != test.ExpectChannel {
-			t.Errorf(`Expected: "%s", but was "%s"`, test.ExpectChannel, was)
-		}
-		if was := a.String(server, ""); was != test.ExpectNoChannel {
-			t.Errorf(`Expected: "%s", but was "%s"`, test.ExpectNoChannel, was)
-		}*/
+func TestUserAccess_ResetPassword(t *T) {
+	t.Parallel()
+	a, err := CreateUserAccess(uname, password)
+	if err != nil {
+		t.Error(err)
+	}
+	oldpasswd := a.Password
+	newpasswd, err := a.ResetPassword()
+	if err != nil {
+		t.Error(err)
+	}
+	if newpasswd == password {
+		t.Error("Not very random password occurred.")
+	}
+	if bytes.Compare(oldpasswd, a.Password) == 0 {
+		t.Error("Password not set correctly.")
+	}
+	if m, err := regexp.MatchString("^[A-Za-z0-9]+$", newpasswd); err != nil {
+		t.Error("Regular Expression did not compile.")
+	} else if !m {
+		t.Error("New password was malformed:", newpasswd)
 	}
 }

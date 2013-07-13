@@ -11,18 +11,19 @@ import (
 )
 
 const (
-	register = `register`
-	auth     = `auth`
-	logout   = `logout`
-	access   = `access`
-	deluser  = `deluser`
-	delme    = `delme`
-	passwd   = `passwd`
-	masks    = `masks`
-	addmask  = `addmask`
-	delmask  = `delmask`
-
 	extension = `core`
+	register  = `register`
+	auth      = `auth`
+	logout    = `logout`
+	access    = `access`
+	deluser   = `deluser`
+	delme     = `delme`
+	passwd    = `passwd`
+	masks     = `masks`
+	addmask   = `addmask`
+	delmask   = `delmask`
+
+	resetpasswd = `setpasswd`
 
 	errFmtRegister = `bot: A core command registration failed: %v`
 	errMsgInternal = `There was an internal error, try again later.`
@@ -43,28 +44,36 @@ const (
 	registerFailure = `The username [%v] is already registered.`
 	authDesc        = `Authenticate a user to an account.`
 	authSuccess     = `Successfully authenticated [%v].`
-	logoutDesc      = `Logs the user out of the account.`
-	logoutSuccess   = `Successfully logged out.`
-	accessDesc      = `Access retrieves the access for the user.`
-	accessSuccess   = `Access for [%v]: %v`
-	deluserDesc     = `Deletes a user account from the bot.`
-	deluserSuccess  = `Removed user [%v].`
-	deluserFailure  = `User [%v] does not exist.`
-	delmeDesc       = `Deletes the current user's account.`
-	delmeSuccess    = `Removed your user account [%v].`
-	delmeFailure    = `User account could not be removed.`
-	passwdDesc      = `Change the current user's account password.`
-	passwdSuccess   = `Successfully updated your password.`
-	passwdFailure   = `Old password did not match the current password.`
-	masksDesc       = `Retrieves the current user's mask list.`
-	masksSuccess    = `Masks: %v`
-	masksFailure    = `No masks set.`
-	addmaskDesc     = `Adds a mask to the current user.`
-	addmaskSuccess  = `Host [%v] added successfully.`
-	addmaskFailure  = `Host [%v] already exists.`
-	delmaskDesc     = `Deletes a mask from the current user.`
-	delmaskSuccess  = `Host [%v] removed successfully.`
-	delmaskFailure  = `Host [%v] not found.`
+	logoutDesc      = `Logs the current user out of the account. Admins can ` +
+		`add a user param to log that user out.`
+	logoutSuccess  = `Successfully logged out.`
+	accessDesc     = `Access retrieves the access for the user.`
+	accessSuccess  = `Access for [%v]: %v`
+	deluserDesc    = `Deletes a user account from the bot.`
+	deluserSuccess = `Removed user [%v].`
+	deluserFailure = `User [%v] does not exist.`
+	delmeDesc      = `Deletes the current user's account.`
+	delmeSuccess   = `Removed your user account [%v].`
+	delmeFailure   = `User account could not be removed.`
+	passwdDesc     = `Change the current user's account password.`
+	passwdSuccess  = `Successfully updated password.`
+	passwdFailure  = `Old password did not match the current password.`
+	masksDesc      = `Retrieves the current user's mask list. Admins can add` +
+		` a user param to see that user's masks.`
+	masksSuccess = `Masks: %v`
+	masksFailure = `No masks set.`
+	addmaskDesc  = `Adds a mask to the current user. Admins can add a user` +
+		` param to add a mask to that user.`
+	addmaskSuccess = `Host [%v] added successfully.`
+	addmaskFailure = `Host [%v] already exists.`
+	delmaskDesc    = `Deletes a mask from the current user. Admins can add a` +
+		` user param to remove a mask to that user.`
+	delmaskSuccess = `Host [%v] removed successfully.`
+	delmaskFailure = `Host [%v] not found.`
+
+	resetpasswdDesc          = `Resets a user's password.`
+	resetpasswdSuccess       = `Password reset successful.`
+	resetpasswdSuccessTarget = `Your password was reset by %v, it is now: %v`
 )
 
 type argv []string
@@ -81,15 +90,16 @@ var commands = []struct {
 	{register, registerDesc, false, false, 0, ``,
 		argv{`password`, `[username]`}},
 	{auth, authDesc, false, false, 0, ``, argv{`password`, `[username]`}},
-	{logout, logoutDesc, true, false, 0, ``, nil},
+	{logout, logoutDesc, true, true, 0, ``, argv{`[*user]`}},
 	{access, accessDesc, true, true, 0, ``, argv{`[*user]`}},
-	{deluser, deluserDesc, true, false, 0, `A`, argv{`*user`}},
-	{delme, delmeDesc, true, false, 0, ``, nil},
+	{deluser, deluserDesc, true, true, 0, `A`, argv{`*user`}},
+	{delme, delmeDesc, true, true, 0, ``, nil},
 	{passwd, passwdDesc, true, false, 0, ``,
 		argv{`oldpassword`, `newpassword`}},
-	{masks, masksDesc, true, false, 0, ``, nil},
-	{addmask, addmaskDesc, true, false, 0, ``, argv{`mask`}},
-	{delmask, delmaskDesc, true, false, 0, ``, argv{`mask`}},
+	{masks, masksDesc, true, false, 0, ``, argv{`[*user]`}},
+	{addmask, addmaskDesc, true, false, 0, ``, argv{`mask`, `[*user]`}},
+	{delmask, delmaskDesc, true, false, 0, ``, argv{`mask`, `[*user]`}},
+	{resetpasswd, resetpasswdDesc, true, false, 0, ``, argv{`~nick`, `*user`}},
 }
 
 // coreCommands is the bot's command handling struct. The bot itself uses
@@ -171,6 +181,8 @@ func (c *coreCommands) Command(cmd string, m *irc.Message, d *data.DataEndpoint,
 		internal, external = c.addmask(d, cd)
 	case delmask:
 		internal, external = c.delmask(d, cd)
+	case resetpasswd:
+		internal, external = c.resetpasswd(d, cd)
 	}
 
 	if internal != nil {
@@ -292,13 +304,27 @@ func (c *coreCommands) auth(d *data.DataEndpoint, cd *cmds.CommandData) (
 func (c *coreCommands) logout(d *data.DataEndpoint, cd *cmds.CommandData) (
 	internal, external error) {
 
+	user := cd.TargetUserAccess["user"]
+	uname := ""
 	host, nick := cd.User.GetFullhost(), cd.User.GetNick()
+	if user != nil {
+		if !cd.UserAccess.HasFlags(d.GetKey(), "", "A") {
+			external = cmds.MakeFlagsError("A")
+			return
+		}
+		uname = user.Username
+	}
+
 	cd.Close()
 	c.b.protectStore.Lock()
 	defer c.b.protectStore.Unlock()
 	store := c.b.store
 
-	store.Logout(d.GetKey(), host)
+	if len(uname) != 0 {
+		store.LogoutByUsername(uname)
+	} else {
+		store.Logout(d.GetKey(), host)
+	}
 	d.Notice(nick, logoutSuccess)
 
 	return
@@ -405,8 +431,14 @@ func (c *coreCommands) passwd(d *data.DataEndpoint, cd *cmds.CommandData) (
 		internal = fmt.Errorf(errFmtExpired, uname)
 		return
 	}
-	access.SetPassword(newpasswd)
-	store.AddUser(access)
+	internal = access.SetPassword(newpasswd)
+	if internal != nil {
+		return
+	}
+	internal = store.AddUser(access)
+	if internal != nil {
+		return
+	}
 	d.Notice(nick, passwdSuccess)
 
 	return
@@ -417,6 +449,15 @@ func (c *coreCommands) masks(d *data.DataEndpoint, cd *cmds.CommandData) (
 	internal, external error) {
 
 	access := cd.UserAccess
+	user := cd.TargetUserAccess["user"]
+	if user != nil {
+		if !cd.UserAccess.HasFlags(d.GetKey(), "", "A") {
+			external = cmds.MakeFlagsError("A")
+			return
+		}
+		access = user
+	}
+
 	if len(access.Masks) > 0 {
 		d.Noticef(cd.User.GetNick(), masksSuccess,
 			strings.Join(access.Masks, " "))
@@ -435,6 +476,15 @@ func (c *coreCommands) addmask(d *data.DataEndpoint, cd *cmds.CommandData) (
 	nick := cd.User.GetNick()
 	uname := cd.UserAccess.Username
 
+	user := cd.TargetUserAccess["user"]
+	if user != nil {
+		if !cd.UserAccess.HasFlags(d.GetKey(), "", "A") {
+			external = cmds.MakeFlagsError("A")
+			return
+		}
+		uname = user.Username
+	}
+
 	cd.Close()
 	c.b.protectStore.Lock()
 	defer c.b.protectStore.Unlock()
@@ -451,7 +501,10 @@ func (c *coreCommands) addmask(d *data.DataEndpoint, cd *cmds.CommandData) (
 	}
 
 	if access.AddMasks(mask) {
-		store.AddUser(access)
+		internal = store.AddUser(access)
+		if internal != nil {
+			return
+		}
 		d.Noticef(nick, addmaskSuccess, mask)
 	} else {
 		d.Noticef(nick, addmaskFailure, mask)
@@ -467,6 +520,15 @@ func (c *coreCommands) delmask(d *data.DataEndpoint, cd *cmds.CommandData) (
 	mask := cd.GetArg("mask")
 	nick := cd.User.GetNick()
 	uname := cd.UserAccess.Username
+
+	user := cd.TargetUserAccess["user"]
+	if user != nil {
+		if !cd.UserAccess.HasFlags(d.GetKey(), "", "A") {
+			external = cmds.MakeFlagsError("A")
+			return
+		}
+		uname = user.Username
+	}
 
 	cd.Close()
 	c.b.protectStore.Lock()
@@ -484,11 +546,51 @@ func (c *coreCommands) delmask(d *data.DataEndpoint, cd *cmds.CommandData) (
 	}
 
 	if access.DelMasks(mask) {
-		store.AddUser(access)
+		internal = store.AddUser(access)
+		if internal != nil {
+			return
+		}
 		d.Noticef(nick, delmaskSuccess, mask)
 	} else {
 		d.Noticef(nick, delmaskFailure, mask)
 	}
+
+	return
+}
+
+// resetpasswd resets a user's password
+func (c *coreCommands) resetpasswd(d *data.DataEndpoint, cd *cmds.CommandData) (
+	internal, external error) {
+
+	uname := cd.TargetUserAccess["user"].Username
+	resetnick := cd.TargetUsers["nick"].GetNick()
+	nick := cd.User.GetNick()
+	newpasswd := ""
+
+	cd.Close()
+	c.b.protectStore.Lock()
+	defer c.b.protectStore.Unlock()
+	store := c.b.store
+
+	var access *data.UserAccess
+	access, internal = store.FindUser(uname)
+	if internal != nil {
+		return
+	}
+	if access == nil {
+		internal = fmt.Errorf(errFmtExpired, uname)
+		return
+	}
+	newpasswd, internal = access.ResetPassword()
+	if internal != nil {
+		return
+	}
+	internal = store.AddUser(access)
+	if internal != nil {
+		return
+	}
+	d.Notice(nick, resetpasswdSuccess)
+	d.Noticef(resetnick, resetpasswdSuccessTarget, nick, newpasswd)
 
 	return
 }
