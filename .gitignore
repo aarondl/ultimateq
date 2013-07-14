@@ -25,6 +25,7 @@ _testmain.go
 tags
 
 # Extras
+config.yaml
 *.db
 todo*
 .1fe85649d7f7b2110f5e83078076942ad065445f
