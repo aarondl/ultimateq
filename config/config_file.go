@@ -69,6 +69,9 @@ func CreateConfigFromReader(reader io.Reader) *Config {
 // is returned to patch up backreferences to the main config as well as check
 // that the name/host are set properly.
 func (c *Config) fixReferencesAndNames() {
+	if c.Global == nil {
+		c.Global = &Server{}
+	}
 	for s, v := range c.Servers {
 		v.parent = c
 		v.Name = s

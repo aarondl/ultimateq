@@ -152,3 +152,9 @@ func (s *s) TestConfig_ToFile(c *C) {
 	conf = CreateConfigFromReader(inbuf)
 	verifyFakeConfig(c, conf)
 }
+
+func (s *s) TestConfig_fixReferenceAndNames(c *C) {
+	conf := Config{}
+	conf.fixReferencesAndNames()
+	c.Check(conf.Global, NotNil)
+}
