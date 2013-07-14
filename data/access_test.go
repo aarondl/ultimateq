@@ -57,6 +57,9 @@ func TestAccess_HasFlags(t *T) {
 	if !a.HasFlags("aBCd") {
 		t.Error("Flags were not all found.")
 	}
+	if !a.HasFlags("aZ") || !a.HasFlags("zB") {
+		t.Error("Flags should or together for access.")
+	}
 }
 
 func TestAccess_SetFlag(t *T) {
@@ -137,6 +140,7 @@ func TestAccess_String(t *T) {
 		Expect string
 	}{
 		{100, "aBCd", "100 BCad"},
+		{0, wholeAlphabet, allFlags},
 		{0, "BCad", "BCad"},
 		{100, "", "100"},
 		{0, "", none},
@@ -147,6 +151,11 @@ func TestAccess_String(t *T) {
 		if was := a.String(); was != test.Expect {
 			t.Errorf("Expected: %s, was: %s", test.Expect, was)
 		}
+	}
+
+	var a *Access
+	if a.String() != none {
+		t.Error("Even if access is nil we should be able to string it to none.")
 	}
 }
 

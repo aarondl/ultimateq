@@ -217,8 +217,7 @@ func (a *UserAccess) Has(server, channel string,
 	var check = func(access *Access) bool {
 		if access != nil {
 			hasLevel = hasLevel || access.HasLevel(level)
-			searchBits &= ^access.Flags
-			hasFlags = hasFlags || searchBits == 0
+			hasFlags = hasFlags || ((searchBits & access.Flags) != 0)
 		}
 		return hasLevel && hasFlags
 	}
@@ -258,11 +257,11 @@ func (a *UserAccess) HasLevel(server, channel string, level uint8) bool {
 func (a *UserAccess) HasFlags(server, channel string, flags ...string) bool {
 	var searchBits = getFlagBits(flags...)
 
-	var check = func(access *Access) bool {
+	var check = func(access *Access) (had bool) {
 		if access != nil {
-			searchBits &= ^access.Flags
+			had = (searchBits & access.Flags) != 0
 		}
-		return searchBits == 0
+		return
 	}
 
 	if check(a.Global) {
@@ -277,6 +276,21 @@ func (a *UserAccess) HasFlags(server, channel string, flags ...string) bool {
 		}
 	}
 
+	return false
+}
+
+// HasFlag checks if a user has a given flag. Where his access is
+// overridden thusly: Global > Server > Channel
+func (a *UserAccess) HasFlag(server, channel string, flag rune) bool {
+	if a.HasGlobalFlag(flag) {
+		return true
+	}
+	if a.HasServerFlag(server, flag) {
+		return true
+	}
+	if a.HasChannelFlag(server, channel, flag) {
+		return true
+	}
 	return false
 }
 

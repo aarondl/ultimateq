@@ -11,6 +11,9 @@ const (
 	ascz      = 122
 	nAlphabet = 26
 	none      = "none"
+	allFlags  = `-ALL-`
+
+	wholeAlphabet = `ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz`
 )
 
 // Access defines an access level and flags a-zA-Z for a user.
@@ -51,16 +54,16 @@ func (a *Access) HasLevel(level uint8) bool {
 	return a.Level >= level
 }
 
-// HasFlags checks many flags at once.
+// HasFlags checks many flags at once. Flags are or'd together.
 func (a *Access) HasFlags(flags ...string) bool {
 	for i := 0; i < len(flags); i++ {
 		for _, f := range flags[i] {
-			if !a.HasFlag(f) {
-				return false
+			if a.HasFlag(f) {
+				return true
 			}
 		}
 	}
-	return true
+	return false
 }
 
 // SetFlag sets the flag given.
@@ -86,6 +89,9 @@ func (a *Access) ClearAllFlags() {
 
 // String transforms the Access into a human-readable format.
 func (a *Access) String() (str string) {
+	if a == nil {
+		return none
+	}
 	hasLevel := a.Level != 0
 	hasFlags := a.Flags != 0
 	if !hasLevel && !hasFlags {
@@ -141,6 +147,9 @@ func getFlagString(bits uint64) (flags string) {
 		} else {
 			flags += string(i - nAlphabet + asca)
 		}
+	}
+	if flags == wholeAlphabet {
+		flags = allFlags
 	}
 	return
 }

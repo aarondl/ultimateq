@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/aarondl/ultimateq/data"
+	"strings"
 	"sync"
 )
 
@@ -65,6 +66,15 @@ type CommandData struct {
 // name of the argument passed into Register() is required to get the argument.
 func (cd *CommandData) GetArg(arg string) string {
 	return cd.args[arg]
+}
+
+// SplitArg behaves exactly like GetArg but calls strings.Fields on the
+// argument. Useful for varargs...
+func (cd *CommandData) SplitArg(arg string) (args []string) {
+	if str, ok := cd.args[arg]; ok && len(str) > 0 {
+		args = strings.Fields(str)
+	}
+	return
 }
 
 // FindUserByNick finds a user by their nickname. An error is returned if

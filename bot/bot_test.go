@@ -57,7 +57,7 @@ func init() {
 	data.UserAccessPwdCost = 4 // See bcrypt.MinCost
 }
 
-var serverId = "irc.gamesurge.net"
+var serverId = "irc.test.net"
 
 var fakeConfig = Configure().
 	Nick("nobody").

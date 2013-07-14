@@ -7,8 +7,12 @@ import (
 	cmds "github.com/aarondl/ultimateq/dispatch/commander"
 	"github.com/aarondl/ultimateq/irc"
 	"log"
+	"regexp"
+	"strconv"
 	"strings"
 )
+
+var rgxFlags = regexp.MustCompile(`[A-Za-z]+`)
 
 const (
 	extension = `core`
@@ -24,6 +28,14 @@ const (
 	delmask   = `delmask`
 
 	resetpasswd = `setpasswd`
+
+	ggive      = `ggive`
+	sgive      = `sgive`
+	give       = `give`
+	gtake      = `gtake`
+	stake      = `stake`
+	take       = `take`
+	takeAllArg = `all`
 
 	errFmtRegister = `bot: A core command registration failed: %v`
 	errMsgInternal = `There was an internal error, try again later.`
@@ -74,9 +86,43 @@ const (
 	resetpasswdDesc          = `Resets a user's password.`
 	resetpasswdSuccess       = `Password reset successful.`
 	resetpasswdSuccessTarget = `Your password was reset by %v, it is now: %v`
+
+	ggiveDesc = `Gives global access to a user.` +
+		` Arguments can be numeric levels or flags.`
+	ggiveSuccess = `User [%v] now has: (%v) globally.`
+	sgiveDesc    = `Gives server access to a user.` +
+		` Arguments can be numeric levels or flags.`
+	sgiveSuccess = `User [%v] now has: (%v) server-wide.`
+	giveDesc     = `Gives channel access to a user.` +
+		` Arguments can be numeric levels or flags.`
+	giveSuccess = `User [%v] now has: (%v) on %v`
+	gtakeDesc   = `Takes global access from a user. If no arguments are ` +
+		`given, takes the level access, otherwise removes the given flags. ` +
+		`Use all to take all access.`
+	gtakeSuccess = `Took (%v) from [%v] globally.`
+	stakeDesc    = `Takes server access from a user. If no arguments are ` +
+		`given, takes the level access, otherwise removes the given flags. ` +
+		`Use all to take all access.`
+	stakeSuccess = `Took (%v) from [%v] server-wide.`
+	takeDesc     = `Takes channel access from a user. If no arguments are ` +
+		`given, takes the level access, otherwise removes the given flags. ` +
+		`Use all to take all access.`
+	takeSuccess = `Took (%v) from [%v] user on %v`
+
+	giveFailure = `Invalid arguments, must be numeric accesses from 1-255 or ` +
+		`flags including A-Z and a-z.`
+	takeFailure = `Invalid arguments, leave empty to delete level access, ` +
+		`specific flags to delete those flags, or the keyword all to delete ` +
+		`everything. (given: %v)`
+	takeFailureNo = `No action taken. User [%v](%v) has none of the given ` +
+		`accesses to remove.`
 )
 
-type argv []string
+type (
+	argv           []string
+	giveHelperFunc func(*data.UserAccess, uint8, string) string
+	takeHelperFunc func(*data.UserAccess, bool, bool, string) (string, bool)
+)
 
 var commands = []struct {
 	Name   string
@@ -92,7 +138,7 @@ var commands = []struct {
 	{auth, authDesc, false, false, 0, ``, argv{`password`, `[username]`}},
 	{logout, logoutDesc, true, true, 0, ``, argv{`[*user]`}},
 	{access, accessDesc, true, true, 0, ``, argv{`[*user]`}},
-	{deluser, deluserDesc, true, true, 0, `A`, argv{`*user`}},
+	{deluser, deluserDesc, true, true, 0, ``, argv{`*user`}},
 	{delme, delmeDesc, true, true, 0, ``, nil},
 	{passwd, passwdDesc, true, false, 0, ``,
 		argv{`oldpassword`, `newpassword`}},
@@ -100,6 +146,14 @@ var commands = []struct {
 	{addmask, addmaskDesc, true, false, 0, ``, argv{`mask`, `[*user]`}},
 	{delmask, delmaskDesc, true, false, 0, ``, argv{`mask`, `[*user]`}},
 	{resetpasswd, resetpasswdDesc, true, false, 0, ``, argv{`~nick`, `*user`}},
+	{ggive, ggiveDesc, true, true, 0, `G`, argv{`*user`, `levelOrFlags...`}},
+	{sgive, sgiveDesc, true, true, 0, `GS`, argv{`*user`, `levelOrFlags...`}},
+	{give, giveDesc, true, true, 0, `GSC`, argv{`#chan`, `*user`,
+		`levelOrFlags...`}},
+	{gtake, gtakeDesc, true, true, 0, `G`, argv{`*user`, `[allOrFlags]`}},
+	{stake, stakeDesc, true, true, 0, `GS`, argv{`*user`, `[allOrFlags]`}},
+	{take, takeDesc, true, true, 0, `GSC`, argv{`#chan`, `*user`,
+		`[allOrFlags]`}},
 }
 
 // coreCommands is the bot's command handling struct. The bot itself uses
@@ -183,6 +237,18 @@ func (c *coreCommands) Command(cmd string, m *irc.Message, d *data.DataEndpoint,
 		internal, external = c.delmask(d, cd)
 	case resetpasswd:
 		internal, external = c.resetpasswd(d, cd)
+	case ggive:
+		internal, external = c.ggive(d, cd)
+	case sgive:
+		internal, external = c.sgive(d, cd)
+	case give:
+		internal, external = c.give(d, cd)
+	case gtake:
+		internal, external = c.gtake(d, cd)
+	case stake:
+		internal, external = c.stake(d, cd)
+	case take:
+		internal, external = c.take(d, cd)
 	}
 
 	if internal != nil {
@@ -308,8 +374,8 @@ func (c *coreCommands) logout(d *data.DataEndpoint, cd *cmds.CommandData) (
 	uname := ""
 	host, nick := cd.User.GetFullhost(), cd.User.GetNick()
 	if user != nil {
-		if !cd.UserAccess.HasFlags(d.GetKey(), "", "A") {
-			external = cmds.MakeFlagsError("A")
+		if !cd.UserAccess.HasGlobalFlag('G') {
+			external = cmds.MakeGlobalFlagsError("G")
 			return
 		}
 		uname = user.Username
@@ -354,6 +420,10 @@ func (c *coreCommands) deluser(d *data.DataEndpoint, cd *cmds.CommandData) (
 	internal, external error) {
 
 	param := cd.GetArg("user")
+	if !cd.UserAccess.HasGlobalFlag('G') {
+		external = cmds.MakeGlobalFlagsError("G")
+		return
+	}
 	uname := cd.TargetUserAccess["user"].Username
 
 	nick := cd.User.GetNick()
@@ -451,8 +521,8 @@ func (c *coreCommands) masks(d *data.DataEndpoint, cd *cmds.CommandData) (
 	access := cd.UserAccess
 	user := cd.TargetUserAccess["user"]
 	if user != nil {
-		if !cd.UserAccess.HasFlags(d.GetKey(), "", "A") {
-			external = cmds.MakeFlagsError("A")
+		if !cd.UserAccess.HasGlobalFlag('G') {
+			external = cmds.MakeGlobalFlagsError("G")
 			return
 		}
 		access = user
@@ -478,8 +548,8 @@ func (c *coreCommands) addmask(d *data.DataEndpoint, cd *cmds.CommandData) (
 
 	user := cd.TargetUserAccess["user"]
 	if user != nil {
-		if !cd.UserAccess.HasFlags(d.GetKey(), "", "A") {
-			external = cmds.MakeFlagsError("A")
+		if !cd.UserAccess.HasGlobalFlag('G') {
+			external = cmds.MakeGlobalFlagsError("G")
 			return
 		}
 		uname = user.Username
@@ -523,8 +593,8 @@ func (c *coreCommands) delmask(d *data.DataEndpoint, cd *cmds.CommandData) (
 
 	user := cd.TargetUserAccess["user"]
 	if user != nil {
-		if !cd.UserAccess.HasFlags(d.GetKey(), "", "A") {
-			external = cmds.MakeFlagsError("A")
+		if !cd.UserAccess.HasGlobalFlag('G') {
+			external = cmds.MakeGlobalFlagsError("G")
 			return
 		}
 		uname = user.Username
@@ -591,6 +661,258 @@ func (c *coreCommands) resetpasswd(d *data.DataEndpoint, cd *cmds.CommandData) (
 	}
 	d.Notice(nick, resetpasswdSuccess)
 	d.Noticef(resetnick, resetpasswdSuccessTarget, nick, newpasswd)
+
+	return
+}
+
+// ggive gives global access to a user.
+func (c *coreCommands) ggive(d *data.DataEndpoint, cd *cmds.CommandData) (
+	internal, external error) {
+	return c.giveHelper(d, cd,
+		func(a *data.UserAccess, level uint8, flags string) string {
+			if level > 0 {
+				a.GrantGlobalLevel(level)
+			}
+			if len(flags) != 0 {
+				a.GrantGlobalFlags(flags)
+			}
+			return fmt.Sprintf(ggiveSuccess, a.Username, a.Global.String())
+		},
+	)
+}
+
+// sgive gives server access to a user.
+func (c *coreCommands) sgive(d *data.DataEndpoint, cd *cmds.CommandData) (
+	internal, external error) {
+	server := d.GetKey()
+	return c.giveHelper(d, cd,
+		func(a *data.UserAccess, level uint8, flags string) string {
+			if level > 0 {
+				a.GrantServerLevel(server, level)
+			}
+			if len(flags) != 0 {
+				a.GrantServerFlags(server, flags)
+			}
+			return fmt.Sprintf(sgiveSuccess, a.Username, a.GetServer(server))
+		},
+	)
+}
+
+// give gives global access to a user.
+func (c *coreCommands) give(d *data.DataEndpoint, cd *cmds.CommandData) (
+	internal, external error) {
+	server := d.GetKey()
+	channel := cd.GetArg("chan")
+	return c.giveHelper(d, cd,
+		func(a *data.UserAccess, level uint8, flags string) string {
+			if level > 0 {
+				a.GrantChannelLevel(server, channel, level)
+			}
+			if len(flags) != 0 {
+				a.GrantChannelFlags(server, channel, flags)
+			}
+			return fmt.Sprintf(giveSuccess, a.Username,
+				a.GetChannel(server, channel))
+		},
+	)
+}
+
+// gtake takes global access from a user.
+func (c *coreCommands) gtake(d *data.DataEndpoint, cd *cmds.CommandData) (
+	internal, external error) {
+	return c.takeHelper(d, cd,
+		func(a *data.UserAccess, all, level bool, flags string) (string, bool) {
+			var save bool
+			if all {
+				if a.HasGlobalLevel(1) || a.HasGlobalFlags(flags) {
+					a.RevokeGlobal()
+					save = true
+				}
+			} else if level {
+				if a.HasGlobalLevel(1) {
+					a.RevokeGlobalLevel()
+					save = true
+				}
+			} else if a.HasGlobalFlags(flags) {
+				a.RevokeGlobalFlags(flags)
+				save = true
+			}
+
+			var rstr = a.Global.String()
+			if save {
+				rstr = fmt.Sprintf(gtakeSuccess, a.Username, rstr)
+			} else {
+				rstr = fmt.Sprintf(takeFailureNo, a.Username, rstr)
+			}
+			return rstr, save
+		},
+	)
+}
+
+// stake takes server access from a user.
+func (c *coreCommands) stake(d *data.DataEndpoint, cd *cmds.CommandData) (
+	internal, external error) {
+	server := d.GetKey()
+	return c.takeHelper(d, cd,
+		func(a *data.UserAccess, all, level bool, flags string) (string, bool) {
+			var save bool
+			if all {
+				if a.HasServerLevel(server, 1) ||
+					a.HasServerFlags(server, flags) {
+
+					a.RevokeServer(server)
+					save = true
+				}
+			} else if level {
+				if a.HasServerLevel(server, 1) {
+					a.RevokeServerLevel(server)
+					save = true
+				}
+			} else if a.HasServerFlags(server, flags) {
+				a.RevokeServerFlags(server, flags)
+				save = true
+			}
+
+			var rstr = a.GetServer(server).String()
+			if save {
+				rstr = fmt.Sprintf(stakeSuccess, a.Username, rstr)
+			} else {
+				rstr = fmt.Sprintf(takeFailureNo, a.Username, rstr)
+			}
+			return rstr, save
+		},
+	)
+}
+
+// take takes global access from a user.
+func (c *coreCommands) take(d *data.DataEndpoint, cd *cmds.CommandData) (
+	internal, external error) {
+	server := d.GetKey()
+	channel := cd.GetArg("chan")
+	return c.takeHelper(d, cd,
+		func(a *data.UserAccess, all, level bool, flags string) (string, bool) {
+			var save bool
+			if all {
+				if a.HasChannelLevel(server, channel, 1) ||
+					a.HasChannelFlags(server, channel, flags) {
+
+					a.RevokeChannel(server, channel)
+					save = true
+				}
+			} else if level {
+				if a.HasChannelLevel(server, channel, 1) {
+					a.RevokeChannelLevel(server, channel)
+					save = true
+				}
+			} else if a.HasChannelFlags(server, channel, flags) {
+				a.RevokeChannelFlags(server, channel, flags)
+				save = true
+			}
+
+			var rstr = a.GetChannel(server, channel).String()
+			if save {
+				rstr = fmt.Sprintf(takeSuccess, a.Username, rstr)
+			} else {
+				rstr = fmt.Sprintf(takeFailureNo, a.Username, rstr)
+			}
+			return rstr, save
+		},
+	)
+}
+
+// giveHelper parses the args to a give function and executes them in context
+func (c *coreCommands) giveHelper(d *data.DataEndpoint, cd *cmds.CommandData,
+	g giveHelperFunc) (internal, external error) {
+
+	uname := cd.TargetUserAccess["user"].Username
+	args := cd.SplitArg("levelOrFlags")
+	nick := cd.User.GetNick()
+
+	cd.Close()
+	c.b.protectStore.Lock()
+	defer c.b.protectStore.Unlock()
+	store := c.b.store
+
+	var access *data.UserAccess
+	access, internal = store.FindUser(uname)
+	if internal != nil {
+		return
+	}
+	if access == nil {
+		internal = fmt.Errorf(errFmtExpired, uname)
+		return
+	}
+
+	var level uint64
+	var flags string
+
+	for _, arg := range args {
+		if rgxFlags.MatchString(arg) {
+			flags += arg
+		} else if level, internal =
+			strconv.ParseUint(arg, 10, 8); internal != nil {
+			return
+		}
+	}
+
+	if (level > 0 && level < 256) || len(flags) > 0 {
+		str := g(access, uint8(level), flags)
+		if internal = store.AddUser(access); internal != nil {
+			return
+		}
+		d.Noticef(nick, str)
+	} else {
+		d.Noticef(nick, giveFailure)
+	}
+
+	return
+}
+
+// takeHelper parses the args to a take function and executes them in context
+func (c *coreCommands) takeHelper(d *data.DataEndpoint, cd *cmds.CommandData,
+	t takeHelperFunc) (internal, external error) {
+
+	uname := cd.TargetUserAccess["user"].Username
+	arg := cd.GetArg("allOrFlags")
+	nick := cd.User.GetNick()
+
+	cd.Close()
+	c.b.protectStore.Lock()
+	defer c.b.protectStore.Unlock()
+	store := c.b.store
+
+	var access *data.UserAccess
+	access, internal = store.FindUser(uname)
+	if internal != nil {
+		return
+	}
+	if access == nil {
+		internal = fmt.Errorf(errFmtExpired, uname)
+		return
+	}
+
+	var all, level bool
+	var flags string
+
+	if len(arg) == 0 {
+		level = true
+	} else if arg == takeAllArg {
+		all = true
+	} else {
+		if rgxFlags.MatchString(arg) {
+			flags = arg
+		} else {
+			external = fmt.Errorf(takeFailure, arg)
+		}
+	}
+
+	str, dosave := t(access, all, level, flags)
+	if dosave {
+		if internal = store.AddUser(access); internal != nil {
+			return
+		}
+	}
+	d.Noticef(nick, str)
 
 	return
 }

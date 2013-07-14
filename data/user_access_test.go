@@ -158,16 +158,21 @@ func TestUserAccess_Has(t *T) {
 		level uint8, flags string, has, hasLevel, hasFlags bool) string {
 
 		if ret := a.Has(server, channel, level, flags); ret != has {
-			return fmt.Sprintf("Expected (%v, %v) to return: %v but got %v",
+			return fmt.Sprintf("Expected (%v, %v) to be: %v but got %v",
 				level, flags, has, ret)
 		}
 		if ret := a.HasLevel(server, channel, level); ret != hasLevel {
-			return fmt.Sprintf("Expected level (%v) to return: %v but got %v",
+			return fmt.Sprintf("Expected level (%v) to be: %v but got %v",
 				level, hasLevel, ret)
 		}
 		if ret := a.HasFlags(server, channel, flags); ret != hasFlags {
-			return fmt.Sprintf("Expected flags (%v) to return: %v but got %v",
+			return fmt.Sprintf("Expected flags (%v) to be: %v but got %v",
 				flags, hasFlags, ret)
+		}
+		for _, f := range flags {
+			if ret := a.HasFlag(server, channel, f); ret != hasFlags {
+				return fmt.Sprintf("Expected flag (%v) to be: %v but got %v")
+			}
 		}
 		return ""
 	}
@@ -201,6 +206,10 @@ func TestUserAccess_Has(t *T) {
 	a.GrantGlobalLevel(3)
 	if s = check(3, "abc", true, true, true); len(s) != 0 {
 		t.Error(s)
+	}
+
+	if a.HasFlags(server, channel, "ad") == false {
+		t.Error("Should have had flag a.")
 	}
 }
 
@@ -271,11 +280,11 @@ func TestUserAccess_HasGlobalFlags(t *T) {
 		t.Error("Should not have any flags.")
 	}
 	a.GrantGlobalFlags("ab")
-	if !a.HasGlobalFlags("ab") {
+	if !a.HasGlobalFlag('a') || !a.HasGlobalFlag('b') {
 		t.Error("Should have ab flags.")
 	}
-	if !a.HasGlobalFlag('a') {
-		t.Error("Should have a flag.")
+	if !a.HasGlobalFlags("abc") {
+		t.Error("Should have a or b flags.")
 	}
 	if a.HasGlobalFlag('c') {
 		t.Error("Should not have c flag.")
@@ -368,11 +377,11 @@ func TestUserAccess_HasServerFlags(t *T) {
 		t.Error("Should not have any flags.")
 	}
 	a.GrantServerFlags(server, "ab")
-	if !a.HasServerFlags(server, "ab") {
+	if !a.HasServerFlag(server, 'a') || !a.HasServerFlag(server, 'b') {
 		t.Error("Should have ab flags.")
 	}
-	if !a.HasServerFlag(server, 'a') {
-		t.Error("Should have a flag.")
+	if !a.HasServerFlags(server, "abc") {
+		t.Error("Should have a or b flags.")
 	}
 	if a.HasServerFlag(server, 'c') {
 		t.Error("Should not have c flag.")
@@ -465,11 +474,12 @@ func TestUserAccess_HasChannelFlags(t *T) {
 		t.Error("Should not have any flags.")
 	}
 	a.GrantChannelFlags(server, channel, "ab")
-	if !a.HasChannelFlags(server, channel, "ab") {
+	if !a.HasChannelFlag(server, channel, 'a') ||
+		!a.HasChannelFlag(server, channel, 'b') {
 		t.Error("Should have ab flags.")
 	}
-	if !a.HasChannelFlag(server, channel, 'a') {
-		t.Error("Should have a flag.")
+	if !a.HasChannelFlags(server, channel, "abc") {
+		t.Error("Should have a or b flags.")
 	}
 	if a.HasChannelFlag(server, channel, 'c') {
 		t.Error("Should not have c flag.")

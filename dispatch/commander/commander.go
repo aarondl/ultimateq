@@ -55,8 +55,14 @@ const (
 	errMsgStateDisabled = "Error: Cannot use nick or user parameter commands " +
 		"when state is disabled."
 	errMsgNotAuthed          = "Access Denied: You are not authenticated."
-	errFmtInsuffLevel        = "Access Denied: [%v] level required."
-	errFmtInsuffFlags        = "Access Denied: [%v] flag(s) required."
+	errFmtInsuffLevel        = "Access Denied: (%v) level required."
+	errFmtInsuffGlobalLevel  = "Access Denied: (%v) global level required."
+	errFmtInsuffServerLevel  = "Access Denied: (%v) server level required."
+	errFmtInsuffChannelLevel = "Access Denied: (%v) channel level required."
+	errFmtInsuffFlags        = "Access Denied: (%v) flag(s) required."
+	errFmtInsuffGlobalFlags  = "Access Denied: (%v) global flag(s) required."
+	errFmtInsuffServerFlags  = "Access Denied: (%v) server flag(s) required."
+	errFmtInsuffChannelFlags = "Access Denied: (%v) channel flag(s) required."
 	errFmtUserNotRegistered  = "Error: User [%v] is not registered."
 	errFmtUserNotAuthed      = "Error: User [%v] is not authenticated."
 	errFmtUserNotFound       = "Error: User [%v] could not be found."
@@ -507,14 +513,52 @@ func makeIdentifier(server, cmd string) string {
 	return server + ":" + cmd
 }
 
-// MakeLevelError creates an error to be shown to the user about required access
+// MakeLevelError creates an error to be shown to the user about required
+// access.
 func MakeLevelError(levelRequired uint8) error {
 	return fmt.Errorf(errFmtInsuffLevel, levelRequired)
 }
 
-// MakeFlagsError creates an error to be shown to the user about required access
+// MakeGlobalLevelError creates an error to be shown to the user about required
+// access.
+func MakeGlobalLevelError(levelRequired uint8) error {
+	return fmt.Errorf(errFmtInsuffGlobalLevel, levelRequired)
+}
+
+// MakeServerLevelError creates an error to be shown to the user about required
+// access.
+func MakeServerLevelError(levelRequired uint8) error {
+	return fmt.Errorf(errFmtInsuffServerLevel, levelRequired)
+}
+
+// MakeChannelLevelError creates an error to be shown to the user about required
+// access.
+func MakeChannelLevelError(levelRequired uint8) error {
+	return fmt.Errorf(errFmtInsuffChannelLevel, levelRequired)
+}
+
+// MakeFlagsError creates an error to be shown to the user about required
+// access.
 func MakeFlagsError(flagsRequired string) error {
 	return fmt.Errorf(errFmtInsuffFlags, flagsRequired)
+}
+
+// MakeGlobalFlagsError creates an error to be shown to the user about required
+// access.
+func MakeGlobalFlagsError(flagsRequired string) error {
+	return fmt.Errorf(errFmtInsuffGlobalFlags, flagsRequired)
+}
+
+// MakeServerFlagsError creates an error to be shown to the user about required
+// access.
+func MakeServerFlagsError(flagsRequired string) error {
+	return fmt.Errorf(errFmtInsuffServerFlags, flagsRequired)
+}
+
+// MakeChannelFlagsError creates an error to be shown to the user about required
+// access.
+func MakeChannelFlagsError(flagsRequired string) error {
+	return fmt.Errorf(errFmtInsuffChannelFlags, flagsRequired)
 }
 
 // MakeNotAuthedError creates an error to be shown to the user about their

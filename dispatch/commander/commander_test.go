@@ -58,7 +58,12 @@ func (b *commandHandler) Command(cmd string, msg *irc.Message,
 	// Test Coverage obviously will work.
 	for k, v := range cmdata.args {
 		if cmdata.GetArg(k) != v {
-			panic("Something is incredibly wrong.")
+			return fmt.Errorf("The argument was not accessible by GetArg")
+		}
+		for _, arg := range cmdata.SplitArg(k) {
+			if !strings.Contains(v, arg) {
+				return fmt.Errorf("The argument was not accessbile by SplitArg")
+			}
 		}
 	}
 
@@ -549,7 +554,8 @@ func TestCommander_DispatchAuthed(t *T) {
 		ErrMsg   string
 	}{
 		{host, 250, "a", false, errFmtInsuffLevel},
-		{host, 100, "ab", false, errFmtInsuffFlags},
+		{host, 100, "ab", true, ""},
+		{host, 100, "bc", false, errFmtInsuffFlags},
 		{"nick!user@diffhost", 100, "ab", false, errMsgNotAuthed},
 		{"nick!user@diffhost", 0, "", false, errMsgNotAuthed},
 		{host, 100, "a", true, ""},
@@ -720,7 +726,13 @@ func TestCommander_DispatchReturns(t *T) {
 		ErrorMsg string
 	}{
 		{MakeLevelError(100), errFmtInsuffLevel},
+		{MakeGlobalLevelError(100), errFmtInsuffGlobalLevel},
+		{MakeServerLevelError(100), errFmtInsuffServerLevel},
+		{MakeChannelLevelError(100), errFmtInsuffChannelLevel},
 		{MakeFlagsError("a"), errFmtInsuffFlags},
+		{MakeGlobalFlagsError("a"), errFmtInsuffGlobalFlags},
+		{MakeServerFlagsError("a"), errFmtInsuffServerFlags},
+		{MakeChannelFlagsError("a"), errFmtInsuffChannelFlags},
 		{MakeUserNotAuthedError("user"), errFmtUserNotAuthed},
 		{MakeUserNotFoundError("user"), errFmtUserNotFound},
 		{MakeUserNotRegisteredError("user"), errFmtUserNotRegistered},

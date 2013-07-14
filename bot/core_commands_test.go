@@ -11,7 +11,6 @@ import (
 )
 
 const (
-	server   = "irc.test.net"
 	bothost  = "bot!botuser@bothost"
 	botnick  = "bot"
 	u1host   = "nick1!user1@host1"
@@ -60,7 +59,7 @@ func commandsSetup(t *T) *tSetup {
 	srv.endpoint.Writer = buf
 
 	srv.state.Update(&irc.IrcMessage{
-		Sender: server, Name: irc.RPL_WELCOME,
+		Sender: serverId, Name: irc.RPL_WELCOME,
 		Args: []string{"Welcome", bothost},
 	})
 	srv.state.Update(&irc.IrcMessage{
@@ -263,7 +262,7 @@ func TestCoreCommands_Logout(t *T) {
 	if err != nil {
 		t.Error(err)
 	}
-	err = rspChk(ts, ".*[A] flag(s) required.*", u2host, logout, u1nick)
+	err = rspChk(ts, ".*(G) global flag(s) required.*", u2host, logout, u1nick)
 	if err != nil {
 		t.Error(err)
 	}
@@ -351,7 +350,8 @@ func TestCoreCommands_Deluser(t *T) {
 		t.Error("User's were not authenticated.")
 	}
 
-	err = rspChk(ts, ".*[A] flag(s) required.*", u2host, deluser, u1user)
+	err = rspChk(ts, ".*(G) global flag(s) required.*", u2host,
+		deluser, "*"+u1user)
 	if err != nil {
 		t.Error(err)
 	}
@@ -521,7 +521,7 @@ func TestCoreCommands_Masks(t *T) {
 		t.Error(err)
 	}
 
-	err = rspChk(ts, ".*[A] flag(s) required.*", u2host, addmask,
+	err = rspChk(ts, ".*(G) global flag(s) required.*", u2host, addmask,
 		u1host, u1nick)
 	if err != nil {
 		t.Error(err)
@@ -551,7 +551,7 @@ func TestCoreCommands_Masks(t *T) {
 		t.Error(err)
 	}
 
-	err = rspChk(ts, ".*[A] flag(s) required.*", u2host, masks, u1nick)
+	err = rspChk(ts, ".*(G) global flag(s) required.*", u2host, masks, u1nick)
 	if err != nil {
 		t.Error(err)
 	}
@@ -571,7 +571,7 @@ func TestCoreCommands_Masks(t *T) {
 		t.Error(err)
 	}
 
-	err = rspChk(ts, ".*[A] flag(s) required.*", u2host, delmask,
+	err = rspChk(ts, ".*(G) global flag(s) required.*", u2host, delmask,
 		u1host, u1nick)
 	if err != nil {
 		t.Error(err)
@@ -641,5 +641,199 @@ func TestCoreCommands_Resetpasswd(t *T) {
 	}
 	if bytes.Compare(access.Password, oldPwd) == 0 {
 		t.Error("Password was not changed.")
+	}
+}
+
+func TestCoreCommands_GiveTakeGlobal(t *T) {
+	ts := commandsSetup(t)
+	defer commandsTeardown(ts, t)
+	var err error
+	var a *data.UserAccess
+
+	err = rspChk(ts, registerSuccessFirst, u1host, register, password, u1user)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = rspChk(ts, registerSuccess, u2host, register, password)
+	if err != nil {
+		t.Error(err)
+	}
+
+	a, err = ts.store.FindUser(u2user)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = rspChk(ts, ggiveSuccess, u1host, ggive, u2nick, "100", "h")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !a.HasGlobalFlag('h') || !a.HasGlobalLevel(100) {
+		t.Error("Global access not granted correctly.")
+	}
+
+	err = rspChk(ts, gtakeSuccess, u1host, gtake, u2nick)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if a.HasGlobalLevel(100) {
+		t.Error("Global access not taken correctly.")
+	}
+
+	err = rspChk(ts, gtakeSuccess, u1host, gtake, u2nick, "h")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if a.HasGlobalFlag('h') {
+		t.Error("Global access not taken correctly.")
+	}
+
+	a.GrantGlobal(100, "h")
+	err = rspChk(ts, gtakeSuccess, u1host, gtake, u2nick, "all")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if a.HasGlobalLevel(100) || a.HasGlobalFlag('h') {
+		t.Error("Global access not taken correctly.")
+	}
+
+	err = rspChk(ts, takeFailureNo, u1host, gtake, u2nick, "h")
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestCoreCommands_GiveTakeServer(t *T) {
+	ts := commandsSetup(t)
+	defer commandsTeardown(ts, t)
+	var err error
+	var a *data.UserAccess
+
+	err = rspChk(ts, registerSuccessFirst, u1host, register, password, u1user)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = rspChk(ts, registerSuccess, u2host, register, password)
+	if err != nil {
+		t.Error(err)
+	}
+
+	a, err = ts.store.FindUser(u2user)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = rspChk(ts, sgiveSuccess, u1host, sgive, u2nick, "100", "h")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !a.HasServerFlag(serverId, 'h') || !a.HasServerLevel(serverId, 100) {
+		t.Error("Server access not granted correctly.")
+	}
+
+	err = rspChk(ts, stakeSuccess, u1host, stake, u2nick)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if a.HasServerLevel(serverId, 100) {
+		t.Error("Server access not taken correctly.")
+	}
+
+	err = rspChk(ts, stakeSuccess, u1host, stake, u2nick, "h")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if a.HasServerFlag(serverId, 'h') {
+		t.Error("Server access not taken correctly.")
+	}
+
+	a.GrantServer(serverId, 100, "h")
+	err = rspChk(ts, stakeSuccess, u1host, stake, u2nick, "all")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if a.HasServerLevel(serverId, 100) || a.HasServerFlag(serverId, 'h') {
+		t.Error("Server access not taken correctly.")
+	}
+
+	err = rspChk(ts, takeFailureNo, u1host, stake, u2nick, "h")
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestCoreCommands_GiveTakeChannel(t *T) {
+	ts := commandsSetup(t)
+	defer commandsTeardown(ts, t)
+	var err error
+	var a *data.UserAccess
+
+	err = rspChk(ts, registerSuccessFirst, u1host, register, password, u1user)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = rspChk(ts, registerSuccess, u2host, register, password)
+	if err != nil {
+		t.Error(err)
+	}
+
+	a, err = ts.store.FindUser(u2user)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = rspChk(ts, giveSuccess, u1host, give, channel, u2nick, "100", "h")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !a.HasChannelFlag(serverId, channel, 'h') ||
+		!a.HasChannelLevel(serverId, channel, 100) {
+		t.Error("Channel access not granted correctly.")
+	}
+
+	err = rspChk(ts, takeSuccess, u1host, take, channel, u2nick)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if a.HasChannelLevel(serverId, channel, 100) {
+		t.Error("Channel access not taken correctly.")
+	}
+
+	err = rspChk(ts, takeSuccess, u1host, take, channel, u2nick, "h")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if a.HasChannelFlag(serverId, channel, 'h') {
+		t.Error("Channel access not taken correctly.")
+	}
+
+	a.GrantChannel(serverId, channel, 100, "h")
+	err = rspChk(ts, takeSuccess, u1host, take, channel, u2nick, "all")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if a.HasChannelFlag(serverId, channel, 'h') ||
+		a.HasChannelLevel(serverId, channel, 100) {
+		t.Error("Channel access not taken correctly.")
+	}
+
+	err = rspChk(ts, takeFailureNo, u1host, take, channel, u2nick, "h")
+	if err != nil {
+		t.Error(err)
 	}
 }
