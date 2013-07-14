@@ -99,18 +99,15 @@ const (
 	gtakeDesc   = `Takes global access from a user. If no arguments are ` +
 		`given, takes the level access, otherwise removes the given flags. ` +
 		`Use all to take all access.`
-	gtakeSuccess = `Took (%v) from [%v] globally.`
-	stakeDesc    = `Takes server access from a user. If no arguments are ` +
+	stakeDesc = `Takes server access from a user. If no arguments are ` +
 		`given, takes the level access, otherwise removes the given flags. ` +
 		`Use all to take all access.`
-	stakeSuccess = `Took (%v) from [%v] server-wide.`
-	takeDesc     = `Takes channel access from a user. If no arguments are ` +
+	takeDesc = `Takes channel access from a user. If no arguments are ` +
 		`given, takes the level access, otherwise removes the given flags. ` +
 		`Use all to take all access.`
-	takeSuccess = `Took (%v) from [%v] user on %v`
 
 	giveFailure = `Invalid arguments, must be numeric accesses from 1-255 or ` +
-		`flags including A-Z and a-z.`
+		`flags in the range: A-Za-z.`
 	takeFailure = `Invalid arguments, leave empty to delete level access, ` +
 		`specific flags to delete those flags, or the keyword all to delete ` +
 		`everything. (given: %v)`
@@ -267,7 +264,7 @@ func (c *coreCommands) register(d *data.DataEndpoint,
 	pwd := cd.GetArg("password")
 	uname := cd.GetArg("username")
 	if len(uname) == 0 {
-		uname = cd.User.GetUsername()
+		uname = strings.TrimLeft(cd.User.GetUsername(), "~")
 	}
 
 	access = cd.UserAccess
@@ -333,7 +330,7 @@ func (c *coreCommands) auth(d *data.DataEndpoint, cd *cmds.CommandData) (
 	pwd := cd.GetArg("password")
 	uname := cd.GetArg("username")
 	if len(uname) == 0 {
-		uname = cd.User.GetUsername()
+		uname = strings.TrimLeft(cd.User.GetUsername(), "~")
 	}
 
 	host, nick := cd.User.GetFullhost(), cd.User.GetNick()
@@ -711,7 +708,7 @@ func (c *coreCommands) give(d *data.DataEndpoint, cd *cmds.CommandData) (
 			if len(flags) != 0 {
 				a.GrantChannelFlags(server, channel, flags)
 			}
-			return fmt.Sprintf(giveSuccess, a.Username,
+			return fmt.Sprintf(giveSuccess, a.Username, channel,
 				a.GetChannel(server, channel))
 		},
 	)
@@ -740,7 +737,7 @@ func (c *coreCommands) gtake(d *data.DataEndpoint, cd *cmds.CommandData) (
 
 			var rstr = a.Global.String()
 			if save {
-				rstr = fmt.Sprintf(gtakeSuccess, a.Username, rstr)
+				rstr = fmt.Sprintf(ggiveSuccess, a.Username, rstr)
 			} else {
 				rstr = fmt.Sprintf(takeFailureNo, a.Username, rstr)
 			}
@@ -775,7 +772,7 @@ func (c *coreCommands) stake(d *data.DataEndpoint, cd *cmds.CommandData) (
 
 			var rstr = a.GetServer(server).String()
 			if save {
-				rstr = fmt.Sprintf(stakeSuccess, a.Username, rstr)
+				rstr = fmt.Sprintf(sgiveSuccess, a.Username, rstr)
 			} else {
 				rstr = fmt.Sprintf(takeFailureNo, a.Username, rstr)
 			}
@@ -811,7 +808,7 @@ func (c *coreCommands) take(d *data.DataEndpoint, cd *cmds.CommandData) (
 
 			var rstr = a.GetChannel(server, channel).String()
 			if save {
-				rstr = fmt.Sprintf(takeSuccess, a.Username, rstr)
+				rstr = fmt.Sprintf(giveSuccess, a.Username, rstr)
 			} else {
 				rstr = fmt.Sprintf(takeFailureNo, a.Username, rstr)
 			}

@@ -674,7 +674,7 @@ func TestCoreCommands_GiveTakeGlobal(t *T) {
 		t.Error("Global access not granted correctly.")
 	}
 
-	err = rspChk(ts, gtakeSuccess, u1host, gtake, u2nick)
+	err = rspChk(ts, ggiveSuccess, u1host, gtake, u2nick)
 	if err != nil {
 		t.Error(err)
 	}
@@ -683,7 +683,7 @@ func TestCoreCommands_GiveTakeGlobal(t *T) {
 		t.Error("Global access not taken correctly.")
 	}
 
-	err = rspChk(ts, gtakeSuccess, u1host, gtake, u2nick, "h")
+	err = rspChk(ts, ggiveSuccess, u1host, gtake, u2nick, "h")
 	if err != nil {
 		t.Error(err)
 	}
@@ -693,7 +693,7 @@ func TestCoreCommands_GiveTakeGlobal(t *T) {
 	}
 
 	a.GrantGlobal(100, "h")
-	err = rspChk(ts, gtakeSuccess, u1host, gtake, u2nick, "all")
+	err = rspChk(ts, ggiveSuccess, u1host, gtake, u2nick, "all")
 	if err != nil {
 		t.Error(err)
 	}
@@ -738,7 +738,7 @@ func TestCoreCommands_GiveTakeServer(t *T) {
 		t.Error("Server access not granted correctly.")
 	}
 
-	err = rspChk(ts, stakeSuccess, u1host, stake, u2nick)
+	err = rspChk(ts, sgiveSuccess, u1host, stake, u2nick)
 	if err != nil {
 		t.Error(err)
 	}
@@ -747,7 +747,7 @@ func TestCoreCommands_GiveTakeServer(t *T) {
 		t.Error("Server access not taken correctly.")
 	}
 
-	err = rspChk(ts, stakeSuccess, u1host, stake, u2nick, "h")
+	err = rspChk(ts, sgiveSuccess, u1host, stake, u2nick, "h")
 	if err != nil {
 		t.Error(err)
 	}
@@ -757,7 +757,7 @@ func TestCoreCommands_GiveTakeServer(t *T) {
 	}
 
 	a.GrantServer(serverId, 100, "h")
-	err = rspChk(ts, stakeSuccess, u1host, stake, u2nick, "all")
+	err = rspChk(ts, sgiveSuccess, u1host, stake, u2nick, "all")
 	if err != nil {
 		t.Error(err)
 	}
@@ -803,7 +803,7 @@ func TestCoreCommands_GiveTakeChannel(t *T) {
 		t.Error("Channel access not granted correctly.")
 	}
 
-	err = rspChk(ts, takeSuccess, u1host, take, channel, u2nick)
+	err = rspChk(ts, giveSuccess, u1host, take, channel, u2nick)
 	if err != nil {
 		t.Error(err)
 	}
@@ -812,7 +812,7 @@ func TestCoreCommands_GiveTakeChannel(t *T) {
 		t.Error("Channel access not taken correctly.")
 	}
 
-	err = rspChk(ts, takeSuccess, u1host, take, channel, u2nick, "h")
+	err = rspChk(ts, giveSuccess, u1host, take, channel, u2nick, "h")
 	if err != nil {
 		t.Error(err)
 	}
@@ -822,7 +822,7 @@ func TestCoreCommands_GiveTakeChannel(t *T) {
 	}
 
 	a.GrantChannel(serverId, channel, 100, "h")
-	err = rspChk(ts, takeSuccess, u1host, take, channel, u2nick, "all")
+	err = rspChk(ts, giveSuccess, u1host, take, channel, u2nick, "all")
 	if err != nil {
 		t.Error(err)
 	}
