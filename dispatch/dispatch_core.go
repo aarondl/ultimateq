@@ -1,7 +1,7 @@
 /*
-Package dispatch supplies a low level core that can be shared between
-multiple dispatcher implementations. It also provides one basic
-dispatcher implementation.
+Package dispatch is used to dispatch irc messages to event handlers in an
+concurrent fashion. It supports various event handler types to easily
+extract information from events, as well as define more succint handlers.
 */
 package dispatch
 
@@ -20,8 +20,8 @@ var (
 )
 
 // DispatchCore is a core for any dispatching mechanisms that includes a sync'd
-// list of channels, a finder, and a waiter to synchronize the exit of all the
-// event handlers sharing this core.
+// list of channels, channel identification services, and a waiter to
+// synchronize the exit of all the event handlers sharing this core.
 type DispatchCore struct {
 	waiter  sync.WaitGroup
 	finder  *irc.ChannelFinder

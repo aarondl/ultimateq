@@ -1,5 +1,5 @@
 /*
-inet package handles connecting to an irc server and reading and writing to
+Package inet handles connecting to an irc server and reading and writing to
 the connection
 */
 package inet

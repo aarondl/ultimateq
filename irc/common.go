@@ -1,5 +1,5 @@
 /*
-irc package defines types and classes to be used by most other packages in
+Package irc defines types to be used by most other packages in
 the ultimateq system. It is small and comprised mostly of helper like types
 and constants.
 */

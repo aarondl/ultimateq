@@ -1,3 +1,6 @@
+/*
+Package mocks includes mocks to simplify testing.
+*/
 package mocks
 
 import (

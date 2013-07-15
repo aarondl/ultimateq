@@ -1,8 +1,3 @@
-/*
-dispatch package is used to dispatch irc messages to event handlers in an
-asynchronous fashion. It supports various event handling types to easily
-extract information from events, as well as define more succint handlers.
-*/
 package dispatch
 
 import (

@@ -1,6 +1,7 @@
 /*
-config package provides inline fluent configuration, validation, file
-input/output, as well as configuration diffs.
+Package config provides several ways to configure an irc bot. Some methods are
+inline fluent configuration, yaml reading from any io.Reader. It also provides
+config validation.
 */
 package config
 

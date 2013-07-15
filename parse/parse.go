@@ -1,5 +1,5 @@
 /*
-parse package deals with parsing the irc protocol
+Package parse has functions to parse the irc protocol into irc.IrcMessages.
 */
 package parse
 

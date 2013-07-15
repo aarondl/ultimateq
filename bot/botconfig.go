@@ -31,9 +31,9 @@ func (b *Bot) WriteConfig(fn configCallback) {
 
 // ReplaceConfig replaces the current configuration for the bot. Running
 // servers not present in the new config will be shut down immediately, while
-// new servers will be connected to any ready to start. Updates active channels
+// new servers will be connected to and started. Updates active channels
 // for all dispatchers as well as sends nick messages to the servers with
-// updates for nicknames.
+// updates for nicknames. Returns any new servers added.
 func (b *Bot) ReplaceConfig(newConfig *config.Config) []NewServer {
 	if !newConfig.IsValid() {
 		return nil
