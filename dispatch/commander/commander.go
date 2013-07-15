@@ -337,6 +337,7 @@ func (c *Commander) filterArgs(server string, command *Command, channel string,
 	state *data.State, store *data.Store) (err error) {
 
 	cmdata.args = make(map[string]string)
+
 	i, j := 0, 0
 	for i = 0; i < len(command.args); i, j = i+1, j+1 {
 		arg := &command.args[i]
@@ -358,7 +359,11 @@ func (c *Commander) filterArgs(server string, command *Command, channel string,
 			}
 		case req:
 			if j >= len(msgArgs) {
-				return fmt.Errorf(errFmtNArguments, errAtLeast, command.reqArgs,
+				nReq := command.reqArgs
+				if command.args[0].Type&CHANNEL != 0 && isChan {
+					nReq--
+				}
+				return fmt.Errorf(errFmtNArguments, errAtLeast, nReq,
 					strings.Join(command.Args, " "))
 			}
 			cmdata.args[arg.Name] = msgArgs[j]
@@ -416,7 +421,7 @@ func (c *Commander) parseChanArg(command *Command, cmdata *CommandData,
 		isFirstChan, _ = c.CheckTarget(msgArgs[index])
 	} else if !isChan {
 		return false, fmt.Errorf(errFmtNArguments, errAtLeast,
-			1+command.reqArgs, strings.Join(command.Args, " "))
+			command.reqArgs, strings.Join(command.Args, " "))
 	}
 
 	name := command.args[index].Name

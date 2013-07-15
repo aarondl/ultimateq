@@ -375,6 +375,7 @@ func TestCommander_Dispatch(t *T) {
 
 	argErr := errFmtNArguments
 	chanErr := errFmtArgumentNotChannel
+	atLeastOneArgErr := fmt.Sprintf(errFmtNArguments, errAtLeast, 1, "%v")
 
 	var table = []struct {
 		CmdArgs []string
@@ -409,6 +410,7 @@ func TestCommander_Dispatch(t *T) {
 		// Channel Arguments
 		{arg1chan1req, ALL, ALL, irc.PRIVMSG, cmsgarg, true, ""},
 		{arg1chan1req, ALL, ALL, irc.PRIVMSG, cmsgargchan, false, argErr},
+		{arg1chan1req, ALL, ALL, irc.PRIVMSG, cmsg, false, atLeastOneArgErr},
 		{arg1chan1req, ALL, ALL, irc.PRIVMSG, cmsgchanarg, true, ""},
 		{arg1chan1req, ALL, ALL, irc.PRIVMSG, umsgarg, false, chanErr},
 		{arg1chan1req, ALL, ALL, irc.PRIVMSG, umsgargchan, false, chanErr},
@@ -839,6 +841,22 @@ func TestCommander_DispatchChannel(t *T) {
 	}
 	if handler.args["channelArg"] != channel {
 		t.Error("The channel argument was not set.")
+	}
+
+	msg.Args = []string{channel, string(prefix) + cmd + " " + channel + " arg"}
+	err = c.Dispatch(server, msg, dataEndpoint)
+	c.WaitForHandlers()
+	err = chkErr(err, fmt.Sprintf(errFmtNArguments, errAtMost, 1, "%v"))
+	if err != nil {
+		t.Error(err)
+	}
+
+	msg.Args = []string{nick, cmd}
+	err = c.Dispatch(server, msg, dataEndpoint)
+	c.WaitForHandlers()
+	err = chkErr(err, fmt.Sprintf(errFmtNArguments, errAtLeast, 1, "%v"))
+	if err != nil {
+		t.Error(err)
 	}
 
 	success := c.Unregister(GLOBAL, cmd)
