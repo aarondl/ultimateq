@@ -213,9 +213,9 @@ func (c *IrcClient) writeMessage(msg []byte) error {
 func (c *IrcClient) siphon() {
 	buf := make([]byte, bufferSize)
 
-	var err error = nil
+	var err error
 	var shutdown bool
-	var position, n = 0, 0
+	var position, n int
 
 	for err == nil {
 		n, err = c.conn.Read(buf[position:])
@@ -303,10 +303,11 @@ func (c *IrcClient) IsClosed() bool {
 	return c.isShutdown
 }
 
-// Reads a message from the read channel in it's entirety. More efficient than
-// read because read requires you to allocate your own buffer, but since we're
-// dealing in routines and splitting the buffer the reality is another buffer
-// has been already allocated to copy the bytes recieved anyways.
+// ReadMessage gets message from the read channel in it's entirety.
+// More efficient than read because read requires you to allocate your own
+// buffer, but since we're dealing in routines and splitting the buffer the
+// reality is another buffer has been already allocated to copy the bytes
+// recieved anyways.
 func (c *IrcClient) ReadMessage() ([]byte, bool) {
 	ret, ok := <-c.siphonchan
 	if !ok {
@@ -315,7 +316,7 @@ func (c *IrcClient) ReadMessage() ([]byte, bool) {
 	return ret, ok
 }
 
-// Retrieves the channel that's used to read.
+// ReadChannel retrieves the channel that's used to read.
 func (c *IrcClient) ReadChannel() <-chan []byte {
 	return c.siphonchan
 }

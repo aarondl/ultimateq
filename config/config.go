@@ -484,7 +484,7 @@ func (c *Config) Channels(channels ...string) *Config {
 	return c
 }
 
-// ServerConfig states the all the details necessary to connect to an irc server
+// Server states the all the details necessary to connect to an irc server
 // Although all of these are exported so they can be deserialized into a yaml
 // file, they are not for direct reading and the helper methods should ALWAYS
 // be used to preserve correct global-value resolution.

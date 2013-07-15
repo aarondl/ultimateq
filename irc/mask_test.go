@@ -101,8 +101,8 @@ func (s *s) TestWildMask_IsValid(c *C) {
 }
 
 func (s *s) TestWildMask_Match(c *C) {
-	var wmask WildMask = ""
-	var mask Mask = ""
+	var wmask WildMask
+	var mask Mask
 	c.Check(wmask.Match(mask), Equals, true)
 
 	c.Check(WildMask("nick!*@*").Match("nick!@"), Equals, true)

@@ -40,9 +40,8 @@ type AuthError struct {
 func (a AuthError) Error() string {
 	if len(a.fmtArgs) > 0 {
 		return fmt.Sprintf(a.str, a.fmtArgs...)
-	} else {
-		return a.str
 	}
+	return a.str
 }
 
 var (
@@ -81,7 +80,7 @@ func CreateStore(prov DbProvider) (*Store, error) {
 	return s, nil
 }
 
-// Closes the underlying database.
+// Close closes the underlying database.
 func (s *Store) Close() error {
 	return s.db.Close()
 }
@@ -179,7 +178,7 @@ func (s *Store) Logout(server, host string) {
 	delete(s.authed, server+host)
 }
 
-// Logout logs an authenticated username out.
+// LogoutByUsername logs an authenticated username out.
 func (s *Store) LogoutByUsername(username string) {
 	hosts := make([]string, 0, 1)
 	for host, user := range s.authed {
@@ -257,7 +256,7 @@ func (s *Store) IsFirst() (isFirst bool, err error) {
 	return
 }
 
-// MakeStoreProvider is the default way to create a store by using the
+// MakeFileStoreProvider is the default way to create a store by using the
 // filename and trying to open it.
 func MakeFileStoreProvider(filename string) DbProvider {
 	return func() (db *kv.DB, err error) {

@@ -28,7 +28,7 @@ func CreateDataEndpoint(key string, write io.Writer, state *State, store *Store,
 	}
 }
 
-// Gets a key to identify the endpoint.
+// GetKey gets a key to identify the endpoint.
 func (d *DataEndpoint) GetKey() string {
 	return d.key
 }
@@ -45,7 +45,7 @@ func (d *DataEndpoint) UsingState(fn func(*State)) (called bool) {
 	return
 }
 
-// OpenStore locks the data state, and returns it. CloseStore must be called or
+// OpenState locks the data state, and returns it. CloseState must be called or
 // the lock will never be released and the bot will sieze up. The state must
 // be checked for nil.
 func (d *DataEndpoint) OpenState() *State {

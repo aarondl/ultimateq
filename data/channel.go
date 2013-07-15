@@ -69,7 +69,7 @@ func (c *Channel) Bans(bans []string) {
 	}
 }
 
-// AddBans adds to the channel's bans.
+// AddBan adds to the channel's bans.
 func (c *Channel) AddBan(ban string) {
 	c.setAddress(banMode, ban)
 }
@@ -90,7 +90,7 @@ func (c *Channel) HasBan(ban string) bool {
 	return c.isAddressSet(banMode, ban)
 }
 
-// DeletBan deletes a ban from the list.
+// DeleteBan deletes a ban from the list.
 func (c *Channel) DeleteBan(ban string) {
 	c.unsetAddress(banMode, ban)
 }

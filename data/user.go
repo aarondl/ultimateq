@@ -26,7 +26,7 @@ func (u *User) GetNick() string {
 	return u.mask.GetNick()
 }
 
-// GetUser returns the username of this user.
+// GetUsername returns the username of this user.
 func (u *User) GetUsername() string {
 	return u.mask.GetUsername()
 }

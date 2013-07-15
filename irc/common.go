@@ -12,17 +12,17 @@ import (
 )
 
 const (
-	// The maximum length for an irc message.
+	// IRC_MAX_LENGTH is the maximum length for an irc message.
 	IRC_MAX_LENGTH = 510
-	// A format string to create privmsg headers.
+	// fmtPrivmsgHeader creates the beginning of a privmsg.
 	fmtPrivmsgHeader = PRIVMSG + " %v :"
-	// A format string to create notice headers.
+	// fmtNoticeHeader creates the beginning of a notice.
 	fmtNoticeHeader = NOTICE + " %v :"
-	// A format string to create joins.
+	// fmtJoin creates a join message.
 	fmtJoin = JOIN + " :%v"
-	// A format string to create parts.
+	// fmtPart creates a part message.
 	fmtPart = PART + " :%v"
-	// A format string to create quits.
+	// fmtQuit creates a quit message.
 	fmtQuit = QUIT + " :%v"
 )
 
@@ -335,7 +335,7 @@ func (h *Helper) Noticef(target, format string, args ...interface{}) error {
 	return h.splitSend(header, msg)
 }
 
-// Sends a join message to the endpoint.
+// Join sends a join message to the endpoint.
 func (h *Helper) Join(targets ...string) error {
 	if len(targets) == 0 {
 		return nil
@@ -344,7 +344,7 @@ func (h *Helper) Join(targets ...string) error {
 	return err
 }
 
-// Sends a part message to the endpoint.
+// Part sends a part message to the endpoint.
 func (h *Helper) Part(targets ...string) error {
 	if len(targets) == 0 {
 		return nil
@@ -353,7 +353,7 @@ func (h *Helper) Part(targets ...string) error {
 	return err
 }
 
-// Sends a quit message to the endpoint.
+// Quit sends a quit message to the endpoint.
 func (h *Helper) Quit(msg string) error {
 	_, err := fmt.Fprintf(h, fmtQuit, msg)
 	return err

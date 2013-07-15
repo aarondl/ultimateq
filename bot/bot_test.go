@@ -309,9 +309,9 @@ func (s *s) TestBot_Register(c *C) {
 	c.Check(ok, Equals, true)
 
 	_, err = b.RegisterServer("", "", &coreHandler{})
-	c.Check(err, Equals, errUnknownServerId)
+	c.Check(err, Equals, errUnknownServerID)
 	_, err = b.UnregisterServer("", "", 0)
-	c.Check(err, Equals, errUnknownServerId)
+	c.Check(err, Equals, errUnknownServerID)
 }
 
 func (s *s) TestBot_RegisterCommand(c *C) {
@@ -336,7 +336,7 @@ func (s *s) TestBot_RegisterCommand(c *C) {
 
 	err = b.RegisterServerCommand("badServer", commander.MkCmd("e", "d", cmd,
 		&testCommand{}, commander.ALL, commander.ALL))
-	c.Check(err, Equals, errUnknownServerId)
+	c.Check(err, Equals, errUnknownServerID)
 
 	success = b.UnregisterServerCommand("badServer", cmd)
 	c.Check(success, Equals, false)

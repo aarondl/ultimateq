@@ -136,7 +136,7 @@ func getFlagBit(flag rune) (bit uint64) {
 // getFlagString maps the bits in a uint64 to A-Za-z
 func getFlagString(bits uint64) (flags string) {
 	var bit uint64 = 1
-	var n int = nAlphabet * 2
+	var n = nAlphabet * 2
 	for i := 0; i < n; i, bit = i+1, bit<<1 {
 		if bit&bits != bit {
 			continue

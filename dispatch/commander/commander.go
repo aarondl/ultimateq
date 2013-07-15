@@ -22,7 +22,7 @@ import (
 
 // Constants used for defining the targets/scope of a command.
 const (
-	// The bot-global registration "server name".
+	// GLOBAL is the bot-global registration "server name".
 	GLOBAL = "GLOBAL"
 	// PRIVMSG only listens to irc.PRIVMSG events.
 	PRIVMSG = 0x1
@@ -32,9 +32,9 @@ const (
 	PRIVATE = 0x1
 	// PUBLIC only listens to PRIVMSG or NOTICE sent to a channel.
 	PUBLIC = 0x2
-	// When passed into the msgtype parameter: ALL listens to both PRIVMSG and
-	// NOTICE events.
-	// When passed into the scope parameter: ALL listens for messages sent both
+	// ALL when passed into the msgtype parameter: listens to both
+	// PRIVMSG and NOTICE events.
+	// When passed into the scope parameter: listens for messages sent both
 	// directly to the bot, and to a channel.
 	ALL = 0x3
 )
@@ -396,11 +396,10 @@ func (c *Commander) filterArgs(server string, command *Command, channel string,
 	if j < len(msgArgs) {
 		if j == 0 {
 			return errors.New(errMsgUnexpectedArgument)
-		} else {
-			return fmt.Errorf(errFmtNArguments, errAtMost,
-				command.reqArgs+command.optArgs,
-				strings.Join(command.Args, " "))
 		}
+		return fmt.Errorf(errFmtNArguments, errAtMost,
+			command.reqArgs+command.optArgs,
+			strings.Join(command.Args, " "))
 	}
 	return nil
 }
@@ -427,11 +426,10 @@ func (c *Commander) parseChanArg(command *Command, cmdata *CommandData,
 			cmdata.Channel = state.GetChannel(channel)
 			cmdata.TargetChannel = cmdata.Channel
 			return false, nil
-		} else {
-			cmdata.args[name] = msgArgs[index]
-			cmdata.TargetChannel = state.GetChannel(msgArgs[index])
-			return true, nil
 		}
+		cmdata.args[name] = msgArgs[index]
+		cmdata.TargetChannel = state.GetChannel(msgArgs[index])
+		return true, nil
 	} else if isFirstChan {
 		cmdata.args[name] = msgArgs[index]
 		cmdata.TargetChannel = state.GetChannel(msgArgs[index])
@@ -561,7 +559,7 @@ func MakeChannelFlagsError(flagsRequired string) error {
 	return fmt.Errorf(errFmtInsuffChannelFlags, flagsRequired)
 }
 
-// MakeNotAuthedError creates an error to be shown to the user about their
+// MakeUserNotAuthedError creates an error to be shown to the user about their
 // target user not being authenticated.
 func MakeUserNotAuthedError(user string) error {
 	return fmt.Errorf(errFmtUserNotAuthed, user)

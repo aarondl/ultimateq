@@ -60,7 +60,7 @@ type Server struct {
 	commander    *commander.Commander
 	endpoint     *ServerEndpoint
 
-	handlerId int
+	handlerID int
 	handler   *coreHandler
 
 	// State and Connection

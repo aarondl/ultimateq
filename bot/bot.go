@@ -46,7 +46,7 @@ var (
 	errInvalidConfig = errors.New("bot: Invalid Configuration")
 	// errInvalidServerId occurs when the user passes in an unknown
 	// server id to a method requiring a server id.
-	errUnknownServerId = errors.New("bot: Unknown Server id.")
+	errUnknownServerID = errors.New("bot: Unknown Server id.")
 )
 
 type (
@@ -105,7 +105,7 @@ func ConfigureFunction(cnf func(*config.Config) *config.Config) *config.Config {
 	return cnf(config.CreateConfig())
 }
 
-// Check config checks a bots config for validity.
+// CheckConfig checks a bots config for validity.
 func CheckConfig(c *config.Config) bool {
 	if !c.IsValid() {
 		c.DisplayErrors()
@@ -332,7 +332,7 @@ func (b *Bot) Register(event string, handler interface{}) int {
 	return b.dispatcher.Register(event, handler)
 }
 
-// Register adds an event handler to a server specific dispatcher.
+// RegisterServer adds an event handler to a server specific dispatcher.
 func (b *Bot) RegisterServer(
 	server string, event string, handler interface{}) (int, error) {
 
@@ -342,7 +342,7 @@ func (b *Bot) RegisterServer(
 	if s, ok := b.servers[server]; ok {
 		return s.dispatcher.Register(event, handler), nil
 	}
-	return 0, errUnknownServerId
+	return 0, errUnknownServerID
 }
 
 // Unregister removes an event handler from the bot's global dispatcher
@@ -350,7 +350,7 @@ func (b *Bot) Unregister(event string, id int) bool {
 	return b.dispatcher.Unregister(event, id)
 }
 
-// Unregister removes an event handler from a server specific dispatcher.
+// UnregisterServer removes an event handler from a server specific dispatcher.
 func (b *Bot) UnregisterServer(
 	server string, event string, id int) (bool, error) {
 
@@ -360,7 +360,7 @@ func (b *Bot) UnregisterServer(
 	if s, ok := b.servers[server]; ok {
 		return s.dispatcher.Unregister(event, id), nil
 	}
-	return false, errUnknownServerId
+	return false, errUnknownServerID
 }
 
 // RegisterCommand registers a command with the bot.
@@ -379,7 +379,7 @@ func (b *Bot) RegisterServerCommand(srv string, cmd *commander.Command) error {
 	if s, ok := b.servers[srv]; ok {
 		return s.commander.Register(srv, cmd)
 	}
-	return errUnknownServerId
+	return errUnknownServerID
 }
 
 // UnregisterCommand unregister's a command from the bot.
@@ -492,11 +492,11 @@ func (b *Bot) Writeln(server, message string) error {
 	b.protectServers.RLock()
 	defer b.protectServers.RUnlock()
 
-	if srv, ok := b.servers[server]; !ok {
-		return errUnknownServerId
-	} else {
-		return srv.Writeln(message)
+	srv, ok := b.servers[server]
+	if !ok {
+		return errUnknownServerID
 	}
+	return srv.Writeln(message)
 }
 
 // dispatch sends a message to both the bot's dispatcher and the given servers
@@ -593,7 +593,7 @@ func (b *Bot) createServer(conf *config.Server) (*Server, error) {
 
 	if b.attachHandlers {
 		s.handler = &coreHandler{bot: b}
-		s.handlerId = s.dispatcher.Register(irc.RAW, s.handler)
+		s.handlerID = s.dispatcher.Register(irc.RAW, s.handler)
 	}
 
 	return s, nil

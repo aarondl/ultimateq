@@ -25,12 +25,12 @@ func CreateModeDiff(
 	}
 }
 
-// Checks if applying this diff will set the given simple modestrs.
+// IsSet checks if applying this diff will set the given simple modestrs.
 func (d *ModeDiff) IsSet(modestrs ...string) bool {
 	return d.pos.IsSet(modestrs...)
 }
 
-// Checks if applying this diff will unset the given simple modestrs.
+// IsUnset checks if applying this diff will unset the given simple modestrs.
 func (d *ModeDiff) IsUnset(modestrs ...string) bool {
 	return d.neg.IsSet(modestrs...)
 }

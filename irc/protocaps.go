@@ -7,6 +7,8 @@ import (
 	"sync"
 )
 
+// These constants are the mappings from the 004 and 005 messages to their
+// respective spots inside the ProtoCaps type.
 const (
 	CAPS_RFC         = "RFC"
 	CAPS_IRCD        = "IRCD"
@@ -21,7 +23,11 @@ const (
 	CAPS_AWAYLEN     = "AWAYLEN"
 	CAPS_KICKLEN     = "KICKLEN"
 	CAPS_MODES       = "MODES"
+)
 
+// These constants are healthy defaults for a ProtoCaps type. They were
+// taken from ngircd.
+const (
 	CAPS_DEFAULT_SERVERNAME  = "unknown"
 	CAPS_DEFAULT_IRCDVERSION = "unknown"
 	CAPS_DEFAULT_USERMODES   = "acCiorRswx"
@@ -46,7 +52,8 @@ var (
 	capsRegexp = regexp.MustCompile(`^(?i)([A-Z0-9]+)(?:=([^\s]+))?$`)
 )
 
-// Used to record the server settings, aids in parsing irc protocol.
+// ProtoCaps is used to record the server capabilities, this later aids in
+// parsing irc protocol.
 type ProtoCaps struct {
 	// The server's self-defined name.
 	serverName string
@@ -115,7 +122,7 @@ func CreateProtoCaps() *ProtoCaps {
 	return p
 }
 
-// Safely clones this protocaps instance.
+// Clone safely clones this protocaps instance.
 func (p *ProtoCaps) Clone() *ProtoCaps {
 	clone := *p
 	clone.extras = make(map[string]string)

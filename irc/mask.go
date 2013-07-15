@@ -122,7 +122,7 @@ func (m Mask) GetNick() string {
 	return nick
 }
 
-// GetUser returns the maskname of this mask.
+// GetUsername returns the maskname of this mask.
 func (m Mask) GetUsername() string {
 	_, mask, _ := m.Split()
 	return mask

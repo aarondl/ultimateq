@@ -4,7 +4,7 @@ import (
 	. "launchpad.net/gocheck"
 )
 
-var modes *int = new(int)
+var modes = new(int)
 
 func (s *s) TestChannelUser(c *C) {
 	user := CreateUser("nick")

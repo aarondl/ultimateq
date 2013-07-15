@@ -42,23 +42,22 @@ type UserModeKinds struct {
 // channel modes on a user. Prefix should be in IRC PREFIX style string. Of the
 // form (ov)@+ where the letters map to symbols
 func CreateUserModeKinds(prefix string) (*UserModeKinds, error) {
-	if modes, err := parsePrefixString(prefix); err != nil {
+	modes, err := parsePrefixString(prefix)
+	if err != nil {
 		return nil, err
-	} else {
-		return &UserModeKinds{
-			modeInfo: modes,
-		}, nil
 	}
+
+	return &UserModeKinds{modeInfo: modes}, nil
 }
 
 // UpdateModes updates the internal lookup table. This will invalidate all the
 // modes that were set previously so they should all be wiped out as well.
 func (u *UserModeKinds) UpdateModes(prefix string) error {
-	if update, err := parsePrefixString(prefix); err != nil {
+	update, err := parsePrefixString(prefix)
+	if err != nil {
 		return err
-	} else {
-		u.modeInfo = update
 	}
+	u.modeInfo = update
 	return nil
 }
 
@@ -128,11 +127,11 @@ type ChannelModeKinds struct {
 // CreateChannelModeKindsCSV creates ChannelModeKinds from an IRC CHANMODES csv
 // string. The format of which is ARGS_ADDRESS,ARGS_ALWAYS,ARGS_ONSET,ARGS_NONE
 func CreateChannelModeKindsCSV(kindstr string) (*ChannelModeKinds, error) {
-	if kinds, err := parseChannelModeKindsCSV(kindstr); err != nil {
+	kinds, err := parseChannelModeKindsCSV(kindstr)
+	if err != nil {
 		return nil, err
-	} else {
-		return &ChannelModeKinds{kinds}, nil
 	}
+	return &ChannelModeKinds{kinds}, nil
 }
 
 // CreateChannelModeKinds creates a mode kinds structure taking in a string,
@@ -195,15 +194,14 @@ func (m *ChannelModeKinds) Update(address, always, onset, none string) {
 // UpdateCSV updates the internal lookup table. This will invalidate all the
 // modes that were set previously using this ChannelModeKinds so they should be
 // reset.
-func (m *ChannelModeKinds) UpdateCSV(kindstr string) error {
-	var err error
+func (m *ChannelModeKinds) UpdateCSV(kindstr string) (err error) {
 	var kinds map[rune]int
-	if kinds, err = parseChannelModeKindsCSV(kindstr); err != nil {
-		return err
-	} else {
-		m.kinds = kinds
+	kinds, err = parseChannelModeKindsCSV(kindstr)
+	if err != nil {
+		return
 	}
-	return nil
+	m.kinds = kinds
+	return
 }
 
 // getKind gets the kind of mode and returns it.

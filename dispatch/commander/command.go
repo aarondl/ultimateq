@@ -15,6 +15,8 @@ var (
 
 type argType int
 
+// These are for internal use of the command structure to deal with parsing
+// and storing argument metadata.
 const (
 	REQUIRED argType = 1 << iota
 	OPTIONAL

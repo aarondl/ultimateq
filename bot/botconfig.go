@@ -7,6 +7,8 @@ import (
 
 type configCallback func(*config.Config)
 
+// NewServer is returned from ReplaceConfig to indicate which servers were
+// added and started. Or which one's had errors connecting.
 type NewServer struct {
 	ServerName string
 	server     *Server

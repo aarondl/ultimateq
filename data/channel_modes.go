@@ -207,8 +207,8 @@ func (m *ChannelModes) GetArg(mode rune) string {
 	return m.argModes[mode]
 }
 
-// GetArg returns the addresses for the current mode. Nil if the mode is not
-// set.
+// GetAddresses returns the addresses for the current mode.
+// Nil if the mode is not set.
 func (m *ChannelModes) GetAddresses(mode rune) []string {
 	return m.addressModes[mode]
 }
