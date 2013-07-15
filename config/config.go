@@ -6,7 +6,6 @@ config validation.
 package config
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"regexp"
@@ -150,10 +149,7 @@ func (c *Config) Clone() *Config {
 
 // addError builds an error object and returns it using Sprintf.
 func (c *Config) addError(format string, args ...interface{}) {
-	c.Errors = append(
-		c.Errors,
-		errors.New(fmt.Sprintf(format, args...)),
-	)
+	c.Errors = append(c.Errors, fmt.Errorf(format, args...))
 }
 
 // IsValid checks to see if the configuration is valid. If errors are found in

@@ -1,7 +1,6 @@
 package data
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 )
@@ -66,16 +65,16 @@ func (u *UserModeKinds) UpdateModes(prefix string) error {
 // and unset.
 func parsePrefixString(prefix string) ([][2]rune, error) {
 	if len(prefix) == 0 || prefix[0] != '(' {
-		return nil, errors.New(fmt.Sprintf(fmtErrCouldNotParsePrefix, prefix))
+		return nil, fmt.Errorf(fmtErrCouldNotParsePrefix, prefix)
 	}
 
 	split := strings.IndexRune(prefix, ')')
 	if split < 0 {
-		return nil, errors.New(fmt.Sprintf(fmtErrCouldNotParsePrefix, prefix))
+		return nil, fmt.Errorf(fmtErrCouldNotParsePrefix, prefix)
 	}
 
 	if split-1 > BITS_IN_BYTE {
-		return nil, errors.New(fmt.Sprintf(errMsgMoreThanEight, prefix))
+		return nil, fmt.Errorf(errMsgMoreThanEight, prefix)
 	}
 
 	modes := make([][2]rune, split-1)
@@ -171,12 +170,12 @@ func parseChannelModeKinds(address, always, onset, none string) (
 // string. The format of which is ARGS_ADDRESS,ARGS_ALWAYS,ARGS_ONSET,ARGS_NONE
 func parseChannelModeKindsCSV(kindstr string) (map[rune]int, error) {
 	if len(kindstr) == 0 {
-		return nil, errors.New(fmt.Sprintf(fmtErrCsvParse, kindstr))
+		return nil, fmt.Errorf(fmtErrCsvParse, kindstr)
 	}
 
 	kindSplits := strings.Split(kindstr, ",")
 	if len(kindSplits) != 4 {
-		return nil, errors.New(fmt.Sprintf(fmtErrCsvParse, kindstr))
+		return nil, fmt.Errorf(fmtErrCsvParse, kindstr)
 	}
 
 	return parseChannelModeKinds(

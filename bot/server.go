@@ -146,7 +146,7 @@ func (s *Server) createIrcClient() error {
 	var err error
 
 	if s.client != nil {
-		return errors.New(fmt.Sprintf(errFmtAlreadyConnected, s.name))
+		return fmt.Errorf(errFmtAlreadyConnected, s.name)
 	}
 
 	port := strconv.Itoa(int(s.conf.GetPort()))

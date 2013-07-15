@@ -158,7 +158,7 @@ func (b *Bot) ConnectServer(serverId string) (found bool, err error) {
 // server.
 func (b *Bot) connectServer(srv *Server) (err error) {
 	if srv.IsConnected() {
-		return errors.New(fmt.Sprintf(errFmtAlreadyConnected, srv.name))
+		return fmt.Errorf(errFmtAlreadyConnected, srv.name)
 	}
 	srv.protect.Lock()
 	err = srv.createIrcClient()
