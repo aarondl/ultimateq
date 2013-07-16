@@ -2,9 +2,9 @@ package data
 
 import (
 	"fmt"
-	"github.com/aarondl/ultimateq/irc"
 	"github.com/cznic/kv"
 	"os"
+	"strings"
 	"sync"
 )
 
@@ -90,7 +90,7 @@ func (s *Store) AddUser(ua *UserAccess) error {
 	var err error
 	var serialized []byte
 
-	serialized, err = ua.Serialize()
+	serialized, err = ua.serialize()
 	if err != nil {
 		return err
 	}
@@ -107,6 +107,7 @@ func (s *Store) AddUser(ua *UserAccess) error {
 
 // RemoveUser removes a user from the database, returns true if successful.
 func (s *Store) RemoveUser(username string) (removed bool, err error) {
+	username = strings.ToLower(username)
 	var exists *UserAccess
 	exists, err = s.FindUser(username)
 	if err != nil || exists == nil {
@@ -127,6 +128,7 @@ func (s *Store) RemoveUser(username string) (removed bool, err error) {
 func (s *Store) AuthUser(
 	server, host, username, password string) (*UserAccess, error) {
 
+	username = strings.ToLower(username)
 	var user *UserAccess
 	var ok bool
 	var err error
@@ -148,7 +150,7 @@ func (s *Store) AuthUser(
 		}
 	}
 
-	if len(user.Masks) > 0 && !user.IsMatch(irc.Mask(host)) {
+	if !user.ValidateMask(host) {
 		return nil, AuthError{
 			errFmtBadHost,
 			[]interface{}{host, username},
@@ -180,6 +182,7 @@ func (s *Store) Logout(server, host string) {
 
 // LogoutByUsername logs an authenticated username out.
 func (s *Store) LogoutByUsername(username string) {
+	username = strings.ToLower(username)
 	hosts := make([]string, 0, 1)
 	for host, user := range s.authed {
 		if user.Username == username {
@@ -194,6 +197,7 @@ func (s *Store) LogoutByUsername(username string) {
 
 // FindUser looks up a user based on username. It caches the result if found.
 func (s *Store) FindUser(username string) (user *UserAccess, err error) {
+	username = strings.ToLower(username)
 	// We're writing to cache in a method that should be considered safe by
 	// read-only locked friends, so we have to protect the cache.
 	s.protectCache.Lock()
@@ -216,6 +220,7 @@ func (s *Store) FindUser(username string) (user *UserAccess, err error) {
 
 // fetchUser gets a user from the database based on username.
 func (s *Store) fetchUser(username string) (user *UserAccess, err error) {
+	username = strings.ToLower(username)
 	var serialized []byte
 	serialized, err = s.db.Get(nil, []byte(username))
 	if err != nil || serialized == nil {

@@ -567,7 +567,7 @@ func (c *coreCommands) addmask(d *data.DataEndpoint, cd *cmds.CommandData) (
 		return
 	}
 
-	if access.AddMasks(mask) {
+	if access.AddMask(mask) {
 		internal = store.AddUser(access)
 		if internal != nil {
 			return
@@ -612,7 +612,7 @@ func (c *coreCommands) delmask(d *data.DataEndpoint, cd *cmds.CommandData) (
 		return
 	}
 
-	if access.DelMasks(mask) {
+	if access.DelMask(mask) {
 		internal = store.AddUser(access)
 		if internal != nil {
 			return

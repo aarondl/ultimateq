@@ -3,8 +3,8 @@ package data
 import (
 	"bytes"
 	"fmt"
-	"github.com/aarondl/ultimateq/irc"
 	"regexp"
+	"strings"
 	. "testing"
 )
 
@@ -37,6 +37,10 @@ func TestUserAccess(t *T) {
 	if a != nil || err != errMissingUnameOrPwd {
 		t.Error("Empty password should fail creation.")
 	}
+	a, err = CreateUserAccess(uname, password, "a", "a")
+	if a != nil || err != errDuplicateMask {
+		t.Error("Duplicate masks should generate an error.")
+	}
 }
 
 func TestUserAccess_VerifyPassword(t *T) {
@@ -64,7 +68,7 @@ func TestUserAccess_SerializeDeserialize(t *T) {
 	a.GrantServer(server, 100, "a")
 	a.GrantChannel(server, channel, 100, "a")
 
-	serialized, err := a.Serialize()
+	serialized, err := a.serialize()
 	if err != nil {
 		t.Fatal("Unexpected error:", err)
 	}
@@ -109,9 +113,15 @@ func TestUserAccess_AddMasks(t *T) {
 	if len(a.Masks) != 0 {
 		t.Error("Masks should be empty.")
 	}
-	a.AddMasks(masks...)
-	if len(a.Masks) != 2 || a.Masks[0] != masks[0] || a.Masks[1] != masks[1] {
-		t.Error("Masks should have:", masks)
+
+	if !a.AddMask(masks[0]) && strings.ToLower(masks[0]) != a.Masks[0] {
+		t.Error("The mask was not set correctly.")
+	}
+	if !a.AddMask(masks[1]) && strings.ToLower(masks[1]) != a.Masks[1] {
+		t.Error("The mask was not set correctly.")
+	}
+	if a.AddMask(masks[0]) && len(a.Masks) > 2 {
+		t.Error("The duplicate mask should not be accepted.")
 	}
 }
 
@@ -120,33 +130,34 @@ func TestUserAccess_DelMasks(t *T) {
 	masks := []string{`*!*@host`, `*!user@*`, `nick!*@*`}
 	a := createUserAccess(masks...)
 	if len(a.Masks) != 3 {
-		t.Error("Masks should have:", masks)
+		t.Error("User should have the masks:", masks)
 	}
-	a.DelMasks(masks[1:]...)
+	if !a.DelMask(masks[1]) || a.ValidateMask(masks[1]) {
+		t.Error("The mask should have been deleted.")
+	}
+	if !a.DelMask(masks[2]) || a.ValidateMask(masks[2]) {
+		t.Error("The mask should have been deleted.")
+	}
 	if len(a.Masks) != 1 {
 		t.Error("Two masks should have been deleted.")
 	}
-	for _, mask := range masks[1:] {
-		for _, hasMask := range a.Masks {
-			if mask == hasMask {
-				t.Errorf("Mask %v should have been deleted.", mask)
-			}
-		}
-	}
 }
 
-func TestUserAccess_IsMatch(t *T) {
+func TestUserAccess_ValidateMasks(t *T) {
 	t.Parallel()
-	var wmasks = []string{"*!*@host1", "*!user2@*"}
-	var mask1, mask2 irc.Mask = "nick1!user1@host1", "nick2!user2@host2"
-	a := createUserAccess()
-	if a.IsMatch(mask1) || a.IsMatch(mask2) {
-		t.Error("No masks should match.")
+	masks := []string{`*!*@host`, `*!user@*`}
+	a := createUserAccess(masks[1:]...)
+
+	if a.ValidateMask(masks[0]) {
+		t.Error("Should not have validated this mask.")
+	}
+	if !a.ValidateMask(masks[1]) {
+		t.Error("Should have validated this mask.")
 	}
 
-	a = createUserAccess(wmasks...)
-	if !a.IsMatch(mask1) || !a.IsMatch(mask2) {
-		t.Error(mask1, "and", mask2, "should match")
+	a = createUserAccess(masks[1:]...)
+	if !a.ValidateMask(masks[1]) {
+		t.Error("When masks are empty should validate any mask.")
 	}
 }
 
@@ -331,7 +342,7 @@ func TestUserAccess_GrantServer(t *T) {
 	}
 }
 
-func TestUserAccess_RekoveServer(t *T) {
+func TestUserAccess_RevokeServer(t *T) {
 	t.Parallel()
 	a := createUserAccess()
 	a.GrantServer(server, 100, "abc")
@@ -428,7 +439,7 @@ func TestUserAccess_GrantChannel(t *T) {
 	}
 }
 
-func TestUserAccess_RekoveChannel(t *T) {
+func TestUserAccess_RevokeChannel(t *T) {
 	t.Parallel()
 	a := createUserAccess()
 	a.GrantChannel(server, channel, 100, "abc")
