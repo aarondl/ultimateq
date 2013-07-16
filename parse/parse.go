@@ -37,13 +37,13 @@ func (p ParseError) Error() string {
 // Parse produces an IrcMessage from a byte slice. The string is an irc
 // protocol message, split by \r\n, and \r\n should not be
 // present at the end of the string.
-func Parse(str []byte) (*irc.IrcMessage, error) {
+func Parse(str []byte) (*irc.Message, error) {
 	parts := ircRegex.FindSubmatch(str)
 	if parts == nil {
 		return nil, ParseError{Msg: errMsgParseFailure, Irc: string(str)}
 	}
 
-	msg := &irc.IrcMessage{}
+	msg := &irc.Message{}
 	msg.Sender = string(parts[1])
 	msg.Name = string(parts[2])
 	if len(parts[3]) != 0 {

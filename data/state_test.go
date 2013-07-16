@@ -43,7 +43,7 @@ func (s *s) TestState(c *C) {
 
 	// Should die on creating kinds
 	fakeCaps := &irc.ProtoCaps{}
-	fakeCaps.ParseISupport(&irc.IrcMessage{Args: []string{
+	fakeCaps.ParseISupport(&irc.Message{Args: []string{
 		"NICK", "CHANTYPES=#&", "PREFIX=(ov)@+",
 	}})
 	st, err = CreateState(fakeCaps)
@@ -52,7 +52,7 @@ func (s *s) TestState(c *C) {
 
 	// Should die on creating user modes
 	fakeCaps = &irc.ProtoCaps{}
-	fakeCaps.ParseISupport(&irc.IrcMessage{Args: []string{
+	fakeCaps.ParseISupport(&irc.Message{Args: []string{
 		"NICK", "CHANTYPES=#&", "CHANMODES=a,b,c,d",
 	}})
 	st, err = CreateState(fakeCaps)
@@ -61,7 +61,7 @@ func (s *s) TestState(c *C) {
 
 	// Should die on creating ChannelFinder
 	fakeCaps = &irc.ProtoCaps{}
-	fakeCaps.ParseISupport(&irc.IrcMessage{Args: []string{
+	fakeCaps.ParseISupport(&irc.Message{Args: []string{
 		"NICK", "CHANTYPES=H", "PREFIX=(ov)@+", "CHANMODES=a,b,c,d",
 	}})
 	st, err = CreateState(fakeCaps)
@@ -74,10 +74,10 @@ func (s *s) TestState_UpdateProtoCaps(c *C) {
 	c.Check(err, IsNil)
 
 	fakeCaps := &irc.ProtoCaps{}
-	fakeCaps.ParseISupport(&irc.IrcMessage{Args: []string{
+	fakeCaps.ParseISupport(&irc.Message{Args: []string{
 		"NICK", "CHANTYPES=!", "PREFIX=(q)@", "CHANMODES=,,,q",
 	}})
-	fakeCaps.ParseMyInfo(&irc.IrcMessage{Args: []string{
+	fakeCaps.ParseMyInfo(&irc.Message{Args: []string{
 		"nick", "irc.test.net", "test-12", "q", "abc",
 	}})
 
@@ -322,7 +322,7 @@ func (s *s) TestState_IsOn(c *C) {
 func (s *s) TestState_UpdateNick(c *C) {
 	st, err := CreateState(irc.CreateProtoCaps())
 	c.Check(err, IsNil)
-	m := &irc.IrcMessage{
+	m := &irc.Message{
 		Name:   irc.NICK,
 		Sender: users[0],
 		Args:   []string{nicks[1]},
@@ -361,7 +361,7 @@ func (s *s) TestState_UpdateJoin(c *C) {
 	st, err := CreateState(irc.CreateProtoCaps())
 	st.Self = self
 	c.Check(err, IsNil)
-	m := &irc.IrcMessage{
+	m := &irc.Message{
 		Name:   irc.JOIN,
 		Sender: users[0],
 		Args:   []string{channels[0]},
@@ -385,7 +385,7 @@ func (s *s) TestState_UpdateJoinSelf(c *C) {
 	st, err := CreateState(irc.CreateProtoCaps())
 	st.Self = self
 	c.Check(err, IsNil)
-	m := &irc.IrcMessage{
+	m := &irc.Message{
 		Name:   irc.JOIN,
 		Sender: string(self.mask),
 		Args:   []string{channels[0]},
@@ -403,7 +403,7 @@ func (s *s) TestState_UpdatePart(c *C) {
 	st.Self = self
 	c.Check(err, IsNil)
 
-	m := &irc.IrcMessage{
+	m := &irc.Message{
 		Name:   irc.PART,
 		Sender: users[0],
 		Args:   []string{channels[0]},
@@ -455,7 +455,7 @@ func (s *s) TestState_UpdatePartSelf(c *C) {
 	st, err := CreateState(irc.CreateProtoCaps())
 	st.Self = self
 	c.Check(err, IsNil)
-	m := &irc.IrcMessage{
+	m := &irc.Message{
 		Name:   irc.PART,
 		Sender: string(self.mask),
 		Args:   []string{channels[0]},
@@ -482,7 +482,7 @@ func (s *s) TestState_UpdateQuit(c *C) {
 	st, err := CreateState(irc.CreateProtoCaps())
 	st.Self = self
 	c.Check(err, IsNil)
-	m := &irc.IrcMessage{
+	m := &irc.Message{
 		Name:   irc.QUIT,
 		Sender: users[0],
 		Args:   []string{"quit message"},
@@ -521,7 +521,7 @@ func (s *s) TestState_UpdateKick(c *C) {
 	st, err := CreateState(irc.CreateProtoCaps())
 	st.Self = self
 	c.Check(err, IsNil)
-	m := &irc.IrcMessage{
+	m := &irc.Message{
 		Name:   irc.KICK,
 		Sender: users[1],
 		Args:   []string{channels[0], users[0]},
@@ -542,7 +542,7 @@ func (s *s) TestState_UpdateKickSelf(c *C) {
 	st, err := CreateState(irc.CreateProtoCaps())
 	st.Self = self
 	c.Check(err, IsNil)
-	m := &irc.IrcMessage{
+	m := &irc.Message{
 		Name:   irc.KICK,
 		Sender: users[1],
 		Args:   []string{channels[0], st.Self.GetNick()},
@@ -562,7 +562,7 @@ func (s *s) TestState_UpdateMode(c *C) {
 	st.Self = self
 	c.Check(err, IsNil)
 
-	m := &irc.IrcMessage{
+	m := &irc.Message{
 		Name:   irc.MODE,
 		Sender: users[0],
 		Args: []string{channels[0],
@@ -602,7 +602,7 @@ func (s *s) TestState_UpdateModeSelf(c *C) {
 	st.Self.User = self.User
 	c.Check(err, IsNil)
 
-	m := &irc.IrcMessage{
+	m := &irc.Message{
 		Name:   irc.MODE,
 		Sender: self.GetFullhost(),
 		Args:   []string{self.GetNick(), "+i-o"},
@@ -622,7 +622,7 @@ func (s *s) TestState_UpdateTopic(c *C) {
 	st.Self = self
 	c.Check(err, IsNil)
 
-	m := &irc.IrcMessage{
+	m := &irc.Message{
 		Name:   irc.TOPIC,
 		Sender: users[1],
 		Args:   []string{channels[0], "topic topic"},
@@ -640,7 +640,7 @@ func (s *s) TestState_UpdateRplTopic(c *C) {
 	st.Self = self
 	c.Check(err, IsNil)
 
-	m := &irc.IrcMessage{
+	m := &irc.Message{
 		Name:   irc.RPL_TOPIC,
 		Sender: server,
 		Args:   []string{self.GetNick(), channels[0], "topic topic"},
@@ -657,7 +657,7 @@ func (s *s) TestState_UpdatePrivmsg(c *C) {
 	st, err := CreateState(irc.CreateProtoCaps())
 	st.Self = self
 	c.Check(err, IsNil)
-	m := &irc.IrcMessage{
+	m := &irc.Message{
 		Name:   irc.PRIVMSG,
 		Sender: users[0],
 		Args:   []string{channels[0]},
@@ -681,7 +681,7 @@ func (s *s) TestState_UpdateNotice(c *C) {
 	st, err := CreateState(irc.CreateProtoCaps())
 	st.Self = self
 	c.Check(err, IsNil)
-	m := &irc.IrcMessage{
+	m := &irc.Message{
 		Name:   irc.NOTICE,
 		Sender: users[0],
 		Args:   []string{channels[0]},
@@ -704,7 +704,7 @@ func (s *s) TestState_UpdateNotice(c *C) {
 func (s *s) TestState_UpdateWelcome(c *C) {
 	st, err := CreateState(irc.CreateProtoCaps())
 	c.Check(err, IsNil)
-	m := &irc.IrcMessage{
+	m := &irc.Message{
 		Name:   irc.RPL_WELCOME,
 		Sender: server,
 		Args:   []string{nicks[1], "Welcome to"},
@@ -714,7 +714,7 @@ func (s *s) TestState_UpdateWelcome(c *C) {
 	c.Check(st.Self.GetFullhost(), Equals, nicks[1])
 	c.Check(st.users[nicks[1]].GetFullhost(), Equals, st.Self.GetFullhost())
 
-	m = &irc.IrcMessage{
+	m = &irc.Message{
 		Name:   irc.RPL_WELCOME,
 		Sender: server,
 		Args:   []string{nicks[1], "Welcome to " + users[1]},
@@ -729,7 +729,7 @@ func (s *s) TestState_UpdateRplNamereply(c *C) {
 	st, err := CreateState(irc.CreateProtoCaps())
 	c.Check(err, IsNil)
 
-	m := &irc.IrcMessage{
+	m := &irc.Message{
 		Name:   irc.RPL_NAMREPLY,
 		Sender: server,
 		Args: []string{
@@ -756,7 +756,7 @@ func (s *s) TestState_RplWhoReply(c *C) {
 	st, err := CreateState(irc.CreateProtoCaps())
 	c.Check(err, IsNil)
 
-	m := &irc.IrcMessage{
+	m := &irc.Message{
 		Name:   irc.RPL_WHOREPLY,
 		Sender: server,
 		Args: []string{
@@ -782,7 +782,7 @@ func (s *s) TestState_UpdateRplMode(c *C) {
 	st, err := CreateState(irc.CreateProtoCaps())
 	c.Check(err, IsNil)
 
-	m := &irc.IrcMessage{
+	m := &irc.Message{
 		Name:   irc.RPL_CHANNELMODEIS,
 		Sender: server,
 		Args:   []string{self.GetNick(), channels[0], "+ntzl", "10"},
@@ -799,7 +799,7 @@ func (s *s) TestState_UpdateRplBanlist(c *C) {
 	st.Self = self
 	c.Check(err, IsNil)
 
-	m := &irc.IrcMessage{
+	m := &irc.Message{
 		Name:   irc.RPL_BANLIST,
 		Sender: server,
 		Args: []string{self.GetNick(), channels[0], nicks[0] + "!*@*", nicks[1],

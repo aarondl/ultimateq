@@ -41,7 +41,7 @@ func (t *testPoint) GetKey() string {
 //==============
 func (s *s) TestCoreHandler_Ping(c *C) {
 	handler := coreHandler{}
-	msg := &irc.IrcMessage{
+	msg := &irc.Message{
 		Name: irc.PING,
 		Args: []string{"123123123123"},
 	}
@@ -59,7 +59,7 @@ func (s *s) TestCoreHandler_Connect(c *C) {
 	msg2 := fmt.Sprintf("USER %v 0 * :%v",
 		cnf.GetUsername(), cnf.GetRealname())
 
-	msg := &irc.IrcMessage{Name: irc.CONNECT}
+	msg := &irc.Message{Name: irc.CONNECT}
 	endpoint := makeTestPoint(b.servers[serverId])
 	handler.HandleRaw(msg, endpoint)
 	c.Check(endpoint.gets(), Equals, msg1+msg2)
@@ -70,7 +70,7 @@ func (s *s) TestCoreHandler_Nick(c *C) {
 	c.Check(err, IsNil)
 	cnf := fakeConfig.GetServer(serverId)
 	handler := coreHandler{bot: b}
-	msg := &irc.IrcMessage{Name: irc.ERR_NICKNAMEINUSE}
+	msg := &irc.Message{Name: irc.ERR_NICKNAMEINUSE}
 
 	endpoint := makeTestPoint(b.servers[serverId])
 
@@ -97,13 +97,13 @@ func (s *s) TestCoreHandler_Caps(c *C) {
 	b, err := createBot(fakeConfig, nil, connProvider, nil, true, false)
 	c.Check(err, IsNil)
 
-	msg1 := &irc.IrcMessage{
+	msg1 := &irc.Message{
 		Name: irc.RPL_MYINFO,
 		Args: []string{
 			"NICK", "irc.test.net", "testircd-1.2", "acCior", "beiIklmno",
 		},
 	}
-	msg2 := &irc.IrcMessage{
+	msg2 := &irc.Message{
 		Name: irc.RPL_ISUPPORT,
 		Args: []string{"RFC8213", "CHANTYPES=&$"},
 	}
@@ -127,7 +127,7 @@ func (s *s) TestCoreHandler_Join(c *C) {
 	c.Check(err, IsNil)
 
 	srv.state.Self.User = data.CreateUser("nick!user@host")
-	msg := &irc.IrcMessage{
+	msg := &irc.Message{
 		Name:   irc.JOIN,
 		Sender: srv.state.Self.GetFullhost(),
 		Args:   []string{"#chan"},

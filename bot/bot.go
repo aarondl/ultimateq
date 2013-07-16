@@ -212,7 +212,7 @@ func (b *Bot) startServer(srv *Server, writing, reading bool) {
 		}
 		srv.client.SpawnWorkers(writing, reading)
 
-		b.dispatchMessage(srv, &irc.IrcMessage{Name: irc.CONNECT})
+		b.dispatchMessage(srv, &irc.Message{Name: irc.CONNECT})
 
 		if reading {
 			b.msgDispatchers.Add(1)
@@ -422,7 +422,7 @@ func (b *Bot) dispatchMessages(s *Server) {
 		case msg, ok := <-read:
 			if !ok {
 				log.Printf(errFmtReaderClosed, s.name)
-				b.dispatchMessage(s, &irc.IrcMessage{Name: irc.DISCONNECT})
+				b.dispatchMessage(s, &irc.Message{Name: irc.DISCONNECT})
 				stop, disconnect = true, true
 				break
 			}
@@ -500,7 +500,7 @@ func (b *Bot) Writeln(server, message string) error {
 }
 
 // dispatch sends a message to both the bot's dispatcher and the given servers
-func (b *Bot) dispatchMessage(s *Server, msg *irc.IrcMessage) {
+func (b *Bot) dispatchMessage(s *Server, msg *irc.Message) {
 	b.dispatcher.Dispatch(msg, s.endpoint)
 	s.dispatcher.Dispatch(msg, s.endpoint)
 	b.commander.Dispatch(s.name, msg, s.endpoint.DataEndpoint)

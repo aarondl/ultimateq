@@ -22,7 +22,7 @@ type coreHandler struct {
 
 // HandleRaw implements the dispatch.EventHandler interface so the bot can
 // deal with all irc messages coming in.
-func (c *coreHandler) HandleRaw(msg *irc.IrcMessage, endpoint irc.Endpoint) {
+func (c *coreHandler) HandleRaw(msg *irc.Message, endpoint irc.Endpoint) {
 	switch msg.Name {
 
 	case irc.PING:

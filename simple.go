@@ -148,9 +148,8 @@ func conf(c *config.Config) *config.Config {
 		FloodProtectBurst(5).
 		FloodProtectTimeout(5).
 		FloodProtectStep(2.5).
-		Host("zkpq.ca").
-		Nick("nobody2").
-		Ssl(true).NoVerifyCert(false).SslCertificate("kniocert.pem")
+		Host("localhost").
+		Nick("nobody2")
 
 	return c
 }
@@ -158,16 +157,18 @@ func conf(c *config.Config) *config.Config {
 func main() {
 	log.SetOutput(os.Stdout)
 
-	b, err := bot.CreateBot(bot.ConfigureFunction(conf))
+	b, err := bot.CreateBot(bot.ConfigureFile("config.yaml"))
 	if err != nil {
 		log.Fatalln(err)
 	}
+	defer b.Close()
 
 	b.Register(irc.PRIVMSG, &Handler{})
 
 	ers := b.Connect()
 	if len(ers) != 0 {
-		log.Fatalln(ers)
+		log.Println(ers)
+		return
 	}
 	b.Start()
 
@@ -193,7 +194,6 @@ func main() {
 
 	b.Stop()
 	b.Disconnect()
-	b.Close()
 	log.Println("Shutting down...")
 	<-time.After(1 * time.Second)
 }

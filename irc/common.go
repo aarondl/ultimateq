@@ -232,8 +232,8 @@ type Endpoint interface {
 	Quit(string) error
 }
 
-// IrcMessage contains all the information broken out of an irc message.
-type IrcMessage struct {
+// Message contains all the information broken out of an irc message.
+type Message struct {
 	// Name of the message. Uppercase constant name or numeric.
 	Name string
 	// The server or user that sent the message, a fullhost if one was supplied.
@@ -244,23 +244,20 @@ type IrcMessage struct {
 
 // Split splits string arguments. A convenience method to avoid having to call
 // splits and import strings.
-func (m *IrcMessage) Split(index int) []string {
+func (m *Message) Split(index int) []string {
 	return strings.Split(m.Args[index], ",")
 }
 
-// Message type provides a view around an IrcMessage to access it's parts in a
-// more convenient way.
-type Message struct {
-	// The underlying irc message.
-	*IrcMessage
-}
-
-// Target retrieves the channel or user this message was sent to.
+// Target retrieves the channel or user this message was sent to. Before using
+// this method it would be prudent to check that it's function aligns with the
+// type of message in Message.Name.
 func (p *Message) Target() string {
 	return p.Args[0]
 }
 
-// Message retrieves the message sent to the user or channel.
+// Message retrieves the message sent to the user or channel. Before using
+// this method it would be prudent to check that it's function aligns with the
+// type of message in Message.Name.
 func (p *Message) Message() string {
 	return p.Args[1]
 }

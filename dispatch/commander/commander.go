@@ -196,7 +196,7 @@ func (c *Commander) Unregister(server, cmd string) (found bool) {
 }
 
 // Dispatch dispatches an IrcEvent into the commander's event handlers.
-func (c *Commander) Dispatch(server string, msg *irc.IrcMessage,
+func (c *Commander) Dispatch(server string, msg *irc.Message,
 	ep *data.DataEndpoint) (err error) {
 
 	// Filter non privmsg/notice
@@ -293,7 +293,7 @@ func (c *Commander) Dispatch(server string, msg *irc.IrcMessage,
 	c.HandlerStarted()
 	go func() {
 		defer cmdata.Close()
-		err := command.Handler.Command(cmd, &irc.Message{msg}, ep, cmdata)
+		err := command.Handler.Command(cmd, msg, ep, cmdata)
 		if err != nil {
 			ep.Notice(nick, err.Error())
 		}
@@ -306,7 +306,7 @@ func (c *Commander) Dispatch(server string, msg *irc.IrcMessage,
 // filterAccess ensures that a user has the correct access to perform the given
 // command.
 func filterAccess(store *data.Store, command *Command, server, channel string,
-	ep *data.DataEndpoint, msg *irc.IrcMessage) (*data.UserAccess, error) {
+	ep *data.DataEndpoint, msg *irc.Message) (*data.UserAccess, error) {
 
 	hasLevel := command.ReqLevel != 0
 	hasFlags := len(command.ReqFlags) != 0

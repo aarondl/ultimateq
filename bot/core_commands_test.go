@@ -58,19 +58,19 @@ func commandsSetup(t *T) *tSetup {
 	buf := &bytes.Buffer{}
 	srv.endpoint.Writer = buf
 
-	srv.state.Update(&irc.IrcMessage{
+	srv.state.Update(&irc.Message{
 		Sender: serverId, Name: irc.RPL_WELCOME,
 		Args: []string{"Welcome", bothost},
 	})
-	srv.state.Update(&irc.IrcMessage{
+	srv.state.Update(&irc.Message{
 		Sender: bothost, Name: irc.JOIN,
 		Args: []string{channel},
 	})
-	srv.state.Update(&irc.IrcMessage{
+	srv.state.Update(&irc.Message{
 		Sender: u1host, Name: irc.JOIN,
 		Args: []string{channel},
 	})
-	srv.state.Update(&irc.IrcMessage{
+	srv.state.Update(&irc.Message{
 		Sender: u2host, Name: irc.PRIVMSG,
 		Args: []string{botnick, "hithere"},
 	})
@@ -95,7 +95,7 @@ func rspChk(ts *tSetup, expected, sender string, args ...string) error {
 
 func prvRspChk(ts *tSetup, expected, to, sender string, args ...string) error {
 	ts.buffer.Reset()
-	err := ts.b.commander.Dispatch(serverId, &irc.IrcMessage{
+	err := ts.b.commander.Dispatch(serverId, &irc.Message{
 		Name: irc.PRIVMSG, Sender: sender,
 		Args: []string{to, strings.Join(args, " ")},
 	}, ts.ep)
@@ -495,7 +495,7 @@ func TestCoreCommands_Masks(t *T) {
 	defer commandsTeardown(ts, t)
 
 	other := "other!other@other"
-	ts.state.Update(&irc.IrcMessage{
+	ts.state.Update(&irc.Message{
 		Name: irc.PRIVMSG, Sender: other,
 		Args: []string{botnick}},
 	)

@@ -259,7 +259,7 @@ func (p *ProtoCaps) Extra(key string) string {
 }
 
 // ParseISupport adds all values in a 005 to the current protocaps object.
-func (p *ProtoCaps) ParseISupport(m *IrcMessage) {
+func (p *ProtoCaps) ParseISupport(m *Message) {
 	p.protect.Lock()
 	defer p.protect.Unlock()
 
@@ -335,7 +335,7 @@ func (p *ProtoCaps) ParseISupport(m *IrcMessage) {
 }
 
 // ParseMyInfo adds all values in a 005 to the current protocaps object.
-func (p *ProtoCaps) ParseMyInfo(m *IrcMessage) {
+func (p *ProtoCaps) ParseMyInfo(m *Message) {
 	p.protect.Lock()
 	defer p.protect.Unlock()
 

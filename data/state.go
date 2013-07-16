@@ -342,7 +342,7 @@ func (s *State) removeFromChannel(nickorhost, channel string) {
 }
 
 // Update uses the irc.IrcMessage to modify the database accordingly.
-func (s *State) Update(m *irc.IrcMessage) {
+func (s *State) Update(m *irc.Message) {
 	if len(m.Sender) > 0 {
 		s.addUser(m.Sender)
 	}
@@ -381,7 +381,7 @@ func (s *State) Update(m *irc.IrcMessage) {
 }
 
 // nick alters the state of the database when a NICK message is received.
-func (s *State) nick(m *irc.IrcMessage) {
+func (s *State) nick(m *irc.Message) {
 	nick, username, host := irc.Mask(m.Sender).Split()
 	newnick := m.Args[0]
 	newuser := irc.Mask(newnick + "!" + username + "@" + host)
@@ -405,7 +405,7 @@ func (s *State) nick(m *irc.IrcMessage) {
 }
 
 // join alters the state of the database when a JOIN message is received.
-func (s *State) join(m *irc.IrcMessage) {
+func (s *State) join(m *irc.Message) {
 	if m.Sender == s.Self.GetFullhost() {
 		s.addChannel(m.Args[0])
 	}
@@ -413,7 +413,7 @@ func (s *State) join(m *irc.IrcMessage) {
 }
 
 // part alters the state of the database when a PART message is received.
-func (s *State) part(m *irc.IrcMessage) {
+func (s *State) part(m *irc.Message) {
 	if m.Sender == s.Self.GetFullhost() {
 		s.removeChannel(m.Args[0])
 	} else {
@@ -422,14 +422,14 @@ func (s *State) part(m *irc.IrcMessage) {
 }
 
 // quit alters the state of the database when a QUIT message is received.
-func (s *State) quit(m *irc.IrcMessage) {
+func (s *State) quit(m *irc.Message) {
 	if m.Sender != s.Self.GetFullhost() {
 		s.removeUser(m.Sender)
 	}
 }
 
 // kick alters the state of the database when a KICK message is received.
-func (s *State) kick(m *irc.IrcMessage) {
+func (s *State) kick(m *irc.Message) {
 	if m.Args[1] == s.Self.GetNick() {
 		s.removeChannel(m.Args[0])
 	} else {
@@ -438,7 +438,7 @@ func (s *State) kick(m *irc.IrcMessage) {
 }
 
 // mode alters the state of the database when a MODE message is received.
-func (s *State) mode(m *irc.IrcMessage) {
+func (s *State) mode(m *irc.Message) {
 	target := strings.ToLower(m.Args[0])
 	if s.cfinder.IsChannel(target) {
 		if ch, ok := s.channels[target]; ok {
@@ -458,7 +458,7 @@ func (s *State) mode(m *irc.IrcMessage) {
 }
 
 // topic alters the state of the database when a TOPIC message is received.
-func (s *State) topic(m *irc.IrcMessage) {
+func (s *State) topic(m *irc.Message) {
 	chname := strings.ToLower(m.Args[0])
 	if ch, ok := s.channels[chname]; ok {
 		ch.Topic(m.Args[1])
@@ -467,7 +467,7 @@ func (s *State) topic(m *irc.IrcMessage) {
 
 // rplTopic alters the state of the database when a RPL_TOPIC message is
 // received.
-func (s *State) rplTopic(m *irc.IrcMessage) {
+func (s *State) rplTopic(m *irc.Message) {
 	chname := strings.ToLower(m.Args[1])
 	if ch, ok := s.channels[chname]; ok {
 		ch.Topic(m.Args[2])
@@ -476,7 +476,7 @@ func (s *State) rplTopic(m *irc.IrcMessage) {
 
 // msg alters the state of the database when a PRIVMSG or NOTICE message is
 // received.
-func (s *State) msg(m *irc.IrcMessage) {
+func (s *State) msg(m *irc.Message) {
 	if s.cfinder.IsChannel(m.Args[0]) {
 		s.addToChannel(m.Sender, m.Args[0])
 	}
@@ -484,7 +484,7 @@ func (s *State) msg(m *irc.IrcMessage) {
 
 // rplWelcome alters the state of the database when a RPL_WELCOME message is
 // received.
-func (s *State) rplWelcome(m *irc.IrcMessage) {
+func (s *State) rplWelcome(m *irc.Message) {
 	splits := strings.Fields(m.Args[1])
 	host := splits[len(splits)-1]
 
@@ -498,7 +498,7 @@ func (s *State) rplWelcome(m *irc.IrcMessage) {
 
 // rplNameReply alters the state of the database when a RPL_NAMEREPLY
 // message is received.
-func (s *State) rplNameReply(m *irc.IrcMessage) {
+func (s *State) rplNameReply(m *irc.Message) {
 	channel := m.Args[2]
 	users := strings.Fields(m.Args[3])
 	for i := 0; i < len(users); i++ {
@@ -524,7 +524,7 @@ func (s *State) rplNameReply(m *irc.IrcMessage) {
 
 // rplWhoReply alters the state of the database when a RPL_WHOREPLY message
 // is received.
-func (s *State) rplWhoReply(m *irc.IrcMessage) {
+func (s *State) rplWhoReply(m *irc.Message) {
 	channel := m.Args[1]
 	fullhost := m.Args[5] + "!" + m.Args[2] + "@" + m.Args[3]
 	modes := m.Args[6]
@@ -542,7 +542,7 @@ func (s *State) rplWhoReply(m *irc.IrcMessage) {
 
 // rplChannelModeIs alters the state of the database when a RPL_CHANNELMODEIS
 // message is received.
-func (s *State) rplChannelModeIs(m *irc.IrcMessage) {
+func (s *State) rplChannelModeIs(m *irc.Message) {
 	channel := m.Args[1]
 	modes := strings.Join(m.Args[2:], " ")
 	s.GetChannel(channel).Apply(modes)
@@ -550,7 +550,7 @@ func (s *State) rplChannelModeIs(m *irc.IrcMessage) {
 
 // rplBanList alters the state of the database when a RPL_BANLIST message is
 // received.
-func (s *State) rplBanList(m *irc.IrcMessage) {
+func (s *State) rplBanList(m *irc.Message) {
 	channel := m.Args[1]
 	s.GetChannel(channel).AddBan(m.Args[2])
 }

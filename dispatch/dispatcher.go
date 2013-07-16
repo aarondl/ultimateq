@@ -11,7 +11,7 @@ import (
 // as a raw IrcMessage event. However there are other message types are specific
 // to very common irc events that are more helpful than this interface.
 type EventHandler interface {
-	HandleRaw(event *irc.IrcMessage, endpoint irc.Endpoint)
+	HandleRaw(event *irc.Message, endpoint irc.Endpoint)
 }
 
 type (
@@ -79,7 +79,7 @@ func (d *Dispatcher) Unregister(event string, id int) bool {
 // Dispatch an IrcMessage to event handlers handling event also ensures all raw
 // handlers receive all messages. Returns false if no eventtable was found for
 // the primary sent event.
-func (d *Dispatcher) Dispatch(msg *irc.IrcMessage, ep irc.Endpoint) bool {
+func (d *Dispatcher) Dispatch(msg *irc.Message, ep irc.Endpoint) bool {
 	event := strings.ToUpper(msg.Name)
 
 	d.protectEvents.RLock()
@@ -94,7 +94,7 @@ func (d *Dispatcher) Dispatch(msg *irc.IrcMessage, ep irc.Endpoint) bool {
 // dispatchHelper locates a handler and attempts to resolve it with
 // resolveHandler. It returns true if it was able to find an event table.
 func (d *Dispatcher) dispatchHelper(event string,
-	msg *irc.IrcMessage, ep irc.Endpoint) bool {
+	msg *irc.Message, ep irc.Endpoint) bool {
 
 	if evtable, ok := d.events[event]; ok {
 		for _, handler := range evtable {
@@ -110,7 +110,7 @@ func (d *Dispatcher) dispatchHelper(event string,
 // real type, coerces the IrcMessage in whatever way necessary and then
 // calls that handlers primary dispatch method with the coerced message.
 func (d *Dispatcher) resolveHandler(
-	handler interface{}, event string, msg *irc.IrcMessage, ep irc.Endpoint) {
+	handler interface{}, event string, msg *irc.Message, ep irc.Endpoint) {
 
 	var handled bool
 	switch msg.Name {
@@ -131,18 +131,18 @@ func (d *Dispatcher) resolveHandler(
 // dispatchPrivmsg dispatches only a private message. Returns true if the
 // event was handled.
 func (d *Dispatcher) dispatchPrivmsg(
-	handler interface{}, msg *irc.IrcMessage, ep irc.Endpoint) (handled bool) {
+	handler interface{}, msg *irc.Message, ep irc.Endpoint) (handled bool) {
 
 	if channelHandler, ok := handler.(PrivmsgChannelHandler); ok &&
 		d.shouldDispatch(true, msg.Args[0]) {
-		channelHandler.PrivmsgChannel(&irc.Message{msg}, ep)
+		channelHandler.PrivmsgChannel(msg, ep)
 		handled = true
 	} else if userHandler, ok := handler.(PrivmsgUserHandler); ok &&
 		d.shouldDispatch(false, msg.Args[0]) {
-		userHandler.PrivmsgUser(&irc.Message{msg}, ep)
+		userHandler.PrivmsgUser(msg, ep)
 		handled = true
 	} else if privmsgHandler, ok := handler.(PrivmsgHandler); ok {
-		privmsgHandler.Privmsg(&irc.Message{msg}, ep)
+		privmsgHandler.Privmsg(msg, ep)
 		handled = true
 	}
 	return
@@ -151,18 +151,18 @@ func (d *Dispatcher) dispatchPrivmsg(
 // dispatchNotice dispatches only a notice message. Returns true if the
 // event was handled.
 func (d *Dispatcher) dispatchNotice(
-	handler interface{}, msg *irc.IrcMessage, ep irc.Endpoint) (handled bool) {
+	handler interface{}, msg *irc.Message, ep irc.Endpoint) (handled bool) {
 
 	if channelHandler, ok := handler.(NoticeChannelHandler); ok &&
 		d.shouldDispatch(true, msg.Args[0]) {
-		channelHandler.NoticeChannel(&irc.Message{msg}, ep)
+		channelHandler.NoticeChannel(msg, ep)
 		handled = true
 	} else if userHandler, ok := handler.(NoticeUserHandler); ok &&
 		d.shouldDispatch(false, msg.Args[0]) {
-		userHandler.NoticeUser(&irc.Message{msg}, ep)
+		userHandler.NoticeUser(msg, ep)
 		handled = true
 	} else if noticeHandler, ok := handler.(NoticeHandler); ok {
-		noticeHandler.Notice(&irc.Message{msg}, ep)
+		noticeHandler.Notice(msg, ep)
 		handled = true
 	}
 	return

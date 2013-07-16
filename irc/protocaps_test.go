@@ -16,17 +16,17 @@ var (
 	_s2 = `NICK CHANNELLEN=49 NICKLEN=8 TOPICLEN=489 AWAYLEN=126 KICKLEN=399 ` +
 		`MODES=4 MAXLIST=beI:49 EXCEPTS=e INVEX=I PENALTY`
 
-	capsTest0 = &IrcMessage{
+	capsTest0 = &Message{
 		Name:   RPL_MYINFO,
 		Args:   strings.Split(_s0, " "),
 		Sender: serverId,
 	}
-	capsTest1 = &IrcMessage{
+	capsTest1 = &Message{
 		Name:   RPL_ISUPPORT,
 		Args:   append(strings.Split(_s1, " "), "are supported by this server"),
 		Sender: serverId,
 	}
-	capsTest2 = &IrcMessage{
+	capsTest2 = &Message{
 		Name:   RPL_ISUPPORT,
 		Args:   append(strings.Split(_s2, " "), "are supported by this server"),
 		Sender: serverId,
@@ -81,10 +81,10 @@ func (s *s) TestProtoCaps_Merge(c *C) {
 	p1 := CreateProtoCaps()
 	p2 := CreateProtoCaps()
 
-	mergeTest1 := &IrcMessage{
+	mergeTest1 := &Message{
 		Args: []string{"NICK", "CHANTYPES=#&"},
 	}
-	mergeTest2 := &IrcMessage{
+	mergeTest2 := &Message{
 		Args: []string{"NICK", "CHANTYPES=~"},
 	}
 

@@ -22,7 +22,7 @@ func (s *s) TestDispatchCore(c *C) {
 	c.Check(err, Equals, errProtoCapsMissing)
 
 	p := irc.CreateProtoCaps()
-	p.ParseISupport(&irc.IrcMessage{Args: []string{"nick", "CHANTYPES=H"}})
+	p.ParseISupport(&irc.Message{Args: []string{"nick", "CHANTYPES=H"}})
 	d, err = CreateDispatchCore(p)
 	c.Check(err, NotNil)
 }
@@ -114,7 +114,7 @@ func (s *s) TestDispatchCore_UpdateChannels(c *C) {
 
 func (s *s) TestDispatchCore_UpdateProtoCaps(c *C) {
 	p := irc.CreateProtoCaps()
-	p.ParseISupport(&irc.IrcMessage{Args: []string{"nick", "CHANTYPES=#"}})
+	p.ParseISupport(&irc.Message{Args: []string{"nick", "CHANTYPES=#"}})
 	d, err := CreateDispatchCore(p)
 	c.Check(err, IsNil)
 	var isChan bool
@@ -124,7 +124,7 @@ func (s *s) TestDispatchCore_UpdateProtoCaps(c *C) {
 	c.Check(isChan, Equals, false)
 
 	p = irc.CreateProtoCaps()
-	p.ParseISupport(&irc.IrcMessage{Args: []string{"nick", "CHANTYPES=&"}})
+	p.ParseISupport(&irc.Message{Args: []string{"nick", "CHANTYPES=&"}})
 	err = d.Protocaps(p)
 	c.Check(err, IsNil)
 	isChan, _ = d.CheckTarget("#chan")

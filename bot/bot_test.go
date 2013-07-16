@@ -23,10 +23,10 @@ type s struct{}
 var _ = Suite(&s{})
 
 type testHandler struct {
-	callback func(*irc.IrcMessage, irc.Endpoint)
+	callback func(*irc.Message, irc.Endpoint)
 }
 
-func (h testHandler) HandleRaw(m *irc.IrcMessage, send irc.Endpoint) {
+func (h testHandler) HandleRaw(m *irc.Message, send irc.Endpoint) {
 	if h.callback != nil {
 		h.callback(m, send)
 	}
@@ -267,7 +267,7 @@ func (s *s) TestBot_Dispatching(c *C) {
 	b, err := createBot(fakeConfig, nil, connProvider, nil, false, false)
 
 	b.Register(irc.PRIVMSG, &testHandler{
-		func(_ *irc.IrcMessage, _ irc.Endpoint) {
+		func(_ *irc.Message, _ irc.Endpoint) {
 			waiter.Done()
 		},
 	})
@@ -388,7 +388,7 @@ func (s *s) TestBot_Providers(c *C) {
 
 	capsProv := func() *irc.ProtoCaps {
 		p := irc.CreateProtoCaps()
-		p.ParseISupport(&irc.IrcMessage{Args: []string{"nick", "CHANTYPES=H"}})
+		p.ParseISupport(&irc.Message{Args: []string{"nick", "CHANTYPES=H"}})
 		return p
 	}
 	badConnProv := func(s string) (net.Conn, error) {

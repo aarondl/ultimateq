@@ -130,7 +130,7 @@ func (s *s) TestServer_Write(c *C) {
 
 func (s *s) TestServer_rehashProtocaps(c *C) {
 	originalCaps := irc.CreateProtoCaps()
-	originalCaps.ParseISupport(&irc.IrcMessage{Args: []string{
+	originalCaps.ParseISupport(&irc.Message{Args: []string{
 		"NICK", "CHANTYPES=!",
 	}})
 	capsProv := func() *irc.ProtoCaps {
@@ -143,7 +143,7 @@ func (s *s) TestServer_rehashProtocaps(c *C) {
 
 	c.Check(srv.caps.Chantypes(), Equals, "!")
 
-	srv.caps.ParseISupport(&irc.IrcMessage{Args: []string{
+	srv.caps.ParseISupport(&irc.Message{Args: []string{
 		"NICK", "CHANTYPES=#",
 	}})
 	err = srv.rehashProtocaps()

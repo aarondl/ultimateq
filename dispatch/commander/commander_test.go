@@ -106,15 +106,15 @@ func setup() (state *data.State, store *data.Store) {
 		panic(err)
 	}
 
-	state.Update(&irc.IrcMessage{
+	state.Update(&irc.Message{
 		Sender: server, Name: irc.RPL_WELCOME,
 		Args: []string{"welcome", self},
 	})
-	state.Update(&irc.IrcMessage{
+	state.Update(&irc.Message{
 		Sender: self, Name: irc.JOIN,
 		Args: []string{channel},
 	})
-	state.Update(&irc.IrcMessage{
+	state.Update(&irc.Message{
 		Sender: host, Name: irc.JOIN,
 		Args: []string{channel},
 	})
@@ -458,7 +458,7 @@ func TestCommander_Dispatch(t *T) {
 			continue
 		}
 
-		msg := &irc.IrcMessage{
+		msg := &irc.Message{
 			Sender: host,
 			Name:   test.Name,
 			Args:   test.MsgArgs,
@@ -582,7 +582,7 @@ func TestCommander_DispatchAuthed(t *T) {
 			continue
 		}
 
-		msg := &irc.IrcMessage{
+		msg := &irc.Message{
 			Sender: test.Sender,
 			Name:   irc.PRIVMSG,
 			Args:   []string{channel, string(prefix) + cmd},
@@ -659,7 +659,7 @@ func TestCommander_DispatchNils(t *T) {
 	var dataEndpoint = data.CreateDataEndpoint(server, buffer, nil, nil,
 		&stateMutex, &storeMutex)
 
-	msg := &irc.IrcMessage{
+	msg := &irc.Message{
 		Sender: host,
 		Name:   irc.PRIVMSG,
 		Args:   []string{channel, string(prefix) + cmd},
@@ -710,7 +710,7 @@ func TestCommander_DispatchReturns(t *T) {
 	var dataEndpoint = data.CreateDataEndpoint(server, buffer, nil, nil,
 		&stateMutex, &storeMutex)
 
-	msg := &irc.IrcMessage{
+	msg := &irc.Message{
 		Sender: host,
 		Name:   irc.PRIVMSG,
 		Args:   []string{channel, string(prefix) + cmd},
@@ -768,7 +768,7 @@ func TestCommander_DispatchChannel(t *T) {
 	var dataEndpoint = data.CreateDataEndpoint(server, buffer, state, store,
 		&stateMutex, &storeMutex)
 
-	msg := &irc.IrcMessage{
+	msg := &irc.Message{
 		Sender: host, Name: irc.PRIVMSG,
 	}
 
@@ -874,7 +874,7 @@ func TestCommander_DispatchUsers(t *T) {
 	var dataEndpoint = data.CreateDataEndpoint(server, buffer, state, store,
 		&stateMutex, &storeMutex)
 
-	msg := &irc.IrcMessage{
+	msg := &irc.Message{
 		Sender: host, Name: irc.PRIVMSG,
 	}
 
@@ -972,7 +972,7 @@ func TestCommander_DispatchErrors(t *T) {
 	var dataEndpoint = data.CreateDataEndpoint(server, buffer, state, store,
 		&stateMutex, &storeMutex)
 
-	msg := &irc.IrcMessage{
+	msg := &irc.Message{
 		Sender: host, Name: irc.PRIVMSG,
 	}
 
@@ -1077,7 +1077,7 @@ func TestCommander_DispatchVariadicUsers(t *T) {
 	var dataEndpoint = data.CreateDataEndpoint(server, buffer, state, store,
 		&stateMutex, &storeMutex)
 
-	msg := &irc.IrcMessage{
+	msg := &irc.Message{
 		Sender: host, Name: irc.PRIVMSG,
 	}
 
@@ -1162,7 +1162,7 @@ func TestCommander_DispatchMixUserAndChan(t *T) {
 	var dataEndpoint = data.CreateDataEndpoint(server, buffer, state, store,
 		&stateMutex, &storeMutex)
 
-	msg := &irc.IrcMessage{
+	msg := &irc.Message{
 		Sender: host, Name: irc.PRIVMSG,
 	}
 
