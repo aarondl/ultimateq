@@ -48,13 +48,20 @@ irc bot. It also provides some validation, and file reading/writing.
 
 ###parse
 This package deals with parsing irc protocols. It is able to consume irc
-protocol messages using the Parse method, returning the common IrcMessage
+protocol messages using the Parse method, returning the common irc.Message
 type from the irc package.
 
 ###dispatch
-Dispatch package is meant to register callbacks and dispatch IrcMessages onto
+Dispatch package is meant to register callbacks and dispatch irc.Messages onto
 them in an asynchronous method. It also presents many handler types that will
 be easy to use for bot-writers.
+
+###dispatch/commander
+Commander package is a much more involved version of the dispatcher. Instead of
+simply responding to irc raw messages, the commander parses arguments, handles
+user authentication and privelege checks. It can also do advanced argument
+handling such as returning a user message's target channels or users from the
+command.
 
 ###inet
 Implements the actual connection to an irc server, handles buffering, \r\n
