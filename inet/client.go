@@ -145,6 +145,8 @@ func (c *IrcClient) calcSleepTime(t time.Time) time.Duration {
 func (c *IrcClient) pump() {
 	var err error
 	var sleeper <-chan time.Time
+	var pinger <- chan time.Time
+	pinger = time.After(30 * time.Second)
 	defer close(c.pumpservice)
 
 	for err == nil {
@@ -182,6 +184,11 @@ func (c *IrcClient) pump() {
 			} else {
 				sleeper = nil
 			}
+		case <- pinger:
+			if err = c.writeMessage([]byte("PING :ghostcheck\r\n")); err != nil {
+				break
+			}
+			pinger = time.After(30 * time.Second)
 		case <-c.killpump:
 			log.Printf(fmtErrPumpClosed, c.name, errMsgShutdown)
 			return
