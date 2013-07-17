@@ -26,9 +26,9 @@ func init() {
 	}
 }
 
-func (s *s) TestCreateIrcClient(c *C) {
+func (s *s) TestcreateIrcClient(c *C) {
 	conn := mocks.CreateConn()
-	client := CreateIrcClient(conn, "name")
+	client := createIrcClient(conn, "name")
 	c.Check(client.isShutdown, Equals, false)
 	c.Check(client.conn, Equals, conn)
 	c.Check(client.siphonchan, NotNil)
@@ -39,14 +39,14 @@ func (s *s) TestCreateIrcClient(c *C) {
 }
 
 func (s *s) TestIrcClient_ImplementsReadWriteCloser(c *C) {
-	client := CreateIrcClient(nil, "")
+	client := createIrcClient(nil, "")
 	c.Check(client, FitsTypeOf, io.ReadWriteCloser(client))
 }
 
 func (s *s) TestIrcClient_SpawnWorkers(c *C) {
 	conn := mocks.CreateConn()
 
-	client := CreateIrcClient(conn, "")
+	client := createIrcClient(conn, "")
 	c.Check(client.IsClosed(), Equals, false)
 	client.SpawnWorkers(true, true)
 	c.Check(client.IsClosed(), Equals, false)
@@ -61,7 +61,7 @@ func (s *s) TestIrcClient_Pump(c *C) {
 	split := 2
 
 	conn := mocks.CreateConn()
-	client := CreateIrcClient(conn, "")
+	client := createIrcClient(conn, "")
 
 	fakelast := time.Now().Truncate(5 * time.Hour)
 	client.SpawnWorkers(true, false)
@@ -83,7 +83,7 @@ func (s *s) TestIrcClient_Pump(c *C) {
 	conn.ResetDeath()
 
 	//Shameful test coverage
-	client = CreateIrcClient(conn, "")
+	client = createIrcClient(conn, "")
 	client.SpawnWorkers(true, false)
 	client.Write(test1)
 	c.Check(bytes.Compare(conn.Receive(0, io.EOF), test1), Equals, 0)
@@ -96,7 +96,7 @@ func (s *s) TestIrcClient_PumpTimeouts(c *C) {
 	test1 := []byte("PRIVMSG :arg1 arg2\r\n")
 
 	conn := mocks.CreateConn()
-	client := CreateIrcClientFloodProtect(conn, "", 5, 5, 5, time.Millisecond)
+	client := CreateIrcClient(conn, "", 5, 5, 5, false, time.Millisecond)
 	client.SpawnWorkers(true, false)
 
 	go func() {
@@ -123,7 +123,7 @@ func (s *s) TestIrcClient_Siphon(c *C) {
 	buf := append(append(append([]byte{}, test1...), test2...), test3...)
 
 	conn := mocks.CreateConn()
-	client := CreateIrcClient(conn, "")
+	client := createIrcClient(conn, "")
 	ch := client.ReadChannel()
 	client.SpawnWorkers(false, true)
 
@@ -142,7 +142,7 @@ func (s *s) TestIrcClient_Siphon(c *C) {
 	conn.WaitForDeath()
 	conn.ResetDeath()
 
-	client = CreateIrcClient(conn, "")
+	client = createIrcClient(conn, "")
 	client.SpawnWorkers(false, true)
 	go func() { conn.Send(buf, len(buf), nil) }()
 	client.Close()
@@ -158,7 +158,7 @@ func (s *s) TestIrcClient_ExtractMessages(c *C) {
 	waiter := sync.WaitGroup{}
 	waiter.Add(1)
 
-	client := CreateIrcClient(nil, "")
+	client := createIrcClient(nil, "")
 	ret := 0
 
 	go func() {
@@ -202,7 +202,7 @@ func (s *s) TestIrcClient_ExtractMessages(c *C) {
 func (s *s) TestIrcClient_Close(c *C) {
 	conn := mocks.CreateConn()
 
-	client := CreateIrcClient(conn, "")
+	client := createIrcClient(conn, "")
 
 	go func() {
 		err := client.Close()
@@ -217,7 +217,7 @@ func (s *s) TestIrcClient_Close(c *C) {
 }
 
 func (s *s) TestIrcClient_ReadMessage(c *C) {
-	client := CreateIrcClient(nil, "")
+	client := createIrcClient(nil, "")
 	read := []byte("PRIVMSG #chan :msg")
 	go func() {
 		client.siphonchan <- read
@@ -231,7 +231,7 @@ func (s *s) TestIrcClient_ReadMessage(c *C) {
 }
 
 func (s *s) TestIrcClient_Read(c *C) {
-	client := CreateIrcClient(nil, "")
+	client := createIrcClient(nil, "")
 	read := []byte("PRIVMSG #chan :msg")
 	go func() {
 		client.siphonchan <- read
@@ -259,7 +259,7 @@ func (s *s) TestIrcClient_Write(c *C) {
 	test1 := []byte("PRIVMSG #chan :msg\r\n")
 	test2 := []byte("PRIVMSG #chan :msg2")
 
-	client := CreateIrcClient(nil, "")
+	client := createIrcClient(nil, "")
 	ch := make(chan []byte)
 	go func() {
 		arg := append(test1, test2...)
@@ -282,14 +282,48 @@ func (s *s) TestIrcClient_Write(c *C) {
 	c.Check(err, Equals, io.EOF)
 }
 
+func (s *s) TestIrcClient_Keepalive(c *C) {
+	// Check not throttled
+	conn := mocks.CreateConn()
+	client := CreateIrcClient(conn, "", 5, 5, 5, true, time.Millisecond)
+	client.SpawnWorkers(true, false)
+	msg := conn.Receive(len(ping), io.EOF)
+	c.Check(bytes.Compare(msg, ping), Equals, 0)
+	client.Close()
+
+	// Check throttled
+	conn = mocks.CreateConn()
+	client = CreateIrcClient(conn, "", 1, 10000, 40, true, time.Millisecond)
+
+	test := []byte("test")
+	client.lastwrite = time.Now()
+	client.nThrottled = 20
+	client.queue.Enqueue(test)
+
+	go func() {
+		<-client.pumpservice <- test
+	}()
+
+	client.SpawnWorkers(true, false)
+
+	msg = conn.Receive(len(test), nil)
+	c.Check(bytes.Compare(msg, test), Equals, 0)
+	msg = conn.Receive(len(test), nil)
+	c.Check(bytes.Compare(msg, test), Equals, 0)
+
+	msg = conn.Receive(len(ping), io.EOF)
+	c.Check(bytes.Compare(msg, ping), Equals, 0)
+	client.Close()
+}
+
 func (s *s) TestIrcClient_calcSleepTime(c *C) {
 	var sleep time.Duration
-	client := CreateIrcClient(nil, "")
+	client := createIrcClient(nil, "")
 
 	sleep = client.calcSleepTime(time.Now())
 	c.Check(sleep, Equals, time.Duration(0))
 
-	client = CreateIrcClientFloodProtect(nil, "", 5, 5, 5, time.Second)
+	client = CreateIrcClient(nil, "", 5, 5, 5, false, time.Second)
 	client.lastwrite = time.Now()
 	for i := 1; i <= 5; i++ {
 		sleep = client.calcSleepTime(time.Now())
@@ -300,13 +334,12 @@ func (s *s) TestIrcClient_calcSleepTime(c *C) {
 	c.Check(sleep, Not(Equals), time.Duration(0))
 
 	// Check no-sleep and negative cases
-	client = CreateIrcClientFloodProtect(nil, "", 5, 5, 5, time.Second)
+	client = CreateIrcClient(nil, "", 5, 5, 5, false, time.Second)
 	client.lastwrite = time.Now()
 	sleep = client.calcSleepTime(time.Time{})
 	c.Check(sleep, Equals, time.Duration(0))
 	sleep = client.calcSleepTime(time.Now().Add(5 * time.Hour))
 	c.Check(sleep, Equals, time.Duration(0))
-
 }
 
 func (s *s) TestfindChunks(c *C) {

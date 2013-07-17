@@ -20,11 +20,15 @@ const (
 	nBufferedWrites = 25
 	// defaultTimeScale is the default scale of the sleeps and timeouts.
 	defaultTimeScale = time.Second
+	// pingInterval is the interval between pings.
+	pingInterval = 30
 )
 
 var (
 	// pong allows replies from pong to write directly without waiting on sleeps
 	pong = []byte("PONG")
+	// ping is a constant message that is sent to keep the connection alive
+	ping = []byte("PING :ping\r\n")
 )
 
 // Format strings for errors and logging output
@@ -64,14 +68,15 @@ type IrcClient struct {
 	burst      int
 	timeout    time.Duration
 	step       time.Duration
+	keepalive  bool
 
 	// buffering for io.Reader interface
 	readbuf []byte
 	pos     int
 }
 
-// CreateIrcClient initializes the required fields in the IrcClient
-func CreateIrcClient(conn net.Conn, name string) *IrcClient {
+// createIrcClient initializes the required fields in the IrcClient
+func createIrcClient(conn net.Conn, name string) *IrcClient {
 	return &IrcClient{
 		name:        name,
 		conn:        conn,
@@ -83,18 +88,19 @@ func CreateIrcClient(conn net.Conn, name string) *IrcClient {
 	}
 }
 
-// CreateIrcClientFloodProtect creates an irc client and sets up the variables
-// required for flood protection. The timeout and step variables are in seconds.
-func CreateIrcClientFloodProtect(conn net.Conn, name string, burst, timeout,
-	step int, scale time.Duration) *IrcClient {
+// CreateIrcClient creates an irc client with optional flood protection and
+// keep alive. If scale is not set timeout and step variables are in seconds.
+func CreateIrcClient(conn net.Conn, name string, burst, timeout,
+	step int, keepalive bool, scale time.Duration) *IrcClient {
 
-	c := CreateIrcClient(conn, name)
+	c := createIrcClient(conn, name)
 	if scale != 0 {
 		c.scale = scale
 	}
 	c.burst = burst
 	c.timeout = time.Duration(timeout) * c.scale
 	c.step = time.Duration(step) * c.scale
+	c.keepalive = keepalive
 	return c
 }
 
@@ -145,8 +151,10 @@ func (c *IrcClient) calcSleepTime(t time.Time) time.Duration {
 func (c *IrcClient) pump() {
 	var err error
 	var sleeper <-chan time.Time
-	var pinger <- chan time.Time
-	pinger = time.After(30 * time.Second)
+	var pinger <-chan time.Time
+	if c.keepalive {
+		pinger = time.After(pingInterval * c.scale)
+	}
 	defer close(c.pumpservice)
 
 	for err == nil {
@@ -184,11 +192,15 @@ func (c *IrcClient) pump() {
 			} else {
 				sleeper = nil
 			}
-		case <- pinger:
-			if err = c.writeMessage([]byte("PING :ghostcheck\r\n")); err != nil {
-				break
+		case <-pinger:
+			if sleeper != nil {
+				c.queue.Enqueue(ping)
+			} else {
+				if err = c.writeMessage(ping); err != nil {
+					break
+				}
 			}
-			pinger = time.After(30 * time.Second)
+			pinger = time.After(pingInterval * c.scale)
 		case <-c.killpump:
 			log.Printf(fmtErrPumpClosed, c.name, errMsgShutdown)
 			return
