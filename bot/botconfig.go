@@ -2,7 +2,7 @@ package bot
 
 import (
 	"github.com/aarondl/ultimateq/config"
-	"github.com/aarondl/ultimateq/irc"
+	//"github.com/aarondl/ultimateq/irc"
 )
 
 type configCallback func(*config.Config)
@@ -37,7 +37,7 @@ func (b *Bot) WriteConfig(fn configCallback) {
 // for all dispatchers as well as sends nick messages to the servers with
 // updates for nicknames. Returns any new servers added.
 func (b *Bot) ReplaceConfig(newConfig *config.Config) []NewServer {
-	if !newConfig.IsValid() {
+	/*if !newConfig.IsValid() {
 		return nil
 	}
 
@@ -98,7 +98,8 @@ func (b *Bot) ReplaceConfig(newConfig *config.Config) []NewServer {
 
 	b.conf = newConfig
 
-	return servers
+	return servers*/
+	return nil
 }
 
 // Rehash loads the config from a file. It attempts to use the previously read

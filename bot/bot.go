@@ -6,7 +6,6 @@ package bot
 
 import (
 	"errors"
-	"fmt"
 	"github.com/aarondl/ultimateq/config"
 	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/dispatch"
@@ -47,6 +46,16 @@ var (
 	// errInvalidServerId occurs when the user passes in an unknown
 	// server id to a method requiring a server id.
 	errUnknownServerID = errors.New("bot: Unknown Server id.")
+	// errServerKilled occurs when the server is killed during the running state
+	errServerKilled = errors.New("bot: Server killed.")
+	// errServerKilledReconn occurs when the server is killed during a
+	// reconnection pause.
+	errServerKilledReconn = errors.New("bot: Server killed.")
+
+	// connMessage is a pseudo message sent to servers upon connect.
+	connMessage = &irc.Message{Name: irc.CONNECT}
+	// discMessage is a pseudo message sent to servers upon disconnect.
+	discMessage = &irc.Message{Name: irc.DISCONNECT}
 )
 
 type (
@@ -65,6 +74,11 @@ type Bot struct {
 	servers map[string]*Server
 	conf    *config.Config
 	store   *data.Store
+
+	// Bot-server synchronization.
+	botEnd chan error
+	serverStart chan int
+	serverEnd chan error
 
 	// Dispatching
 	caps         *irc.ProtoCaps
@@ -123,196 +137,131 @@ func CreateBot(conf *config.Config) (*Bot, error) {
 	return createBot(conf, nil, nil, nil, true, true)
 }
 
-// Connect creates the connections and the IrcClient objects, as well as
-// connects the bot to all defined servers.
-func (b *Bot) Connect() []error {
-	var ers = make([]error, 0, nAssumedServers)
+// Start runs the bot. A channel is returned, every time a server is killed
+// permanently it reports the error on this channel. When the channel is closed,
+// there are no more servers left to run and the program can safely exit.
+func (b *Bot) Start() <-chan error {
 	b.protectServers.RLock()
 	for _, srv := range b.servers {
-		err := b.connectServer(srv)
-		if err != nil {
-			ers = append(ers, err)
+		go b.startServer(srv, true, true)
+	}
+	b.protectServers.RUnlock()
+
+	go b.monitorServers()
+
+	return b.botEnd
+}
+
+// monitorServers watches the starting and stopping of servers. It sends any
+// permanent server deaths to the botEnd channel, and if all servers
+// are stopped it closes the botEnd channel.
+func (b *Bot) monitorServers() {
+	servers := 0
+	for {
+		var err error
+		select {
+		case <-b.serverStart:
+			servers++
+		case err = <-b.serverEnd:
+			b.botEnd <- err
+			servers--
+		}
+
+		if servers == 0 {
+			close(b.botEnd)
 		}
 	}
-	b.protectServers.RUnlock()
-
-	if len(ers) > 0 {
-		return ers
-	}
-	return nil
 }
 
-// ConnectServer creates the connection and IrcClient object for the given
-// serverId.
-func (b *Bot) ConnectServer(serverId string) (found bool, err error) {
-	b.protectServers.RLock()
-	if srv, ok := b.servers[serverId]; ok {
-		err = b.connectServer(srv)
-		found = true
-	}
-	b.protectServers.RUnlock()
-	return
-}
-
-// connectServer creates the connection and IrcClient object for the given
-// server.
-func (b *Bot) connectServer(srv *Server) (err error) {
-	if srv.IsConnected() {
-		return fmt.Errorf(errFmtAlreadyConnected, srv.name)
-	}
-	srv.protect.Lock()
-	err = srv.createIrcClient()
-	if err == nil {
-		srv.setConnected(true, false)
-	}
-	srv.protect.Unlock()
-	return
-}
-
-// Start begins message pumps on all defined and connected servers.
-func (b *Bot) Start() {
-	b.start(true, true)
-}
-
-// StartServer begins message pumps on a server by id.
-func (b *Bot) StartServer(serverId string) (found bool) {
-	b.protectServers.RLock()
-	if srv, ok := b.servers[serverId]; ok {
-		b.startServer(srv, true, true)
-		found = true
-	}
-	b.protectServers.RUnlock()
-	return
-}
-
-// start begins the called for routines on all servers
-func (b *Bot) start(writing, reading bool) {
-	b.protectServers.RLock()
-	for _, srv := range b.servers {
-		b.startServer(srv, writing, reading)
-	}
-	b.protectServers.RUnlock()
-}
-
-// startServer begins the called for routines on the specific server
+// startServer starts up a server. When it has finished (permanently
+// disconnected) it will send it's disconnection error to serverEnd.
 func (b *Bot) startServer(srv *Server, writing, reading bool) {
-	if srv.IsStarted() {
-		return
-	}
+	var err error
+	var disconnect bool
 
-	srv.protect.Lock()
-	defer srv.protect.Unlock()
+	b.serverStart <- 0
+	for err == nil {
+		srv.setConnecting(true, true)
+		err = srv.createIrcClient()
+		if err != nil {
+			srv.setConnecting(false, true)
+			break
+		}
 
-	if srv.isConnected() && srv.client != nil {
-		if writing {
-			srv.setWriting(true, false)
-		}
-		if reading {
-			srv.setReading(true, false)
-		}
+		srv.protectState.Lock()
+		srv.setConnecting(false, false)
+		srv.setConnected(true, false)
+		srv.setStarted(true, false)
+		srv.protectState.Unlock()
+
 		srv.client.SpawnWorkers(writing, reading)
+		disconnect, err = b.dispatch(srv)
+		if err != nil {
+			break
+		}
 
-		b.dispatchMessage(srv, &irc.Message{Name: irc.CONNECT})
+		srv.client.Close()
+		srv.client = nil
+		srv.setStarted(false, true)
+		srv.setConnected(false, true)
 
-		if reading {
-			b.msgDispatchers.Add(1)
-			go b.dispatchMessages(srv)
+		b.protectConfig.RLock()
+		if !disconnect || srv.conf.GetNoReconnect() {
+			b.protectConfig.RUnlock()
+			break
+		}
+
+		wait := time.Duration(srv.conf.GetReconnectTimeout()) * srv.reconnScale
+		b.protectConfig.RUnlock()
+
+		srv.setReconnecting(true, true)
+		select {
+		case <-srv.kill:
+			err = errServerKilledReconn
+		case <-time.After(wait):
+		}
+		srv.setReconnecting(false, true)
+	}
+
+	b.serverEnd <- err
+}
+
+// dispatch starts dispatch loops on the server.
+func (b *Bot) dispatch(srv *Server) (disconnect bool, err error) {
+	var ircMsg *irc.Message
+	var parseErr error
+	readCh := srv.client.ReadChannel()
+
+	b.dispatchMessage(srv, connMessage)
+	for err == nil && !disconnect {
+		select {
+		case msg, ok := <-readCh:
+			if !ok {
+				disconnect = true
+				break
+			}
+			ircMsg, parseErr = parse.Parse(msg)
+			if parseErr != nil {
+				log.Printf(errFmtParsingIrcMessage, parseErr, msg)
+				break
+			}
+			b.dispatchMessage(srv, ircMsg)
+		case <-srv.kill:
+			err = errServerKilled
+			break
 		}
 	}
-}
 
-// Stop shuts down all dispatch routines.
-func (b *Bot) Stop() {
-	b.protectServers.RLock()
-	for _, srv := range b.servers {
-		b.stopServer(srv)
-	}
-	b.protectServers.RUnlock()
-}
-
-// StopServer shuts down the dispatch routine of the given server by id.
-func (b *Bot) StopServer(serverId string) (found bool) {
-	b.protectServers.RLock()
-	if srv, ok := b.servers[serverId]; ok {
-		b.stopServer(srv)
-		found = true
-	}
-	b.protectServers.RUnlock()
+	b.dispatchMessage(srv, discMessage)
 	return
 }
 
-// stopServer stops dispatcher on the given server.
-func (b *Bot) stopServer(srv *Server) {
-	if srv.IsReading() {
-		srv.killdispatch <- 0
-		srv.setReading(false, true)
-	}
-}
-
-// Disconnect closes all connections to the servers
-func (b *Bot) Disconnect() {
-	b.protectServers.RLock()
-	for _, srv := range b.servers {
-		b.disconnectServer(srv)
-	}
-	b.protectServers.RUnlock()
-}
-
-// DisconnectServer disconnects the given server by id.
-func (b *Bot) DisconnectServer(serverId string) (found bool) {
-	b.protectServers.RLock()
-	if srv, ok := b.servers[serverId]; ok {
-		b.disconnectServer(srv)
-		found = true
-	}
-	b.protectServers.RUnlock()
-	return
-}
-
-// disconnectServer disconnects the given server.
-func (b *Bot) disconnectServer(srv *Server) {
-	srv.protect.RLock()
-	if !srv.isConnected() || srv.client == nil {
-		srv.protect.RUnlock()
-		return
-	}
-	srv.client.Close()
-	srv.protect.RUnlock()
-
-	srv.protect.Lock()
-	defer srv.protect.Unlock()
-	srv.client = nil
-	srv.setWriting(false, false)
-	srv.setConnected(false, false)
-}
-
-// InterruptReconnect stops reconnecting the given server by id.
-func (b *Bot) InterruptReconnect(serverId string) (found bool) {
-	b.protectServers.RLock()
-	if srv, ok := b.servers[serverId]; ok {
-		b.interruptReconnect(srv)
-		found = true
-	}
-	b.protectServers.RUnlock()
-	return
-}
-
-// interruptReconnect stops reconnecting the given server.
-func (b *Bot) interruptReconnect(srv *Server) {
-	if srv.IsReconnecting() {
-		srv.killreconn <- 0
-	}
-}
-
-// WaitForHalt waits for all servers to halt.
-func (b *Bot) WaitForHalt() {
-	b.msgDispatchers.Wait()
-	b.dispatchCore.WaitForHandlers()
-	b.protectServers.RLock()
-	for _, srv := range b.servers {
-		srv.dispatchCore.WaitForHandlers()
-	}
-	b.protectServers.RUnlock()
+// dispatch sends a message to both the bot's dispatcher and the given servers
+func (b *Bot) dispatchMessage(s *Server, msg *irc.Message) {
+	b.dispatcher.Dispatch(msg, s.endpoint)
+	s.dispatcher.Dispatch(msg, s.endpoint)
+	b.commander.Dispatch(s.name, msg, s.endpoint.DataEndpoint)
+	s.commander.Dispatch(s.name, msg, s.endpoint.DataEndpoint)
 }
 
 // Close closes the store database.
@@ -398,95 +347,6 @@ func (b *Bot) UnregisterServerCommand(server, cmd string) bool {
 	return false
 }
 
-// dispatchMessages is a constant read-dispatch from the server to the
-// dispatcher.
-func (b *Bot) dispatchMessages(s *Server) {
-	var reconnOnDisconnect bool
-	var scale time.Duration
-	var timeout uint
-	b.ReadConfig(func(c *config.Config) {
-		cserver := c.GetServer(s.name)
-		if cserver != nil {
-			reconnOnDisconnect = !cserver.GetNoReconnect()
-			scale = s.reconnScale
-			timeout = cserver.GetReconnectTimeout()
-		}
-	})
-
-	s.protect.RLock()
-
-	read := s.client.ReadChannel()
-	stop, disconnect := false, false
-	for !stop {
-		select {
-		case msg, ok := <-read:
-			if !ok {
-				log.Printf(errFmtReaderClosed, s.name)
-				b.dispatchMessage(s, &irc.Message{Name: irc.DISCONNECT})
-				stop, disconnect = true, true
-				break
-			}
-			ircMsg, err := parse.Parse(msg)
-			if err != nil {
-				log.Printf(errFmtParsingIrcMessage, err, msg)
-			} else {
-				s.protectState.Lock()
-				if s.state != nil {
-					s.state.Update(ircMsg)
-				}
-				s.protectState.Unlock()
-				b.dispatchMessage(s, ircMsg)
-			}
-		case <-s.killdispatch:
-			log.Printf(errFmtReaderClosed, s.name)
-			stop = true
-			break
-		}
-	}
-	s.protect.RUnlock()
-
-	reconn := disconnect && reconnOnDisconnect
-
-	if !reconn {
-		b.msgDispatchers.Done()
-	}
-
-	log.Printf(fmtDisconnected, s.name)
-
-	if reconn {
-		for {
-			dur := time.Duration(timeout) * scale
-			log.Printf(fmtReconnecting, s.name, dur)
-			b.disconnectServer(s)
-			s.protect.Lock()
-			s.setStarted(false, false)
-			s.setReconnecting(true, false)
-			s.protect.Unlock()
-			select {
-			case <-time.After(dur):
-				s.setReconnecting(false, true)
-				break
-			case <-s.killreconn:
-				s.setReconnecting(false, true)
-				b.msgDispatchers.Done()
-				return
-			}
-
-			err := b.connectServer(s)
-			if err != nil {
-				log.Printf(fmtFailedConnecting, s.name, err)
-				continue
-			} else {
-				b.startServer(s, true, true)
-				break
-			}
-		}
-		b.msgDispatchers.Done()
-	} else if disconnect {
-		<-s.killdispatch
-	}
-}
-
 // Writeln writes a string to the given server's IrcClient.
 func (b *Bot) Writeln(server, message string) error {
 	b.protectServers.RLock()
@@ -497,14 +357,6 @@ func (b *Bot) Writeln(server, message string) error {
 		return errUnknownServerID
 	}
 	return srv.Writeln(message)
-}
-
-// dispatch sends a message to both the bot's dispatcher and the given servers
-func (b *Bot) dispatchMessage(s *Server, msg *irc.Message) {
-	b.dispatcher.Dispatch(msg, s.endpoint)
-	s.dispatcher.Dispatch(msg, s.endpoint)
-	b.commander.Dispatch(s.name, msg, s.endpoint.DataEndpoint)
-	s.commander.Dispatch(s.name, msg, s.endpoint.DataEndpoint)
 }
 
 // createBot creates a bot from the given configuration, using the providers
@@ -520,6 +372,9 @@ func createBot(conf *config.Config, capsProv CapsProvider,
 		connProvider:   connProv,
 		storeProvider:  storeProv,
 		attachHandlers: attachHandlers,
+		botEnd: make(chan error),
+		serverStart: make(chan int),
+		serverEnd: make(chan error),
 	}
 
 	if capsProv == nil {
@@ -572,6 +427,7 @@ func (b *Bot) createServer(conf *config.Server) (*Server, error) {
 		name:         conf.GetName(),
 		caps:         b.caps.Clone(),
 		conf:         conf,
+		kill:         make(chan int),
 		killdispatch: make(chan int),
 		killreconn:   make(chan int),
 		reconnScale:  defaultReconnScale,

@@ -22,12 +22,10 @@ import (
 // Server Statuses
 const (
 	STATUS_NEW          = byte(0x0)
-	STATUS_CONNECTED    = byte(0x1)
-	STATUS_READING      = byte(0x2)
-	STATUS_WRITING      = byte(0x4)
+	STATUS_CONNECTING   = byte(0x1)
+	STATUS_CONNECTED    = byte(0x2)
+	STATUS_STARTED      = byte(0x4)
 	STATUS_RECONNECTING = byte(0x8)
-
-	MASK_STARTED = STATUS_READING | STATUS_WRITING
 )
 
 const (
@@ -41,7 +39,19 @@ var (
 	errNotConnected = errors.New("bot: Server not connected")
 	// errFailedToLoadCertificate happens when we fail to parse the certificate
 	errFailedToLoadCertificate = errors.New("bot: Failed to load certificate")
+	// errKilledConn happens when the server is killed mid-connect.
+	errKilledConn = errors.New("bot: Killed trying to connect.")
 )
+
+// connResult is used to return results from the channel patterns in
+// createIrcClient
+type connResult struct {
+	conn net.Conn
+	err error
+}
+
+// certReader is for IoC of the createTlsConfig function.
+type certReader func(string) (*x509.CertPool, error)
 
 // Server is all the details around a specific server connection. Also contains
 // the connection and configuration for the specific server.
@@ -67,6 +77,7 @@ type Server struct {
 	client       *inet.IrcClient
 	state        *data.State
 	reconnScale  time.Duration
+	kill chan int
 	killdispatch chan int
 	killreconn   chan int
 
@@ -142,53 +153,78 @@ func (s *Server) createState() (err error) {
 // createIrcClient connects to the configured server, and creates an IrcClient
 // for use with that connection.
 func (s *Server) createIrcClient() error {
-	var conn net.Conn
-	var err error
-
 	if s.client != nil {
 		return fmt.Errorf(errFmtAlreadyConnected, s.name)
 	}
 
-	port := strconv.Itoa(int(s.conf.GetPort()))
-	server := s.conf.GetHost() + ":" + port
+	var result *connResult
+	resultService := make(chan chan *connResult)
+	resultChan := make(chan *connResult)
 
-	if s.bot.connProvider == nil {
-		if s.conf.GetSsl() {
-			conf := &tls.Config{}
+	go s.createConnection(resultService)
 
-			if s.conf.GetNoVerifyCert() == true {
-				conf.InsecureSkipVerify = true
-			}
-
-			if len(s.conf.GetSslCert()) > 0 {
-				conf.RootCAs, err = readCert(s.conf.GetSslCert())
-				if err != nil {
-					return err
-				}
-			}
-
-			conn, err = tls.Dial("tcp", server, conf)
-			if err != nil {
-				return err
-			}
-		} else {
-			if conn, err = net.Dial("tcp", server); err != nil {
-				return err
-			}
+	select {
+	case resultService <- resultChan:
+		result = <-resultChan
+		if result.err != nil {
+			return result.err
 		}
-	} else {
-		if conn, err = s.bot.connProvider(server); err != nil {
-			return err
-		}
+	case <-s.kill:
+		close(resultService)
+		return errKilledConn
 	}
 
-	s.client = inet.CreateIrcClient(conn, s.name,
+	s.client = inet.CreateIrcClient(result.conn, s.name,
 		int(s.conf.GetFloodLenPenalty()),
 		time.Duration(s.conf.GetFloodTimeout()*1000.0)*time.Millisecond,
 		time.Duration(s.conf.GetFloodStep()*1000.0)*time.Millisecond,
 		time.Duration(s.conf.GetKeepAlive())*time.Second,
 		time.Second)
 	return nil
+}
+
+// createConnection creates a connection based off the server receiver's
+// config variables. It takes a chan of channels to return the result on.
+// If the channel is closed before it can send it's result, it will close the
+// connection automatically.
+func (s *Server) createConnection(resultService chan chan *connResult) {
+	r := &connResult{}
+	port := strconv.Itoa(int(s.conf.GetPort()))
+	server := s.conf.GetHost() + ":" + port
+
+	if s.bot.connProvider == nil {
+		if s.conf.GetSsl() {
+			var conf *tls.Config
+			conf, r.err = s.createTlsConfig(readCert)
+			if r.err != nil {
+				r.conn, r.err = tls.Dial("tcp", server, conf)
+			}
+		} else {
+			r.conn, r.err = net.Dial("tcp", server)
+		}
+	} else {
+		r.conn, r.err = s.bot.connProvider(server)
+	}
+
+	if resultChan, ok := <-resultService; ok {
+		resultChan <- r
+	} else {
+		if r.conn != nil {
+			r.conn.Close()
+		}
+	}
+}
+
+// createTlsConfig creates a tls config appropriate for the 
+func (s *Server) createTlsConfig(cr certReader) (conf *tls.Config, err error) {
+	conf = &tls.Config{}
+	conf.InsecureSkipVerify = s.conf.GetNoVerifyCert()
+
+	if len(s.conf.GetSslCert()) > 0 {
+		conf.RootCAs, err = cr(s.conf.GetSslCert())
+	}
+
+	return
 }
 
 // rehashProtocaps delivers updated protocaps to the server's components who
@@ -210,6 +246,33 @@ func (s *Server) rehashProtocaps() error {
 	}
 	s.protectState.Unlock()
 	return nil
+}
+
+// IsConnecting checks to see if the server is connecting.
+func (s *Server) IsConnecting() bool {
+	s.protect.RLock()
+	defer s.protect.RUnlock()
+
+	return s.isConnecting()
+}
+
+// isConnecting checks to see if the server is connecting without locking
+func (s *Server) isConnecting() bool {
+	return STATUS_CONNECTED == s.status&STATUS_CONNECTED
+}
+
+// setConnecting sets the server's connecting flag.
+func (s *Server) setConnecting(value, lock bool) {
+	if lock {
+		s.protect.Lock()
+		defer s.protect.Unlock()
+	}
+
+	if value {
+		s.status |= STATUS_CONNECTED
+	} else {
+		s.status &= ^STATUS_CONNECTED
+	}
 }
 
 // IsConnected checks to see if the server is connected.
@@ -250,7 +313,7 @@ func (s *Server) IsStarted() bool {
 // isStarted checks to see if the the server is currently reading or writing
 // without locking.
 func (s *Server) isStarted() bool {
-	return 0 != s.status&MASK_STARTED
+	return 0 != s.status&STATUS_STARTED
 }
 
 // setStarted sets the server's reading and writing flags simultaneously.
@@ -261,65 +324,9 @@ func (s *Server) setStarted(value, lock bool) {
 	}
 
 	if value {
-		s.status |= MASK_STARTED
+		s.status |= STATUS_STARTED
 	} else {
-		s.status &= ^MASK_STARTED
-	}
-}
-
-// IsReading checks to see if the dispatcher read-loop is running on the server.
-func (s *Server) IsReading() bool {
-	s.protect.RLock()
-	defer s.protect.RUnlock()
-
-	return s.isReading()
-}
-
-// isReading checks to see if the dispatcher read-loop is running on the server
-// without locking.
-func (s *Server) isReading() bool {
-	return STATUS_READING == s.status&STATUS_READING
-}
-
-// setReading sets the server's reading flag.
-func (s *Server) setReading(value, lock bool) {
-	if lock {
-		s.protect.Lock()
-		defer s.protect.Unlock()
-	}
-
-	if value {
-		s.status |= STATUS_READING
-	} else {
-		s.status &= ^STATUS_READING
-	}
-}
-
-// IsWriting checks to see if the server's write loop has been activated.
-func (s *Server) IsWriting() bool {
-	s.protect.RLock()
-	defer s.protect.RUnlock()
-
-	return s.isWriting()
-}
-
-// isWriting checks to see if the server's write loop has been activated without
-// locking.
-func (s *Server) isWriting() bool {
-	return STATUS_WRITING == s.status&STATUS_WRITING
-}
-
-// setWriting sets the server's writing flag.
-func (s *Server) setWriting(value, lock bool) {
-	if lock {
-		s.protect.Lock()
-		defer s.protect.Unlock()
-	}
-
-	if value {
-		s.status |= STATUS_WRITING
-	} else {
-		s.status &= ^STATUS_WRITING
+		s.status &= ^STATUS_STARTED
 	}
 }
 

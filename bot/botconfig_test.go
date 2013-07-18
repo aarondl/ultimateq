@@ -1,12 +1,14 @@
 package bot
 
 import (
+	/*
 	"bytes"
 	"github.com/aarondl/ultimateq/config"
 	"github.com/aarondl/ultimateq/irc"
 	"github.com/aarondl/ultimateq/mocks"
 	"io"
 	. "launchpad.net/gocheck"
+	*/
 	"net"
 )
 
@@ -14,7 +16,7 @@ var zeroConnProvider = func(srv string) (net.Conn, error) {
 	return nil, nil
 }
 
-func (s *s) TestBot_ReadConfig(c *C) {
+/*func (s *s) TestBot_ReadConfig(c *C) {
 	b, err := createBot(fakeConfig, nil, nil, nil, false, false)
 	c.Check(err, IsNil)
 
@@ -154,4 +156,4 @@ func (s *s) TestBot_testElementEquals(c *C) {
 	a = []string{"a"}
 	b = []string{}
 	c.Check(elementsEquals(a, b), Equals, false)
-}
+}*/

@@ -1,15 +1,86 @@
 package bot
 
 import (
-	"bytes"
-	"github.com/aarondl/ultimateq/data"
-	"github.com/aarondl/ultimateq/irc"
-	"github.com/aarondl/ultimateq/mocks"
-	. "launchpad.net/gocheck"
+	//"bytes"
+	//"github.com/aarondl/ultimateq/data"
+	//"github.com/aarondl/ultimateq/irc"
+	//"github.com/aarondl/ultimateq/mocks"
+	//. "launchpad.net/gocheck"
+	"io"
+	"crypto/x509"
+	. "testing"
+	"time"
 	"net"
 )
 
-func (s *s) TestServerSender(c *C) {
+func TestServer_createIrcClient(t *T) {
+	t.Parallel()
+	doSleep := false
+	errch := make(chan error)
+	var retErr error
+
+	connProvider := func(srv string) (net.Conn, error) {
+		if doSleep {
+			time.Sleep(time.Second * 5)
+		}
+		return nil, retErr
+	}
+	b, _ := createBot(fakeConfig, nil, connProvider, nil, false, false)
+	srv := b.servers[serverId]
+
+	doSleep = true
+	go func() {
+		errch <- srv.createIrcClient()
+	}()
+
+	srv.kill <- 0
+	if <-errch != errKilledConn {
+		t.Error("Expected a killed connection.")
+	}
+
+	doSleep = false
+	retErr = io.EOF
+	go func() {
+		errch <- srv.createIrcClient()
+	}()
+
+	if <-errch != io.EOF {
+		t.Error("Expected a failed connection.")
+	}
+
+	doSleep = false
+	retErr = nil
+	go func() {
+		errch <- srv.createIrcClient()
+	}()
+
+	if <-errch != nil {
+		t.Error("Expected a clean connect.")
+	}
+	if srv.client == nil {
+		t.Error("Client should have been instantiated.")
+	}
+}
+
+func TestServer_createTlsConfig(t *T) {
+	t.Parallel()
+	b, _ := createBot(fakeConfig, nil, nil, nil, false, false)
+	srv := b.servers[serverId]
+
+	pool := x509.NewCertPool()
+	tlsConfig, _ := srv.createTlsConfig(func(_ string) (*x509.CertPool, error) {
+		return pool, nil
+	})
+
+	if !tlsConfig.InsecureSkipVerify {
+		t.Error("This should have been set to fakeconfig's value.")
+	}
+	if tlsConfig.RootCAs != pool {
+		t.Error("The provided root ca pool should be used.")
+	}
+}
+
+/*func (s *s) TestServerSender(c *C) {
 	b, err := createBot(fakeConfig, nil, nil, nil, false, false)
 	c.Check(err, IsNil)
 	srv := b.servers[serverId]
@@ -212,4 +283,4 @@ func (s *s) TestServer_State(c *C) {
 	c.Check(srv.IsReconnecting(), Equals, true)
 	srv.setReconnecting(false, true)
 	c.Check(srv.IsReconnecting(), Equals, false)
-}
+}*/
