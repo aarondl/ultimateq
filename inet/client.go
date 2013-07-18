@@ -58,7 +58,8 @@ type IrcClient struct {
 	name string
 
 	// write throttling
-	nThrottled int
+	//nThrottled int
+	msgSince   time.Time
 	lastwrite  time.Time
 	scale      time.Duration
 	burst      int
@@ -118,23 +119,25 @@ func (c *IrcClient) SpawnWorkers(pump, siphon bool) {
 
 // calcSleepTime calculates the sleep time required by the flood protection
 // given a time of write.
-func (c *IrcClient) calcSleepTime(t time.Time) time.Duration {
+func (c *IrcClient) calcSleepTime(t time.Time, sentLen int) time.Duration {
 	if c.timeout == 0 || c.step == 0 {
 		return 0
 	}
 
-	dur := t.Sub(c.lastwrite)
-	if dur < 0 {
-		dur = 0
+	if c.lastwrite.After(c.msgSince) {
+		c.msgSince = c.lastwrite
+	}
+	
+	slowItDown := false
+	
+	if c.msgSince.Sub(t).Seconds() >= 10 {
+		slowItDown = true
 	}
 
-	if dur > c.timeout {
-		c.nThrottled = 1
-	} else {
-		if c.nThrottled >= c.burst {
-			return c.step
-		}
-		c.nThrottled++
+	c.msgSince = c.msgSince.Add(time.Second * time.Duration(2 + (sentLen /120)))
+	
+	if slowItDown {
+		return c.msgSince.Sub(t) - (time.Second * 10)
 	}
 
 	return 0
@@ -160,7 +163,7 @@ func (c *IrcClient) pump() {
 					break
 				}
 			} else if sleeper == nil {
-				sleepTime := c.calcSleepTime(time.Now())
+				sleepTime := c.calcSleepTime(time.Now(), len(message))
 				if sleepTime == 0 {
 					if err = c.writeMessage(message); err != nil {
 						break
@@ -173,11 +176,12 @@ func (c *IrcClient) pump() {
 				c.queue.Enqueue(message)
 			}
 		case <-sleeper:
-			if err = c.writeMessage(c.queue.Dequeue()); err != nil {
+			message := c.queue.Dequeue()
+			if err = c.writeMessage(message); err != nil {
 				break
 			}
 			if c.queue.length > 0 {
-				sleepTime := c.calcSleepTime(time.Now())
+				sleepTime := c.calcSleepTime(time.Now(), len(message))
 				sleeper = time.After(sleepTime)
 			} else {
 				sleeper = nil
