@@ -246,7 +246,7 @@ func (c *IrcClient) siphon() {
 	for err == nil {
 		n, err = c.conn.Read(buf[position:])
 
-		if n > 0 && (err == nil || err == io.EOF) {
+		if n > 0 {
 			position, shutdown = c.extractMessages(buf[:n+position])
 			if shutdown {
 				return
