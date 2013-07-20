@@ -20,9 +20,9 @@ const (
 const (
 	// errFmtUserNotFound occurs when the database lookup fails.
 	errFmtUserNotFound = "User [%v] not found."
-	// errMsgBadPassword occurs when the user provides a password that does
+	// errFmtBadPassword occurs when the user provides a password that does
 	// not match.
-	errMsgBadPassword = "Password does not match for user [%v]."
+	errFmtBadPassword = "Password does not match for user [%v]."
 	// errFmtBadHost occurs when a user has hosts defined, and the user's
 	// current host is not a match.
 	errFmtBadHost = "Host [%v] does not match stored hosts for user [%v]."
@@ -160,7 +160,7 @@ func (s *Store) AuthUser(
 
 	if !user.VerifyPassword(password) {
 		return nil, AuthError{
-			errMsgBadPassword,
+			errFmtBadPassword,
 			[]interface{}{username},
 			AuthErrBadPassword,
 		}

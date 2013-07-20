@@ -521,6 +521,7 @@ func TestUserAccess_String(t *T) {
 			"#chan1(200 abc)",
 			"#chan1(200 abc) #chan2(200 abc)"},
 		{false, 0, "", false, 0, "", false, 0, "", "none", "none"},
+		{false, 0, "", false, 0, "", true, 0, "", "none", "none"},
 	}
 
 	for _, test := range table {

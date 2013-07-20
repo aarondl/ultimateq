@@ -349,13 +349,21 @@ func TestStore_IsFirst(t *T) {
 }
 
 func TestStore_AuthError(t *T) {
-	var err error = AuthError{
+	var err1 error = AuthError{
 		errFmtBadHost,
 		[]interface{}{"h", "u"},
 		AuthErrHostNotFound,
 	}
+	if err1.Error() != "Host [h] does not match stored hosts for user [u]." {
+		t.Error("The error message builder is not working correctly.")
+	}
 
-	if err.Error() != "Host [h] does not match stored hosts for user [u]." {
+	var err2 error = AuthError{
+		"msg",
+		nil,
+		AuthErrHostNotFound,
+	}
+	if err2.Error() != "msg" {
 		t.Error("The error message builder is not working correctly.")
 	}
 }
