@@ -33,7 +33,7 @@ func (t *testPoint) resetTestWritten() {
 }
 
 func (t *testPoint) GetKey() string {
-	return serverId
+	return serverID
 }
 
 //==============
@@ -53,14 +53,14 @@ func (s *s) TestCoreHandler_Ping(c *C) {
 func (s *s) TestCoreHandler_Connect(c *C) {
 	b, err := createBot(fakeConfig, nil, nil, nil, false, false)
 	c.Check(err, IsNil)
-	cnf := fakeConfig.GetServer(serverId)
+	cnf := fakeConfig.GetServer(serverID)
 	handler := coreHandler{bot: b}
 	msg1 := fmt.Sprintf("NICK :%v", cnf.GetNick())
 	msg2 := fmt.Sprintf("USER %v 0 * :%v",
 		cnf.GetUsername(), cnf.GetRealname())
 
 	msg := &irc.Message{Name: irc.CONNECT}
-	endpoint := makeTestPoint(b.servers[serverId])
+	endpoint := makeTestPoint(b.servers[serverID])
 	handler.HandleRaw(msg, endpoint)
 	c.Check(endpoint.gets(), Equals, msg1+msg2)
 }
@@ -68,11 +68,11 @@ func (s *s) TestCoreHandler_Connect(c *C) {
 func (s *s) TestCoreHandler_Nick(c *C) {
 	b, err := createBot(fakeConfig, nil, nil, nil, false, false)
 	c.Check(err, IsNil)
-	cnf := fakeConfig.GetServer(serverId)
+	cnf := fakeConfig.GetServer(serverID)
 	handler := coreHandler{bot: b}
 	msg := &irc.Message{Name: irc.ERR_NICKNAMEINUSE}
 
-	endpoint := makeTestPoint(b.servers[serverId])
+	endpoint := makeTestPoint(b.servers[serverID])
 
 	nickstr := "NICK :"
 	nick1 := nickstr + cnf.GetAltnick()
@@ -107,7 +107,7 @@ func (s *s) TestCoreHandler_Caps(c *C) {
 		Name: irc.RPL_ISUPPORT,
 		Args: []string{"RFC8213", "CHANTYPES=&$"},
 	}
-	srv := b.servers[serverId]
+	srv := b.servers[serverID]
 	srv.handler.HandleRaw(msg1, &testPoint{})
 	srv.handler.HandleRaw(msg2, &testPoint{})
 	c.Check(srv.caps.ServerName(), Equals, "irc.test.net")
@@ -123,7 +123,7 @@ func (s *s) TestCoreHandler_Join(c *C) {
 	}
 
 	b, err := createBot(fakeConfig, nil, connProvider, nil, true, false)
-	srv := b.servers[serverId]
+	srv := b.servers[serverID]
 	c.Check(err, IsNil)
 
 	srv.state.Self.User = data.CreateUser("nick!user@host")

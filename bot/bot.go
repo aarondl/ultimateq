@@ -76,9 +76,9 @@ type Bot struct {
 	store   *data.Store
 
 	// Bot-server synchronization.
-	botEnd chan error
+	botEnd      chan error
 	serverStart chan int
-	serverEnd chan error
+	serverEnd   chan error
 
 	// Dispatching
 	caps         *irc.ProtoCaps
@@ -185,25 +185,27 @@ func (b *Bot) startServer(srv *Server, writing, reading bool) {
 		err = srv.createIrcClient()
 		if err != nil {
 			srv.setConnecting(false, true)
-			break
+			disconnect = true
 		}
 
-		srv.protectState.Lock()
-		srv.setConnecting(false, false)
-		srv.setConnected(true, false)
-		srv.setStarted(true, false)
-		srv.protectState.Unlock()
+		if err == nil {
+			srv.protectState.Lock()
+			srv.setConnecting(false, false)
+			srv.setConnected(true, false)
+			srv.setStarted(true, false)
+			srv.protectState.Unlock()
 
-		srv.client.SpawnWorkers(writing, reading)
-		disconnect, err = b.dispatch(srv)
-		if err != nil {
-			break
+			srv.client.SpawnWorkers(writing, reading)
+			disconnect, err = b.dispatch(srv)
+			if err != nil {
+				break
+			}
+
+			srv.client.Close()
+			srv.client = nil
+			srv.setStarted(false, true)
+			srv.setConnected(false, true)
 		}
-
-		srv.client.Close()
-		srv.client = nil
-		srv.setStarted(false, true)
-		srv.setConnected(false, true)
 
 		b.protectConfig.RLock()
 		if !disconnect || srv.conf.GetNoReconnect() {
@@ -211,6 +213,7 @@ func (b *Bot) startServer(srv *Server, writing, reading bool) {
 			break
 		}
 
+		err = nil
 		wait := time.Duration(srv.conf.GetReconnectTimeout()) * srv.reconnScale
 		b.protectConfig.RUnlock()
 
@@ -262,6 +265,22 @@ func (b *Bot) dispatchMessage(s *Server, msg *irc.Message) {
 	s.dispatcher.Dispatch(msg, s.endpoint)
 	b.commander.Dispatch(s.name, msg, s.endpoint.DataEndpoint)
 	s.commander.Dispatch(s.name, msg, s.endpoint.DataEndpoint)
+}
+
+// Stop shuts down all connections and exits.
+func (b *Bot) Stop() {
+	b.protectServers.RLock()
+	for _, srv := range b.servers {
+		b.stopServer(srv)
+	}
+	b.protectServers.RUnlock()
+}
+
+// stopServer stops the current server if it's running.
+func (b *Bot) stopServer(srv *Server) {
+	if !srv.IsStopped() {
+		srv.kill <- 0
+	}
 }
 
 // Close closes the store database.
@@ -347,16 +366,16 @@ func (b *Bot) UnregisterServerCommand(server, cmd string) bool {
 	return false
 }
 
-// Writeln writes a string to the given server's IrcClient.
-func (b *Bot) Writeln(server, message string) error {
+// GetEndpoint retrieves a servers endpoint. Will be nil if the server does
+// not exist.
+func (b *Bot) GetEndpoint(server string) (endpoint *data.DataEndpoint) {
 	b.protectServers.RLock()
 	defer b.protectServers.RUnlock()
 
-	srv, ok := b.servers[server]
-	if !ok {
-		return errUnknownServerID
+	if srv, ok := b.servers[server]; ok {
+		endpoint = srv.endpoint.DataEndpoint
 	}
-	return srv.Writeln(message)
+	return
 }
 
 // createBot creates a bot from the given configuration, using the providers
@@ -372,9 +391,9 @@ func createBot(conf *config.Config, capsProv CapsProvider,
 		connProvider:   connProv,
 		storeProvider:  storeProv,
 		attachHandlers: attachHandlers,
-		botEnd: make(chan error),
-		serverStart: make(chan int),
-		serverEnd: make(chan error),
+		botEnd:         make(chan error),
+		serverStart:    make(chan int),
+		serverEnd:      make(chan error),
 	}
 
 	if capsProv == nil {
@@ -445,7 +464,7 @@ func (b *Bot) createServer(conf *config.Server) (*Server, error) {
 		}
 	}
 
-	s.createServerEndpoint(b.store, &b.protectStore)
+	s.createEndpoint(b.store, &b.protectStore)
 
 	if b.attachHandlers {
 		s.handler = &coreHandler{bot: b}

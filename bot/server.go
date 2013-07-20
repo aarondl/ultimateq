@@ -21,11 +21,11 @@ import (
 
 // Server Statuses
 const (
-	STATUS_NEW          = byte(0x0)
-	STATUS_CONNECTING   = byte(0x1)
-	STATUS_CONNECTED    = byte(0x2)
-	STATUS_STARTED      = byte(0x4)
-	STATUS_RECONNECTING = byte(0x8)
+	STATUS_STOPPED         = 0
+	STATUS_CONNECTING byte = 1 << (iota - 1)
+	STATUS_CONNECTED
+	STATUS_STARTED
+	STATUS_RECONNECTING
 )
 
 const (
@@ -47,7 +47,7 @@ var (
 // createIrcClient
 type connResult struct {
 	conn net.Conn
-	err error
+	err  error
 }
 
 // certReader is for IoC of the createTlsConfig function.
@@ -77,7 +77,7 @@ type Server struct {
 	client       *inet.IrcClient
 	state        *data.State
 	reconnScale  time.Duration
-	kill chan int
+	kill         chan int
 	killdispatch chan int
 	killreconn   chan int
 
@@ -94,19 +94,11 @@ type ServerEndpoint struct {
 	server *Server
 }
 
-// GetKey returns the server id of the current server.
-func (s *ServerEndpoint) GetKey() string {
-	return s.server.name
-}
-
-// Writeln writes to the server's IrcClient.
-func (s *Server) Writeln(args ...interface{}) error {
-	_, err := s.Write([]byte(fmt.Sprint(args...)))
-	return err
-}
-
 // Write writes to the server's IrcClient.
 func (s *Server) Write(buf []byte) (int, error) {
+	if len(buf) == 0 {
+		return 0, nil
+	}
 	s.protect.RLock()
 	defer s.protect.RUnlock()
 
@@ -117,8 +109,8 @@ func (s *Server) Write(buf []byte) (int, error) {
 	return 0, errNotConnected
 }
 
-// createServerEndpoint creates a ServerEndpoint with an embedded DataEndpoint.
-func (s *Server) createServerEndpoint(store *data.Store, mutex *sync.RWMutex) {
+// createEndpoint creates a ServerEndpoint with an embedded DataEndpoint.
+func (s *Server) createEndpoint(store *data.Store, mutex *sync.RWMutex) {
 	s.endpoint = &ServerEndpoint{
 		DataEndpoint: data.CreateDataEndpoint(
 			s.name,
@@ -215,7 +207,7 @@ func (s *Server) createConnection(resultService chan chan *connResult) {
 	}
 }
 
-// createTlsConfig creates a tls config appropriate for the 
+// createTlsConfig creates a tls config appropriate for the
 func (s *Server) createTlsConfig(cr certReader) (conf *tls.Config, err error) {
 	conf = &tls.Config{}
 	conf.InsecureSkipVerify = s.conf.GetNoVerifyCert()
@@ -248,6 +240,19 @@ func (s *Server) rehashProtocaps() error {
 	return nil
 }
 
+// IsStopped checks to see if the server is stopped.
+func (s *Server) IsStopped() bool {
+	s.protect.RLock()
+	defer s.protect.RUnlock()
+
+	return s.isStopped()
+}
+
+// isStopped checks to see if the server is stopped without locking
+func (s *Server) isStopped() bool {
+	return s.status == STATUS_STOPPED
+}
+
 // IsConnecting checks to see if the server is connecting.
 func (s *Server) IsConnecting() bool {
 	s.protect.RLock()
@@ -258,7 +263,7 @@ func (s *Server) IsConnecting() bool {
 
 // isConnecting checks to see if the server is connecting without locking
 func (s *Server) isConnecting() bool {
-	return STATUS_CONNECTED == s.status&STATUS_CONNECTED
+	return STATUS_CONNECTING == s.status&STATUS_CONNECTING
 }
 
 // setConnecting sets the server's connecting flag.
@@ -269,9 +274,9 @@ func (s *Server) setConnecting(value, lock bool) {
 	}
 
 	if value {
-		s.status |= STATUS_CONNECTED
+		s.status |= STATUS_CONNECTING
 	} else {
-		s.status &= ^STATUS_CONNECTED
+		s.status &= ^STATUS_CONNECTING
 	}
 }
 

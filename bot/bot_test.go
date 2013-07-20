@@ -11,8 +11,8 @@ import (
 	"log"
 	"net"
 	"os"
-	//"regexp/syntax"
-	//"sync"
+	"regexp/syntax"
+	"runtime"
 	. "testing"
 	"time"
 )
@@ -51,13 +51,13 @@ func init() {
 	if err != nil {
 		log.Println("Could not set logger:", err)
 	} else {
-		_ = f//log.SetOutput(f)
+		log.SetOutput(f)
 	}
 
 	data.UserAccessPwdCost = 4 // See bcrypt.MinCost
 }
 
-var serverId = "irc.test.net"
+var serverID = "irc.test.net"
 
 var fakeConfig = Configure().
 	Nick("nobody").
@@ -70,7 +70,7 @@ var fakeConfig = Configure().
 	NoVerifyCert(true).
 	SslCert("fakecert").
 	Ssl(true).
-	Server(serverId)
+	Server(serverID)
 
 //==================================
 // Tests begin
@@ -127,7 +127,7 @@ func TestBot_Dispatching(t *T) {
 		return conn, nil
 	}
 	b, _ := createBot(fakeConfig, nil, connProvider, nil, false, false)
-	srv := b.servers[serverId]
+	srv := b.servers[serverID]
 
 	result := make(chan *irc.Message)
 	thandler := &testHandler{
@@ -135,29 +135,49 @@ func TestBot_Dispatching(t *T) {
 			result <- m
 		},
 	}
+	cresult := make(chan string)
+	tcommand := &testCommand{
+		func(cmd string, _ *irc.Message, _ *data.DataEndpoint,
+			_ *commander.CommandData) error {
+
+			cresult <- cmd
+			return nil
+		},
+	}
 	b.Register(irc.PRIVMSG, thandler)
+	if err := b.RegisterCommand(commander.MkCmd(
+		"a", "b", "cmd", tcommand, commander.ALL, commander.ALL)); err != nil {
+		t.Error("Should have registered a command successfully.")
+	}
 
 	end := b.Start()
 	for !srv.IsConnected() {
-		time.Sleep(1)
+		runtime.Gosched()
 	}
 	for !srv.IsStarted() {
-		time.Sleep(1)
+		runtime.Gosched()
 	}
 
-	testMsg := "message"
+	testMsg := "cmd"
 	msg := []byte("PRIVMSG bot :" + testMsg + "\r\n")
 	go func() {
 		// First send should simply log.
-		conn.Send([]byte(testMsg + "\r\n"), len(testMsg)+2, nil)
+		conn.Send([]byte(testMsg+"\r\n"), len(testMsg)+2, nil)
 		conn.Send(msg, len(msg), io.EOF)
 	}()
 
 	if d := <-result; d == nil || d.Message() != testMsg {
 		t.Error("Expected:", string(msg), "got:", d)
 	}
+	if c := <-cresult; c != testMsg {
+		t.Error("Expected:", testMsg, "got:", c)
+	}
 
 	for _ = range end {
+	}
+
+	if !b.UnregisterCommand("cmd") {
+		t.Error("Should have unregistered a command.")
 	}
 }
 
@@ -204,9 +224,10 @@ func TestBot_Reconnect(t *T) {
 		return conn, nil
 	}
 
-	conf := fakeConfig.Clone().GlobalContext().NoReconnect(false)
+	conf := fakeConfig.Clone().GlobalContext().NoReconnect(false).
+		ReconnectTimeout(1)
 	b, _ := createBot(conf, nil, connProvider, nil, false, false)
-	srv := b.servers[serverId]
+	srv := b.servers[serverID]
 	srv.reconnScale = time.Millisecond
 
 	end := b.Start()
@@ -221,12 +242,42 @@ func TestBot_Reconnect(t *T) {
 	wantedConn <- 0
 
 	for !srv.IsConnecting() {
-		time.Sleep(1)
+		runtime.Gosched()
 	}
 	srv.kill <- 0
 	for err := range end {
 		if err != errServerKilled {
 			t.Error("Expected it to die during connection.")
+		}
+	}
+}
+
+func TestBot_ReconnectConnection(t *T) {
+	t.Parallel()
+	wantedConn := make(chan int)
+	connProvider := func(srv string) (net.Conn, error) {
+		<-wantedConn
+		return nil, io.EOF
+	}
+
+	conf := fakeConfig.Clone().GlobalContext().NoReconnect(false).
+		ReconnectTimeout(1)
+	b, _ := createBot(conf, nil, connProvider, nil, false, false)
+	srv := b.servers[serverID]
+	srv.reconnScale = time.Millisecond
+
+	end := b.Start()
+	wantedConn <- 0
+	wantedConn <- 0
+	wantedConn <- 0
+
+	for !srv.IsConnecting() {
+		runtime.Gosched()
+	}
+	srv.kill <- 0
+	for err := range end {
+		if err != errServerKilledReconn {
+			t.Error("Expected it to die during reconnection.")
 		}
 	}
 }
@@ -239,9 +290,9 @@ func TestBot_ReconnectKill(t *T) {
 	}
 
 	conf := fakeConfig.Clone().GlobalContext().NoReconnect(false).
-		ReconnectTimeout(20)
+		ReconnectTimeout(1)
 	b, _ := createBot(conf, nil, connProvider, nil, false, false)
-	srv := b.servers[serverId]
+	srv := b.servers[serverID]
 
 	result := make(chan *irc.Message)
 	thandler := &testHandler{
@@ -258,7 +309,7 @@ func TestBot_ReconnectKill(t *T) {
 	}
 	conn.Send(nil, 0, io.EOF)
 	for !srv.IsReconnecting() {
-		time.Sleep(1)
+		runtime.Gosched()
 	}
 	srv.kill <- 0
 	for err := range end {
@@ -267,261 +318,202 @@ func TestBot_ReconnectKill(t *T) {
 		}
 	}
 }
-/*func (s *s) TestBot_StartStop(c *C) {
-	conn := mocks.CreateConn()
-	connProvider := func(srv string) (net.Conn, error) {
-		return conn, nil
-	}
 
-	b, err := createBot(fakeConfig, nil, connProvider, nil, false, false)
-	c.Check(err, IsNil)
-	ers := b.Connect()
-	c.Check(len(ers), Equals, 0)
-	b.Start()
-	b.Start() // This shouldn't do anything, test cov
-
-	conn.Send([]byte{}, 0, io.EOF)
-
-	b.Stop()
-	b.Disconnect()
-	b.WaitForHalt()
-}
-
-func (s *s) TestBot_StartStopServer(c *C) {
-	conn := mocks.CreateConn()
-	connProvider := func(srv string) (net.Conn, error) {
-		return conn, nil
-	}
-
-	b, err := createBot(fakeConfig, nil, connProvider, nil, false, false)
-	c.Check(err, IsNil)
-
-	srv := b.servers[serverId]
-	c.Check(srv.IsStarted(), Equals, false)
-	c.Check(srv.IsConnected(), Equals, false)
-
-	_, err = b.ConnectServer(serverId)
-	c.Check(err, IsNil)
-	c.Check(srv.IsConnected(), Equals, true)
-
-	_, err = b.ConnectServer(serverId)
-	c.Check(err, NotNil)
-
-	b.StartServer(serverId)
-	c.Check(srv.IsStarted(), Equals, true)
-	c.Check(srv.IsReading(), Equals, true)
-	c.Check(srv.IsWriting(), Equals, true)
-
-	b.StopServer(serverId)
-	c.Check(srv.IsStarted(), Equals, true)
-	c.Check(srv.IsReading(), Equals, false)
-	c.Check(srv.IsWriting(), Equals, true)
-
-	conn.Send([]byte{}, 0, io.EOF)
-
-	b.DisconnectServer(serverId)
-	c.Check(srv.IsConnected(), Equals, false)
-	c.Check(srv.IsWriting(), Equals, false)
-
-	b.WaitForHalt()
-
-	_, err = b.ConnectServer(serverId)
-	conn.ResetDeath()
-	c.Check(err, IsNil)
-	b.DisconnectServer(serverId)
-}
-
-func (s *s) TestBot_Reconnecting(c *C) {
-	conf := Configure().Nick("nobody").Altnick("nobody1").Username("nobody").
-		Userhost("bitforge.ca").Realname("ultimateq").NoReconnect(false).
-		ReconnectTimeout(1).Ssl(true).NoStore(true).Server(serverId)
-
-	cumutex := sync.Mutex{}
-
-	conn := mocks.CreateConn()
-	waiter := sync.WaitGroup{}
-	ndisc := 0
-
-	var b *Bot
-	connProvider := func(srv string) (net.Conn, error) {
-		cumutex.Lock()
-		defer cumutex.Unlock()
-		defer waiter.Done()
-
-		ndisc++
-
-		switch ndisc {
-		case 1:
-			return conn, nil
-		case 2:
-			return nil, io.EOF
-		case 3:
-			go func() {
-				b.servers[serverId].killreconn <- 0
-			}()
-			return conn, nil
-		}
-
-		c.Fatal("Unexpected reconnect occured.")
-		return nil, nil
-	}
-
-	var err error
-	b, err = createBot(conf, nil, connProvider, nil, false, false)
-	c.Check(err, IsNil)
-	srv := b.servers[serverId]
-	srv.reconnScale = time.Microsecond
-
-	waiter.Add(1)
-
-	b.Connect()
-	b.start(false, true)
-
-	waiter.Wait()
-	waiter.Add(1)
-
-	conn.Send([]byte{}, 0, io.EOF)
-	conn.WaitForDeath()
-	conn.ResetDeath()
-
-	waiter.Wait()
-	waiter.Add(1)
-
-	conn.Send([]byte{}, 0, io.EOF)
-	conn.WaitForDeath()
-	conn.ResetDeath()
-
-	waiter.Wait()
-	b.WaitForHalt()
-
-	cumutex.Lock()
-	c.Check(ndisc, Equals, 3)
-	cumutex.Unlock()
-}
-
-func (s *s) TestBot_InterruptReconnect(c *C) {
-	conf := Configure().Nick("nobody").Altnick("nobody1").Username("nobody").
-		Userhost("bitforge.ca").Realname("ultimateq").NoReconnect(false).
-		ReconnectTimeout(1).Ssl(true).NoStore(true).Server(serverId)
-
-	cumutex := sync.Mutex{}
-
-	conn := mocks.CreateConn()
-	ndisc := 0
-	var b *Bot
-	connProvider := func(srv string) (net.Conn, error) {
-		cumutex.Lock()
-		defer cumutex.Unlock()
-
-		ndisc++
-		return conn, nil
-	}
-
-	var err error
-	b, err = createBot(conf, nil, connProvider, nil, false, false)
-	c.Check(err, IsNil)
-	srv := b.servers[serverId]
-
-	b.connectServer(srv)
-	b.startServer(srv, false, true)
-
-	conn.Send([]byte{}, 0, io.EOF)
-	conn.WaitForDeath()
-
-	c.Check(b.InterruptReconnect(serverId), Equals, true)
-	cumutex.Lock()
-	c.Check(ndisc, Equals, 1)
-	cumutex.Unlock()
-}
-
-func (s *s) TestBot_Dispatching(c *C) {
-	str := []byte(":user!host@chan PRIVMSG chan :msg\r\n#\r\n")
-
-	conn := mocks.CreateConn()
-	connProvider := func(srv string) (net.Conn, error) {
-		return conn, nil
-	}
-
-	waiter := sync.WaitGroup{}
-	waiter.Add(2)
-	b, err := createBot(fakeConfig, nil, connProvider, nil, false, false)
-
-	b.Register(irc.PRIVMSG, &testHandler{
-		func(_ *irc.Message, _ irc.Endpoint) {
-			waiter.Done()
-		},
-	})
-	err = b.RegisterCommand(commander.MkCmd("ext", "dsc", "msg", &testCommand{
-		func(_ string, _ *irc.Message, _ *data.DataEndpoint,
-			_ *commander.CommandData) error {
-			waiter.Done()
-			return nil
-		},
-	}, commander.PRIVMSG, commander.PRIVATE))
-
-	c.Check(err, IsNil)
-	ers := b.Connect()
-	c.Check(len(ers), Equals, 0)
-	b.start(false, true)
-
-	conn.Send(str, len(str), io.EOF)
-
-	waiter.Wait()
-	b.Stop()
-	b.WaitForHalt()
-	b.Disconnect()
-
-	b.UnregisterCommand("msg")
-}
-
-func (s *s) TestBot_Register(c *C) {
-	b, err := createBot(fakeConfig, nil, nil, nil, false, false)
+func TestBot_Register(t *T) {
+	t.Parallel()
+	b, _ := createBot(fakeConfig, nil, nil, nil, false, false)
 	gid := b.Register(irc.PRIVMSG, &coreHandler{})
-	id, err := b.RegisterServer(serverId, irc.PRIVMSG, &coreHandler{})
-	c.Check(err, IsNil)
+	id, err := b.RegisterServer(serverID, irc.PRIVMSG, &coreHandler{})
 
-	c.Check(b.Unregister(irc.PRIVMSG, id), Equals, false)
-	c.Check(b.Unregister(irc.PRIVMSG, gid), Equals, true)
+	if b.Unregister(irc.PRIVMSG, id) {
+		t.Error("Unregister should not know about server events.")
+	}
+	if !b.Unregister(irc.PRIVMSG, gid) {
+		t.Error("Should unregister the global registration.")
+	}
 
-	ok, err := b.UnregisterServer(serverId, irc.PRIVMSG, gid)
-	c.Check(ok, Equals, false)
-	ok, err = b.UnregisterServer(serverId, irc.PRIVMSG, id)
-	c.Check(ok, Equals, true)
+	if ok, _ := b.UnregisterServer(serverID, irc.PRIVMSG, gid); ok {
+		t.Error("Unregister server should not know about global events.")
+	}
+	if ok, _ := b.UnregisterServer(serverID, irc.PRIVMSG, id); !ok {
+		t.Error("Unregister should unregister events.")
+	}
 
 	_, err = b.RegisterServer("", "", &coreHandler{})
-	c.Check(err, Equals, errUnknownServerID)
+	if err != errUnknownServerID {
+		t.Error("Expecting:", errUnknownServerID, "got:", err)
+	}
 	_, err = b.UnregisterServer("", "", 0)
-	c.Check(err, Equals, errUnknownServerID)
+	if err != errUnknownServerID {
+		t.Error("Expecting:", errUnknownServerID, "got:", err)
+	}
 }
 
-func (s *s) TestBot_RegisterCommand(c *C) {
+func TestBot_RegisterCommand(t *T) {
+	// t.Parallel() Cannot be parallel due to the nature of command registration
 	var err error
 	var success bool
-	b, err := createBot(fakeConfig, nil, nil, nil, false, false)
+	b, _ := createBot(fakeConfig, nil, nil, nil, false, false)
 	cmd := "cmd"
 	err = b.RegisterCommand(commander.MkCmd("ext", "desc", cmd, &testCommand{},
 		commander.ALL, commander.ALL))
+	if err != nil {
+		t.Error("Unexpected error:", err)
+	}
 
 	err = b.RegisterCommand(commander.MkCmd("ext", "desc", cmd, &testCommand{},
 		commander.ALL, commander.ALL))
-	c.Check(err, NotNil) // Duplicate
-	success = b.UnregisterCommand(cmd)
-	c.Check(success, Equals, true)
+	if err == nil {
+		t.Error("Expecting error about duplicates.")
+	}
+	if success = b.UnregisterCommand(cmd); !success {
+		t.Error("It should unregister correctly.")
+	}
 
-	err = b.RegisterServerCommand(serverId, commander.MkCmd("e", "d", cmd,
+	err = b.RegisterServerCommand(serverID, commander.MkCmd("e", "d", cmd,
 		&testCommand{}, commander.ALL, commander.ALL))
-	c.Check(err, IsNil)
-	success = b.UnregisterServerCommand(serverId, cmd)
-	c.Check(success, Equals, true)
+	if err != nil {
+		t.Error("Unexpected error:", err)
+	}
+	if success = b.UnregisterServerCommand(serverID, cmd); !success {
+		t.Error("It should unregister correctly.")
+	}
 
 	err = b.RegisterServerCommand("badServer", commander.MkCmd("e", "d", cmd,
 		&testCommand{}, commander.ALL, commander.ALL))
-	c.Check(err, Equals, errUnknownServerID)
+	if err != errUnknownServerID {
+		t.Error("Expecting:", errUnknownServerID, "got:", err)
+	}
 
-	success = b.UnregisterServerCommand("badServer", cmd)
-	c.Check(success, Equals, false)
+	if success = b.UnregisterServerCommand("badServer", cmd); success {
+		t.Error("It should not unregister from non existent servers.")
+	}
 }
 
+func TestBot_Providers(t *T) {
+	t.Parallel()
+	storeConf1 := fakeConfig.Clone().GlobalContext().NoStore(false)
+	storeConf2 := storeConf1.Clone().ServerContext(serverID).NoStore(false)
+	storeConf3 := storeConf1.Clone().ServerContext(serverID).NoStore(true)
+
+	capsProv := func() *irc.ProtoCaps {
+		p := irc.CreateProtoCaps()
+		p.ParseISupport(&irc.Message{Args: []string{"nick", "CHANTYPES=H"}})
+		return p
+	}
+	badConnProv := func(s string) (net.Conn, error) {
+		return nil, net.ErrWriteToConnected
+	}
+	goodConnProv := func(s string) (net.Conn, error) {
+		return mocks.CreateConn(), nil
+	}
+	badStoreProv := func(s string) (*data.Store, error) {
+		return nil, io.EOF
+	}
+
+	b, err := createBot(
+		fakeConfig, capsProv, goodConnProv, badStoreProv, false, false)
+	if _, ok := err.(*syntax.Error); !ok {
+		t.Error("The error was not a syntax error:", err)
+	}
+
+	b, err = createBot(fakeConfig, nil, badConnProv, badStoreProv, false, false)
+	if err = <-b.Start(); err != net.ErrWriteToConnected {
+		t.Error("Expected:", net.ErrWriteToConnected, "got:", err)
+	}
+
+	b, err = createBot(fakeConfig, nil, nil, badStoreProv, false, false)
+	if err != nil {
+		t.Error("Expected no errors.")
+	}
+	b, err = createBot(storeConf1, nil, nil, badStoreProv, false, false)
+	if err != io.EOF {
+		t.Error("Expected an error creating the store.")
+	}
+	b, err = createBot(storeConf2, nil, nil, badStoreProv, false, false)
+	if err != io.EOF {
+		t.Error("Expected an error creating the store.")
+	}
+	b, err = createBot(storeConf3, nil, nil, badStoreProv, false, false)
+	if err != nil {
+		t.Error("Expected no errors.")
+	}
+}
+
+func TestBot_Store(t *T) {
+	t.Parallel()
+	conf := fakeConfig.Clone().GlobalContext().NoStore(false)
+	goodStoreProv := func(s string) (*data.Store, error) {
+		return data.CreateStore(data.MemStoreProvider)
+	}
+	b, err := createBot(conf, nil, nil, goodStoreProv, false, false)
+	if err != nil {
+		t.Error("Expected no errors.")
+	}
+	if b.store == nil {
+		t.Error("Store should not be nil.")
+	}
+	b.Close()
+	b.Close() // Nothing bad should happen
+}
+
+func TestBot_Stop(t *T) {
+	t.Parallel()
+	conn := mocks.CreateConn()
+	connProvider := func(srv string) (net.Conn, error) {
+		return conn, nil
+	}
+	b, _ := createBot(fakeConfig, nil, connProvider, nil, false, false)
+	srv := b.servers[serverID]
+
+	end := b.Start()
+
+	for !srv.IsStarted() {
+		runtime.Gosched()
+	}
+
+	b.Stop()
+	for _ = range end {
+	}
+}
+
+func TestBot_GetEndpoint(t *T) {
+	t.Parallel()
+	conn := mocks.CreateConn()
+	connProvider := func(srv string) (net.Conn, error) {
+		return conn, nil
+	}
+	b, _ := createBot(fakeConfig, nil, connProvider, nil, false, false)
+	srv := b.servers[serverID]
+
+	end := b.Start()
+
+	ep := b.GetEndpoint(serverID)
+
+	test := "test\r\n"
+	result := make(chan string)
+	go func() {
+		result <- string(conn.Receive(len(test), io.EOF))
+	}()
+
+	for !srv.IsConnected() {
+		runtime.Gosched()
+	}
+
+	if err := ep.Send(test); err != nil {
+		t.Fatal("Unexpected error:", err)
+	}
+
+	if res := <-result; res != test {
+		t.Error("Expected:", test, "got:", res)
+	}
+
+	b.Stop()
+	for _ = range end {
+	}
+}
+
+/*
 func (s *s) TestBot_createBot(c *C) {
 	capsProvider := func() *irc.ProtoCaps {
 		return irc.CreateProtoCaps()
@@ -544,7 +536,7 @@ func (s *s) TestBot_createBot(c *C) {
 func (s *s) TestBot_createServer(c *C) {
 	b, err := createBot(fakeConfig, nil, nil, nil, true, false)
 	c.Check(err, IsNil)
-	srv := b.servers[serverId]
+	srv := b.servers[serverID]
 	c.Check(srv.dispatcher, NotNil)
 	c.Check(srv.commander, NotNil)
 	c.Check(srv.dispatchCore, NotNil)
@@ -555,48 +547,10 @@ func (s *s) TestBot_createServer(c *C) {
 	cnf.GlobalContext().NoState(true)
 	b, err = createBot(cnf, nil, nil, nil, false, false)
 	c.Check(err, IsNil)
-	srv = b.servers[serverId]
+	srv = b.servers[serverID]
 	c.Check(srv.dispatcher, NotNil)
 	c.Check(srv.state, IsNil)
 	c.Check(srv.handler, IsNil)
-}
-
-func (s *s) TestBot_Providers(c *C) {
-	storeConf1 := fakeConfig.Clone().GlobalContext().NoStore(false)
-	storeConf2 := storeConf1.Clone().ServerContext(serverId).NoStore(false)
-	storeConf3 := storeConf1.Clone().ServerContext(serverId).NoStore(true)
-
-	capsProv := func() *irc.ProtoCaps {
-		p := irc.CreateProtoCaps()
-		p.ParseISupport(&irc.Message{Args: []string{"nick", "CHANTYPES=H"}})
-		return p
-	}
-	badConnProv := func(s string) (net.Conn, error) {
-		return nil, net.ErrWriteToConnected
-	}
-	goodConnProv := func(s string) (net.Conn, error) {
-		return mocks.CreateConn(), nil
-	}
-	badStoreProv := func(s string) (*data.Store, error) {
-		return nil, io.EOF
-	}
-
-	b, err := createBot(
-		fakeConfig, capsProv, goodConnProv, badStoreProv, false, false)
-	c.Check(err, FitsTypeOf, &syntax.Error{})
-
-	b, err = createBot(fakeConfig, nil, badConnProv, badStoreProv, false, false)
-	ers := b.Connect()
-	c.Check(ers[0], Equals, net.ErrWriteToConnected)
-
-	b, err = createBot(fakeConfig, nil, nil, badStoreProv, false, false)
-	c.Check(err, IsNil)
-	b, err = createBot(storeConf1, nil, nil, badStoreProv, false, false)
-	c.Check(err, Equals, io.EOF)
-	b, err = createBot(storeConf2, nil, nil, badStoreProv, false, false)
-	c.Check(err, Equals, io.EOF)
-	b, err = createBot(storeConf3, nil, nil, badStoreProv, false, false)
-	c.Check(err, IsNil)
 }
 
 func (s *s) TestBot_createIrcClient(c *C) {

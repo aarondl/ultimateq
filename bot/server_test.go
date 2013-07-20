@@ -1,16 +1,15 @@
 package bot
 
 import (
-	//"bytes"
-	//"github.com/aarondl/ultimateq/data"
-	//"github.com/aarondl/ultimateq/irc"
-	//"github.com/aarondl/ultimateq/mocks"
-	//. "launchpad.net/gocheck"
-	"io"
+	"bytes"
 	"crypto/x509"
+	"github.com/aarondl/ultimateq/irc"
+	"github.com/aarondl/ultimateq/mocks"
+	"io"
+	"net"
+	"runtime"
 	. "testing"
 	"time"
-	"net"
 )
 
 func TestServer_createIrcClient(t *T) {
@@ -26,7 +25,7 @@ func TestServer_createIrcClient(t *T) {
 		return nil, retErr
 	}
 	b, _ := createBot(fakeConfig, nil, connProvider, nil, false, false)
-	srv := b.servers[serverId]
+	srv := b.servers[serverID]
 
 	doSleep = true
 	go func() {
@@ -65,7 +64,7 @@ func TestServer_createIrcClient(t *T) {
 func TestServer_createTlsConfig(t *T) {
 	t.Parallel()
 	b, _ := createBot(fakeConfig, nil, nil, nil, false, false)
-	srv := b.servers[serverId]
+	srv := b.servers[serverID]
 
 	pool := x509.NewCertPool()
 	tlsConfig, _ := srv.createTlsConfig(func(_ string) (*x509.CertPool, error) {
@@ -80,126 +79,98 @@ func TestServer_createTlsConfig(t *T) {
 	}
 }
 
-/*func (s *s) TestServerSender(c *C) {
-	b, err := createBot(fakeConfig, nil, nil, nil, false, false)
-	c.Check(err, IsNil)
-	srv := b.servers[serverId]
-	c.Check(srv.endpoint.GetKey(), Equals, serverId)
+func TestServerSender(t *T) {
+	t.Parallel()
+	b, _ := createBot(fakeConfig, nil, nil, nil, false, false)
+	ep := b.GetEndpoint(serverID)
+	if ep.GetKey() != serverID {
+		t.Error("Expected the key to represent the server.")
+	}
+	if b.servers[serverID].endpoint.server != b.servers[serverID] {
+		t.Error("Endpoints are being constructed with wrong servers.")
+	}
 }
 
-func (s *s) TestServerSender_UsingState(c *C) {
-	b, err := createBot(fakeConfig, nil, nil, nil, false, false)
-	c.Check(err, IsNil)
-	srv := b.servers[serverId]
+func TestServer_Status(t *T) {
+	t.Parallel()
+	srv := &Server{}
 
-	c.Check(srv.endpoint.GetKey(), Equals, serverId)
-	called := false
-	reportCalled := false
-	reportCalled = srv.endpoint.UsingState(func(*data.State) {
-		called = true
-	})
-	c.Check(called, Equals, true)
-	c.Check(reportCalled, Equals, true)
-
-	srv.state = nil
-	srv.createServerEndpoint(nil, nil)
-	called = false
-	reportCalled = false
-	reportCalled = srv.endpoint.UsingState(func(*data.State) {
-		called = true
-	})
-	c.Check(called, Equals, false)
-	c.Check(reportCalled, Equals, false)
-}
-
-func (s *s) TestServerSender_UsingStore(c *C) {
-	b, err := createBot(fakeConfig, nil, nil, nil, false, false)
-	c.Check(err, IsNil)
-	srv := b.servers[serverId]
-	store, err := data.CreateStore(data.MemStoreProvider)
-	srv.createServerEndpoint(store, &b.protectStore)
-	c.Check(err, IsNil)
-
-	called := false
-	reportCalled := false
-	reportCalled = srv.endpoint.UsingStore(func(*data.Store) {
-		called = true
-	})
-	c.Check(called, Equals, true)
-	c.Check(reportCalled, Equals, true)
-
-	srv.createServerEndpoint(nil, &b.protectStore)
-	called = false
-	reportCalled = false
-	reportCalled = srv.endpoint.UsingStore(func(*data.Store) {
-		called = true
-	})
-	c.Check(called, Equals, false)
-	c.Check(reportCalled, Equals, false)
-}
-
-func (s *s) TestServerSender_OpenState(c *C) {
-	b, err := createBot(fakeConfig, nil, nil, nil, false, false)
-	c.Check(err, IsNil)
-	srv := b.servers[serverId]
-	srv.createServerEndpoint(nil, nil)
-
-	c.Check(srv.endpoint.OpenState(), Equals, srv.state)
-	srv.endpoint.CloseState()
-
-	srv.protectState.Lock()
-	srv.protectState.Unlock()
-	c.Succeed()
-}
-
-func (s *s) TestServerSender_OpenStore(c *C) {
-	b, err := createBot(fakeConfig, nil, nil, nil, false, false)
-	c.Check(err, IsNil)
-	srv := b.servers[serverId]
-	store, err := data.CreateStore(data.MemStoreProvider)
-	c.Check(err, IsNil)
-	srv.createServerEndpoint(store, &b.protectStore)
-
-	c.Check(srv.endpoint.OpenStore(), Equals, b.store)
-	srv.endpoint.CloseStore()
-
-	b.protectStore.Lock()
-	b.protectStore.Unlock()
-	c.Succeed()
-}
-
-func (s *s) TestServer_Write(c *C) {
-	str := "PONG :msg\r\n"
-
-	conn := mocks.CreateConn()
-	connProvider := func(srv string) (net.Conn, error) {
-		return conn, nil
+	var tests = []struct {
+		Value, Lock, Expect bool
+	}{
+		{true, false, true},
+		{false, false, false},
+		{true, true, true},
+		{false, true, false},
 	}
 
-	b, err := createBot(fakeConfig, nil, connProvider, nil, false, false)
-	c.Check(err, IsNil)
-	srv := b.servers[serverId]
+	var funcs = []func(int){
+		func(i int) {
+			test := tests[i]
+			srv.setConnecting(test.Value, test.Lock)
+			if was := srv.IsConnecting(); was != test.Expect {
+				t.Error("In Test:", test)
+				t.Error("Expected:", test.Expect, "was:", was)
+			}
+		},
+		func(i int) {
+			test := tests[i]
+			srv.setConnected(test.Value, test.Lock)
+			if was := srv.IsConnected(); was != test.Expect {
+				t.Error("In Test:", test)
+				t.Error("Expected:", test.Expect, "was:", was)
+			}
+		},
+		func(i int) {
+			test := tests[i]
+			srv.setStarted(test.Value, test.Lock)
+			if was := srv.IsStarted(); was != test.Expect {
+				t.Error("In Test:", test)
+				t.Error("Expected:", test.Expect, "was:", was)
+			}
+		},
+		func(i int) {
+			test := tests[i]
+			srv.setReconnecting(test.Value, test.Lock)
+			if was := srv.IsReconnecting(); was != test.Expect {
+				t.Error("In Test:", test)
+				t.Error("Expected:", test.Expect, "was:", was)
+			}
+		},
+	}
 
-	_, err = srv.Write([]byte{})
-	c.Check(err, Equals, errNotConnected)
-
-	ers := b.Connect()
-	c.Check(len(ers), Equals, 0)
-	b.start(true, false)
-
-	err = srv.Writeln(str)
-	c.Check(bytes.Compare(conn.Receive(len(str), nil), []byte(str)), Equals, 0)
-	c.Check(err, IsNil)
-	_, err = srv.Write([]byte(str))
-	c.Check(bytes.Compare(conn.Receive(len(str), nil), []byte(str)), Equals, 0)
-	c.Check(err, IsNil)
-	err = b.Writeln("notrealserver", str)
-	c.Check(err, NotNil)
-	b.WaitForHalt()
-	b.Disconnect()
+	for _, fn := range funcs {
+		for j := range tests {
+			fn(j)
+		}
+	}
 }
 
-func (s *s) TestServer_rehashProtocaps(c *C) {
+func TestServer_StatusMultiple(t *T) {
+	srv := &Server{}
+	srv.status = 0
+	if !srv.IsStopped() {
+		t.Error("If there are no flags set, isstopped should be true.")
+	}
+	srv.status = ^byte(0)
+	if srv.IsStopped() {
+		t.Error("If there is any flags set, isstopped should be false.")
+	}
+	if !srv.IsConnecting() {
+		t.Error("All flags should all be able to be set together.")
+	}
+	if !srv.IsConnected() {
+		t.Error("All flags should all be able to be set together.")
+	}
+	if !srv.IsStarted() {
+		t.Error("All flags should all be able to be set together.")
+	}
+	if !srv.IsReconnecting() {
+		t.Error("All flags should all be able to be set together.")
+	}
+}
+
+func TestServer_rehashProtocaps(t *T) {
 	originalCaps := irc.CreateProtoCaps()
 	originalCaps.ParseISupport(&irc.Message{Args: []string{
 		"NICK", "CHANTYPES=!",
@@ -208,79 +179,67 @@ func (s *s) TestServer_rehashProtocaps(c *C) {
 		return originalCaps
 	}
 
-	b, err := createBot(fakeConfig, capsProv, nil, nil, false, false)
-	c.Check(err, IsNil)
-	srv := b.servers[serverId]
+	b, _ := createBot(fakeConfig, capsProv, nil, nil, false, false)
+	srv := b.servers[serverID]
 
-	c.Check(srv.caps.Chantypes(), Equals, "!")
+	if srv.caps.Chantypes() != "!" {
+		t.Error("Protocaps were not set by caps provider.")
+	}
+	if b.caps.Chantypes() != "!" {
+		t.Error("Protocaps were not set by caps provider.")
+	}
 
 	srv.caps.ParseISupport(&irc.Message{Args: []string{
 		"NICK", "CHANTYPES=#",
 	}})
-	err = srv.rehashProtocaps()
-	c.Check(err, IsNil)
+	err := srv.rehashProtocaps()
+	if err != nil {
+		t.Error("Unexpected:", err)
+	}
 
-	c.Check(b.caps.Chantypes(), Equals, "!#")
+	if srv.caps.Chantypes() != "#" {
+		t.Error("Protocaps were not set by rehash.")
+	}
+	if b.caps.Chantypes() != "!#" {
+		t.Error("Protocaps were not merged correctly.")
+	}
 }
 
-func (s *s) TestServer_State(c *C) {
-	srv := &Server{}
+func TestServer_Write(t *T) {
+	conn := mocks.CreateConn()
+	connProvider := func(srv string) (net.Conn, error) {
+		return conn, nil
+	}
 
-	srv.setStarted(true, false)
-	c.Check(srv.IsStarted(), Equals, true)
-	srv.setStarted(false, false)
-	c.Check(srv.IsStarted(), Equals, false)
+	b, _ := createBot(fakeConfig, nil, connProvider, nil, false, false)
+	srv := b.servers[serverID]
 
-	srv.setStarted(true, true)
-	c.Check(srv.IsStarted(), Equals, true)
-	srv.setStarted(false, true)
-	c.Check(srv.IsStarted(), Equals, false)
+	var err error
+	_, err = srv.Write(nil)
+	if err != nil {
+		t.Error("Expected:", err)
+	}
+	_, err = srv.Write([]byte{1})
+	if err != errNotConnected {
+		t.Error("Expected:", errNotConnected, "got:", err)
+	}
 
-	srv.setReading(true, false)
-	c.Check(srv.IsReading(), Equals, true)
-	c.Check(srv.IsStarted(), Equals, true)
-	srv.setReading(false, false)
-	c.Check(srv.IsReading(), Equals, false)
-	c.Check(srv.IsStarted(), Equals, false)
+	end := b.Start()
 
-	srv.setReading(true, true)
-	c.Check(srv.IsReading(), Equals, true)
-	c.Check(srv.IsStarted(), Equals, true)
-	srv.setReading(false, true)
-	c.Check(srv.IsReading(), Equals, false)
-	c.Check(srv.IsStarted(), Equals, false)
+	for !srv.IsConnected() {
+		runtime.Gosched()
+	}
 
-	srv.setWriting(true, false)
-	c.Check(srv.IsWriting(), Equals, true)
-	c.Check(srv.IsStarted(), Equals, true)
-	srv.setWriting(false, false)
-	c.Check(srv.IsWriting(), Equals, false)
-	c.Check(srv.IsStarted(), Equals, false)
+	message := []byte("PONG :msg\r\n")
+	if _, err = srv.Write(message); err != nil {
+		t.Error("Unexpected write error:", err)
+	}
+	got := conn.Receive(len(message), nil)
+	if bytes.Compare(got, message) != 0 {
+		t.Errorf("Socket received wrong message: (%s) != (%s)", got, message)
+	}
 
-	srv.setWriting(true, true)
-	c.Check(srv.IsWriting(), Equals, true)
-	c.Check(srv.IsStarted(), Equals, true)
-	srv.setWriting(false, true)
-	c.Check(srv.IsWriting(), Equals, false)
-	c.Check(srv.IsStarted(), Equals, false)
-
-	srv.setConnected(true, false)
-	c.Check(srv.IsConnected(), Equals, true)
-	srv.setConnected(false, false)
-	c.Check(srv.IsConnected(), Equals, false)
-
-	srv.setConnected(true, true)
-	c.Check(srv.IsConnected(), Equals, true)
-	srv.setConnected(false, true)
-	c.Check(srv.IsConnected(), Equals, false)
-
-	srv.setReconnecting(true, false)
-	c.Check(srv.IsReconnecting(), Equals, true)
-	srv.setReconnecting(false, false)
-	c.Check(srv.IsReconnecting(), Equals, false)
-
-	srv.setReconnecting(true, true)
-	c.Check(srv.IsReconnecting(), Equals, true)
-	srv.setReconnecting(false, true)
-	c.Check(srv.IsReconnecting(), Equals, false)
-}*/
+	b.Stop()
+	for _ = range end {
+	}
+}

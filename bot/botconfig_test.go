@@ -2,12 +2,12 @@ package bot
 
 import (
 	/*
-	"bytes"
-	"github.com/aarondl/ultimateq/config"
-	"github.com/aarondl/ultimateq/irc"
-	"github.com/aarondl/ultimateq/mocks"
-	"io"
-	. "launchpad.net/gocheck"
+		"bytes"
+		"github.com/aarondl/ultimateq/config"
+		"github.com/aarondl/ultimateq/irc"
+		"github.com/aarondl/ultimateq/mocks"
+		"io"
+		. "launchpad.net/gocheck"
 	*/
 	"net"
 )
