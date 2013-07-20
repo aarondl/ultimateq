@@ -1,165 +1,191 @@
 package dispatch
 
 import (
+	"fmt"
 	"github.com/aarondl/ultimateq/irc"
-	. "launchpad.net/gocheck"
-	"testing"
+	. "testing"
 )
 
-func Test(t *testing.T) { TestingT(t) } //Hook into testing package
-type s struct{}
-
-var _ = Suite(&s{})
+func checkArrays(expected []string, actual []string) error {
+	if len(expected) != len(actual) {
+		return fmt.Errorf("Length Expected: %v got: %v",
+			len(expected), len(actual))
+	}
+	for i, v := range expected {
+		if v != actual[i] {
+			return fmt.Errorf("Expected: %v got: %v", v, actual[i])
+		}
+	}
+	return nil
+}
 
 var caps = irc.CreateProtoCaps()
 
-func (s *s) TestDispatchCore(c *C) {
-	d, err := CreateDispatchCore(caps)
-	c.Check(d, NotNil)
-	c.Check(err, IsNil)
-
-	d, err = CreateDispatchCore(nil)
-	c.Check(err, Equals, errProtoCapsMissing)
-
-	p := irc.CreateProtoCaps()
-	p.ParseISupport(&irc.Message{Args: []string{"nick", "CHANTYPES=H"}})
-	d, err = CreateDispatchCore(p)
-	c.Check(err, NotNil)
+func TestDispatchCore(t *T) {
+	t.Parallel()
+	d := CreateDispatchCore(caps)
+	if d == nil {
+		t.Error("Create should create things.")
+	}
 }
 
-func (s *s) TestDispatchCore_Synchronization(c *C) {
-	d, err := CreateDispatchCore(caps)
-	c.Check(err, IsNil)
+func TestDispatchCore_Synchronization(t *T) {
+	t.Parallel()
+	d := CreateDispatchCore(caps)
 	d.HandlerStarted()
 	d.HandlerStarted()
-	d.HandlerStarted()
-	d.HandlerFinished()
 	d.HandlerFinished()
 	d.HandlerFinished()
 	d.WaitForHandlers()
-	c.Succeed()
 }
 
-func (s *s) TestDispatchCore_AddRemoveChannels(c *C) {
+func TestDispatchCore_AddRemoveChannels(t *T) {
+	t.Parallel()
 	chans := []string{"#chan1", "#chan2", "#chan3"}
-	d, err := CreateDispatchCore(caps, chans...)
-	c.Check(err, IsNil)
+	d := CreateDispatchCore(caps, chans...)
 
-	c.Check(len(d.chans), Equals, len(chans))
-	for i, v := range chans {
-		c.Check(d.chans[i], Equals, v)
+	if err := checkArrays(chans, d.chans); err != nil {
+		t.Error(err)
 	}
 
 	d.RemoveChannels(chans...)
-	c.Check(d.chans, IsNil)
+	if d.chans != nil {
+		t.Error("Removing everything should remove everything.")
+	}
 	d.RemoveChannels(chans...)
-	c.Check(d.chans, IsNil)
+	if d.chans != nil {
+		t.Error("Removing everything should remove everything.")
+	}
 	d.RemoveChannels()
-	c.Check(d.chans, IsNil)
+	if d.chans != nil {
+		t.Error("Removing nothing should add test coverage.")
+	}
 
 	d.Channels(chans)
 	d.RemoveChannels(chans[1:]...)
-	c.Check(len(d.chans), Equals, len(chans)-2)
-	for i, v := range chans[:1] {
-		c.Check(d.chans[i], Equals, v)
+	if err := checkArrays(chans[:1], d.chans); err != nil {
+		t.Error(err)
 	}
 	d.AddChannels(chans[1:]...)
-	c.Check(len(d.chans), Equals, len(chans))
-	for i, v := range chans {
-		c.Check(d.chans[i], Equals, v)
+	if err := checkArrays(chans, d.chans); err != nil {
+		t.Error(err)
 	}
 	d.AddChannels(chans[0])
 	d.AddChannels()
-	c.Check(len(d.chans), Equals, len(chans))
+	if err := checkArrays(chans, d.chans); err != nil {
+		t.Error(err)
+	}
 	d.RemoveChannels(chans...)
 	d.AddChannels(chans...)
-	c.Check(len(d.chans), Equals, len(chans))
+	if err := checkArrays(chans, d.chans); err != nil {
+		t.Error(err)
+	}
 }
 
-func (s *s) TestDispatchCore_GetChannels(c *C) {
-	d, err := CreateDispatchCore(caps)
-	c.Check(err, IsNil)
+func TestDispatchCore_GetChannels(t *T) {
+	t.Parallel()
+	d := CreateDispatchCore(caps)
 
-	c.Check(d.GetChannels(), IsNil)
+	if d.GetChannels() != nil {
+		t.Error("Should start uninitialized.")
+	}
 	chans := []string{"#chan1", "#chan2"}
 	d.Channels(chans)
-
-	for i, ch := range d.GetChannels() {
-		c.Check(d.chans[i], Equals, ch)
+	if err := checkArrays(d.chans, d.GetChannels()); err != nil {
+		t.Error(err)
 	}
 
 	first := d.GetChannels()
 	first[0] = "#chan3"
-	for i, ch := range d.GetChannels() {
-		c.Check(d.chans[i], Equals, ch)
+	if err := checkArrays(d.chans, d.GetChannels()); err != nil {
+		t.Error(err)
+		t.Error("The array should be copied so data changes do not affect it.")
 	}
 }
 
-func (s *s) TestDispatchCore_UpdateChannels(c *C) {
-	d, err := CreateDispatchCore(caps)
-	c.Check(err, IsNil)
+func TestDispatchCore_UpdateChannels(t *T) {
+	t.Parallel()
+	d := CreateDispatchCore(caps)
 	chans := []string{"#chan1", "#chan2"}
 	d.Channels(chans)
-	c.Check(len(d.chans), Equals, len(chans))
-	for i, v := range chans {
-		c.Check(d.chans[i], Equals, v)
+	if err := checkArrays(chans, d.chans); err != nil {
+		t.Error("Channels were not set correctly.")
 	}
 	d.Channels([]string{})
-	c.Check(len(d.chans), Equals, 0)
+	if d.chans != nil {
+		t.Error("It should be nil after an empty set.")
+	}
 	d.Channels(chans)
-	c.Check(len(d.chans), Equals, len(chans))
+	if err := checkArrays(chans, d.chans); err != nil {
+		t.Error("Channels were not set correctly.")
+	}
 	d.Channels(nil)
-	c.Check(len(d.chans), Equals, 0)
+	if d.chans != nil {
+		t.Error("It should be nil after an empty set.")
+	}
 }
 
-func (s *s) TestDispatchCore_UpdateProtoCaps(c *C) {
+func TestDispatchCore_UpdateProtoCaps(t *T) {
+	t.Parallel()
 	p := irc.CreateProtoCaps()
 	p.ParseISupport(&irc.Message{Args: []string{"nick", "CHANTYPES=#"}})
-	d, err := CreateDispatchCore(p)
-	c.Check(err, IsNil)
-	var isChan bool
-	isChan, _ = d.CheckTarget("#chan")
-	c.Check(isChan, Equals, true)
-	isChan, _ = d.CheckTarget("&chan")
-	c.Check(isChan, Equals, false)
+	d := CreateDispatchCore(p)
+	if isChan, _ := d.CheckTarget("#chan"); !isChan {
+		t.Error("Expected it to be a channel.")
+	}
+	if isChan, _ := d.CheckTarget("&chan"); isChan {
+		t.Error("Expected it to not be a channel.")
+	}
 
 	p = irc.CreateProtoCaps()
 	p.ParseISupport(&irc.Message{Args: []string{"nick", "CHANTYPES=&"}})
-	err = d.Protocaps(p)
-	c.Check(err, IsNil)
-	isChan, _ = d.CheckTarget("#chan")
-	c.Check(isChan, Equals, false)
-	isChan, _ = d.CheckTarget("&chan")
-	c.Check(isChan, Equals, true)
+	d.Protocaps(p)
+	if isChan, _ := d.CheckTarget("#chan"); isChan {
+		t.Error("Expected it to not be a channel.")
+	}
+	if isChan, _ := d.CheckTarget("&chan"); !isChan {
+		t.Error("Expected it to be a channel.")
+	}
 }
 
-func (s *s) TestDispatchCore_CheckTarget(c *C) {
-	d, err := CreateDispatchCore(caps, "#chan")
-	c.Check(err, IsNil)
+func TestDispatchCore_CheckTarget(t *T) {
+	t.Parallel()
+	d := CreateDispatchCore(caps, "#chan")
 
-	var isChan, hasChan bool
-	isChan, hasChan = d.CheckTarget("#chan")
-	c.Check(isChan, Equals, true)
-	c.Check(hasChan, Equals, true)
-	isChan, hasChan = d.CheckTarget("#chan2")
-	c.Check(isChan, Equals, true)
-	c.Check(hasChan, Equals, false)
-	isChan, hasChan = d.CheckTarget("!chan")
-	c.Check(isChan, Equals, false)
-	c.Check(hasChan, Equals, false)
-	isChan, hasChan = d.CheckTarget("user")
-	c.Check(isChan, Equals, false)
-	c.Check(hasChan, Equals, false)
+	var tests = []struct {
+		IsChan  bool
+		HasChan bool
+		Chan    string
+	}{
+		{true, true, "#chan"},
+		{true, false, "#chan2"},
+		{false, false, "!chan"},
+		{false, false, "user"},
+	}
+
+	for _, test := range tests {
+		isChan, hasChan := d.CheckTarget(test.Chan)
+		if isChan != test.IsChan || hasChan != test.HasChan {
+			t.Error("Fail:", test)
+			t.Errorf("Expected: IsChan(%v) HasChan(%v)",
+				test.IsChan, test.HasChan)
+			t.Errorf("Actual: IsChan(%v) HasChan(%v)",
+				isChan, hasChan)
+		}
+	}
 }
 
-func (s *s) TestDispatchCore_filterChannelDispatch(c *C) {
-	d, err := CreateDispatchCore(caps, []string{"#CHAN"}...)
-	c.Check(err, IsNil)
-	c.Check(d.chans, NotNil)
+func TestDispatchCore_filterChannelDispatch(t *T) {
+	t.Parallel()
+	d := CreateDispatchCore(caps, []string{"#CHAN"}...)
+	if d.chans == nil {
+		t.Error("Initialization failed.")
+	}
 
-	var should bool
-	should = d.hasChannel("#chan")
-	c.Check(should, Equals, true)
-	should = d.hasChannel("#chan2")
-	c.Check(should, Equals, false)
+	if has := d.hasChannel("#chan"); !has {
+		t.Error("It should have this channel.")
+	}
+	if has := d.hasChannel("#chan2"); has {
+		t.Error("It should not have this channel.")
+	}
 }

@@ -2,10 +2,10 @@ package dispatch
 
 import (
 	"github.com/aarondl/ultimateq/irc"
-	. "launchpad.net/gocheck"
+	. "testing"
 )
 
-var core, _ = CreateDispatchCore(irc.CreateProtoCaps())
+var core = CreateDispatchCore(irc.CreateProtoCaps())
 
 //===========================================================
 // Set up a type that can be used to mock irc.Endpoint
@@ -36,29 +36,39 @@ func (handler testHandler) HandleRaw(msg *irc.Message, ep irc.Endpoint) {
 //===========================================================
 // Tests
 //===========================================================
-func (s *s) TestDispatcher(c *C) {
+func TestDispatcher(t *T) {
+	t.Parallel()
 	d := CreateDispatcher(core)
-	c.Check(d, NotNil)
-	c.Check(d.events, NotNil)
+	if d == nil || d.events == nil {
+		t.Error("Initialization failed.")
+	}
 }
 
-func (s *s) TestDispatcher_Registration(c *C) {
+func TestDispatcher_Registration(t *T) {
+	t.Parallel()
 	d := CreateDispatcher(core)
-	cb := testHandler{}
+	handler := testHandler{}
 
-	id := d.Register(irc.PRIVMSG, cb)
-	c.Check(id, Not(Equals), 0)
-	id2 := d.Register(irc.PRIVMSG, cb)
-	c.Check(id2, Not(Equals), id)
-	ok := d.Unregister("privmsg", id)
-	c.Check(ok, Equals, true)
-	ok = d.Unregister("privmsg", id)
-	c.Check(ok, Equals, false)
+	id := d.Register(irc.PRIVMSG, handler)
+	if id == 0 {
+		t.Error("It should have given back an id.")
+	}
+	id2 := d.Register(irc.PRIVMSG, handler)
+	if id == id2 {
+		t.Error("It should not produce duplicate ids.")
+	}
+	if !d.Unregister("privmsg", id) {
+		t.Error("It should unregister via it's id regardless of string case")
+	}
+	if d.Unregister("privmsg", id) {
+		t.Error("It should not unregister the same event multiple times.")
+	}
 }
 
-func (s *s) TestDispatcher_Dispatching(c *C) {
+func TestDispatcher_Dispatching(t *T) {
+	t.Parallel()
 	var msg1, msg2, msg3 *irc.Message
-	var s1, s2, s3 irc.Endpoint
+	var s1, s2 irc.Endpoint
 	h1 := testHandler{func(m *irc.Message, s irc.Endpoint) {
 		msg1 = m
 		s1 = s
@@ -69,7 +79,6 @@ func (s *s) TestDispatcher_Dispatching(c *C) {
 	}}
 	h3 := testHandler{func(m *irc.Message, s irc.Endpoint) {
 		msg3 = m
-		s3 = s
 	}}
 
 	d := CreateDispatcher(core)
@@ -83,17 +92,35 @@ func (s *s) TestDispatcher_Dispatching(c *C) {
 	quitmsg := &irc.Message{Name: irc.QUIT}
 	d.Dispatch(privmsg, send)
 	d.WaitForHandlers()
-	c.Check(msg1.Name, Equals, irc.PRIVMSG)
-	c.Check(msg1, Equals, msg2)
-	c.Check(s1, NotNil)
-	c.Check(s1, Equals, s2)
-	c.Check(msg3, IsNil)
+
+	if msg1 == nil {
+		t.Error("Failed to dispatch to h1.")
+	}
+	if msg1.Name != irc.PRIVMSG {
+		t.Error("Got the wrong msg name:", msg1.Name)
+	}
+	if msg1 != msg2 {
+		t.Error("Failed to dispatch to msg2, or the msg data is not shared.")
+	}
+	if s1 == nil {
+		t.Error("The endpoint should never be nil.")
+	}
+	if s1 != s2 {
+		t.Error("The endpoint should be shared.")
+	}
+	if msg3 != nil {
+		t.Error("Erroneously dispatched to h3.")
+	}
+
 	d.Dispatch(quitmsg, send)
 	d.WaitForHandlers()
-	c.Check(msg3.Name, Equals, irc.QUIT)
+	if msg3.Name != irc.QUIT {
+		t.Error("Failed to dispatch to h3.")
+	}
 }
 
-func (s *s) TestDispatcher_RawDispatch(c *C) {
+func TestDispatcher_RawDispatch(t *T) {
+	t.Parallel()
 	var msg1, msg2 *irc.Message
 	h1 := testHandler{func(m *irc.Message, send irc.Endpoint) {
 		msg1 = m
@@ -110,8 +137,12 @@ func (s *s) TestDispatcher_RawDispatch(c *C) {
 	privmsg := &irc.Message{Name: irc.PRIVMSG}
 	d.Dispatch(privmsg, send)
 	d.WaitForHandlers()
-	c.Check(msg1, Equals, privmsg)
-	c.Check(msg1, Equals, msg2)
+	if msg1 != privmsg {
+		t.Error("Failed to dispatch to privmsg handler.")
+	}
+	if msg1 != msg2 {
+		t.Error("Failed to dispatch to raw.")
+	}
 }
 
 // ================================
@@ -215,7 +246,8 @@ var privUsermsg = &irc.Message{
 	Sender: "nick!user@host.com",
 }
 
-func (s *s) TestDispatcher_Privmsg(c *C) {
+func TestDispatcher_Privmsg(t *T) {
+	t.Parallel()
 	var p, pu, pc *irc.Message
 	ph := testPrivmsgHandler{func(m *irc.Message, _ irc.Endpoint) {
 		p = m
@@ -234,17 +266,26 @@ func (s *s) TestDispatcher_Privmsg(c *C) {
 
 	d.Dispatch(privUsermsg, nil)
 	d.WaitForHandlers()
-	c.Check(p, NotNil)
-	c.Check(pu, Equals, p)
+	if p == nil {
+		t.Error("Failed to dispatch to handler.")
+	}
+	if pu != p {
+		t.Error("Failed to dispatch to user handler.")
+	}
 
 	p, pu, pc = nil, nil, nil
 	d.Dispatch(privChanmsg, nil)
 	d.WaitForHandlers()
-	c.Check(p, NotNil)
-	c.Check(pc, Equals, p)
+	if p == nil {
+		t.Error("Failed to dispatch to handler.")
+	}
+	if pc != p {
+		t.Error("Failed to dispatch to channel handler.")
+	}
 }
 
-func (s *s) TestDispatcher_PrivmsgMultiple(c *C) {
+func TestDispatcher_PrivmsgMultiple(t *T) {
+	t.Parallel()
 	var p, pu, pc *irc.Message
 	pall := testPrivmsgAllHandler{
 		func(m *irc.Message, _ irc.Endpoint) {
@@ -264,16 +305,28 @@ func (s *s) TestDispatcher_PrivmsgMultiple(c *C) {
 	p, pu, pc = nil, nil, nil
 	d.Dispatch(privChanmsg, nil)
 	d.WaitForHandlers()
-	c.Check(p, IsNil)
-	c.Check(pu, IsNil)
-	c.Check(pc, NotNil)
+	if p != nil {
+		t.Error("Erroneously dispatched to handler.")
+	}
+	if pu != nil {
+		t.Error("Erroneously dispatched to user handler.")
+	}
+	if pc == nil {
+		t.Error("Failed to dispatch to channel handler.")
+	}
 
 	p, pu, pc = nil, nil, nil
 	d.Dispatch(privUsermsg, nil)
 	d.WaitForHandlers()
-	c.Check(p, IsNil)
-	c.Check(pu, NotNil)
-	c.Check(pc, IsNil)
+	if p != nil {
+		t.Error("Erroneously dispatched to handler.")
+	}
+	if pu == nil {
+		t.Error("Failed to dispatch to user handler.")
+	}
+	if pc != nil {
+		t.Error("Erroneously dispatched to user handler.")
+	}
 }
 
 var noticeChanmsg = &irc.Message{
@@ -287,7 +340,8 @@ var noticeUsermsg = &irc.Message{
 	Sender: "nick!user@host.com",
 }
 
-func (s *s) TestDispatcher_Notice(c *C) {
+func TestDispatcher_Notice(t *T) {
+	t.Parallel()
 	var n, nu, nc *irc.Message
 	nh := testNoticeHandler{func(m *irc.Message, _ irc.Endpoint) {
 		n = m
@@ -306,17 +360,26 @@ func (s *s) TestDispatcher_Notice(c *C) {
 
 	d.Dispatch(noticeUsermsg, nil)
 	d.WaitForHandlers()
-	c.Check(n, NotNil)
-	c.Check(nu, Equals, n)
+	if n == nil {
+		t.Error("Failed to dispatch to handler.")
+	}
+	if nu != n {
+		t.Error("Failed to dispatch to user handler.")
+	}
 
 	n, nu, nc = nil, nil, nil
 	d.Dispatch(noticeChanmsg, nil)
 	d.WaitForHandlers()
-	c.Check(n, NotNil)
-	c.Check(nc, Equals, n)
+	if n == nil {
+		t.Error("Failed to dispatch to handler.")
+	}
+	if nc != n {
+		t.Error("Failed to dispatch to channel handler.")
+	}
 }
 
-func (s *s) TestDispatcher_NoticeMultiple(c *C) {
+func TestDispatcher_NoticeMultiple(t *T) {
+	t.Parallel()
 	var n, nu, nc *irc.Message
 	nall := testNoticeAllHandler{
 		func(m *irc.Message, _ irc.Endpoint) {
@@ -336,36 +399,32 @@ func (s *s) TestDispatcher_NoticeMultiple(c *C) {
 	n, nu, nc = nil, nil, nil
 	d.Dispatch(noticeChanmsg, nil)
 	d.WaitForHandlers()
-	c.Check(n, IsNil)
-	c.Check(nu, IsNil)
-	c.Check(nc, NotNil)
+	if n != nil {
+		t.Error("Erroneously dispatched to handler.")
+	}
+	if nu != nil {
+		t.Error("Erroneously dispatched to user handler.")
+	}
+	if nc == nil {
+		t.Error("Failed to dispatch to channel handler.")
+	}
 
 	n, nu, nc = nil, nil, nil
 	d.Dispatch(noticeUsermsg, nil)
 	d.WaitForHandlers()
-	c.Check(n, IsNil)
-	c.Check(nu, NotNil)
-	c.Check(nc, IsNil)
-}
-
-func (s *s) TestDispatcher_Sender(c *C) {
-	d := CreateDispatcher(core)
-	send := testPoint{&irc.Helper{}}
-
-	msg := &irc.Message{
-		Name:   irc.PRIVMSG,
-		Args:   []string{"#chan", "msg"},
-		Sender: "nick!user@host.com",
+	if n != nil {
+		t.Error("Erroneously dispatched to handler.")
 	}
-
-	d.Register(irc.PRIVMSG, func(msg *irc.Message, point irc.Endpoint) {
-		c.Check(point.GetKey(), NotNil)
-		c.Check(point.Sendln(""), IsNil)
-	})
-	d.Dispatch(msg, send)
+	if nu == nil {
+		t.Error("Failed to dispatch to user handler.")
+	}
+	if nc != nil {
+		t.Error("Erroneously dispatched to user handler.")
+	}
 }
 
-func (s *s) TestDispatcher_FilterPrivmsgChannels(c *C) {
+func TestDispatcher_FilterPrivmsgChannels(t *T) {
+	t.Parallel()
 	chanmsg2 := &irc.Message{
 		Name:   irc.PRIVMSG,
 		Args:   []string{"#chan2", "msg"},
@@ -380,25 +439,33 @@ func (s *s) TestDispatcher_FilterPrivmsgChannels(c *C) {
 		pc = m
 	}}
 
-	dcore, err := CreateDispatchCore(irc.CreateProtoCaps(), "#CHAN")
-	c.Check(err, IsNil)
+	dcore := CreateDispatchCore(irc.CreateProtoCaps(), "#CHAN")
 	d := CreateDispatcher(dcore)
 	d.Register(irc.PRIVMSG, ph)
 	d.Register(irc.PRIVMSG, pch)
 
 	d.Dispatch(privChanmsg, nil)
 	d.WaitForHandlers()
-	c.Check(p, NotNil)
-	c.Check(pc, Equals, p)
+	if p == nil {
+		t.Error("Failed to dispatch to handler.")
+	}
+	if pc != p {
+		t.Error("Failed to dispatch to channel handler.")
+	}
 
 	p, pc = nil, nil
 	d.Dispatch(chanmsg2, nil)
 	d.WaitForHandlers()
-	c.Check(p, NotNil)
-	c.Check(pc, IsNil)
+	if p == nil {
+		t.Error("Failed to dispatch to handler.")
+	}
+	if pc != nil {
+		t.Error("Erronously dispatched to channel handler.")
+	}
 }
 
-func (s *s) TestDispatcher_FilterNoticeChannels(c *C) {
+func TestDispatcher_FilterNoticeChannels(t *T) {
+	t.Parallel()
 	chanmsg2 := &irc.Message{
 		Name:   irc.NOTICE,
 		Args:   []string{"#chan2", "msg"},
@@ -413,35 +480,51 @@ func (s *s) TestDispatcher_FilterNoticeChannels(c *C) {
 		uc = m
 	}}
 
-	dcore, err := CreateDispatchCore(irc.CreateProtoCaps(), "#CHAN")
-	c.Check(err, IsNil)
+	dcore := CreateDispatchCore(irc.CreateProtoCaps(), "#CHAN")
 	d := CreateDispatcher(dcore)
 	d.Register(irc.NOTICE, uh)
 	d.Register(irc.NOTICE, uch)
 
 	d.Dispatch(noticeChanmsg, nil)
 	d.WaitForHandlers()
-	c.Check(u, NotNil)
-	c.Check(uc, Equals, u)
+	if u == nil {
+		t.Error("Failed to dispatch to handler.")
+	}
+	if uc != u {
+		t.Error("Failed to dispatch to channel handler.")
+	}
 
 	u, uc = nil, nil
 	d.Dispatch(chanmsg2, nil)
 	d.WaitForHandlers()
-	c.Check(u, NotNil)
-	c.Check(uc, IsNil)
+	if u == nil {
+		t.Error("Failed to dispatch to handler.")
+	}
+	if uc != nil {
+		t.Error("Erronously dispatched to channel handler.")
+	}
 }
 
-func (s *s) TestDispatchCore_ShouldDispatch(c *C) {
+func TestDispatchCore_ShouldDispatch(t *T) {
+	t.Parallel()
 	d := CreateDispatcher(core)
 
-	var should bool
-	should = d.shouldDispatch(true, "#chan")
-	c.Check(should, Equals, true)
-	should = d.shouldDispatch(false, "#chan2")
-	c.Check(should, Equals, false)
+	var tests = []struct {
+		IsChan bool
+		Chan   string
+		Expect bool
+	}{
+		{true, "#chan", true},
+		{false, "#chan2", false},
+		{true, "user", false},
+		{false, "user", true},
+	}
 
-	should = d.shouldDispatch(true, "chan")
-	c.Check(should, Equals, false)
-	should = d.shouldDispatch(false, "chan")
-	c.Check(should, Equals, true)
+	for _, test := range tests {
+		should := d.shouldDispatch(test.IsChan, test.Chan)
+		if should != test.Expect {
+			t.Error("Fail:", test)
+			t.Error("Expected:", test.Expect, "got:", should)
+		}
+	}
 }

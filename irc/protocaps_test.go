@@ -1,12 +1,12 @@
 package irc
 
 import (
-	. "launchpad.net/gocheck"
 	"strings"
+	. "testing"
 )
 
 var (
-	serverId = "irc.gamesurge.net"
+	serverID = "irc.gamesurge.net"
 
 	_s0 = `NICK irc.test.net testircd-1.2 acCior abcde`
 
@@ -19,51 +19,95 @@ var (
 	capsTest0 = &Message{
 		Name:   RPL_MYINFO,
 		Args:   strings.Split(_s0, " "),
-		Sender: serverId,
+		Sender: serverID,
 	}
 	capsTest1 = &Message{
 		Name:   RPL_ISUPPORT,
 		Args:   append(strings.Split(_s1, " "), "are supported by this server"),
-		Sender: serverId,
+		Sender: serverID,
 	}
 	capsTest2 = &Message{
 		Name:   RPL_ISUPPORT,
 		Args:   append(strings.Split(_s2, " "), "are supported by this server"),
-		Sender: serverId,
+		Sender: serverID,
 	}
 )
 
-func (s *s) TestProtoCaps(c *C) {
+func TestProtoCaps_Parse(t *T) {
+	t.Parallel()
 	p := CreateProtoCaps()
 
 	p.ParseMyInfo(capsTest0)
 	p.ParseISupport(capsTest1)
 	p.ParseISupport(capsTest2)
 
-	c.Check(p.ServerName(), Equals, "irc.test.net")
-	c.Check(p.IrcdVersion(), Equals, "testircd-1.2")
-	c.Check(p.Usermodes(), Equals, "acCior")
-	c.Check(p.LegacyChanmodes(), Equals, "abcde")
-	c.Check(p.RFC(), Equals, "RFC8812")
-	c.Check(p.IRCD(), Equals, "gIRCd")
-	c.Check(p.Casemapping(), Equals, "scii")
-	c.Check(p.Prefix(), Equals, "(v)+")
-	c.Check(p.Chantypes(), Equals, "#&")
-	c.Check(p.Chanmodes(), Equals, "a,b,c,d")
-	c.Check(p.Chanlimit(), Equals, 10)
-	c.Check(p.Channellen(), Equals, 49)
-	c.Check(p.Nicklen(), Equals, 8)
-	c.Check(p.Topiclen(), Equals, 489)
-	c.Check(p.Awaylen(), Equals, 126)
-	c.Check(p.Kicklen(), Equals, 399)
-	c.Check(p.Modes(), Equals, 4)
-	c.Check(p.Extra("EXCEPTS"), Equals, "e")
-	c.Check(p.Extra("PENALTY"), Equals, "true")
-	c.Check(p.Extra("INVEX"), Equals, "I")
-	c.Check(p.Extra("NICK"), Equals, "")
+	if exp, val := "irc.test.net", p.ServerName(); val != exp {
+		t.Error("Unexpected:", val, "should be:", exp)
+	}
+	if exp, val := "testircd-1.2", p.IrcdVersion(); val != exp {
+		t.Error("Unexpected:", val, "should be:", exp)
+	}
+	if exp, val := "acCior", p.Usermodes(); val != exp {
+		t.Error("Unexpected:", val, "should be:", exp)
+	}
+	if exp, val := "abcde", p.LegacyChanmodes(); val != exp {
+		t.Error("Unexpected:", val, "should be:", exp)
+	}
+	if exp, val := "RFC8812", p.RFC(); val != exp {
+		t.Error("Unexpected:", val, "should be:", exp)
+	}
+	if exp, val := "gIRCd", p.IRCD(); val != exp {
+		t.Error("Unexpected:", val, "should be:", exp)
+	}
+	if exp, val := "scii", p.Casemapping(); val != exp {
+		t.Error("Unexpected:", val, "should be:", exp)
+	}
+	if exp, val := "(v)+", p.Prefix(); val != exp {
+		t.Error("Unexpected:", val, "should be:", exp)
+	}
+	if exp, val := "#&", p.Chantypes(); val != exp {
+		t.Error("Unexpected:", val, "should be:", exp)
+	}
+	if exp, val := "a,b,c,d", p.Chanmodes(); val != exp {
+		t.Error("Unexpected:", val, "should be:", exp)
+	}
+	if exp, val := 10, p.Chanlimit(); val != exp {
+		t.Error("Unexpected:", val, "should be:", exp)
+	}
+	if exp, val := 49, p.Channellen(); val != exp {
+		t.Error("Unexpected:", val, "should be:", exp)
+	}
+	if exp, val := 8, p.Nicklen(); val != exp {
+		t.Error("Unexpected:", val, "should be:", exp)
+	}
+	if exp, val := 489, p.Topiclen(); val != exp {
+		t.Error("Unexpected:", val, "should be:", exp)
+	}
+	if exp, val := 126, p.Awaylen(); val != exp {
+		t.Error("Unexpected:", val, "should be:", exp)
+	}
+	if exp, val := 399, p.Kicklen(); val != exp {
+		t.Error("Unexpected:", val, "should be:", exp)
+	}
+	if exp, val := 4, p.Modes(); val != exp {
+		t.Error("Unexpected:", val, "should be:", exp)
+	}
+	if exp, val := "e", p.Extra("EXCEPTS"); val != exp {
+		t.Error("Unexpected:", val, "should be:", exp)
+	}
+	if exp, val := "true", p.Extra("PENALTY"); val != exp {
+		t.Error("Unexpected:", val, "should be:", exp)
+	}
+	if exp, val := "I", p.Extra("INVEX"); val != exp {
+		t.Error("Unexpected:", val, "should be:", exp)
+	}
+	if exp, val := "", p.Extra("NICK"); val != exp {
+		t.Error("Unexpected:", val, "should be:", exp)
+	}
 }
 
-func (s *s) TestProtoCaps_Clone(c *C) {
+func TestProtoCaps_Clone(t *T) {
+	t.Parallel()
 	other := "other"
 	diff := "different"
 
@@ -73,11 +117,34 @@ func (s *s) TestProtoCaps_Clone(c *C) {
 	p1.chantypes = other
 	p1.extras[other] = diff
 
-	c.Check(p2.chantypes, Not(Equals), other)
-	c.Check(p2.extras[other], Equals, other)
+	if p2.chantypes == other {
+		t.Error("Clones should not share memory.")
+	}
+	if p2.extras[other] != other {
+		t.Error("The extras map should be deep copied.")
+	}
 }
 
-func (s *s) TestProtoCaps_Merge(c *C) {
+func TestProtoCaps_IsChannel(t *T) {
+	t.Parallel()
+	p := CreateProtoCaps()
+	p.chantypes = "#&~"
+	if test := "#channel"; !p.IsChannel(test) {
+		t.Error("Expected:", test, "to be a channel.")
+	}
+	if test := "&channel"; !p.IsChannel(test) {
+		t.Error("Expected:", test, "to be a channel.")
+	}
+	if test := "n#otchannel"; p.IsChannel(test) {
+		t.Error("Expected:", test, "to not be a channel.")
+	}
+	if p.IsChannel("") {
+		t.Error("It should return false when empty.")
+	}
+}
+
+func TestProtoCaps_Merge(t *T) {
+	t.Parallel()
 	p1 := CreateProtoCaps()
 	p2 := CreateProtoCaps()
 
@@ -90,8 +157,14 @@ func (s *s) TestProtoCaps_Merge(c *C) {
 
 	p1.ParseISupport(mergeTest1)
 	p2.ParseISupport(mergeTest2)
-	c.Check(p1.Chantypes(), Equals, "#&")
-	c.Check(p2.Chantypes(), Equals, "~")
+	if p1.Chantypes() != "#&" {
+		t.Error("Parse failed to set chantypes correctly.")
+	}
+	if p2.Chantypes() != "~" {
+		t.Error("Parse failed to set chantypes correctly.")
+	}
 	p1.Merge(p2)
-	c.Check(p1.Chantypes(), Equals, "#&~")
+	if p1.Chantypes() != "#&~" {
+		t.Error("Merge failed to produce a merged version of chantypes.")
+	}
 }

@@ -23,6 +23,10 @@ func TestDataEndpoint(t *T) {
 		t.Fatal("EP was not created.")
 	}
 
+	if ep.GetKey() != "key" {
+		t.Error("Key was unexpected:", ep.GetKey())
+	}
+
 	var called, reallyCalled bool
 	called = ep.UsingState(func(st *State) {
 		reallyCalled = true

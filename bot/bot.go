@@ -59,8 +59,6 @@ var (
 )
 
 type (
-	// CapsProvider returns a usable ProtoCaps to start the bot with
-	CapsProvider func() *irc.ProtoCaps
 	// ConnProvider transforms a "server:port" string into a net.Conn
 	ConnProvider func(string) (net.Conn, error)
 	// StoreProvider transforms an optional path into a store.
@@ -89,7 +87,6 @@ type Bot struct {
 
 	// IoC and DI components mostly for testing.
 	attachHandlers bool
-	capsProvider   CapsProvider
 	connProvider   ConnProvider
 	storeProvider  StoreProvider
 
@@ -134,7 +131,7 @@ func CreateBot(conf *config.Config) (*Bot, error) {
 	if !CheckConfig(conf) {
 		return nil, errInvalidConfig
 	}
-	return createBot(conf, nil, nil, nil, true, true)
+	return createBot(conf, nil, nil, true, true)
 }
 
 // Start runs the bot. A channel is returned, every time a server is killed
@@ -189,11 +186,11 @@ func (b *Bot) startServer(srv *Server, writing, reading bool) {
 		}
 
 		if err == nil {
-			srv.protectState.Lock()
+			srv.protect.Lock()
 			srv.setConnecting(false, false)
 			srv.setConnected(true, false)
 			srv.setStarted(true, false)
-			srv.protectState.Unlock()
+			srv.protect.Unlock()
 
 			srv.client.SpawnWorkers(writing, reading)
 			disconnect, err = b.dispatch(srv)
@@ -380,14 +377,13 @@ func (b *Bot) GetEndpoint(server string) (endpoint *data.DataEndpoint) {
 
 // createBot creates a bot from the given configuration, using the providers
 // given to create connections and protocol caps.
-func createBot(conf *config.Config, capsProv CapsProvider,
-	connProv ConnProvider, storeProv StoreProvider,
+func createBot(conf *config.Config, connProv ConnProvider,
+	storeProv StoreProvider,
 	attachHandlers, attachCommands bool) (*Bot, error) {
 
 	b := &Bot{
 		conf:           conf,
 		servers:        make(map[string]*Server, nAssumedServers),
-		capsProvider:   capsProv,
 		connProvider:   connProv,
 		storeProvider:  storeProv,
 		attachHandlers: attachHandlers,
@@ -396,24 +392,15 @@ func createBot(conf *config.Config, capsProv CapsProvider,
 		serverEnd:      make(chan error),
 	}
 
-	if capsProv == nil {
-		b.caps = irc.CreateProtoCaps()
-	} else {
-		b.caps = capsProv()
-	}
-
-	var err error
-	if err = b.createDispatching(
-		conf.Global.GetPrefix(), conf.Global.GetChannels()); err != nil {
-
-		return nil, err
-	}
+	b.caps = irc.CreateProtoCaps()
+	b.createDispatching(conf.Global.GetPrefix(), conf.Global.GetChannels())
 
 	makeStore := false
 	for _, srv := range conf.Servers {
 		makeStore = makeStore || !srv.GetNoStore()
 	}
 
+	var err error
 	if makeStore {
 		if err = b.createStore(conf.GetStoreFile()); err != nil {
 			return nil, err
@@ -452,11 +439,7 @@ func (b *Bot) createServer(conf *config.Server) (*Server, error) {
 		reconnScale:  defaultReconnScale,
 	}
 
-	if err := s.createDispatching(
-		conf.GetPrefix(), conf.GetChannels()); err != nil {
-
-		return nil, err
-	}
+	s.createDispatching(conf.GetPrefix(), conf.GetChannels())
 
 	if !conf.GetNoState() {
 		if err := s.createState(); err != nil {
@@ -475,15 +458,10 @@ func (b *Bot) createServer(conf *config.Server) (*Server, error) {
 }
 
 // createDispatcher uses the bot's current ProtoCaps to create a dispatcher.
-func (b *Bot) createDispatching(prefix rune, channels []string) error {
-	var err error
-	b.dispatchCore, err = dispatch.CreateDispatchCore(b.caps, channels...)
-	if err != nil {
-		return err
-	}
+func (b *Bot) createDispatching(prefix rune, channels []string) {
+	b.dispatchCore = dispatch.CreateDispatchCore(b.caps, channels...)
 	b.dispatcher = dispatch.CreateDispatcher(b.dispatchCore)
 	b.commander = commander.CreateCommander(prefix, b.dispatchCore)
-	return nil
 }
 
 // createStore creates a store from a filename.
@@ -499,8 +477,7 @@ func (b *Bot) createStore(filename string) (err error) {
 // mergeProtocaps merges a protocaps with the bot's current protocaps to ensure
 // the bot's main dispatcher still recognizes all channel types that the servers
 // currently recognize.
-func (b *Bot) mergeProtocaps(toMerge *irc.ProtoCaps) (err error) {
+func (b *Bot) mergeProtocaps(toMerge *irc.ProtoCaps) {
 	b.caps.Merge(toMerge)
-	err = b.dispatchCore.Protocaps(b.caps)
-	return
+	b.dispatchCore.Protocaps(b.caps)
 }

@@ -334,6 +334,17 @@ func (p *ProtoCaps) ParseISupport(m *Message) {
 	}
 }
 
+// IsChannel checks to see if the target is a channel based on this instances
+// chantypes.
+func (p *ProtoCaps) IsChannel(target string) (isChan bool) {
+	if len(target) > 0 {
+		p.protect.RLock()
+		isChan = strings.ContainsRune(p.chantypes, rune(target[0]))
+		p.protect.RUnlock()
+	}
+	return
+}
+
 // ParseMyInfo adds all values in a 005 to the current protocaps object.
 func (p *ProtoCaps) ParseMyInfo(m *Message) {
 	p.protect.Lock()

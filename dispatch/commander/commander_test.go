@@ -146,7 +146,7 @@ func setupForAuth() (state *data.State, store *data.Store,
 	return
 }
 
-var core, _ = dispatch.CreateDispatchCore(irc.CreateProtoCaps())
+var core = dispatch.CreateDispatchCore(irc.CreateProtoCaps())
 var prefix = '.'
 
 func TestCommander(t *T) {
@@ -333,10 +333,7 @@ func TestCommander_RegisterProtected(t *T) {
 }
 
 func TestCommander_Dispatch(t *T) {
-	dcore, err := dispatch.CreateDispatchCore(irc.CreateProtoCaps())
-	if err != nil {
-		t.Error("Unexpected error:", err)
-	}
+	dcore := dispatch.CreateDispatchCore(irc.CreateProtoCaps())
 	c := CreateCommander(prefix, dcore)
 	c.AddChannels(channel)
 	if c == nil {

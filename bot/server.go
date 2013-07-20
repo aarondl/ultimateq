@@ -125,15 +125,10 @@ func (s *Server) createEndpoint(store *data.Store, mutex *sync.RWMutex) {
 }
 
 // createDispatcher uses the server's current ProtoCaps to create a dispatcher.
-func (s *Server) createDispatching(prefix rune, channels []string) error {
-	var err error
-	s.dispatchCore, err = dispatch.CreateDispatchCore(s.caps, channels...)
-	if err != nil {
-		return err
-	}
+func (s *Server) createDispatching(prefix rune, channels []string) {
+	s.dispatchCore = dispatch.CreateDispatchCore(s.caps, channels...)
 	s.dispatcher = dispatch.CreateDispatcher(s.dispatchCore)
 	s.commander = commander.CreateCommander(prefix, s.dispatchCore)
-	return nil
 }
 
 // createState uses the server's current ProtoCaps to create a state.
@@ -223,12 +218,8 @@ func (s *Server) createTlsConfig(cr certReader) (conf *tls.Config, err error) {
 // may need it.
 func (s *Server) rehashProtocaps() error {
 	var err error
-	if err = s.bot.mergeProtocaps(s.caps); err != nil {
-		return err
-	}
-	if err = s.dispatcher.Protocaps(s.caps); err != nil {
-		return err
-	}
+	s.bot.mergeProtocaps(s.caps)
+	s.dispatcher.Protocaps(s.caps)
 	s.protectState.Lock()
 	if s.state != nil {
 		err = s.state.Protocaps(s.caps)

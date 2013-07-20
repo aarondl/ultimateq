@@ -47,7 +47,7 @@ func commandsSetup(t *T) *tSetup {
 		Userhost("host.com").Realname("ultimateq").NoReconnect(true).
 		Ssl(true).Prefix(prefix).Server(serverID)
 
-	b, err := createBot(conf, nil, nil, func(_ string) (*data.Store, error) {
+	b, err := createBot(conf, nil, func(_ string) (*data.Store, error) {
 		return data.CreateStore(data.MemStoreProvider)
 	}, true, true)
 
@@ -125,7 +125,7 @@ func TestCoreCommands(t *T) {
 		Userhost("bitforge.ca").Realname("ultimateq").NoReconnect(true).
 		Ssl(true).Server(serverID)
 
-	b, err := createBot(conf, nil, nil, func(_ string) (*data.Store, error) {
+	b, err := createBot(conf, nil, func(_ string) (*data.Store, error) {
 		return data.CreateStore(data.MemStoreProvider)
 	}, true, true)
 

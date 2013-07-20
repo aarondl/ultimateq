@@ -41,6 +41,9 @@ func (s *s) TestState(c *C) {
 	c.Check(err, IsNil)
 	c.Check(st.Self.ChannelModes, NotNil)
 
+	st, err = CreateState(nil)
+	c.Check(err, Equals, errProtoCapsMissing)
+
 	// Should die on creating kinds
 	fakeCaps := &irc.ProtoCaps{}
 	fakeCaps.ParseISupport(&irc.Message{Args: []string{
@@ -54,15 +57,6 @@ func (s *s) TestState(c *C) {
 	fakeCaps = &irc.ProtoCaps{}
 	fakeCaps.ParseISupport(&irc.Message{Args: []string{
 		"NICK", "CHANTYPES=#&", "CHANMODES=a,b,c,d",
-	}})
-	st, err = CreateState(fakeCaps)
-	c.Check(st, IsNil)
-	c.Check(err, NotNil)
-
-	// Should die on creating ChannelFinder
-	fakeCaps = &irc.ProtoCaps{}
-	fakeCaps.ParseISupport(&irc.Message{Args: []string{
-		"NICK", "CHANTYPES=H", "PREFIX=(ov)@+", "CHANMODES=a,b,c,d",
 	}})
 	st, err = CreateState(fakeCaps)
 	c.Check(st, IsNil)
@@ -83,11 +77,11 @@ func (s *s) TestState_UpdateProtoCaps(c *C) {
 
 	c.Assert(st.kinds.kinds['q'], Equals, 0)
 	c.Assert(st.umodes.GetModeBit('q'), Equals, byte(0))
-	c.Assert(st.cfinder.IsChannel("!"), Equals, false)
+	c.Assert(st.caps.IsChannel("!"), Equals, false)
 	st.Protocaps(fakeCaps)
 	c.Assert(st.kinds.kinds['q'], Not(Equals), 0)
 	c.Assert(st.umodes.GetModeBit('q'), Not(Equals), 0)
-	c.Assert(st.cfinder.IsChannel("!"), Equals, true)
+	c.Assert(st.caps.IsChannel("!"), Equals, true)
 }
 
 func (s *s) TestState_GetUser(c *C) {

@@ -14,41 +14,13 @@ import (
 
 func TestServer_createIrcClient(t *T) {
 	t.Parallel()
-	doSleep := false
 	errch := make(chan error)
-	var retErr error
-
 	connProvider := func(srv string) (net.Conn, error) {
-		if doSleep {
-			time.Sleep(time.Second * 5)
-		}
-		return nil, retErr
+		return nil, nil
 	}
-	b, _ := createBot(fakeConfig, nil, connProvider, nil, false, false)
+	b, _ := createBot(fakeConfig, connProvider, nil, false, false)
 	srv := b.servers[serverID]
 
-	doSleep = true
-	go func() {
-		errch <- srv.createIrcClient()
-	}()
-
-	srv.kill <- 0
-	if <-errch != errKilledConn {
-		t.Error("Expected a killed connection.")
-	}
-
-	doSleep = false
-	retErr = io.EOF
-	go func() {
-		errch <- srv.createIrcClient()
-	}()
-
-	if <-errch != io.EOF {
-		t.Error("Expected a failed connection.")
-	}
-
-	doSleep = false
-	retErr = nil
 	go func() {
 		errch <- srv.createIrcClient()
 	}()
@@ -61,9 +33,47 @@ func TestServer_createIrcClient(t *T) {
 	}
 }
 
+func TestServer_createIrcClient_failConn(t *T) {
+	t.Parallel()
+	errch := make(chan error)
+	connProvider := func(srv string) (net.Conn, error) {
+		return nil, io.EOF
+	}
+	b, _ := createBot(fakeConfig, connProvider, nil, false, false)
+	srv := b.servers[serverID]
+
+	go func() {
+		errch <- srv.createIrcClient()
+	}()
+
+	if <-errch != io.EOF {
+		t.Error("Expected a failed connection.")
+	}
+}
+
+func TestServer_createIrcClient_killConn(t *T) {
+	t.Parallel()
+	errch := make(chan error)
+	connProvider := func(srv string) (net.Conn, error) {
+		time.Sleep(time.Second * 5)
+		return nil, io.EOF
+	}
+	b, _ := createBot(fakeConfig, connProvider, nil, false, false)
+	srv := b.servers[serverID]
+
+	go func() {
+		errch <- srv.createIrcClient()
+	}()
+
+	srv.kill <- 0
+	if <-errch != errKilledConn {
+		t.Error("Expected a killed connection.")
+	}
+}
+
 func TestServer_createTlsConfig(t *T) {
 	t.Parallel()
-	b, _ := createBot(fakeConfig, nil, nil, nil, false, false)
+	b, _ := createBot(fakeConfig, nil, nil, false, false)
 	srv := b.servers[serverID]
 
 	pool := x509.NewCertPool()
@@ -81,7 +91,7 @@ func TestServer_createTlsConfig(t *T) {
 
 func TestServerSender(t *T) {
 	t.Parallel()
-	b, _ := createBot(fakeConfig, nil, nil, nil, false, false)
+	b, _ := createBot(fakeConfig, nil, nil, false, false)
 	ep := b.GetEndpoint(serverID)
 	if ep.GetKey() != serverID {
 		t.Error("Expected the key to represent the server.")
@@ -171,36 +181,21 @@ func TestServer_StatusMultiple(t *T) {
 }
 
 func TestServer_rehashProtocaps(t *T) {
-	originalCaps := irc.CreateProtoCaps()
-	originalCaps.ParseISupport(&irc.Message{Args: []string{
-		"NICK", "CHANTYPES=!",
-	}})
-	capsProv := func() *irc.ProtoCaps {
-		return originalCaps
-	}
-
-	b, _ := createBot(fakeConfig, capsProv, nil, nil, false, false)
+	b, _ := createBot(fakeConfig, nil, nil, false, false)
 	srv := b.servers[serverID]
 
-	if srv.caps.Chantypes() != "!" {
-		t.Error("Protocaps were not set by caps provider.")
-	}
-	if b.caps.Chantypes() != "!" {
-		t.Error("Protocaps were not set by caps provider.")
-	}
-
 	srv.caps.ParseISupport(&irc.Message{Args: []string{
-		"NICK", "CHANTYPES=#",
+		"NICK", "CHANTYPES=@",
 	}})
 	err := srv.rehashProtocaps()
 	if err != nil {
 		t.Error("Unexpected:", err)
 	}
 
-	if srv.caps.Chantypes() != "#" {
+	if srv.caps.Chantypes() != "@" {
 		t.Error("Protocaps were not set by rehash.")
 	}
-	if b.caps.Chantypes() != "!#" {
+	if b.caps.Chantypes() != "#&~@" {
 		t.Error("Protocaps were not merged correctly.")
 	}
 }
@@ -211,7 +206,7 @@ func TestServer_Write(t *T) {
 		return conn, nil
 	}
 
-	b, _ := createBot(fakeConfig, nil, connProvider, nil, false, false)
+	b, _ := createBot(fakeConfig, connProvider, nil, false, false)
 	srv := b.servers[serverID]
 
 	var err error

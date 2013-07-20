@@ -24,43 +24,27 @@ var (
 // synchronize the exit of all the event handlers sharing this core.
 type DispatchCore struct {
 	waiter  sync.WaitGroup
-	finder  *irc.ChannelFinder
+	caps    *irc.ProtoCaps
 	chans   []string
 	protect sync.RWMutex
 }
 
 // CreateDispatchCore initializes a dispatch core, it takes a protocaps in order
-// to filter between channel and other messages.
-func CreateDispatchCore(
-	caps *irc.ProtoCaps, activeChannels ...string) (*DispatchCore, error) {
-
-	if caps == nil {
-		return nil, errProtoCapsMissing
+// to filter between channel and other messages and a list of active channels.
+func CreateDispatchCore(caps *irc.ProtoCaps, chans ...string) *DispatchCore {
+	d := &DispatchCore{
+		caps: caps,
 	}
+	d.channels(chans)
 
-	d := &DispatchCore{}
-
-	err := d.protocaps(caps)
-	if err != nil {
-		return nil, err
-	}
-	d.channels(activeChannels)
-
-	return d, nil
+	return d
 }
 
 // Protocaps sets the protocaps for this dispatcher.
-func (d *DispatchCore) Protocaps(caps *irc.ProtoCaps) (err error) {
+func (d *DispatchCore) Protocaps(caps *irc.ProtoCaps) {
 	d.protect.Lock()
 	defer d.protect.Unlock()
-	err = d.protocaps(caps)
-	return
-}
-
-// protocaps sets the protocaps for this dispatcher. Not thread safe.
-func (d *DispatchCore) protocaps(caps *irc.ProtoCaps) (err error) {
-	d.finder, err = irc.CreateChannelFinder(caps.Chantypes())
-	return
+	d.caps = caps
 }
 
 // Channels sets the active channels for this dispatcher.
@@ -178,7 +162,7 @@ func (d *DispatchCore) CheckTarget(target string) (isChan, hasChan bool) {
 	d.protect.RLock()
 	defer d.protect.RUnlock()
 	target = strings.ToLower(target)
-	isChan = d.finder.IsChannel(target)
+	isChan = d.caps != nil && d.caps.IsChannel(target)
 	hasChan = isChan && d.hasChannel(target)
 	return
 }

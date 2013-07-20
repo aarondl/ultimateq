@@ -4,8 +4,13 @@ Package data is used to turn irc.IrcMessages into a stateful database.
 package data
 
 import (
+	"errors"
 	"github.com/aarondl/ultimateq/irc"
 	"strings"
+)
+
+var (
+	errProtoCapsMissing = errors.New("data: Protocaps missing.")
 )
 
 // Self is the bot's user, he's a special case since he has to hold a Modeset.
@@ -25,20 +30,17 @@ type State struct {
 	channelUsers map[string]map[string]*ChannelUser
 	userChannels map[string]map[string]*UserChannel
 
-	kinds   ChannelModeKinds
-	umodes  UserModeKinds
-	cfinder *irc.ChannelFinder
+	kinds  ChannelModeKinds
+	umodes UserModeKinds
+	caps   *irc.ProtoCaps
 }
 
 // CreateState creates a state from an irc protocaps instance.
 func CreateState(caps *irc.ProtoCaps) (*State, error) {
 	state := &State{}
-	err := state.Protocaps(caps)
-
-	if err != nil {
+	if err := state.Protocaps(caps); err != nil {
 		return nil, err
 	}
-
 	state.Self.ChannelModes = CreateChannelModes(&ChannelModeKinds{}, nil)
 
 	state.channels = make(map[string]*Channel)
@@ -51,6 +53,10 @@ func CreateState(caps *irc.ProtoCaps) (*State, error) {
 
 // Protocaps updates the protocaps of the state.
 func (s *State) Protocaps(caps *irc.ProtoCaps) error {
+	if caps == nil {
+		return errProtoCapsMissing
+	}
+	s.caps = caps
 	kinds, err := CreateChannelModeKindsCSV(caps.Chanmodes())
 	if err != nil {
 		return err
@@ -59,14 +65,9 @@ func (s *State) Protocaps(caps *irc.ProtoCaps) error {
 	if err != nil {
 		return err
 	}
-	cfinder, err := irc.CreateChannelFinder(caps.Chantypes())
-	if err != nil {
-		return err
-	}
 
 	s.kinds = *kinds
 	s.umodes = *modes
-	s.cfinder = cfinder
 	return nil
 }
 
@@ -440,7 +441,7 @@ func (s *State) kick(m *irc.Message) {
 // mode alters the state of the database when a MODE message is received.
 func (s *State) mode(m *irc.Message) {
 	target := strings.ToLower(m.Args[0])
-	if s.cfinder.IsChannel(target) {
+	if s.caps.IsChannel(target) {
 		if ch, ok := s.channels[target]; ok {
 			pos, neg := ch.Apply(strings.Join(m.Args[1:], " "))
 			for i := 0; i < len(pos); i++ {
@@ -477,7 +478,7 @@ func (s *State) rplTopic(m *irc.Message) {
 // msg alters the state of the database when a PRIVMSG or NOTICE message is
 // received.
 func (s *State) msg(m *irc.Message) {
-	if s.cfinder.IsChannel(m.Args[0]) {
+	if s.caps.IsChannel(m.Args[0]) {
 		s.addToChannel(m.Sender, m.Args[0])
 	}
 }

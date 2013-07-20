@@ -11,7 +11,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"regexp/syntax"
 	"runtime"
 	. "testing"
 	"time"
@@ -107,7 +106,7 @@ func TestBot_Start(t *T) {
 	var err error
 	conf := fakeConfig.Clone()
 	conf.Server("otherserver")
-	b, _ := createBot(conf, nil, connProvider, nil, false, false)
+	b, _ := createBot(conf, connProvider, nil, false, false)
 	dead := 0
 	for err = range b.Start() {
 		if err != io.EOF {
@@ -126,7 +125,7 @@ func TestBot_Dispatching(t *T) {
 	connProvider := func(srv string) (net.Conn, error) {
 		return conn, nil
 	}
-	b, _ := createBot(fakeConfig, nil, connProvider, nil, false, false)
+	b, _ := createBot(fakeConfig, connProvider, nil, false, false)
 	srv := b.servers[serverID]
 
 	result := make(chan *irc.Message)
@@ -187,7 +186,7 @@ func TestBot_Dispatch_ConnectDisconnect(t *T) {
 	connProvider := func(srv string) (net.Conn, error) {
 		return conn, nil
 	}
-	b, _ := createBot(fakeConfig, nil, connProvider, nil, false, false)
+	b, _ := createBot(fakeConfig, connProvider, nil, false, false)
 
 	result := make(chan *irc.Message)
 	thandler := &testHandler{
@@ -226,7 +225,7 @@ func TestBot_Reconnect(t *T) {
 
 	conf := fakeConfig.Clone().GlobalContext().NoReconnect(false).
 		ReconnectTimeout(1)
-	b, _ := createBot(conf, nil, connProvider, nil, false, false)
+	b, _ := createBot(conf, connProvider, nil, false, false)
 	srv := b.servers[serverID]
 	srv.reconnScale = time.Millisecond
 
@@ -262,7 +261,7 @@ func TestBot_ReconnectConnection(t *T) {
 
 	conf := fakeConfig.Clone().GlobalContext().NoReconnect(false).
 		ReconnectTimeout(1)
-	b, _ := createBot(conf, nil, connProvider, nil, false, false)
+	b, _ := createBot(conf, connProvider, nil, false, false)
 	srv := b.servers[serverID]
 	srv.reconnScale = time.Millisecond
 
@@ -291,7 +290,7 @@ func TestBot_ReconnectKill(t *T) {
 
 	conf := fakeConfig.Clone().GlobalContext().NoReconnect(false).
 		ReconnectTimeout(1)
-	b, _ := createBot(conf, nil, connProvider, nil, false, false)
+	b, _ := createBot(conf, connProvider, nil, false, false)
 	srv := b.servers[serverID]
 
 	result := make(chan *irc.Message)
@@ -321,7 +320,7 @@ func TestBot_ReconnectKill(t *T) {
 
 func TestBot_Register(t *T) {
 	t.Parallel()
-	b, _ := createBot(fakeConfig, nil, nil, nil, false, false)
+	b, _ := createBot(fakeConfig, nil, nil, false, false)
 	gid := b.Register(irc.PRIVMSG, &coreHandler{})
 	id, err := b.RegisterServer(serverID, irc.PRIVMSG, &coreHandler{})
 
@@ -353,7 +352,7 @@ func TestBot_RegisterCommand(t *T) {
 	// t.Parallel() Cannot be parallel due to the nature of command registration
 	var err error
 	var success bool
-	b, _ := createBot(fakeConfig, nil, nil, nil, false, false)
+	b, _ := createBot(fakeConfig, nil, nil, false, false)
 	cmd := "cmd"
 	err = b.RegisterCommand(commander.MkCmd("ext", "desc", cmd, &testCommand{},
 		commander.ALL, commander.ALL))
@@ -396,45 +395,31 @@ func TestBot_Providers(t *T) {
 	storeConf2 := storeConf1.Clone().ServerContext(serverID).NoStore(false)
 	storeConf3 := storeConf1.Clone().ServerContext(serverID).NoStore(true)
 
-	capsProv := func() *irc.ProtoCaps {
-		p := irc.CreateProtoCaps()
-		p.ParseISupport(&irc.Message{Args: []string{"nick", "CHANTYPES=H"}})
-		return p
-	}
 	badConnProv := func(s string) (net.Conn, error) {
 		return nil, net.ErrWriteToConnected
-	}
-	goodConnProv := func(s string) (net.Conn, error) {
-		return mocks.CreateConn(), nil
 	}
 	badStoreProv := func(s string) (*data.Store, error) {
 		return nil, io.EOF
 	}
 
-	b, err := createBot(
-		fakeConfig, capsProv, goodConnProv, badStoreProv, false, false)
-	if _, ok := err.(*syntax.Error); !ok {
-		t.Error("The error was not a syntax error:", err)
-	}
-
-	b, err = createBot(fakeConfig, nil, badConnProv, badStoreProv, false, false)
+	b, err := createBot(fakeConfig, badConnProv, nil, false, false)
 	if err = <-b.Start(); err != net.ErrWriteToConnected {
 		t.Error("Expected:", net.ErrWriteToConnected, "got:", err)
 	}
 
-	b, err = createBot(fakeConfig, nil, nil, badStoreProv, false, false)
+	b, err = createBot(fakeConfig, nil, badStoreProv, false, false)
 	if err != nil {
 		t.Error("Expected no errors.")
 	}
-	b, err = createBot(storeConf1, nil, nil, badStoreProv, false, false)
+	b, err = createBot(storeConf1, nil, badStoreProv, false, false)
 	if err != io.EOF {
 		t.Error("Expected an error creating the store.")
 	}
-	b, err = createBot(storeConf2, nil, nil, badStoreProv, false, false)
+	b, err = createBot(storeConf2, nil, badStoreProv, false, false)
 	if err != io.EOF {
 		t.Error("Expected an error creating the store.")
 	}
-	b, err = createBot(storeConf3, nil, nil, badStoreProv, false, false)
+	b, err = createBot(storeConf3, nil, badStoreProv, false, false)
 	if err != nil {
 		t.Error("Expected no errors.")
 	}
@@ -446,7 +431,7 @@ func TestBot_Store(t *T) {
 	goodStoreProv := func(s string) (*data.Store, error) {
 		return data.CreateStore(data.MemStoreProvider)
 	}
-	b, err := createBot(conf, nil, nil, goodStoreProv, false, false)
+	b, err := createBot(conf, nil, goodStoreProv, false, false)
 	if err != nil {
 		t.Error("Expected no errors.")
 	}
@@ -463,7 +448,7 @@ func TestBot_Stop(t *T) {
 	connProvider := func(srv string) (net.Conn, error) {
 		return conn, nil
 	}
-	b, _ := createBot(fakeConfig, nil, connProvider, nil, false, false)
+	b, _ := createBot(fakeConfig, connProvider, nil, false, false)
 	srv := b.servers[serverID]
 
 	end := b.Start()
@@ -483,7 +468,7 @@ func TestBot_GetEndpoint(t *T) {
 	connProvider := func(srv string) (net.Conn, error) {
 		return conn, nil
 	}
-	b, _ := createBot(fakeConfig, nil, connProvider, nil, false, false)
+	b, _ := createBot(fakeConfig, connProvider, nil, false, false)
 	srv := b.servers[serverID]
 
 	end := b.Start()
@@ -512,60 +497,3 @@ func TestBot_GetEndpoint(t *T) {
 	for _ = range end {
 	}
 }
-
-/*
-func (s *s) TestBot_createBot(c *C) {
-	capsProvider := func() *irc.ProtoCaps {
-		return irc.CreateProtoCaps()
-	}
-	conn := mocks.CreateConn()
-	connProvider := func(srv string) (net.Conn, error) {
-		return conn, nil
-	}
-
-	b, err := createBot(fakeConfig, capsProvider, connProvider,
-		nil, false, false)
-	c.Check(b, NotNil)
-	c.Check(err, IsNil)
-	c.Check(len(b.servers), Equals, 1)
-	c.Check(b.caps, NotNil)
-	c.Check(b.capsProvider, NotNil)
-	c.Check(b.connProvider, NotNil)
-}
-
-func (s *s) TestBot_createServer(c *C) {
-	b, err := createBot(fakeConfig, nil, nil, nil, true, false)
-	c.Check(err, IsNil)
-	srv := b.servers[serverID]
-	c.Check(srv.dispatcher, NotNil)
-	c.Check(srv.commander, NotNil)
-	c.Check(srv.dispatchCore, NotNil)
-	c.Check(srv.state, NotNil)
-	c.Check(srv.handler, NotNil)
-
-	cnf := fakeConfig.Clone()
-	cnf.GlobalContext().NoState(true)
-	b, err = createBot(cnf, nil, nil, nil, false, false)
-	c.Check(err, IsNil)
-	srv = b.servers[serverID]
-	c.Check(srv.dispatcher, NotNil)
-	c.Check(srv.state, IsNil)
-	c.Check(srv.handler, IsNil)
-}
-
-func (s *s) TestBot_createIrcClient(c *C) {
-	connProv := func(server string) (net.Conn, error) {
-		return nil, errFailedToLoadCertificate
-	}
-	b, err := createBot(fakeConfig, nil, connProv, nil, false, false)
-	c.Check(err, IsNil)
-	ers := b.Connect()
-	c.Check(ers[0], Equals, errFailedToLoadCertificate)
-}
-
-func (s *s) TestBot_createDispatcher(c *C) {
-	_, err := createBot(fakeConfig, func() *irc.ProtoCaps {
-		return nil
-	}, nil, nil, false, false)
-	c.Check(err, NotNil)
-}*/
