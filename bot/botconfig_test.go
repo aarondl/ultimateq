@@ -1,55 +1,91 @@
 package bot
 
 import (
-	/*
-		"bytes"
-		"github.com/aarondl/ultimateq/config"
-		"github.com/aarondl/ultimateq/irc"
-		"github.com/aarondl/ultimateq/mocks"
-		"io"
-		. "launchpad.net/gocheck"
-	*/
+	"bytes"
+	"github.com/aarondl/ultimateq/config"
+	"github.com/aarondl/ultimateq/irc"
+	"github.com/aarondl/ultimateq/mocks"
 	"net"
+	. "testing"
 )
 
 var zeroConnProvider = func(srv string) (net.Conn, error) {
 	return nil, nil
 }
 
-/*func (s *s) TestBot_ReadConfig(c *C) {
-	b, err := createBot(fakeConfig, nil, nil, nil, false, false)
-	c.Check(err, IsNil)
+func TestBotConfig_ReadConfig(t *T) {
+	b, _ := createBot(fakeConfig, nil, nil, false, false)
 
 	b.ReadConfig(func(conf *config.Config) {
-		c.Check(
-			conf.Servers[serverId].GetNick(),
-			Equals,
-			fakeConfig.Servers[serverId].GetNick(),
-		)
+		if conf.Servers[serverID].GetNick() !=
+			fakeConfig.Servers[serverID].GetNick() {
+
+			t.Error("The names should have been the same.")
+		}
 	})
 }
 
-func (s *s) TestBot_WriteConfig(c *C) {
-	b, err := createBot(fakeConfig, nil, nil, nil, false, false)
-	c.Check(err, IsNil)
+func TestBotConfig_WriteConfig(t *T) {
+	b, _ := createBot(fakeConfig, nil, nil, false, false)
 
 	b.WriteConfig(func(conf *config.Config) {
-		c.Check(
-			conf.Servers[serverId].GetNick(),
-			Equals,
-			fakeConfig.Servers[serverId].GetNick(),
-		)
+		if conf.Servers[serverID].GetNick() !=
+			fakeConfig.Servers[serverID].GetNick() {
+
+			t.Error("The names should have been the same.")
+		}
 	})
 }
 
-func (s *s) TestBot_ReplaceConfig(c *C) {
+func TestBotConfig_testElementEquals(t *T) {
+	a := []string{"a", "b"}
+	b := []string{"b", "a"}
+	if !contains(a, b) {
+		t.Error("Expected equals.")
+	}
+
+	a = []string{"a", "b", "c"}
+	if contains(a, b) {
+		t.Error("Expected not equals.")
+	}
+
+	a = []string{"x", "y"}
+	if contains(a, b) {
+		t.Error("Expected not equals.")
+	}
+
+	a = []string{}
+	b = []string{}
+	if !contains(a, b) {
+		t.Error("Expected equals.")
+	}
+
+	b = []string{"a"}
+	if contains(a, b) {
+		t.Error("Expected not equals.")
+	}
+
+	a = []string{"a"}
+	b = []string{}
+	if contains(a, b) {
+		t.Error("Expected not equals.")
+	}
+}
+
+func TestBotConfig_ReplaceConfig(t *T) {
 	nick := []byte(irc.NICK + " :newnick\r\n")
 
-	conns := make(map[string]*mocks.Conn)
+	conns := map[string]*mocks.Conn{
+		serverID + ":6667":      mocks.CreateConn(),
+		"newserver:6667":        mocks.CreateConn(),
+		"anothernewserver:6667": mocks.CreateConn(),
+	}
 	connProvider := func(srv string) (net.Conn, error) {
-		conn := mocks.CreateConn()
-		conns[srv[:len(srv)-5]] = conn //Remove port
-		return conn, nil
+		c := conns[srv]
+		if c == nil {
+			panic("No connection found:" + srv)
+		}
+		return conns[srv], nil
 	}
 
 	chans1 := []string{"#chan1", "#chan2", "#chan3"}
@@ -65,95 +101,100 @@ func (s *s) TestBot_ReplaceConfig(c *C) {
 		GlobalContext().
 		NoState(true).
 		Channels(chans2...).
-		ServerContext(serverId).
+		ServerContext(serverID).
 		Nick("newnick").
 		Channels(chans3...).
 		Server("anothernewserver")
 
 	c3 := &config.Config{}
 
-	b, err := createBot(c1, nil, connProvider, nil, false, false)
-	c.Check(err, IsNil)
-	c.Check(len(b.servers), Equals, 2)
+	b, _ := createBot(c1, connProvider, nil, false, false)
+	if len(c1.Servers) != len(b.servers) {
+		t.Errorf("The number of servers (%v) should match the config (%v)",
+			len(b.servers), len(c1.Servers))
+	}
 
-	oldsrv1, oldsrv2 := b.servers[serverId], b.servers["newserver"]
+	oldsrv1, oldsrv2 := b.servers[serverID], b.servers["newserver"]
+	old1listen, old2listen := make(chan Status), make(chan Status)
 
-	errs := b.Connect()
-	c.Check(len(errs), Equals, 0)
-	b.start(true, false)
+	oldsrv1.addStatusListener(old1listen, STATUS_STARTED)
+	oldsrv2.addStatusListener(old2listen, STATUS_STARTED)
 
-	c.Check(elementsEquals(b.conf.Global.Channels, chans1), Equals, true)
-	c.Check(elementsEquals(oldsrv1.conf.GetChannels(), chans1), Equals, true)
-	c.Check(elementsEquals(oldsrv2.conf.GetChannels(), chans1), Equals, true)
-	c.Check(elementsEquals(b.dispatcher.GetChannels(), chans1), Equals, true)
-	c.Check(elementsEquals(oldsrv1.dispatcher.GetChannels(), chans1),
-		Equals, true)
-	c.Check(elementsEquals(oldsrv2.dispatcher.GetChannels(), chans1),
-		Equals, true)
-	c.Check(oldsrv1.state, NotNil)
+	end := b.Start()
 
-	servers := b.ReplaceConfig(c3) // Invalid Config
-	c.Check(len(servers), Equals, 0)
-	servers = b.ReplaceConfig(c2)
-	c.Check(len(servers), Equals, 1)
-	c.Check(len(b.servers), Equals, 2)
+	<-old1listen
+	<-old2listen
 
-	c.Check(elementsEquals(b.conf.Global.Channels, chans2), Equals, true)
-	c.Check(elementsEquals(oldsrv1.conf.GetChannels(), chans3), Equals, true)
-	c.Check(elementsEquals(servers[0].server.conf.GetChannels(), chans2),
-		Equals, true)
-	c.Check(elementsEquals(b.dispatcher.GetChannels(), chans2), Equals, true)
-	c.Check(elementsEquals(oldsrv1.dispatcher.GetChannels(), chans3),
-		Equals, true)
-	c.Check(elementsEquals(servers[0].server.dispatcher.GetChannels(), chans2),
-		Equals, true)
-	c.Check(oldsrv1.state, IsNil)
+	if e := b.conf.Global.Channels; !contains(e, chans1) {
+		t.Errorf("Expected elements: %v", e)
+	}
+	if e := oldsrv1.conf.GetChannels(); !contains(e, chans1) {
+		t.Errorf("Expected elements: %v", e)
+	}
+	if e := oldsrv2.conf.GetChannels(); !contains(e, chans1) {
+		t.Errorf("Expected elements: %v", e)
+	}
+	if e := b.dispatchCore.GetChannels(); !contains(e, chans1) {
+		t.Errorf("Expected elements: %v", e)
+	}
+	if e := oldsrv1.dispatchCore.GetChannels(); !contains(e, chans1) {
+		t.Errorf("Expected elements: %v", e)
+	}
+	if e := oldsrv2.dispatchCore.GetChannels(); !contains(e, chans1) {
+		t.Errorf("Expected elements: %v", e)
+	}
+	if oldsrv1.state == nil {
+		t.Error("Old server should have state.")
+	}
 
-	c.Check(servers[0].Err, IsNil)
-	c.Check(servers[0].ServerName, Equals, "anothernewserver")
+	success := b.ReplaceConfig(c3) // Invalid Config
+	if success {
+		t.Error("An invalid config should fail.")
+	}
+	success = b.ReplaceConfig(c2)
+	if !success {
+		t.Error("A valid new config should succeed.")
+	}
 
-	c.Check(
-		bytes.Compare(conns[serverId].Receive(len(nick), nil), nick),
-		Equals,
-		0,
-	)
+	if <-end == nil {
+		t.Error("Expected a kill error")
+	}
 
-	server := servers[0].server
-	c.Check(server, NotNil)
+	newsrv1 := b.servers["anothernewserver"]
 
-	errs = b.Connect()
-	c.Check(len(errs), Equals, 2)
-	c.Check(errs[0].Error(), Matches, ".*already connected.\n")
+	if len(c2.Servers) != len(b.servers) {
+		t.Errorf("The number of servers (%v) should match the config (%v)",
+			len(b.servers), len(c2.Servers))
+	}
 
-	c.Check(oldsrv1.IsConnected(), Equals, true)
-	c.Check(server.IsConnected(), Equals, true)
+	if e := b.conf.Global.Channels; !contains(e, chans2) {
+		t.Errorf("Expected elements: %v", e)
+	}
+	if e := oldsrv1.conf.GetChannels(); !contains(e, chans3) {
+		t.Errorf("Expected elements: %v", e)
+	}
+	if e := newsrv1.conf.GetChannels(); !contains(e, chans2) {
+		t.Errorf("Expected elements: %v", e)
+	}
+	if e := b.dispatchCore.GetChannels(); !contains(e, chans2) {
+		t.Errorf("Expected elements: %v", e)
+	}
+	if e := oldsrv1.dispatchCore.GetChannels(); !contains(e, chans3) {
+		t.Errorf("Expected elements: %v", e)
+	}
+	if e := newsrv1.dispatchCore.GetChannels(); !contains(e, chans2) {
+		t.Errorf("Expected elements: %v", e)
+	}
+	if oldsrv1.state != nil {
+		t.Error("Old server should not have state.")
+	}
 
-	conns["anothernewserver"].Send([]byte{}, 0, io.EOF)
+	recv := conns[serverID+":6667"].Receive(len(nick), nil)
+	if bytes.Compare(recv, nick) != 0 {
+		t.Errorf("Was expecting a change in nick but got: %s", recv)
+	}
 
 	b.Stop()
-	b.Disconnect()
-	b.WaitForHalt()
+	for _ = range end {
+	}
 }
-
-func (s *s) TestBot_testElementEquals(c *C) {
-	a := []string{"a", "b"}
-	b := []string{"b", "a"}
-	c.Check(elementsEquals(a, b), Equals, true)
-
-	a = []string{"a", "b", "c"}
-	c.Check(elementsEquals(a, b), Equals, false)
-
-	a = []string{"x", "y"}
-	c.Check(elementsEquals(a, b), Equals, false)
-
-	a = []string{}
-	b = []string{}
-	c.Check(elementsEquals(a, b), Equals, true)
-
-	b = []string{"a"}
-	c.Check(elementsEquals(a, b), Equals, false)
-
-	a = []string{"a"}
-	b = []string{}
-	c.Check(elementsEquals(a, b), Equals, false)
-}*/

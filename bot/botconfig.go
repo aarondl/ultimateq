@@ -1,19 +1,18 @@
 package bot
 
 import (
+	"fmt"
 	"github.com/aarondl/ultimateq/config"
-	//"github.com/aarondl/ultimateq/irc"
+	"github.com/aarondl/ultimateq/irc"
+)
+
+const (
+	// errFmtNewServer occurs when a server that was created by RehashConfig
+	// fails to initialize for some reason.
+	errFmtNewServer = "bot: The new server (%v) could not be instantiated: %v"
 )
 
 type configCallback func(*config.Config)
-
-// NewServer is returned from ReplaceConfig to indicate which servers were
-// added and started. Or which one's had errors connecting.
-type NewServer struct {
-	ServerName string
-	server     *Server
-	Err        error
-}
 
 // ReadConfig opens the config for reading, for the duration of the callback
 // the config is synchronized.
@@ -33,73 +32,75 @@ func (b *Bot) WriteConfig(fn configCallback) {
 
 // ReplaceConfig replaces the current configuration for the bot. Running
 // servers not present in the new config will be shut down immediately, while
-// new servers will be connected to and started. Updates active channels
-// for all dispatchers as well as sends nick messages to the servers with
-// updates for nicknames. Returns any new servers added.
-func (b *Bot) ReplaceConfig(newConfig *config.Config) []NewServer {
-	/*if !newConfig.IsValid() {
-		return nil
+// new servers will be connected to and started. Updates updateable attributes
+// from the new configuration for each server. Returns false if the config
+// had an error.
+func (b *Bot) ReplaceConfig(newConfig *config.Config) bool {
+	if !newConfig.IsValid() {
+		return false
 	}
-
-	servers := make([]NewServer, 0)
 
 	b.protectServers.Lock()
 	b.protectConfig.Lock()
 	defer b.protectServers.Unlock() // LIFO
 	defer b.protectConfig.Unlock()
 
+	b.startNewServers(newConfig)
+
 	for k, s := range b.servers {
 		if serverConf := newConfig.GetServer(k); nil == serverConf {
 			b.stopServer(s)
-			b.disconnectServer(s)
 			delete(b.servers, k)
+			continue
 		} else {
-			setNick := s.conf.GetNick() != serverConf.GetNick()
-			setChannels :=
-				!elementsEquals(s.conf.GetChannels(), serverConf.GetChannels())
-
-			if !s.conf.GetNoState() && serverConf.GetNoState() {
-				s.protectState.Lock()
-				s.state = nil
-				s.protectState.Unlock()
-			}
-
-			s.conf = serverConf
-
-			if setNick {
-				s.Writeln(irc.NICK + " :" + s.conf.GetNick())
-			}
-			if setChannels {
-				s.dispatcher.Channels(s.conf.GetChannels())
-			}
+			s.rehashConfig(serverConf)
 		}
 	}
 
-	if !elementsEquals(b.conf.Global.GetChannels(),
-		newConfig.Global.GetChannels()) {
-
-		b.dispatcher.Channels(newConfig.Global.GetChannels())
-	}
-
-	for k, s := range newConfig.Servers {
-		if serverConf := b.conf.GetServer(k); nil == serverConf {
-			server, err := b.createServer(s)
-			b.servers[k] = server
-
-			if err == nil {
-				err = b.connectServer(server)
-				if err == nil {
-					b.startServer(server, true, true)
-				}
-			}
-			servers = append(servers, NewServer{k, server, err})
-		}
+	if !contains(b.conf.Global.GetChannels(), newConfig.Global.GetChannels()) {
+		b.dispatchCore.Channels(newConfig.Global.GetChannels())
 	}
 
 	b.conf = newConfig
+	return true
+}
 
-	return servers*/
-	return nil
+// startNewServers adds non-existing servers to the bot and starts them.
+func (b *Bot) startNewServers(newConfig *config.Config) {
+	for k, s := range newConfig.Servers {
+		if serverConf := b.conf.GetServer(k); nil == serverConf {
+			server, err := b.createServer(s)
+			if err != nil {
+				b.botEnd <- fmt.Errorf(errFmtNewServer, k, err)
+				continue
+			}
+			b.servers[k] = server
+
+			go b.startServer(server, true, true)
+		}
+	}
+}
+
+// rehashConfig updates the server's config values from the new configuration.
+func (s *Server) rehashConfig(srvConfig *config.Server) {
+	setNick := s.conf.GetNick() != srvConfig.GetNick()
+	setChannels :=
+		!contains(s.conf.GetChannels(), srvConfig.GetChannels())
+
+	if !s.conf.GetNoState() && srvConfig.GetNoState() {
+		s.protectState.Lock()
+		s.state = nil
+		s.protectState.Unlock()
+	}
+
+	s.conf = srvConfig
+
+	if setNick {
+		s.Write([]byte(irc.NICK + " :" + s.conf.GetNick()))
+	}
+	if setChannels {
+		s.dispatchCore.Channels(s.conf.GetChannels())
+	}
 }
 
 // Rehash loads the config from a file. It attempts to use the previously read
@@ -128,8 +129,8 @@ func (b *Bot) DumpConfig() (err error) {
 	return
 }
 
-// elementsEquals checks that the string arrays contain the same elements.
-func elementsEquals(a, b []string) bool {
+// contains checks that the string arrays contain the same elements.
+func contains(a, b []string) bool {
 	lena, lenb := len(a), len(b)
 	if lena != lenb {
 		return false
