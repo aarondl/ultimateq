@@ -19,11 +19,12 @@ import (
 	"time"
 )
 
+type Status byte
+
 // Server Statuses
 const (
-	STATUS_STOPPED         = 0
-	STATUS_CONNECTING byte = 1 << (iota - 1)
-	STATUS_CONNECTED
+	STATUS_STOPPED Status = iota
+	STATUS_CONNECTING
 	STATUS_STARTED
 	STATUS_RECONNECTING
 )
@@ -39,8 +40,8 @@ var (
 	errNotConnected = errors.New("bot: Server not connected")
 	// errFailedToLoadCertificate happens when we fail to parse the certificate
 	errFailedToLoadCertificate = errors.New("bot: Failed to load certificate")
-	// errKilledConn happens when the server is killed mid-connect.
-	errKilledConn = errors.New("bot: Killed trying to connect.")
+	// errServerKilledConn happens when the server is killed mid-connect.
+	errServerKilledConn = errors.New("bot: Killed trying to connect.")
 )
 
 // connResult is used to return results from the channel patterns in
@@ -56,9 +57,12 @@ type certReader func(string) (*x509.CertPool, error)
 // Server is all the details around a specific server connection. Also contains
 // the connection and configuration for the specific server.
 type Server struct {
-	bot    *Bot
-	name   string
-	status byte
+	bot  *Bot
+	name string
+
+	// Status
+	status          Status
+	statusListeners [][]chan Status
 
 	// Configuration
 	conf *config.Server
@@ -74,12 +78,10 @@ type Server struct {
 	handler   *coreHandler
 
 	// State and Connection
-	client       *inet.IrcClient
-	state        *data.State
-	reconnScale  time.Duration
-	kill         chan int
-	killdispatch chan int
-	killreconn   chan int
+	client      *inet.IrcClient
+	state       *data.State
+	reconnScale time.Duration
+	killable    chan int
 
 	// protects client reading/writing
 	protect sync.RWMutex
@@ -102,7 +104,7 @@ func (s *Server) Write(buf []byte) (int, error) {
 	s.protect.RLock()
 	defer s.protect.RUnlock()
 
-	if s.isConnected() {
+	if s.GetStatus() != STATUS_STOPPED {
 		return s.client.Write(buf)
 	}
 
@@ -156,17 +158,19 @@ func (s *Server) createIrcClient() error {
 		if result.err != nil {
 			return result.err
 		}
-	case <-s.kill:
+	case s.killable <- 0:
 		close(resultService)
-		return errKilledConn
+		return errServerKilledConn
 	}
 
+	s.protect.Lock()
 	s.client = inet.CreateIrcClient(result.conn, s.name,
 		int(s.conf.GetFloodLenPenalty()),
 		time.Duration(s.conf.GetFloodTimeout()*1000.0)*time.Millisecond,
 		time.Duration(s.conf.GetFloodStep()*1000.0)*time.Millisecond,
 		time.Duration(s.conf.GetKeepAlive())*time.Second,
 		time.Second)
+	s.protect.Unlock()
 	return nil
 }
 
@@ -214,6 +218,18 @@ func (s *Server) createTlsConfig(cr certReader) (conf *tls.Config, err error) {
 	return
 }
 
+// Close shuts down the connection and returns.
+func (s *Server) Close() (err error) {
+	s.protect.Lock()
+	defer s.protect.Unlock()
+
+	if s.client != nil {
+		err = s.client.Close()
+	}
+	s.client = nil
+	return
+}
+
 // rehashProtocaps delivers updated protocaps to the server's components who
 // may need it.
 func (s *Server) rehashProtocaps() error {
@@ -231,128 +247,55 @@ func (s *Server) rehashProtocaps() error {
 	return nil
 }
 
-// IsStopped checks to see if the server is stopped.
-func (s *Server) IsStopped() bool {
-	s.protect.RLock()
-	defer s.protect.RUnlock()
+// setStatus safely sets the status of the server and notifies any listeners.
+func (s *Server) setStatus(newstatus Status) {
+	s.protect.Lock()
+	defer s.protect.Unlock()
 
-	return s.isStopped()
+	s.status = newstatus
+	if s.statusListeners == nil {
+		return
+	}
+	for _, listener := range s.statusListeners[0] {
+		listener <- s.status
+	}
+	i := byte(newstatus) + 1
+	for _, listener := range s.statusListeners[i] {
+		listener <- s.status
+	}
 }
 
-// isStopped checks to see if the server is stopped without locking
-func (s *Server) isStopped() bool {
-	return s.status == STATUS_STOPPED
-}
+// addStatusListener adds a listener for status changes.
+func (s *Server) addStatusListener(listener chan Status, listen ...Status) {
+	s.protect.Lock()
+	defer s.protect.Unlock()
 
-// IsConnecting checks to see if the server is connecting.
-func (s *Server) IsConnecting() bool {
-	s.protect.RLock()
-	defer s.protect.RUnlock()
-
-	return s.isConnecting()
-}
-
-// isConnecting checks to see if the server is connecting without locking
-func (s *Server) isConnecting() bool {
-	return STATUS_CONNECTING == s.status&STATUS_CONNECTING
-}
-
-// setConnecting sets the server's connecting flag.
-func (s *Server) setConnecting(value, lock bool) {
-	if lock {
-		s.protect.Lock()
-		defer s.protect.Unlock()
+	if s.statusListeners == nil {
+		s.statusListeners = [][]chan Status{
+			make([]chan Status, 0),
+			make([]chan Status, 0),
+			make([]chan Status, 0),
+			make([]chan Status, 0),
+			make([]chan Status, 0),
+		}
 	}
 
-	if value {
-		s.status |= STATUS_CONNECTING
+	if len(listen) == 0 {
+		s.statusListeners[0] = append(s.statusListeners[0], listener)
 	} else {
-		s.status &= ^STATUS_CONNECTING
+		for _, st := range listen {
+			i := byte(st) + 1
+			s.statusListeners[i] = append(s.statusListeners[i], listener)
+		}
 	}
 }
 
-// IsConnected checks to see if the server is connected.
-func (s *Server) IsConnected() bool {
+// GetStatus safely gets the status of the server.
+func (s *Server) GetStatus() Status {
 	s.protect.RLock()
 	defer s.protect.RUnlock()
 
-	return s.isConnected()
-}
-
-// isConnected checks to see if the server is connected without locking
-func (s *Server) isConnected() bool {
-	return STATUS_CONNECTED == s.status&STATUS_CONNECTED
-}
-
-// setConnected sets the server's connected flag.
-func (s *Server) setConnected(value, lock bool) {
-	if lock {
-		s.protect.Lock()
-		defer s.protect.Unlock()
-	}
-
-	if value {
-		s.status |= STATUS_CONNECTED
-	} else {
-		s.status &= ^STATUS_CONNECTED
-	}
-}
-
-// IsStarted checks to see if the the server is currently reading or writing.
-func (s *Server) IsStarted() bool {
-	s.protect.RLock()
-	defer s.protect.RUnlock()
-
-	return s.isStarted()
-}
-
-// isStarted checks to see if the the server is currently reading or writing
-// without locking.
-func (s *Server) isStarted() bool {
-	return 0 != s.status&STATUS_STARTED
-}
-
-// setStarted sets the server's reading and writing flags simultaneously.
-func (s *Server) setStarted(value, lock bool) {
-	if lock {
-		s.protect.Lock()
-		defer s.protect.Unlock()
-	}
-
-	if value {
-		s.status |= STATUS_STARTED
-	} else {
-		s.status &= ^STATUS_STARTED
-	}
-}
-
-// IsReconnecting checks to see if the dispatcher is waiting to reconnect the
-// server.
-func (s *Server) IsReconnecting() bool {
-	s.protect.RLock()
-	defer s.protect.RUnlock()
-
-	return s.isReconnecting()
-}
-
-// isReconnecting checks to see if the dispatcher is waiting to reconnect the
-// without locking.
-func (s *Server) isReconnecting() bool {
-	return STATUS_RECONNECTING == s.status&STATUS_RECONNECTING
-}
-
-// setStarted sets the server's reconnecting flag.
-func (s *Server) setReconnecting(value, lock bool) {
-	if lock {
-		s.protect.Lock()
-		defer s.protect.Unlock()
-	}
-
-	if value {
-		s.status |= STATUS_RECONNECTING
-	} else {
-		s.status &= ^STATUS_RECONNECTING
-	}
+	return s.status
 }
 
 // readCert returns a CertPool containing the client certificate specified

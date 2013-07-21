@@ -11,7 +11,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"runtime"
 	. "testing"
 	"time"
 )
@@ -119,6 +118,55 @@ func TestBot_Start(t *T) {
 	}
 }
 
+func TestBot_StartStopServer(t *T) {
+	t.Parallel()
+	conn1 := mocks.CreateConn()
+	conn2 := mocks.CreateConn()
+	connProvider := func(srv string) (net.Conn, error) {
+		if srv == "other:6667" {
+			return conn1, nil
+		}
+		conn2.ResetDeath()
+		return conn2, nil
+	}
+	conf := fakeConfig.Clone()
+	conf.Server("othersrv").Host("other")
+	b, _ := createBot(conf, connProvider, nil, false, false)
+	srv := b.servers[serverID]
+	//othersrv := b.servers["othersrv"]
+
+	done := make(chan int)
+	start := make(chan Status)
+	stop := make(chan Status)
+	srv.addStatusListener(start, STATUS_STARTED)
+	srv.addStatusListener(stop, STATUS_STOPPED)
+	//othersrv.addStatusListener(start, STATUS_STARTED)
+
+	go func() {
+		//<-start
+		for i := 0; i < 2; i++ {
+			<-start
+			if !b.StopServer(serverID) {
+				t.Error("There was a problem stopping the server.")
+			}
+
+			<-stop
+			if !b.StartServer(serverID) {
+				t.Fatal("There was an error starting the server.")
+			}
+		}
+
+		go b.Stop()
+		<-stop
+		done <- 0
+	}()
+
+	for _ = range b.Start() {
+	}
+
+	<-done
+}
+
 func TestBot_Dispatching(t *T) {
 	t.Parallel()
 	conn := mocks.CreateConn()
@@ -126,7 +174,6 @@ func TestBot_Dispatching(t *T) {
 		return conn, nil
 	}
 	b, _ := createBot(fakeConfig, connProvider, nil, false, false)
-	srv := b.servers[serverID]
 
 	result := make(chan *irc.Message)
 	thandler := &testHandler{
@@ -150,12 +197,6 @@ func TestBot_Dispatching(t *T) {
 	}
 
 	end := b.Start()
-	for !srv.IsConnected() {
-		runtime.Gosched()
-	}
-	for !srv.IsStarted() {
-		runtime.Gosched()
-	}
 
 	testMsg := "cmd"
 	msg := []byte("PRIVMSG bot :" + testMsg + "\r\n")
@@ -220,6 +261,7 @@ func TestBot_Reconnect(t *T) {
 	wantedConn := make(chan int)
 	connProvider := func(srv string) (net.Conn, error) {
 		<-wantedConn
+		conn.ResetDeath()
 		return conn, nil
 	}
 
@@ -229,24 +271,21 @@ func TestBot_Reconnect(t *T) {
 	srv := b.servers[serverID]
 	srv.reconnScale = time.Millisecond
 
-	end := b.Start()
-	wantedConn <- 0
+	go func() {
+		wantedConn <- 0
 
-	conn.Send(nil, 0, io.EOF)
-	conn.ResetDeath()
-	wantedConn <- 0
+		conn.Send(nil, 0, io.EOF)
+		wantedConn <- 0
 
-	conn.Send(nil, 0, io.EOF)
-	conn.ResetDeath()
-	wantedConn <- 0
+		conn.Send(nil, 0, io.EOF)
+		wantedConn <- 0
 
-	for !srv.IsConnecting() {
-		runtime.Gosched()
-	}
-	srv.kill <- 0
-	for err := range end {
+		b.Stop()
+	}()
+
+	for err := range b.Start() {
 		if err != errServerKilled {
-			t.Error("Expected it to die during connection.")
+			t.Error("Expected it to die during running state.")
 		}
 	}
 }
@@ -265,55 +304,47 @@ func TestBot_ReconnectConnection(t *T) {
 	srv := b.servers[serverID]
 	srv.reconnScale = time.Millisecond
 
-	end := b.Start()
-	wantedConn <- 0
-	wantedConn <- 0
-	wantedConn <- 0
+	listen := make(chan Status)
+	srv.addStatusListener(listen, STATUS_CONNECTING)
 
-	for !srv.IsConnecting() {
-		runtime.Gosched()
-	}
-	srv.kill <- 0
+	end := b.Start()
+	<-listen
+	wantedConn <- 0
+	<-listen
+	wantedConn <- 0
+	<-listen
+	wantedConn <- 0
+	<-listen
+
+	b.Stop()
 	for err := range end {
-		if err != errServerKilledReconn {
-			t.Error("Expected it to die during reconnection.")
+		if err != errServerKilledConn {
+			t.Error("Expected it to die during connecting:", err)
 		}
 	}
 }
 
 func TestBot_ReconnectKill(t *T) {
 	t.Parallel()
-	conn := mocks.CreateConn()
 	connProvider := func(srv string) (net.Conn, error) {
-		return conn, nil
+		return nil, io.EOF
 	}
 
 	conf := fakeConfig.Clone().GlobalContext().NoReconnect(false).
-		ReconnectTimeout(1)
+		ReconnectTimeout(3)
 	b, _ := createBot(conf, connProvider, nil, false, false)
 	srv := b.servers[serverID]
 
-	result := make(chan *irc.Message)
-	thandler := &testHandler{
-		func(m *irc.Message, ep irc.Endpoint) {
-			result <- m
-		},
-	}
-	b.Register(irc.CONNECT, thandler)
+	listen := make(chan Status)
+	srv.addStatusListener(listen, STATUS_RECONNECTING)
 
 	end := b.Start()
 
-	if d := <-result; d == nil || d.Name != irc.CONNECT {
-		t.Error("Expected a dispatch of connect:", d)
-	}
-	conn.Send(nil, 0, io.EOF)
-	for !srv.IsReconnecting() {
-		runtime.Gosched()
-	}
-	srv.kill <- 0
+	<-listen
+	b.Stop()
 	for err := range end {
 		if err != errServerKilledReconn {
-			t.Error("Expected it to die during reconnection:", err)
+			t.Error("Expected it to die during connection:", err)
 		}
 	}
 }
@@ -451,11 +482,12 @@ func TestBot_Stop(t *T) {
 	b, _ := createBot(fakeConfig, connProvider, nil, false, false)
 	srv := b.servers[serverID]
 
+	listen := make(chan Status)
+	srv.addStatusListener(listen, STATUS_STARTED)
+
 	end := b.Start()
 
-	for !srv.IsStarted() {
-		runtime.Gosched()
-	}
+	<-listen
 
 	b.Stop()
 	for _ = range end {
@@ -471,6 +503,9 @@ func TestBot_GetEndpoint(t *T) {
 	b, _ := createBot(fakeConfig, connProvider, nil, false, false)
 	srv := b.servers[serverID]
 
+	listen := make(chan Status)
+	srv.addStatusListener(listen, STATUS_STARTED)
+
 	end := b.Start()
 
 	ep := b.GetEndpoint(serverID)
@@ -481,9 +516,7 @@ func TestBot_GetEndpoint(t *T) {
 		result <- string(conn.Receive(len(test), io.EOF))
 	}()
 
-	for !srv.IsConnected() {
-		runtime.Gosched()
-	}
+	<-listen
 
 	if err := ep.Send(test); err != nil {
 		t.Fatal("Unexpected error:", err)

@@ -50,7 +50,7 @@ var (
 	errServerKilled = errors.New("bot: Server killed.")
 	// errServerKilledReconn occurs when the server is killed during a
 	// reconnection pause.
-	errServerKilledReconn = errors.New("bot: Server killed.")
+	errServerKilledReconn = errors.New("bot: Server reconnection aborted.")
 
 	// connMessage is a pseudo message sent to servers upon connect.
 	connMessage = &irc.Message{Name: irc.CONNECT}
@@ -63,6 +63,12 @@ type (
 	ConnProvider func(string) (net.Conn, error)
 	// StoreProvider transforms an optional path into a store.
 	StoreProvider func(string) (*data.Store, error)
+	// serverOp represents a server operation (starting/stopping).
+	serverOp struct {
+		server   *Server
+		starting bool
+		err      error
+	}
 )
 
 // Bot is a main type that joins together all the packages into a functioning
@@ -74,9 +80,11 @@ type Bot struct {
 	store   *data.Store
 
 	// Bot-server synchronization.
-	botEnd      chan error
-	serverStart chan int
-	serverEnd   chan error
+	botEnd        chan error
+	serverControl chan serverOp
+	serverStart   chan bool
+	serverStop    chan bool
+	serverEnd     chan serverOp
 
 	// Dispatching
 	caps         *irc.ProtoCaps
@@ -154,20 +162,49 @@ func (b *Bot) Start() <-chan error {
 // are stopped it closes the botEnd channel.
 func (b *Bot) monitorServers() {
 	servers := 0
+	state := make(map[string]bool)
 	for {
-		var err error
 		select {
-		case <-b.serverStart:
-			servers++
-		case err = <-b.serverEnd:
-			b.botEnd <- err
+		case op := <-b.serverControl:
+			isStarted := state[op.server.name]
+			if op.starting {
+				op.server.killable = make(chan int)
+				b.serverStart <- !isStarted
+				if !isStarted {
+					state[op.server.name] = true
+					servers++
+				}
+			} else {
+				if isStarted {
+					delete(state, op.server.name)
+					_, isStarted = <-op.server.killable
+				}
+				b.serverStop <- isStarted
+			}
+		case op := <-b.serverEnd:
+			delete(state, op.server.name)
+			b.botEnd <- op.err
 			servers--
 		}
 
 		if servers == 0 {
 			close(b.botEnd)
+			break
 		}
 	}
+}
+
+// StartServer starts a server by name. Start() should have been called prior
+// to this.
+func (b *Bot) StartServer(server string) (started bool) {
+	b.protectServers.RLock()
+	defer b.protectServers.RUnlock()
+
+	var srv *Server
+	if srv, started = b.servers[server]; started {
+		go b.startServer(srv, true, true)
+	}
+	return
 }
 
 // startServer starts up a server. When it has finished (permanently
@@ -176,32 +213,24 @@ func (b *Bot) startServer(srv *Server, writing, reading bool) {
 	var err error
 	var disconnect bool
 
-	b.serverStart <- 0
+	b.serverControl <- serverOp{srv, true, nil}
+	if !<-b.serverStart {
+		return
+	}
+
 	for err == nil {
-		srv.setConnecting(true, true)
+		srv.setStatus(STATUS_CONNECTING)
 		err = srv.createIrcClient()
-		if err != nil {
-			srv.setConnecting(false, true)
-			disconnect = true
-		}
+		disconnect = err != nil && err != errServerKilledConn
 
 		if err == nil {
-			srv.protect.Lock()
-			srv.setConnecting(false, false)
-			srv.setConnected(true, false)
-			srv.setStarted(true, false)
-			srv.protect.Unlock()
+			srv.setStatus(STATUS_STARTED)
 
 			srv.client.SpawnWorkers(writing, reading)
 			disconnect, err = b.dispatch(srv)
 			if err != nil {
 				break
 			}
-
-			srv.client.Close()
-			srv.client = nil
-			srv.setStarted(false, true)
-			srv.setConnected(false, true)
 		}
 
 		b.protectConfig.RLock()
@@ -211,19 +240,22 @@ func (b *Bot) startServer(srv *Server, writing, reading bool) {
 		}
 
 		err = nil
+		srv.Close()
 		wait := time.Duration(srv.conf.GetReconnectTimeout()) * srv.reconnScale
 		b.protectConfig.RUnlock()
 
-		srv.setReconnecting(true, true)
+		srv.setStatus(STATUS_RECONNECTING)
 		select {
-		case <-srv.kill:
+		case srv.killable <- 0:
 			err = errServerKilledReconn
 		case <-time.After(wait):
 		}
-		srv.setReconnecting(false, true)
 	}
 
-	b.serverEnd <- err
+	srv.Close()
+	close(srv.killable)
+	b.serverEnd <- serverOp{srv, false, err}
+	srv.setStatus(STATUS_STOPPED)
 }
 
 // dispatch starts dispatch loops on the server.
@@ -246,7 +278,7 @@ func (b *Bot) dispatch(srv *Server) (disconnect bool, err error) {
 				break
 			}
 			b.dispatchMessage(srv, ircMsg)
-		case <-srv.kill:
+		case srv.killable <- 0:
 			err = errServerKilled
 			break
 		}
@@ -267,17 +299,28 @@ func (b *Bot) dispatchMessage(s *Server, msg *irc.Message) {
 // Stop shuts down all connections and exits.
 func (b *Bot) Stop() {
 	b.protectServers.RLock()
+	defer b.protectServers.RUnlock()
+
 	for _, srv := range b.servers {
 		b.stopServer(srv)
 	}
-	b.protectServers.RUnlock()
+}
+
+// StopServer stops a server by name.
+func (b *Bot) StopServer(server string) (stopped bool) {
+	b.protectServers.RLock()
+	defer b.protectServers.RUnlock()
+
+	if srv, ok := b.servers[server]; ok {
+		stopped = b.stopServer(srv)
+	}
+	return
 }
 
 // stopServer stops the current server if it's running.
-func (b *Bot) stopServer(srv *Server) {
-	if !srv.IsStopped() {
-		srv.kill <- 0
-	}
+func (b *Bot) stopServer(srv *Server) (stopped bool) {
+	b.serverControl <- serverOp{srv, false, nil}
+	return <-b.serverStop
 }
 
 // Close closes the store database.
@@ -388,8 +431,10 @@ func createBot(conf *config.Config, connProv ConnProvider,
 		storeProvider:  storeProv,
 		attachHandlers: attachHandlers,
 		botEnd:         make(chan error),
-		serverStart:    make(chan int),
-		serverEnd:      make(chan error),
+		serverControl:  make(chan serverOp),
+		serverStart:    make(chan bool),
+		serverStop:     make(chan bool),
+		serverEnd:      make(chan serverOp),
 	}
 
 	b.caps = irc.CreateProtoCaps()
@@ -429,14 +474,12 @@ func createBot(conf *config.Config, connProv ConnProvider,
 // server.
 func (b *Bot) createServer(conf *config.Server) (*Server, error) {
 	s := &Server{
-		bot:          b,
-		name:         conf.GetName(),
-		caps:         b.caps.Clone(),
-		conf:         conf,
-		kill:         make(chan int),
-		killdispatch: make(chan int),
-		killreconn:   make(chan int),
-		reconnScale:  defaultReconnScale,
+		bot:         b,
+		name:        conf.GetName(),
+		caps:        b.caps.Clone(),
+		conf:        conf,
+		killable:    make(chan int),
+		reconnScale: defaultReconnScale,
 	}
 
 	s.createDispatching(conf.GetPrefix(), conf.GetChannels())

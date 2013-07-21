@@ -7,7 +7,6 @@ import (
 	"github.com/aarondl/ultimateq/mocks"
 	"io"
 	"net"
-	"runtime"
 	. "testing"
 	"time"
 )
@@ -65,8 +64,10 @@ func TestServer_createIrcClient_killConn(t *T) {
 		errch <- srv.createIrcClient()
 	}()
 
-	srv.kill <- 0
-	if <-errch != errKilledConn {
+	if _, ok := <-srv.killable; !ok {
+		t.Error("The connection was not killed by request.")
+	}
+	if <-errch != errServerKilledConn {
 		t.Error("Expected a killed connection.")
 	}
 }
@@ -101,86 +102,90 @@ func TestServerSender(t *T) {
 	}
 }
 
+func TestServer_Close(t *T) {
+	t.Parallel()
+	errch := make(chan error)
+	conn := mocks.CreateConn()
+	connProvider := func(srv string) (net.Conn, error) {
+		return conn, nil
+	}
+	b, _ := createBot(fakeConfig, connProvider, nil, false, false)
+	srv := b.servers[serverID]
+
+	go func() {
+		errch <- srv.createIrcClient()
+	}()
+
+	if err := <-errch; err != nil {
+		t.Error("Unexpected:", err)
+	}
+
+	if err := srv.Close(); err != nil {
+		t.Error("Unexpected:", err)
+	}
+
+	if srv.client != nil {
+		t.Error("Expected client to be nil.")
+	}
+}
+
 func TestServer_Status(t *T) {
 	t.Parallel()
 	srv := &Server{}
 
-	var tests = []struct {
-		Value, Lock, Expect bool
-	}{
-		{true, false, true},
-		{false, false, false},
-		{true, true, true},
-		{false, true, false},
-	}
+	status := make(chan Status)
+	connAndStop := make(chan Status)
+	srv.addStatusListener(connAndStop, STATUS_CONNECTING, STATUS_STOPPED)
+	srv.addStatusListener(status)
 
-	var funcs = []func(int){
-		func(i int) {
-			test := tests[i]
-			srv.setConnecting(test.Value, test.Lock)
-			if was := srv.IsConnecting(); was != test.Expect {
-				t.Error("In Test:", test)
-				t.Error("Expected:", test.Expect, "was:", was)
-			}
-		},
-		func(i int) {
-			test := tests[i]
-			srv.setConnected(test.Value, test.Lock)
-			if was := srv.IsConnected(); was != test.Expect {
-				t.Error("In Test:", test)
-				t.Error("Expected:", test.Expect, "was:", was)
-			}
-		},
-		func(i int) {
-			test := tests[i]
-			srv.setStarted(test.Value, test.Lock)
-			if was := srv.IsStarted(); was != test.Expect {
-				t.Error("In Test:", test)
-				t.Error("Expected:", test.Expect, "was:", was)
-			}
-		},
-		func(i int) {
-			test := tests[i]
-			srv.setReconnecting(test.Value, test.Lock)
-			if was := srv.IsReconnecting(); was != test.Expect {
-				t.Error("In Test:", test)
-				t.Error("Expected:", test.Expect, "was:", was)
-			}
-		},
-	}
+	done := make(chan int)
 
-	for _, fn := range funcs {
-		for j := range tests {
-			fn(j)
+	go func() {
+		srv.setStatus(STATUS_CONNECTING)
+		srv.setStatus(STATUS_STARTED)
+		srv.setStatus(STATUS_STOPPED)
+	}()
+
+	go func() {
+		ers := 0
+		if st := <-status; st != STATUS_CONNECTING {
+			t.Error("Received the wrong state:", st)
+			ers++
 		}
-	}
-}
+		if st := <-status; st != STATUS_STARTED {
+			t.Error("Received the wrong state:", st)
+			ers++
+		}
+		if st := <-status; st != STATUS_STOPPED {
+			t.Error("Received the wrong state:", st)
+			ers++
+		}
+		done <- ers
+	}()
 
-func TestServer_StatusMultiple(t *T) {
-	srv := &Server{}
-	srv.status = 0
-	if !srv.IsStopped() {
-		t.Error("If there are no flags set, isstopped should be true.")
+	go func() {
+		ers := 0
+		if st := <-connAndStop; st != STATUS_CONNECTING {
+			t.Error("Received the wrong state:", st)
+			ers++
+		}
+		if st := <-connAndStop; st != STATUS_STOPPED {
+			t.Error("Received the wrong state:", st)
+			ers++
+		}
+		done <- ers
+	}()
+
+	if ers := <-done; ers > 0 {
+		t.Error(ers, " errors encountered during run.")
 	}
-	srv.status = ^byte(0)
-	if srv.IsStopped() {
-		t.Error("If there is any flags set, isstopped should be false.")
-	}
-	if !srv.IsConnecting() {
-		t.Error("All flags should all be able to be set together.")
-	}
-	if !srv.IsConnected() {
-		t.Error("All flags should all be able to be set together.")
-	}
-	if !srv.IsStarted() {
-		t.Error("All flags should all be able to be set together.")
-	}
-	if !srv.IsReconnecting() {
-		t.Error("All flags should all be able to be set together.")
+	if ers := <-done; ers > 0 {
+		t.Error(ers, " errors encountered during run.")
 	}
 }
 
 func TestServer_rehashProtocaps(t *T) {
+	t.Parallel()
 	b, _ := createBot(fakeConfig, nil, nil, false, false)
 	srv := b.servers[serverID]
 
@@ -201,6 +206,7 @@ func TestServer_rehashProtocaps(t *T) {
 }
 
 func TestServer_Write(t *T) {
+	t.Parallel()
 	conn := mocks.CreateConn()
 	connProvider := func(srv string) (net.Conn, error) {
 		return conn, nil
@@ -219,10 +225,12 @@ func TestServer_Write(t *T) {
 		t.Error("Expected:", errNotConnected, "got:", err)
 	}
 
+	listen := make(chan Status)
+	srv.addStatusListener(listen, STATUS_STARTED)
+
 	end := b.Start()
 
-	for !srv.IsConnected() {
-		runtime.Gosched()
+	for <-listen != STATUS_STARTED {
 	}
 
 	message := []byte("PONG :msg\r\n")
