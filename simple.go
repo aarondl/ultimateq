@@ -162,35 +162,33 @@ func main() {
 
 	b.Register(irc.PRIVMSG, &Handler{})
 
-	ers := b.Connect()
-	if len(ers) != 0 {
-		log.Println(ers)
-		return
-	}
-	b.Start()
+	end := b.Start()
 
-	input, dead, quit := make(chan int), make(chan int), make(chan os.Signal, 2)
+	input, quit := make(chan int), make(chan os.Signal, 2)
 
 	go func() {
 		scanner := bufio.NewScanner(os.Stdin)
 		scanner.Scan()
 		input <- 0
 	}()
-	go func() {
-		b.WaitForHalt()
-		dead <- 0
-	}()
 
 	signal.Notify(quit, os.Interrupt, os.Kill)
 
-	select {
-	case <-input:
-	case <-dead:
-	case <-quit:
+	stop := false
+	for !stop {
+		select {
+		case <-input:
+			b.Stop()
+			stop = true
+		case <-quit:
+			b.Stop()
+			stop = true
+		case err, ok := <-end:
+			log.Println("Server death:", err)
+			stop = !ok
+		}
 	}
 
-	b.Stop()
-	b.Disconnect()
 	log.Println("Shutting down...")
 	<-time.After(1 * time.Second)
 }

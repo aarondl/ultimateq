@@ -278,6 +278,9 @@ func (b *Bot) dispatch(srv *Server) (disconnect bool, err error) {
 				break
 			}
 			b.dispatchMessage(srv, ircMsg)
+			srv.protectState.Lock()
+			srv.state.Update(ircMsg)
+			srv.protectState.Unlock()
 		case srv.killable <- 0:
 			err = errServerKilled
 			break

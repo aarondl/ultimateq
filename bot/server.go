@@ -179,6 +179,9 @@ func (s *Server) createIrcClient() error {
 // If the channel is closed before it can send it's result, it will close the
 // connection automatically.
 func (s *Server) createConnection(resultService chan chan *connResult) {
+	s.bot.protectConfig.RLock()
+	defer s.bot.protectConfig.RUnlock()
+
 	r := &connResult{}
 	port := strconv.Itoa(int(s.conf.GetPort()))
 	server := s.conf.GetHost() + ":" + port
@@ -187,7 +190,7 @@ func (s *Server) createConnection(resultService chan chan *connResult) {
 		if s.conf.GetSsl() {
 			var conf *tls.Config
 			conf, r.err = s.createTlsConfig(readCert)
-			if r.err != nil {
+			if r.err == nil {
 				r.conn, r.err = tls.Dial("tcp", server, conf)
 			}
 		} else {
