@@ -4,6 +4,7 @@ Package mocks includes mocks to simplify testing.
 package mocks
 
 import (
+	"io"
 	"net"
 	"sync"
 	"time"
@@ -24,6 +25,7 @@ type Conn struct {
 	writereturn chan IOReturn
 	readchan    chan []byte
 	readreturn  chan IOReturn
+	killread    chan int
 	deathWaiter sync.WaitGroup
 }
 
@@ -33,6 +35,7 @@ func CreateConn() (conn *Conn) {
 		writereturn: make(chan IOReturn),
 		readchan:    make(chan []byte),
 		readreturn:  make(chan IOReturn),
+		killread:    make(chan int, 1),
 	}
 
 	conn.deathWaiter.Add(1)
@@ -57,13 +60,18 @@ func (m *Conn) Send(buffer []byte, n int, err error) {
 }
 
 func (m *Conn) Read(buffer []byte) (int, error) {
-	read := <-m.readchan
-	copy(buffer, read)
-	ret := <-m.readreturn
-	return ret.n, ret.err
+	select {
+	case read := <-m.readchan:
+		copy(buffer, read)
+		ret := <-m.readreturn
+		return ret.n, ret.err
+	case <-m.killread:
+	}
+	return 0, io.EOF
 }
 
 func (m *Conn) ResetDeath() {
+	m.killread = make(chan int, 1)
 	m.deathWaiter.Add(1)
 }
 
@@ -72,6 +80,7 @@ func (m *Conn) WaitForDeath() {
 }
 
 func (m *Conn) Close() error {
+	m.killread <- 0
 	m.deathWaiter.Done()
 	return nil
 }

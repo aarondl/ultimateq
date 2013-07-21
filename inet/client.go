@@ -306,9 +306,10 @@ func (c *IrcClient) Close() error {
 		return nil
 	}
 
-	err := c.conn.Close()
-
 	c.isShutdownProtect.Lock()
+	defer c.isShutdownProtect.Unlock()
+
+	err := c.conn.Close()
 	c.isShutdown = true
 
 	if c.killpump != nil {
@@ -317,7 +318,6 @@ func (c *IrcClient) Close() error {
 	if c.killsiphon != nil {
 		c.killsiphon <- 0
 	}
-	c.isShutdownProtect.Unlock()
 
 	return err
 }
