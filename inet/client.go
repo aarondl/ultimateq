@@ -20,8 +20,6 @@ const (
 	nBufferedWrites = 25
 	// defaultTimeScale is the default scale of the sleeps and timeouts.
 	defaultTimeScale = time.Second
-	// pingInterval is the interval between pings.
-	pingInterval = 30
 )
 
 var (
@@ -62,14 +60,16 @@ type IrcClient struct {
 	name string
 
 	// write throttling
-	//nThrottled int
-	msgSince   time.Time
-	lastwrite  time.Time
-	scale      time.Duration
-	burst      int
-	timeout    time.Duration
-	step       time.Duration
-	keepalive  bool
+	lastwrite        time.Time
+	penalty          time.Time
+	timeout          time.Duration
+	basestep         time.Duration
+	lenPenaltyFactor float64
+
+	// Time scaling for tests.
+	scale time.Duration
+
+	keepalive time.Duration
 
 	// buffering for io.Reader interface
 	readbuf []byte
@@ -90,17 +90,20 @@ func createIrcClient(conn net.Conn, name string) *IrcClient {
 }
 
 // CreateIrcClient creates an irc client with optional flood protection and
-// keep alive. If scale is not set timeout and step variables are in seconds.
-func CreateIrcClient(conn net.Conn, name string, burst, timeout,
-	step int, keepalive bool, scale time.Duration) *IrcClient {
+// keep alive. scale is used to round the final sleeping values as well as
+// scale the penalties incurred by lenPenaltyFactor, if 0 it is time.Second.
+func CreateIrcClient(conn net.Conn, name string, lenPenaltyFactor int,
+	timeout, basestep, keepalive, scale time.Duration) *IrcClient {
 
 	c := createIrcClient(conn, name)
 	if scale != 0 {
 		c.scale = scale
 	}
-	c.burst = burst
-	c.timeout = time.Duration(timeout) * c.scale
-	c.step = time.Duration(step) * c.scale
+	if lenPenaltyFactor > 0 {
+		c.lenPenaltyFactor = 1.0 / float64(lenPenaltyFactor)
+	}
+	c.timeout = timeout
+	c.basestep = basestep
 	c.keepalive = keepalive
 	return c
 }
@@ -125,25 +128,25 @@ func (c *IrcClient) SpawnWorkers(pump, siphon bool) {
 
 // calcSleepTime calculates the sleep time required by the flood protection
 // given a time of write.
-func (c *IrcClient) calcSleepTime(t time.Time, sentLen int) time.Duration {
-	if c.timeout == 0 || c.step == 0 {
-		return 0
+func (c *IrcClient) calcSleepTime(t time.Time, msgLen int) time.Duration {
+	roundToScale := func(in time.Duration) time.Duration {
+		return ((in + (c.scale / 2)) / c.scale) * c.scale
 	}
 
-	if c.lastwrite.After(c.msgSince) {
-		c.msgSince = c.lastwrite
-	}
-	
-	slowItDown := false
-	
-	if c.msgSince.Sub(t).Seconds() >= 10 {
-		slowItDown = true
+	if c.lastwrite.After(c.penalty) {
+		c.penalty = c.lastwrite
 	}
 
-	c.msgSince = c.msgSince.Add(time.Second * time.Duration(2 + (sentLen /120)))
-	
-	if slowItDown {
-		return c.msgSince.Sub(t) - (time.Second * 10)
+	applyPenalty := roundToScale(c.penalty.Sub(t)) >= c.timeout
+	c.penalty = c.penalty.Add(c.basestep + roundToScale(
+		time.Duration(float64(c.scale)*float64(msgLen)*c.lenPenaltyFactor)))
+
+	if applyPenalty {
+		sleep := roundToScale(c.penalty.Sub(t) - c.timeout)
+		if sleep > c.timeout {
+			sleep = c.timeout
+		}
+		return sleep
 	}
 
 	return 0
@@ -155,8 +158,8 @@ func (c *IrcClient) pump() {
 	var err error
 	var sleeper <-chan time.Time
 	var pinger <-chan time.Time
-	if c.keepalive {
-		pinger = time.After(pingInterval * c.scale)
+	if c.keepalive != 0 {
+		pinger = time.After(c.keepalive)
 	}
 	defer close(c.pumpservice)
 
@@ -204,7 +207,7 @@ func (c *IrcClient) pump() {
 					break
 				}
 			}
-			pinger = time.After(pingInterval * c.scale)
+			pinger = time.After(c.keepalive)
 		case <-c.killpump:
 			log.Printf(fmtErrPumpClosed, c.name, errMsgShutdown)
 			return

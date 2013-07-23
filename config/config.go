@@ -20,15 +20,18 @@ const (
 	// defaultStoreFile is where the bot will store it's Store database if not
 	// overridden.
 	defaultStoreFile = "./store.db"
-	// defaultFloodProtectBurst is how many messages can be sent before spam
-	// filters set in.
-	defaultFloodProtectBurst = uint(3)
-	// defaultFloodProtectTimeout is how many seconds between messages before
-	// the flood protection resets itself.
-	defaultFloodProtectTimeout = float64(3)
-	// defaultFloodProtectStep is the number of seconds between messages once
+	// defaultFloodLenPenalty is how many characters in a message by default
+	// warrant an extra second wait time.
+	defaultFloodLenPenalty = uint(120)
+	// defaultFloodTimeout is how many seconds worth of penalty must accumulate
+	// before setting penalties.
+	defaultFloodTimeout = 10.0
+	// defaultFloodStep is the default number of seconds between messages once
 	// flood protection has been activated.
-	defaultFloodProtectStep = float64(3)
+	defaultFloodStep = 2.0
+	// defaultKeepAlive is the default number of seconds to wait on an idle
+	// connection before sending a ping.
+	defaultKeepAlive = 60.0
 	// defaultReconnectTimeout is how many seconds to wait between reconns.
 	defaultReconnectTimeout = uint(20)
 	// botDefaultPrefix is the command prefix by default
@@ -48,25 +51,26 @@ const (
 
 // The following is for mapping config setting names to strings
 const (
-	errHost                = "host"
-	errPort                = "port"
-	errSsl                 = "ssl"
-	errNoVerifyCert        = "noverifycert"
-	errNoState             = "nostate"
-	errNoStore             = "nostore"
-	errStoreFile           = "storefile"
-	errFloodProtectBurst   = "floodprotectburst"
-	errFloodProtectTimeout = "floodprotecttimeout"
-	errFloodProtectStep    = "floodprotectstep"
-	errNoReconnect         = "noreconnect"
-	errReconnectTimeout    = "reconnecttimeout"
-	errNick                = "nickname"
-	errAltnick             = "alternate nickname"
-	errRealname            = "realname"
-	errUsername            = "username"
-	errUserhost            = "userhost"
-	errPrefix              = "prefix"
-	errChannel             = "channel"
+	errHost             = "host"
+	errPort             = "port"
+	errSsl              = "ssl"
+	errNoVerifyCert     = "noverifycert"
+	errNoState          = "nostate"
+	errNoStore          = "nostore"
+	errStoreFile        = "storefile"
+	errFloodLenPenalty  = "floodprotectlenPenalty"
+	errFloodTimeout     = "floodprotecttimeout"
+	errFloodStep        = "floodprotectstep"
+	errKeepAlive        = "keepalive"
+	errNoReconnect      = "noreconnect"
+	errReconnectTimeout = "reconnecttimeout"
+	errNick             = "nickname"
+	errAltnick          = "alternate nickname"
+	errRealname         = "realname"
+	errUsername         = "username"
+	errUserhost         = "userhost"
+	errPrefix           = "prefix"
+	errChannel          = "channel"
 )
 
 var (
@@ -198,25 +202,32 @@ func (c *Config) validateServer(s *Server, missingIsError bool) {
 		}
 	}
 
-	if len(s.FloodProtectBurst) != 0 {
+	if len(s.FloodLenPenalty) != 0 {
 		if _, err :=
-			strconv.ParseUint(s.FloodProtectBurst, 10, 32); err != nil {
-			c.addError(fmtErrInvalid, name, errFloodProtectBurst,
-				s.FloodProtectBurst)
+			strconv.ParseUint(s.FloodLenPenalty, 10, 32); err != nil {
+			c.addError(fmtErrInvalid, name, errFloodLenPenalty,
+				s.FloodLenPenalty)
 		}
 	}
 
-	if len(s.FloodProtectTimeout) != 0 {
-		if _, err := strconv.ParseFloat(s.FloodProtectTimeout, 32); err != nil {
-			c.addError(fmtErrInvalid, name, errFloodProtectTimeout,
-				s.FloodProtectTimeout)
+	if len(s.FloodTimeout) != 0 {
+		if _, err := strconv.ParseFloat(s.FloodTimeout, 32); err != nil {
+			c.addError(fmtErrInvalid, name, errFloodTimeout,
+				s.FloodTimeout)
 		}
 	}
 
-	if len(s.FloodProtectStep) != 0 {
-		if _, err := strconv.ParseFloat(s.FloodProtectStep, 32); err != nil {
-			c.addError(fmtErrInvalid, name, errFloodProtectStep,
-				s.FloodProtectStep)
+	if len(s.FloodStep) != 0 {
+		if _, err := strconv.ParseFloat(s.FloodStep, 32); err != nil {
+			c.addError(fmtErrInvalid, name, errFloodStep,
+				s.FloodStep)
+		}
+	}
+
+	if len(s.KeepAlive) != 0 {
+		if _, err := strconv.ParseFloat(s.KeepAlive, 32); err != nil {
+			c.addError(fmtErrInvalid, name, errKeepAlive,
+				s.KeepAlive)
 		}
 	}
 
@@ -395,30 +406,38 @@ func (c *Config) NoStore(nostore bool) *Config {
 	return c
 }
 
-// FloodProtectBurst fluently sets flood burst for the current config context,
-// this is how many messages will be bursted through without enabling flood
-// protection.
-func (c *Config) FloodProtectBurst(floodburst uint) *Config {
-	c.GetContext().FloodProtectBurst =
-		strconv.FormatUint(uint64(floodburst), 10)
+// FloodLenPenalty fluently sets flood lenPenalty for the current config
+// context. This is how many characters in a message will generate an extra
+// second of flood protection penalty.
+func (c *Config) FloodLenPenalty(floodlenPenalty uint) *Config {
+	c.GetContext().FloodLenPenalty =
+		strconv.FormatUint(uint64(floodlenPenalty), 10)
 	return c
 }
 
-// FloodProtectTimeout fluently sets flood timeout for the current config
-// context, this is how long flood protect will stay enabled after being
-// enabled.
-func (c *Config) FloodProtectTimeout(floodtimeout float64) *Config {
-	c.GetContext().FloodProtectTimeout =
-		strconv.FormatFloat(floodtimeout, 'e', -1, 64)
+// FloodTimeout fluently sets flood timeout for the current config
+// context, this is how many seconds of penalty must accumulate before flood
+// protection is triggered, and also how long after flood protection activation
+// it will continue to flood protect for.
+func (c *Config) FloodTimeout(floodtimeout float64) *Config {
+	c.GetContext().FloodTimeout = strconv.FormatFloat(floodtimeout, 'e', -1, 64)
 	return c
 }
 
-// FloodProtectStep fluently sets flood protect step for the current config
-// context, this is how many seconds to put in between messages after flood
-// protect has been activated (after FloodProtectBurst messages).
-func (c *Config) FloodProtectStep(floodstep float64) *Config {
-	c.GetContext().FloodProtectStep =
-		strconv.FormatFloat(floodstep, 'e', -1, 64)
+// FloodStep fluently sets flood protect step for the current config
+// context, this is how many seconds as a base are used to protect against
+// flooding, but may be added on to by FloodLenPenalty for sufficiently long
+// messages.
+func (c *Config) FloodStep(floodstep float64) *Config {
+	c.GetContext().FloodStep = strconv.FormatFloat(floodstep, 'e', -1, 64)
+	return c
+}
+
+// KeepAlive fluently sets keep alive timeout for the current config
+// context, this is how many seconds to wait on an idle connection before
+// sending a ping to see if the server is dead.
+func (c *Config) KeepAlive(floodstep float64) *Config {
+	c.GetContext().KeepAlive = strconv.FormatFloat(floodstep, 'e', -1, 64)
 	return c
 }
 
@@ -504,9 +523,12 @@ type Server struct {
 	NoStore string
 
 	// Flood Protection
-	FloodProtectBurst   string
-	FloodProtectTimeout string
-	FloodProtectStep    string
+	FloodLenPenalty string
+	FloodTimeout    string
+	FloodStep       string
+
+	// Keep alive
+	KeepAlive string
 
 	// Auto reconnection
 	NoReconnect      string
@@ -659,63 +681,76 @@ func (s *Server) GetNoReconnect() (noReconnect bool) {
 	return
 }
 
-// GetFloodProtectBurst gets FloodProtectBurst of the server, or the global
-// floodProtectBurst, or defaultFloodProtectBurst
-func (s *Server) GetFloodProtectBurst() (floodBurst uint) {
+// GetFloodLenPenalty gets FloodLenPenalty of the server, or the global
+// floodLenPenalty, or defaultFloodLenPenalty
+func (s *Server) GetFloodLenPenalty() (floodLenPenalty uint) {
 	var err error
 	var u uint64
 	var notset bool
-	floodBurst = defaultFloodProtectBurst
-	if len(s.FloodProtectBurst) != 0 {
-		u, err = strconv.ParseUint(s.FloodProtectBurst, 10, 32)
-	} else if s.parent != nil && len(s.parent.Global.FloodProtectBurst) != 0 {
-		u, err = strconv.ParseUint(s.parent.Global.FloodProtectBurst, 10, 32)
+	floodLenPenalty = defaultFloodLenPenalty
+	if len(s.FloodLenPenalty) != 0 {
+		u, err = strconv.ParseUint(s.FloodLenPenalty, 10, 32)
+	} else if s.parent != nil && len(s.parent.Global.FloodLenPenalty) != 0 {
+		u, err = strconv.ParseUint(s.parent.Global.FloodLenPenalty, 10, 32)
 	} else {
 		notset = true
 	}
 
 	if err != nil {
-		floodBurst = defaultFloodProtectBurst
+		floodLenPenalty = defaultFloodLenPenalty
 	} else if !notset {
-		floodBurst = uint(u)
+		floodLenPenalty = uint(u)
 	}
 	return
 }
 
-// GetFloodProtectTimeout gets FloodProtectTimeout of the server, or the global
-// floodProtectTimeout, or defaultFloodProtectTimeout
-func (s *Server) GetFloodProtectTimeout() (floodTimeout float64) {
+// GetFloodTimeout gets FloodTimeout of the server, or the global
+// floodTimeout, or defaultFloodTimeout
+func (s *Server) GetFloodTimeout() (floodTimeout float64) {
 	var err error
-	floodTimeout = defaultFloodProtectTimeout
-	if len(s.FloodProtectTimeout) != 0 {
-		floodTimeout, err =
-			strconv.ParseFloat(s.FloodProtectTimeout, 32)
-	} else if s.parent != nil && len(s.parent.Global.FloodProtectTimeout) != 0 {
-		floodTimeout, err =
-			strconv.ParseFloat(s.parent.Global.FloodProtectTimeout, 32)
+	floodTimeout = defaultFloodTimeout
+	if len(s.FloodTimeout) != 0 {
+		floodTimeout, err = strconv.ParseFloat(s.FloodTimeout, 32)
+	} else if s.parent != nil && len(s.parent.Global.FloodTimeout) != 0 {
+		floodTimeout, err = strconv.ParseFloat(s.parent.Global.FloodTimeout, 32)
 	}
 
 	if err != nil {
-		floodTimeout = defaultFloodProtectTimeout
+		floodTimeout = defaultFloodTimeout
 	}
 	return
 }
 
-// GetFloodProtectStep gets FloodProtectStep of the server, or the global
-// floodProtectStep, or defaultFloodProtectStep
-func (s *Server) GetFloodProtectStep() (floodStep float64) {
+// GetFloodStep gets FloodStep of the server, or the global
+// floodStep, or defaultFloodStep
+func (s *Server) GetFloodStep() (floodStep float64) {
 	var err error
-	floodStep = defaultFloodProtectStep
-	if len(s.FloodProtectStep) != 0 {
-		floodStep, err =
-			strconv.ParseFloat(s.FloodProtectStep, 32)
-	} else if s.parent != nil && len(s.parent.Global.FloodProtectStep) != 0 {
-		floodStep, err =
-			strconv.ParseFloat(s.parent.Global.FloodProtectStep, 32)
+	floodStep = defaultFloodStep
+	if len(s.FloodStep) != 0 {
+		floodStep, err = strconv.ParseFloat(s.FloodStep, 32)
+	} else if s.parent != nil && len(s.parent.Global.FloodStep) != 0 {
+		floodStep, err = strconv.ParseFloat(s.parent.Global.FloodStep, 32)
 	}
 
 	if err != nil {
-		floodStep = defaultFloodProtectStep
+		floodStep = defaultFloodStep
+	}
+	return
+}
+
+// GetKeepAlive gets KeepAlive of the server, or the global keepAlive,
+// or defaultKeepAlive.
+func (s *Server) GetKeepAlive() (keepAlive float64) {
+	var err error
+	keepAlive = defaultKeepAlive
+	if len(s.KeepAlive) != 0 {
+		keepAlive, err = strconv.ParseFloat(s.KeepAlive, 32)
+	} else if s.parent != nil && len(s.parent.Global.KeepAlive) != 0 {
+		keepAlive, err = strconv.ParseFloat(s.parent.Global.KeepAlive, 32)
+	}
+
+	if err != nil {
+		keepAlive = defaultKeepAlive
 	}
 	return
 }

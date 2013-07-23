@@ -145,9 +145,6 @@ func conf(c *config.Config) *config.Config {
 
 	c. // Second Server
 		Server("irc.gamesurge.net2").
-		FloodProtectBurst(5).
-		FloodProtectTimeout(5).
-		FloodProtectStep(2.5).
 		Host("localhost").
 		Nick("nobody2")
 

@@ -183,11 +183,11 @@ func (s *Server) createIrcClient() error {
 	}
 
 	s.client = inet.CreateIrcClient(conn, s.name,
-		int(s.conf.GetFloodProtectBurst()),
-		int(s.conf.GetFloodProtectTimeout()*1000.0),
-		int(s.conf.GetFloodProtectStep()*1000.0),
-		true,
-		time.Millisecond)
+		int(s.conf.GetFloodLenPenalty()),
+		time.Duration(s.conf.GetFloodTimeout()*1000.0)*time.Millisecond,
+		time.Duration(s.conf.GetFloodStep()*1000.0)*time.Millisecond,
+		time.Duration(s.conf.GetKeepAlive())*time.Second,
+		time.Second)
 	return nil
 }
 

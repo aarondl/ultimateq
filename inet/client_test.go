@@ -92,11 +92,11 @@ func (s *s) TestIrcClient_Pump(c *C) {
 	c.Check(client.lastwrite.Equal(fakelast), Equals, false)
 }
 
-func (s *s) TestIrcClient_PumpTimeouts(c *C) {
+func (s *s) TestIrcClient_PumpFloodProtect(c *C) {
 	test1 := []byte("PRIVMSG :arg1 arg2\r\n")
 
 	conn := mocks.CreateConn()
-	client := CreateIrcClient(conn, "", 5, 5, 5, false, time.Millisecond)
+	client := CreateIrcClient(conn, "", 10, 2, 120, 0, time.Millisecond)
 	client.SpawnWorkers(true, false)
 
 	go func() {
@@ -285,7 +285,8 @@ func (s *s) TestIrcClient_Write(c *C) {
 func (s *s) TestIrcClient_Keepalive(c *C) {
 	// Check not throttled
 	conn := mocks.CreateConn()
-	client := CreateIrcClient(conn, "", 5, 5, 5, true, time.Millisecond)
+	client := CreateIrcClient(conn, "", 0, 0, 0, time.Millisecond,
+		time.Millisecond)
 	client.SpawnWorkers(true, false)
 	msg := conn.Receive(len(ping), io.EOF)
 	c.Check(bytes.Compare(msg, ping), Equals, 0)
@@ -293,11 +294,14 @@ func (s *s) TestIrcClient_Keepalive(c *C) {
 
 	// Check throttled
 	conn = mocks.CreateConn()
-	client = CreateIrcClient(conn, "", 1, 10000, 40, true, time.Millisecond)
+	client = CreateIrcClient(conn, "", 1000,
+		10*time.Millisecond,
+		10*time.Millisecond,
+		15*time.Millisecond, time.Millisecond)
 
 	test := []byte("test")
 	client.lastwrite = time.Now()
-	client.nThrottled = 20
+	client.penalty = time.Now().Add(10 * time.Millisecond)
 	client.queue.Enqueue(test)
 
 	go func() {
@@ -317,28 +321,33 @@ func (s *s) TestIrcClient_Keepalive(c *C) {
 }
 
 func (s *s) TestIrcClient_calcSleepTime(c *C) {
+	var penFact = 120
+	var scale = time.Millisecond
+	var timeout, step, keepalive time.Duration = 10 * time.Millisecond,
+		2 * time.Millisecond, 0
+
 	var sleep time.Duration
 	client := createIrcClient(nil, "")
 
-	sleep = client.calcSleepTime(time.Now())
+	sleep = client.calcSleepTime(time.Now(), 0)
 	c.Check(sleep, Equals, time.Duration(0))
 
-	client = CreateIrcClient(nil, "", 5, 5, 5, false, time.Second)
+	client = CreateIrcClient(nil, "", penFact, timeout, step, keepalive, scale)
 	client.lastwrite = time.Now()
 	for i := 1; i <= 5; i++ {
-		sleep = client.calcSleepTime(time.Now())
+		sleep = client.calcSleepTime(time.Now(), 0)
 		c.Check(sleep, Equals, time.Duration(0))
 	}
 
-	sleep = client.calcSleepTime(time.Now())
+	sleep = client.calcSleepTime(time.Now(), 0)
 	c.Check(sleep, Not(Equals), time.Duration(0))
 
 	// Check no-sleep and negative cases
-	client = CreateIrcClient(nil, "", 5, 5, 5, false, time.Second)
+	client = CreateIrcClient(nil, "", penFact, timeout, step, keepalive, scale)
 	client.lastwrite = time.Now()
-	sleep = client.calcSleepTime(time.Time{})
-	c.Check(sleep, Equals, time.Duration(0))
-	sleep = client.calcSleepTime(time.Now().Add(5 * time.Hour))
+	sleep = client.calcSleepTime(time.Time{}, 0)
+	c.Check(sleep, Equals, client.timeout)
+	sleep = client.calcSleepTime(time.Now().Add(5*time.Hour), 0)
 	c.Check(sleep, Equals, time.Duration(0))
 }
 
