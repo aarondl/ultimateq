@@ -73,6 +73,10 @@ func (c *Config) fixReferencesAndNames() {
 		c.Global = &Server{}
 	}
 	for s, v := range c.Servers {
+		if v == nil {
+			v = &Server{}
+			c.Servers[s] = v
+		}
 		v.parent = c
 		v.Name = s
 		if len(v.Host) == 0 {

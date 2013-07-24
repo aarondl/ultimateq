@@ -154,7 +154,9 @@ func (s *s) TestConfig_ToFile(c *C) {
 }
 
 func (s *s) TestConfig_fixReferenceAndNames(c *C) {
-	conf := Config{}
+	conf := Config{Servers: make(map[string]*Server)}
+	conf.Servers["test"] = nil
 	conf.fixReferencesAndNames()
 	c.Check(conf.Global, NotNil)
+	c.Check(conf.Servers["test"], NotNil)
 }
