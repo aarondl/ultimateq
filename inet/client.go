@@ -29,17 +29,56 @@ var (
 	ping = []byte("PING :ping\r\n")
 )
 
+// ClientError is returned from Close() to give the status of all the
+// moving parts within the client.
+type ClientError struct {
+	Socket error
+	Pump   error
+	Siphon error
+}
+
+// CheckNeeded allows the ClientError to dissappear into a nil value if all of
+// it's contained errors are nil.
+func (c ClientError) CheckNeeded() (err error) {
+	if c.Pump != nil || c.Siphon != nil || c.Socket != nil {
+		err = c
+	}
+	return
+}
+
+// Error returns a concatenated error string of all the strings.
+func (c ClientError) Error() string {
+	var b bytes.Buffer
+	var wrote bool
+	if c.Socket != nil {
+		b.WriteString("Socket: ")
+		b.WriteString(c.Socket.Error())
+		wrote = true
+	}
+	if c.Pump != nil {
+		if wrote {
+			b.WriteString(" || ")
+		}
+		b.WriteString("Pump: ")
+		b.WriteString(c.Pump.Error())
+		wrote = true
+	}
+	if c.Siphon != nil {
+		if wrote {
+			b.WriteString(" || ")
+		}
+		b.WriteString("Siphon: ")
+		b.WriteString(c.Siphon.Error())
+	}
+
+	return b.String()
+}
+
 // Format strings for errors and logging output
 const (
-	fmtDiscarded          = "(%v) <- (DISCARDED) %s\n"
-	fmtWrite              = "(%v) <- %s\n"
-	fmtWriteErr           = "(%v) <- (%v) %s\n"
-	fmtRead               = "(%v) -> %s\n"
-	fmtErrSiphonReadError = "inet: (%v) read socket error (%s)\n"
-	fmtErrPumpReadError   = "inet: (%v) write socket error (%s)\n"
-	fmtErrSiphonClosed    = "inet: (%v) siphon closed (%s)\n"
-	fmtErrPumpClosed      = "inet: (%v) pump closed (%s)\n"
-	errMsgShutdown        = "Shut Down"
+	fmtWrite    = "(%v) <- %s\n"
+	fmtWriteErr = "(%v) <- (%v) %s\n"
+	fmtRead     = "(%v) -> %s\n"
 )
 
 // IrcClient represents a connection to an irc server. It uses a queueing system
@@ -52,8 +91,8 @@ type IrcClient struct {
 	siphonchan  chan []byte
 	pumpchan    chan []byte
 	pumpservice chan chan []byte
-	killpump    chan int
-	killsiphon  chan int
+	killpump    chan error
+	killsiphon  chan error
 	queue       Queue
 
 	// The name of the connection for logging
@@ -117,11 +156,11 @@ func (c *IrcClient) SpawnWorkers(pump, siphon bool) {
 	c.isShutdown = false
 
 	if pump {
-		c.killpump = make(chan int)
+		c.killpump = make(chan error)
 		go c.pump()
 	}
 	if siphon {
-		c.killsiphon = make(chan int)
+		c.killsiphon = make(chan error)
 		go c.siphon()
 	}
 }
@@ -208,13 +247,12 @@ func (c *IrcClient) pump() {
 				}
 			}
 			pinger = time.After(c.keepalive)
-		case <-c.killpump:
-			log.Printf(fmtErrPumpClosed, c.name, errMsgShutdown)
+		case c.killpump <- nil:
 			return
 		}
 	}
 
-	<-c.killpump
+	c.killpump <- err
 }
 
 // writeMessage writes a byte array out to the socket, sets the last write time.
@@ -252,15 +290,10 @@ func (c *IrcClient) siphon() {
 				return
 			}
 		}
-
-		if err != nil {
-			log.Printf(fmtErrSiphonReadError, c.name, err)
-			break
-		}
 	}
 
 	close(c.siphonchan)
-	<-c.killsiphon
+	c.killsiphon <- err
 }
 
 // extractMessages takes the information in a buffer and splits on \r\n pairs.
@@ -282,7 +315,7 @@ func (c *IrcClient) extractMessages(buf []byte) (int, bool) {
 		case c.siphonchan <- cpy:
 			log.Printf(fmtRead, c.name, cpy)
 			return false
-		case <-c.killsiphon:
+		case c.killsiphon <- nil:
 			return true
 		}
 	}
@@ -309,17 +342,18 @@ func (c *IrcClient) Close() error {
 	c.isShutdownProtect.Lock()
 	defer c.isShutdownProtect.Unlock()
 
-	err := c.conn.Close()
+	err := &ClientError{}
+	err.Socket = c.conn.Close()
 	c.isShutdown = true
 
 	if c.killpump != nil {
-		c.killpump <- 0
+		err.Pump = <-c.killpump
 	}
 	if c.killsiphon != nil {
-		c.killsiphon <- 0
+		err.Siphon = <-c.killsiphon
 	}
 
-	return err
+	return err.CheckNeeded()
 }
 
 // IsClosed returns true if the IrcClient has been closed.

@@ -189,13 +189,13 @@ func (s *s) TestIrcClient_ExtractMessages(c *C) {
 	waiter.Wait()
 
 	waiter.Add(1)
-	client.killsiphon = make(chan int)
+	client.killsiphon = make(chan error)
 	go func() {
 		_, abort := client.extractMessages(test1)
 		c.Check(abort, Equals, true)
 		waiter.Done()
 	}()
-	client.killsiphon <- 0
+	<-client.killsiphon
 	waiter.Wait()
 }
 
@@ -378,4 +378,23 @@ func (s *s) TestfindChunks(c *C) {
 		return true
 	})
 	c.Check(abort, Equals, true)
+}
+
+func (s *s) TestIrcClient_ClientError(c *C) {
+	var _ error = ClientError{} // Should compile
+	e := ClientError{}
+	c.Check(len(e.Error()), Equals, 0)
+	c.Check(e.CheckNeeded(), IsNil)
+	e.Siphon = io.EOF
+	c.Check(e.Error(), Equals, "Siphon: "+io.EOF.Error())
+	e.Pump = io.EOF
+	c.Check(e.Error(), Equals,
+		"Pump: "+io.EOF.Error()+
+			" || Siphon: "+io.EOF.Error())
+	e.Socket = io.EOF
+	c.Check(e.Error(), Equals,
+		"Socket: "+io.EOF.Error()+
+			" || Pump: "+io.EOF.Error()+
+			" || Siphon: "+io.EOF.Error())
+	c.Check(e.CheckNeeded(), NotNil)
 }
