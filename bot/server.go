@@ -79,6 +79,7 @@ type Server struct {
 
 	// State and Connection
 	client      *inet.IrcClient
+	started     bool
 	state       *data.State
 	reconnScale time.Duration
 	killable    chan int

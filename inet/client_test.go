@@ -297,12 +297,12 @@ func (s *s) TestIrcClient_Keepalive(c *C) {
 	client = CreateIrcClient(conn, "", 1000,
 		10*time.Millisecond,
 		10*time.Millisecond,
-		15*time.Millisecond, time.Millisecond)
+		40*time.Millisecond, time.Millisecond)
 
 	test := []byte("test")
-	client.lastwrite = time.Now()
-	client.penalty = time.Now().Add(10 * time.Millisecond)
 	client.queue.Enqueue(test)
+	client.lastwrite = time.Now()
+	client.penalty = client.lastwrite.Add(time.Hour)
 
 	go func() {
 		<-client.pumpservice <- test

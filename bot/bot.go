@@ -162,27 +162,26 @@ func (b *Bot) Start() <-chan error {
 // are stopped it closes the botEnd channel.
 func (b *Bot) monitorServers() {
 	servers := 0
-	state := make(map[string]bool)
 	for {
 		select {
 		case op := <-b.serverControl:
-			isStarted := state[op.server.name]
+			isStarted := op.server.started
 			if op.starting {
 				op.server.killable = make(chan int)
 				b.serverStart <- !isStarted
 				if !isStarted {
-					state[op.server.name] = true
+					op.server.started = true
 					servers++
 				}
 			} else {
 				if isStarted {
-					delete(state, op.server.name)
+					op.server.started = false
 					_, isStarted = <-op.server.killable
 				}
 				b.serverStop <- isStarted
 			}
 		case op := <-b.serverEnd:
-			delete(state, op.server.name)
+			op.server.started = false
 			b.botEnd <- op.err
 			servers--
 		}
@@ -277,10 +276,12 @@ func (b *Bot) dispatch(srv *Server) (disconnect bool, err error) {
 				log.Printf(errFmtParsingIrcMessage, parseErr, msg)
 				break
 			}
-			b.dispatchMessage(srv, ircMsg)
 			srv.protectState.Lock()
-			srv.state.Update(ircMsg)
+			if srv.state != nil {
+				srv.state.Update(ircMsg)
+			}
 			srv.protectState.Unlock()
+			b.dispatchMessage(srv, ircMsg)
 		case srv.killable <- 0:
 			err = errServerKilled
 			break

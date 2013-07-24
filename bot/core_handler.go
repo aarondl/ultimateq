@@ -1,7 +1,6 @@
 package bot
 
 import (
-	"fmt"
 	"github.com/aarondl/ultimateq/irc"
 	"sync"
 )
@@ -30,25 +29,26 @@ func (c *coreHandler) HandleRaw(msg *irc.Message, endpoint irc.Endpoint) {
 
 	case irc.CONNECT:
 		server := c.getServer(endpoint)
+		server.bot.protectConfig.Lock()
+		nick, uname, realname := server.conf.GetNick(),
+			server.conf.GetUsername(), server.conf.GetRealname()
+		server.bot.protectConfig.Unlock()
 		c.protect.Lock()
 		c.nickvalue = 0
 		c.protect.Unlock()
-		endpoint.Send("NICK :" + server.conf.GetNick())
-		endpoint.Send(fmt.Sprintf(
-			"USER %v 0 * :%v",
-			server.conf.GetUsername(),
-			server.conf.GetRealname(),
-		))
+		endpoint.Send("NICK :", nick)
+		endpoint.Sendf("USER %v 0 * :%v", uname, realname)
 
 	case irc.ERR_NICKNAMEINUSE:
 		server := c.getServer(endpoint)
+		server.bot.protectConfig.Lock()
+		nick, altnick := server.conf.GetNick(), server.conf.GetAltnick()
+		server.bot.protectConfig.Unlock()
 		c.protect.Lock()
-		var nick string
-		if c.nickvalue == 0 && 0 < len(server.conf.GetAltnick()) {
-			nick = server.conf.GetAltnick()
+		if c.nickvalue == 0 && 0 < len(altnick) {
+			nick = altnick
 			c.nickvalue += 1
 		} else {
-			nick = server.conf.GetNick()
 			for i := 0; i < c.nickvalue; i++ {
 				nick += "_"
 			}
