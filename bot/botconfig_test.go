@@ -99,7 +99,6 @@ func TestBotConfig_ReplaceConfig(t *T) {
 
 	c2 := fakeConfig.Clone().
 		GlobalContext().
-		NoState(true).
 		Channels(chans2...).
 		ServerContext(serverID).
 		Nick("newnick").
@@ -143,9 +142,6 @@ func TestBotConfig_ReplaceConfig(t *T) {
 	if e := oldsrv2.dispatchCore.GetChannels(); !contains(e, chans1) {
 		t.Errorf("Expected elements: %v", e)
 	}
-	if oldsrv1.state == nil {
-		t.Error("Old server should have state.")
-	}
 
 	success := b.ReplaceConfig(c3) // Invalid Config
 	if success {
@@ -184,9 +180,6 @@ func TestBotConfig_ReplaceConfig(t *T) {
 	}
 	if e := newsrv1.dispatchCore.GetChannels(); !contains(e, chans2) {
 		t.Errorf("Expected elements: %v", e)
-	}
-	if oldsrv1.state != nil {
-		t.Error("Old server should not have state.")
 	}
 
 	recv := conns[serverID+":6667"].Receive(len(nick), nil)

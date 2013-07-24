@@ -84,14 +84,7 @@ func (b *Bot) startNewServers(newConfig *config.Config) {
 // rehashConfig updates the server's config values from the new configuration.
 func (s *Server) rehashConfig(srvConfig *config.Server) {
 	setNick := s.conf.GetNick() != srvConfig.GetNick()
-	setChannels :=
-		!contains(s.conf.GetChannels(), srvConfig.GetChannels())
-
-	if !s.conf.GetNoState() && srvConfig.GetNoState() {
-		s.protectState.Lock()
-		s.state = nil
-		s.protectState.Unlock()
-	}
+	setChannels := !contains(s.conf.GetChannels(), srvConfig.GetChannels())
 
 	s.conf = srvConfig
 
