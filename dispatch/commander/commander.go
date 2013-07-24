@@ -16,6 +16,7 @@ import (
 	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/dispatch"
 	"github.com/aarondl/ultimateq/irc"
+	"reflect"
 	"strings"
 	"sync"
 )
@@ -99,7 +100,20 @@ var (
 )
 
 // CommandHandler is the interface that Commander expects structs to implement
-// in order to be able to handle command events.
+// in order to be able to handle command events. Although this interface must
+// be implemented for fallback, if the type has a method with the same name as
+// the command being invoked with the first letter uppercased and the same
+// arguments and return types as the Command function below (minus the cmd arg),
+// it will be called instead of the Command function.
+//
+// Example:
+// type Handler struct {}
+// func (b *Handler) Command(cmd string, m *irc.Message, d *data.DataEndpoint,
+//     c *commander.CommandData) error { return nil }
+// func (b *Handler) Supercommand(m *irc.Message, d *data.DataEndpoint,
+//     c *commander.CommandData) error { return nil }
+//
+// !supercommand in a channel would invoke the bottom handler.
 type CommandHandler interface {
 	Command(string, *irc.Message, *data.DataEndpoint, *CommandData) error
 }
@@ -293,7 +307,10 @@ func (c *Commander) Dispatch(server string, msg *irc.Message,
 	c.HandlerStarted()
 	go func() {
 		defer cmdata.Close()
-		err := command.Handler.Command(cmd, msg, ep, cmdata)
+		ok, err := cmdNameDispatch(command.Handler, cmd, msg, ep, cmdata)
+		if !ok {
+			err = command.Handler.Command(cmd, msg, ep, cmdata)
+		}
 		if err != nil {
 			ep.Notice(nick, err.Error())
 		}
@@ -301,6 +318,46 @@ func (c *Commander) Dispatch(server string, msg *irc.Message,
 	}()
 
 	return nil
+}
+
+// cmdNameDispatch attempts to dispatch an event to a function named the same
+// as the command with an uppercase letter (no camel case). The arguments
+// must be the exact same as the CommandHandler.Command with the cmd string
+// argument removed for this to work.
+func cmdNameDispatch(handler CommandHandler, cmd string, msg *irc.Message,
+	ep *data.DataEndpoint, cmdata *CommandData) (dispatched bool, err error) {
+
+	methodName := strings.ToUpper(cmd[:1]) + cmd[1:]
+
+	var fn reflect.Method
+	handleType := reflect.TypeOf(handler)
+	fn, dispatched = handleType.MethodByName(methodName)
+	if !dispatched {
+		return
+	}
+
+	fnType := fn.Type
+	dispatched = fnType.NumIn() == 4 && fnType.NumOut() == 1
+	if !dispatched {
+		return
+	}
+
+	dispatched = reflect.TypeOf(msg).AssignableTo(fnType.In(1)) &&
+		reflect.TypeOf(ep).AssignableTo(fnType.In(2)) &&
+		reflect.TypeOf(cmdata).AssignableTo(fnType.In(3)) &&
+		reflect.TypeOf(errors.New("")).AssignableTo(fnType.Out(0))
+	if !dispatched {
+		return
+	}
+
+	returnVals := fn.Func.Call([]reflect.Value{
+		reflect.ValueOf(handler), reflect.ValueOf(msg),
+		reflect.ValueOf(ep), reflect.ValueOf(cmdata),
+	})
+
+	// We have already verified it's type. So this should never fail.
+	err, _ = returnVals[0].Interface().(error)
+	return
 }
 
 // filterAccess ensures that a user has the correct access to perform the given

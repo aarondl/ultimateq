@@ -80,6 +80,44 @@ func (e *errorHandler) Command(_ string, _ *irc.Message, _ *data.DataEndpoint,
 	return e.Error
 }
 
+type reflectCommandHandler struct {
+	Called    bool
+	CalledBad bool
+	Error     error
+}
+
+func (b *reflectCommandHandler) Command(cmd string, msg *irc.Message,
+	end *data.DataEndpoint, cmdata *CommandData) (err error) {
+
+	b.CalledBad = true
+	return
+}
+
+func (b *reflectCommandHandler) Cmd(msg *irc.Message,
+	end *data.DataEndpoint, cmdata *CommandData) (err error) {
+
+	b.Called = true
+	return b.Error
+}
+
+func (b *reflectCommandHandler) Badargnum(msg *irc.Message,
+	end *data.DataEndpoint, cmdata *data.DataEndpoint) (err error) {
+	b.Called = true
+	return
+}
+
+func (b *reflectCommandHandler) Noreturn(msg *irc.Message,
+	end *data.DataEndpoint, cmdata *data.DataEndpoint) {
+	b.Called = true
+	return
+}
+
+func (b *reflectCommandHandler) Badargs(msg *irc.Message,
+	end *data.DataEndpoint, cmdata *data.DataEndpoint) (err error) {
+	b.Called = true
+	return
+}
+
 const (
 	ext     = "extension"
 	dsc     = "description"
@@ -1186,5 +1224,85 @@ func TestCommander_DispatchMixUserAndChan(t *T) {
 	success := c.Unregister(GLOBAL, cmd)
 	if !success {
 		t.Error("Handler could not be unregistered.")
+	}
+}
+
+func TestCommander_DispatchReflection(t *T) {
+	c := CreateCommander(prefix, core)
+	var buffer = &bytes.Buffer{}
+	var err error
+	var stateMutex, storeMutex sync.RWMutex
+
+	state, _ := setup()
+	var dataEndpoint = data.CreateDataEndpoint(server, buffer, state, nil,
+		&stateMutex, &storeMutex)
+
+	errMsg := "error"
+	handler := &reflectCommandHandler{Error: fmt.Errorf(errMsg)}
+
+	cmds := []string{cmd, "badargnum", "noreturn", "badargs"}
+	for _, command := range cmds {
+		err = c.Register(GLOBAL, MkCmd(ext, dsc, command, handler, ALL, ALL))
+		if err != nil {
+			t.Error("Unexpected:", command, err)
+		}
+	}
+
+	msg := &irc.Message{Name: irc.PRIVMSG, Sender: host,
+		Args: []string{"a", cmd}}
+	err = c.Dispatch(server, msg, dataEndpoint)
+	c.WaitForHandlers()
+
+	if handler.CalledBad {
+		t.Error("The reflection should call Cmd method instead of Command.")
+	}
+	if !handler.Called {
+		t.Error("Expected a call to Cmd.")
+	}
+	if !strings.Contains(buffer.String(), errMsg) {
+		t.Error("Expected:", buffer.String(), "to contain:", errMsg)
+	}
+
+	handler.Called, handler.CalledBad = false, false
+	msg.Args = []string{"a", "badargnum"}
+	err = c.Dispatch(server, msg, dataEndpoint)
+	c.WaitForHandlers()
+
+	if !handler.CalledBad {
+		t.Error("Expecting fallback to Command when reflection fails.")
+	}
+	if handler.Called {
+		t.Error("Not expecting it to be able to call this handler.")
+	}
+
+	handler.Called, handler.CalledBad = false, false
+	msg.Args = []string{"a", "noreturn"}
+	err = c.Dispatch(server, msg, dataEndpoint)
+	c.WaitForHandlers()
+
+	if !handler.CalledBad {
+		t.Error("Expecting fallback to Command when reflection fails.")
+	}
+	if handler.Called {
+		t.Error("Not expecting it to be able to call this handler.")
+	}
+
+	handler.Called, handler.CalledBad = false, false
+	msg.Args = []string{"a", "badargs"}
+	err = c.Dispatch(server, msg, dataEndpoint)
+	c.WaitForHandlers()
+
+	if !handler.CalledBad {
+		t.Error("Expecting fallback to Command when reflection fails.")
+	}
+	if handler.Called {
+		t.Error("Not expecting it to be able to call this handler.")
+	}
+
+	for _, command := range cmds {
+		success := c.Unregister(GLOBAL, command)
+		if !success {
+			t.Error(command, "handler could not be unregistered.")
+		}
 	}
 }
