@@ -1306,3 +1306,43 @@ func TestCommander_DispatchReflection(t *T) {
 		}
 	}
 }
+
+func TestCommander_EachCommand(t *T) {
+	c := CreateCommander(prefix, core)
+	var err error
+
+	handler := &errorHandler{}
+
+	err = c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALL, ALL))
+	if err != nil {
+		t.Error("Unexpected:", err)
+	}
+	err = c.Register(GLOBAL, MkCmd(ext, dsc, "other", handler, ALL, ALL))
+	if err != nil {
+		t.Error("Unexpected:", err)
+	}
+
+	visitedCmd, visitedOther := false, false
+	EachCommand(func(command *Command) bool {
+		visitedCmd = visitedCmd || command.Cmd == cmd
+		visitedOther = visitedOther || command.Cmd == "other"
+		return visitedCmd
+	})
+
+	if !visitedCmd {
+		t.Error("Expected iteration over cmd.")
+	}
+
+	if visitedOther {
+		t.Error("Expected iteration abort before visitedOther.")
+	}
+
+	success := c.Unregister(GLOBAL, cmd)
+	if !success {
+		t.Error(cmd, "handler could not be unregistered.")
+	}
+	success = c.Unregister(GLOBAL, "other")
+	if !success {
+		t.Error("other handler could not be unregistered.")
+	}
+}

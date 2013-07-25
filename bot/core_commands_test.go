@@ -834,3 +834,47 @@ func TestCoreCommands_GiveTakeChannel(t *T) {
 		t.Error(err)
 	}
 }
+
+func TestCoreCommands_Help(t *T) {
+	ts := commandsSetup(t)
+	defer commandsTeardown(ts, t)
+	var err error
+
+	err = rspChk(ts, registerSuccessFirst, u1host, register, password, u1user)
+	if err != nil {
+		t.Error(err)
+	}
+
+	check := helpSuccess + `NOTICE .* (core.auth|core.logout|core.access){3}.*`
+	err = rspChk(ts, check, u1host, help)
+	if err != nil {
+		t.Error(err)
+	}
+
+	check = helpSuccess + " " + extension + "." + register +
+		`NOTICE .* :` + registerDesc +
+		`NOTICE .* :` + helpSuccessUsage + strings.Join(commands[0].Args, " ")
+	err = rspChk(ts, check, u1host, help, register)
+	if err != nil {
+		t.Error(err)
+	}
+
+	check = helpSuccess + " " + extension + "." + delme +
+		`NOTICE .* :` + delmeDesc
+	err = rspChk(ts, check, u1host, help, delme)
+	if err != nil {
+		t.Error(err)
+	}
+
+	check = helpSuccess +
+		`NOTICE .* (core.ggive|core.sgive|core.register|core.give){4}`
+	err = rspChk(ts, check, u1host, help, "gi")
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = rspChk(ts, helpFailure, u1host, help, "badsearch")
+	if err != nil {
+		t.Error(err)
+	}
+}

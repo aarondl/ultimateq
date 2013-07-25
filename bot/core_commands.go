@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"github.com/aarondl/ultimateq/data"
@@ -36,6 +37,8 @@ const (
 	stake      = `stake`
 	take       = `take`
 	takeAllArg = `all`
+
+	help = `help`
 
 	errFmtRegister = `bot: A core command registration failed: %v`
 	errMsgInternal = `There was an internal error, try again later.`
@@ -113,6 +116,14 @@ const (
 		`everything. (given: %v)`
 	takeFailureNo = `No action taken. User [%v](%v) has none of the given ` +
 		`accesses to remove.`
+
+	helpSuccess      = `Commands:`
+	helpSuccessUsage = `Usage: `
+	helpFailure      = `No help available for (%v), try "help" for a list of ` +
+		`all commands.`
+	helpDesc = `Help with no arguments shows all commands, help with an ` +
+		`argument performs a search, if only one match is found gives ` +
+		`detailed information about that command.`
 )
 
 type (
@@ -151,6 +162,7 @@ var commands = []struct {
 	{stake, stakeDesc, true, true, 0, `GS`, argv{`*user`, `[allOrFlags]`}},
 	{take, takeDesc, true, true, 0, `GSC`, argv{`#chan`, `*user`,
 		`[allOrFlags]`}},
+	{help, helpDesc, true, true, 0, ``, argv{`[command]`}},
 }
 
 // coreCommands is the bot's command handling struct. The bot itself uses
@@ -246,6 +258,8 @@ func (c *coreCommands) Command(cmd string, m *irc.Message, d *data.DataEndpoint,
 		internal, external = c.stake(d, cd)
 	case take:
 		internal, external = c.take(d, cd)
+	case help:
+		internal, external = c.help(d, cd)
 	}
 
 	if internal != nil {
@@ -910,6 +924,67 @@ func (c *coreCommands) takeHelper(d *data.DataEndpoint, cd *cmds.CommandData,
 		}
 	}
 	d.Noticef(nick, str)
+
+	return
+}
+
+// help searches for commands, and also provides details for specific commands
+func (c *coreCommands) help(d *data.DataEndpoint, cd *cmds.CommandData) (
+	internal, external error) {
+
+	search := strings.ToLower(cd.GetArg("command"))
+	nick := cd.User.GetNick()
+
+	commands := bytes.Buffer{}
+	first := true
+	var exactMatch *cmds.Command
+	cmds.EachCommand(func(cmd *cmds.Command) bool {
+		write := true
+
+		if len(search) > 0 {
+			if cmd.Cmd == search {
+				exactMatch = cmd
+				return true
+			} else if !strings.Contains(cmd.Cmd, search) {
+				write = false
+			}
+		}
+
+		if write {
+			if first {
+				first = false
+			} else {
+				_, internal = commands.WriteRune(' ')
+				if internal != nil {
+					return true
+				}
+			}
+
+			_, internal = commands.WriteString(cmd.Extension + "." + cmd.Cmd)
+			if internal != nil {
+				return true
+			}
+		}
+		return false
+	})
+
+	if internal != nil {
+		return
+	}
+
+	if exactMatch != nil {
+		d.Notice(nick, helpSuccess,
+			" ", exactMatch.Extension, ".", exactMatch.Cmd)
+		d.Notice(nick, exactMatch.Description)
+		if len(exactMatch.Args) > 0 {
+			d.Notice(nick, helpSuccessUsage, strings.Join(exactMatch.Args, " "))
+		}
+	} else if commands.Len() > 0 {
+		d.Notice(nick, helpSuccess)
+		d.Notice(nick, commands.String())
+	} else {
+		d.Noticef(nick, helpFailure, search)
+	}
 
 	return
 }

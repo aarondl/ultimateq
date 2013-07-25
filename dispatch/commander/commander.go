@@ -99,6 +99,19 @@ var (
 	protectGlobalReg sync.RWMutex
 )
 
+// EachCommand allows safe iteration through each command in the registry. The
+// return value of the callback can be used to stop iteration by returning true.
+func EachCommand(fn func(*Command) bool) {
+	protectGlobalReg.RLock()
+	defer protectGlobalReg.RUnlock()
+
+	for _, cmd := range globalCommandRegistry {
+		if fn(cmd) {
+			break
+		}
+	}
+}
+
 // CommandHandler is the interface that Commander expects structs to implement
 // in order to be able to handle command events. Although this interface must
 // be implemented for fallback, if the type has a method with the same name as
