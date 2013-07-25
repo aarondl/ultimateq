@@ -45,6 +45,9 @@ const (
 	errFmtInternal = `commander: Error processing command %v (%v)`
 	errFmtExpired  = `commander: Data expired between locks. ` +
 		`Could not find user [%v]`
+	fmtCommandExec = "bot: Core command executed (%v)"
+	errFmtInternalError = "bot: Core command (%v) error: %v"
+	errFmtInternalPanic = "bot: Core command (%v) error: %v"
 
 	errMsgAuthed        = `You are already authenticated.`
 	errFmtUserNotFound  = `The user [%v] could not be found.`
@@ -213,15 +216,13 @@ func (c *coreCommands) Command(cmd string, m *irc.Message, d *data.DataEndpoint,
 
 	var external error
 
-	log.Printf("bot: Core command executed (%v)", cmd)
+	log.Printf(fmtCommandExec, cmd)
 
-	/*defer func() {
+	defer func() {
 		if r := recover(); r != nil {
-			log.Println("FATAL:", r)
-			log.Printf("%+v", d)
-			log.Printf("%+v", cd)
+			log.Printf(errFmtInternalPanic, r)
 		}
-	}()*/
+	}()
 
 	switch cmd {
 	case register:
@@ -263,7 +264,7 @@ func (c *coreCommands) Command(cmd string, m *irc.Message, d *data.DataEndpoint,
 	}
 
 	if internal != nil {
-		log.Printf("bot: Core command (%v) error: %v", cmd, internal)
+		log.Printf(errFmtInternalError, cmd, internal)
 	}
 
 	return external
