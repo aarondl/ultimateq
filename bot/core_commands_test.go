@@ -845,7 +845,7 @@ func TestCoreCommands_Help(t *T) {
 		t.Error(err)
 	}
 
-	check := helpSuccess + `NOTICE .* (core.auth|core.logout|core.access){3}.*`
+	check := `core:NOTICE .* (access|addmask|auth){3}.*`
 	err = rspChk(ts, check, u1host, help)
 	if err != nil {
 		t.Error(err)
@@ -859,6 +859,11 @@ func TestCoreCommands_Help(t *T) {
 		t.Error(err)
 	}
 
+	err = rspChk(ts, check, u1host, help, "core."+register)
+	if err != nil {
+		t.Error(err)
+	}
+
 	check = helpSuccess + " " + extension + "." + delme +
 		`NOTICE .* :` + delmeDesc
 	err = rspChk(ts, check, u1host, help, delme)
@@ -866,8 +871,7 @@ func TestCoreCommands_Help(t *T) {
 		t.Error(err)
 	}
 
-	check = helpSuccess +
-		`NOTICE .* (core.ggive|core.sgive|core.register|core.give){4}`
+	check = `core:NOTICE .* (give|ggive|sgive|register){4}`
 	err = rspChk(ts, check, u1host, help, "gi")
 	if err != nil {
 		t.Error(err)
