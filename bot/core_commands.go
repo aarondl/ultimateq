@@ -1,7 +1,6 @@
 package bot
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"github.com/aarondl/ultimateq/data"
@@ -9,6 +8,7 @@ import (
 	"github.com/aarondl/ultimateq/irc"
 	"log"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -45,7 +45,7 @@ const (
 	errFmtInternal = `commander: Error processing command %v (%v)`
 	errFmtExpired  = `commander: Data expired between locks. ` +
 		`Could not find user [%v]`
-	fmtCommandExec = "bot: Core command executed (%v)"
+	fmtCommandExec      = "bot: Core command executed (%v)"
 	errFmtInternalError = "bot: Core command (%v) error: %v"
 	errFmtInternalPanic = "bot: Core command (%v) error: %v"
 
@@ -936,53 +936,64 @@ func (c *coreCommands) help(d *data.DataEndpoint, cd *cmds.CommandData) (
 	search := strings.ToLower(cd.GetArg("command"))
 	nick := cd.User.GetNick()
 
-	commands := bytes.Buffer{}
-	first := true
-	var exactMatch *cmds.Command
+	var output = make(map[string][]string)
+	var exactMatches []*cmds.Command
+
 	cmds.EachCommand(func(cmd *cmds.Command) bool {
 		write := true
 
 		if len(search) > 0 {
-			if cmd.Cmd == search {
-				exactMatch = cmd
-				return true
-			} else if !strings.Contains(cmd.Cmd, search) {
+			combined := cmd.Extension + "." + cmd.Cmd
+			if perfect := combined == search; cmd.Cmd == search || perfect {
+				if exactMatches == nil || perfect {
+					exactMatches = []*cmds.Command{cmd}
+				} else {
+					exactMatches = append(exactMatches, cmd)
+					write = false
+				}
+				if perfect {
+					return true
+				}
+			} else if !strings.Contains(combined, search) {
 				write = false
 			}
 		}
 
 		if write {
-			if first {
-				first = false
+			if arr, ok := output[cmd.Extension]; ok {
+				output[cmd.Extension] = append(arr, cmd.Cmd)
 			} else {
-				_, internal = commands.WriteRune(' ')
-				if internal != nil {
-					return true
-				}
-			}
-
-			_, internal = commands.WriteString(cmd.Extension + "." + cmd.Cmd)
-			if internal != nil {
-				return true
+				output[cmd.Extension] = []string{cmd.Cmd}
 			}
 		}
 		return false
 	})
 
-	if internal != nil {
-		return
+	if len(exactMatches) > 1 {
+		for _, cmd := range exactMatches {
+			if arr, ok := output[cmd.Extension]; ok {
+				output[cmd.Extension] = append(arr, cmd.Cmd)
+			} else {
+				output[cmd.Extension] = []string{cmd.Cmd}
+			}
+		}
+		exactMatches = nil
 	}
 
-	if exactMatch != nil {
+	if exactMatches != nil {
+		exactMatch := exactMatches[0]
 		d.Notice(nick, helpSuccess,
 			" ", exactMatch.Extension, ".", exactMatch.Cmd)
 		d.Notice(nick, exactMatch.Description)
 		if len(exactMatch.Args) > 0 {
 			d.Notice(nick, helpSuccessUsage, strings.Join(exactMatch.Args, " "))
 		}
-	} else if commands.Len() > 0 {
-		d.Notice(nick, helpSuccess)
-		d.Notice(nick, commands.String())
+	} else if len(output) > 0 {
+		for extension, commands := range output {
+			sort.Strings(commands)
+			d.Notice(nick, extension, ":")
+			d.Notice(nick, " ", strings.Join(commands, " "))
+		}
 	} else {
 		d.Noticef(nick, helpFailure, search)
 	}
