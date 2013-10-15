@@ -3,26 +3,305 @@ package main
 
 import (
 	"bufio"
+	"fmt"
+	"github.com/aarondl/query"
+	"github.com/aarondl/quotes"
 	"github.com/aarondl/ultimateq/bot"
-	"github.com/aarondl/ultimateq/config"
 	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/dispatch/commander"
 	"github.com/aarondl/ultimateq/irc"
 	"log"
 	"os"
 	"os/signal"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
 
+var (
+	sanitizeNewline = strings.NewReplacer("\r\n", " ", "\n", " ")
+	rgxSpace        = regexp.MustCompile(`\s{2,}`)
+	queryConf       query.Config
+)
+
+const (
+	dateFormat = "January 02, 2006 at 3:04pm MST"
+)
+
+func sanitize(str string) string {
+	return rgxSpace.ReplaceAllString(sanitizeNewline.Replace(str), " ")
+}
+
+func isNick(potential string) (is bool) {
+	if len(potential) > 0 {
+		first := potential[0]
+		is = (first >= 'a' && first <= 'z') ||
+			(first >= 'A' && first <= 'Z')
+	}
+	return
+}
+
+type Quoter struct {
+	db *quotes.QuoteDB
+}
+
+type Queryer struct {
+}
+
 type Handler struct {
 }
 
-func (h *Handler) Command(cmd string, msg *irc.Message,
-	endpoint *data.DataEndpoint, cdata *commander.CommandData) error {
-
-	endpoint.Notice(cdata.User.GetNick(), "hello")
+// Let reflection hook up the commands, instead of doing it here.
+func (_ *Quoter) Command(_ string, _ *irc.Message,
+	_ *data.DataEndpoint, _ *commander.CommandData) error {
 	return nil
+}
+
+func (_ *Queryer) Command(_ string, _ *irc.Message,
+	_ *data.DataEndpoint, _ *commander.CommandData) error {
+	return nil
+}
+
+func (_ *Handler) Command(_ string, _ *irc.Message,
+	_ *data.DataEndpoint, _ *commander.CommandData) error {
+	return nil
+}
+
+/* =====================
+ Quoter methods.
+===================== */
+
+func (q *Quoter) Addquote(m *irc.Message, e *data.DataEndpoint,
+	c *commander.CommandData) error {
+
+	c.Close()
+
+	nick := irc.Mask(m.Sender).GetNick()
+	quote := c.GetArg("quote")
+	if len(quote) == 0 {
+		return nil
+	}
+
+	err := q.db.AddQuote(nick, quote)
+	if err != nil {
+		e.Noticef(nick, "\x02Quote:\x02 %v", err)
+	}
+	e.Notice(nick, "\x02Quote:\x02 Added.")
+	return nil
+}
+
+func (q *Quoter) Delquote(m *irc.Message, e *data.DataEndpoint,
+	c *commander.CommandData) error {
+
+	c.Close()
+
+	nick := irc.Mask(m.Sender).GetNick()
+	id, err := strconv.Atoi(c.GetArg("id"))
+	if err != nil {
+		e.Notice(nick, "\x02Quote:\x02 Not a valid id.")
+		return nil
+	}
+	if did, err := q.db.DelQuote(int(id)); err != nil {
+		e.Noticef(nick, "\x02Quote:\x02 %v", err)
+	} else if !did {
+		e.Notice(nick, "\x02Quote:\x02 Could not find quote %d.", id)
+	} else {
+		e.Noticef(nick, "\x02Quote:\x02 Quote %d deleted.", id)
+	}
+	return nil
+}
+
+func (q *Quoter) Editquote(m *irc.Message, e *data.DataEndpoint,
+	c *commander.CommandData) error {
+
+	c.Close()
+
+	quote := c.GetArg("quote")
+	if len(quote) == 0 {
+		return nil
+	}
+
+	nick := irc.Mask(m.Sender).GetNick()
+	id, err := strconv.Atoi(c.GetArg("id"))
+	if err != nil {
+		e.Notice(nick, "\x02Quote:\x02 Not a valid id.")
+		return nil
+	}
+	if did, err := q.db.EditQuote(int(id), quote); err != nil {
+		e.Noticef(nick, "\x02Quote:\x02 %v", err)
+	} else if !did {
+		e.Notice(nick, "\x02Quote:\x02 Could not find quote %d.", id)
+	} else {
+		e.Noticef(nick, "\x02Quote:\x02 Quote %d updated.", id)
+	}
+	return nil
+}
+
+func (q *Quoter) Quote(m *irc.Message, e *data.DataEndpoint,
+	c *commander.CommandData) error {
+
+	c.Close()
+
+	strid := c.GetArg("id")
+	nick := irc.Mask(m.Sender).GetNick()
+	var quote string
+	var id int
+	var err error
+	if len(strid) > 0 {
+		getid, err := strconv.Atoi(strid)
+		id = int(getid)
+		if err != nil {
+			e.Notice(nick, "\x02Quote:\x02 Not a valid id.")
+			return nil
+		}
+		quote, err = q.db.GetQuote(id)
+	} else {
+		id, quote, err = q.db.RandomQuote()
+	}
+	if err != nil {
+		e.Noticef(nick, "\x02Quote:\x02 %v", err)
+		return nil
+	}
+
+	if len(quote) == 0 {
+		e.Privmsgf(m.Target(), "\x02Quote:\x02 Does not exist.")
+	} else {
+		e.Privmsgf(m.Target(), "\x02Quote (\x02#%d\x02):\x02 %s", id, quote)
+	}
+	return nil
+}
+
+func (q *Quoter) Quotes(m *irc.Message, e *data.DataEndpoint,
+	c *commander.CommandData) error {
+
+	c.Close()
+
+	e.Privmsgf(m.Target(), "\x02Quote:\x02 %d quote(s) in database.", q.db.NQuotes())
+	return nil
+}
+
+func (q *Quoter) Details(m *irc.Message, e *data.DataEndpoint,
+	c *commander.CommandData) error {
+
+	c.Close()
+
+	nick := irc.Mask(m.Sender).GetNick()
+	id, err := strconv.Atoi(c.GetArg("id"))
+	if err != nil {
+		e.Notice(nick, "\x02Quote:\x02 Not a valid id.")
+		return nil
+	}
+
+	if date, author, err := q.db.GetDetails(int(id)); err != nil {
+		e.Noticef(nick, "\x02Quote:\x02 %v", err)
+	} else {
+		e.Privmsgf(m.Target(), "\x02Quote (\x02#%d\x02):\x02 Created on %s by %s",
+			id, time.Unix(date, 0).UTC().Format(dateFormat), author)
+	}
+
+	return nil
+}
+
+/* =====================
+ Queryer methods.
+===================== */
+
+func (_ *Queryer) PrivmsgChannel(m *irc.Message, endpoint irc.Endpoint) {
+	if out, err := query.YouTube(m.Message()); len(out) != 0 {
+		endpoint.Privmsg(m.Target(), out)
+	} else if err != nil {
+		nick := irc.Mask(m.Sender).GetNick()
+		endpoint.Notice(nick, err.Error())
+	}
+}
+
+func (_ *Queryer) Calc(m *irc.Message, e *data.DataEndpoint,
+	c *commander.CommandData) error {
+
+	c.Close()
+
+	q := c.GetArg("query")
+	nick := irc.Mask(m.Sender).GetNick()
+	if out, err := query.Wolfram(q, &queryConf); len(out) != 0 {
+		out = sanitize(out)
+		if targ := m.Target(); isNick(targ) {
+			e.Notice(nick, out)
+		} else {
+			e.Privmsg(targ, out)
+		}
+	} else if err != nil {
+		e.Notice(nick, err.Error())
+	}
+
+	return nil
+}
+
+func (_ *Queryer) Google(m *irc.Message, e *data.DataEndpoint,
+	c *commander.CommandData) error {
+
+	c.Close()
+
+	q := c.GetArg("query")
+	nick := irc.Mask(m.Sender).GetNick()
+	if out, err := query.Google(q); len(out) != 0 {
+		out = sanitize(out)
+		if targ := m.Target(); isNick(targ) {
+			e.Notice(nick, out)
+		} else {
+			e.Privmsg(targ, out)
+		}
+	} else if err != nil {
+		e.Notice(nick, err.Error())
+	}
+
+	return nil
+}
+
+/* =====================
+ Handler methods.
+===================== */
+
+func (h *Handler) Up(m *irc.Message, e *data.DataEndpoint,
+	c *commander.CommandData) error {
+
+	user := c.UserAccess
+	ch := c.TargetChannel
+	if ch == nil {
+		return fmt.Errorf("Must be a channel that the bot is on.")
+	}
+	chname := ch.GetName()
+
+	if !putPeopleUp(m, chname, user, e) {
+		return commander.MakeFlagsError("ov")
+	}
+	return nil
+}
+
+func (h *Handler) HandleRaw(m *irc.Message, endpoint irc.Endpoint) {
+	if m.Name == irc.JOIN {
+		end := endpoint.(*bot.ServerEndpoint)
+		end.UsingStore(func(s *data.Store) {
+			a := s.GetAuthedUser(endpoint.GetKey(), m.Sender)
+			ch := m.Target()
+			putPeopleUp(m, ch, a, endpoint)
+		})
+	}
+}
+
+func putPeopleUp(m *irc.Message, ch string,
+	a *data.UserAccess, e irc.Endpoint) (did bool) {
+	if a != nil {
+		nick := irc.Mask(m.Sender).GetNick()
+		if a.HasFlag(e.GetKey(), ch, 'o') {
+			e.Sendf("MODE %s +o :%s", ch, nick)
+			did = true
+		} else if a.HasFlag(e.GetKey(), ch, 'v') {
+			e.Sendf("MODE %s +v :%s", ch, nick)
+			did = true
+		}
+	}
+	return
 }
 
 func (h *Handler) PrivmsgUser(m *irc.Message, endpoint irc.Endpoint) {
@@ -32,135 +311,98 @@ func (h *Handler) PrivmsgUser(m *irc.Message, endpoint irc.Endpoint) {
 	}
 }
 
-func (h *Handler) PrivmsgChannel(m *irc.Message, endpoint irc.Endpoint) {
-	if m.Message() == "hello" {
-		endpoint.Privmsg(m.Target(), "Hello to you too!")
-	}
-	if irc.Mask(m.Sender).GetNick() == "Aaron" {
-		end := endpoint.(*bot.ServerEndpoint)
-		split := strings.Fields(m.Message())
-		switch split[0] {
-		case "whoami":
-			end.UsingState(func(s *data.State) {
-				end.Privmsgf(m.Target(), "I am (%v) on channels: %v",
-					s.Self.GetFullhost(),
-					strings.Join(s.GetUserChans(s.Self.GetFullhost()), ", "))
-			})
-		case "who":
-			end.UsingState(func(s *data.State) {
-				user := s.GetUser("Aaron")
-				cu := s.GetUsersChannelModes("Aaron", m.Target())
-				end.Privmsgf(m.Target(), "Aaron is: %v, modes on %v: %v",
-					user.GetFullhost(), m.Target(), cu)
-			})
-		case "channels":
-			end.UsingState(func(s *data.State) {
-				channels := make([]string, 0, s.GetNChannels())
-				s.EachChannel(func(c *data.Channel) {
-					channels = append(channels, c.String())
-				})
-				end.Privmsgf(m.Target(), "Channels (%v)",
-					strings.Join(channels, ", "))
-			})
-		case "users":
-			end.UsingState(func(s *data.State) {
-				users := make([]string, 0, s.GetNUsers())
-				s.EachUser(func(u *data.User) {
-					if u == nil {
-						log.Println("There was a nil user.")
-					} else {
-						log.Println(u)
-					}
-					users = append(users, u.String())
-				})
-				end.Privmsgf(m.Target(), "Users (%v)",
-					strings.Join(users, ", "))
-			})
-		case "userchans":
-			user := m.Sender
-			if len(split) > 1 {
-				user = split[1]
-			}
-			end.UsingState(func(s *data.State) {
-				if s.GetUser(user) == nil {
-					end.Privmsgf(m.Target(), "No user: %v", user)
-					return
-				}
-				channels := make([]string, 0, s.GetNChanUsers(user))
-				s.EachUserChan(user, func(uc *data.UserChannel) {
-					channels = append(channels, uc.Channel.String())
-				})
-				end.Privmsgf(m.Target(), "%v is on (%v)",
-					user, strings.Join(channels, ", "))
-			})
-		case "chanusers":
-			ch := m.Target()
-			if len(split) > 1 {
-				ch = split[1]
-			}
-			end.UsingState(func(s *data.State) {
-				if s.GetChannel(ch) == nil {
-					end.Privmsgf(m.Target(), "No channel: %v", ch)
-					return
-				}
-				users := make([]string, 0, s.GetNChanUsers(ch))
-				s.EachChanUser(ch, func(cu *data.ChannelUser) {
-					users = append(users, cu.User.String())
-				})
-				end.Privmsgf(m.Target(), "Users on %v (%v)",
-					ch, strings.Join(users, ", "))
-			})
-		case "modes":
-			end.UsingState(func(s *data.State) {
-				ch := s.GetChannel(m.Target())
-				end.Privmsgf(m.Target(), "%v has modes: %v",
-					ch, ch.ChannelModes)
-			})
-		case "topic":
-			end.UsingState(func(s *data.State) {
-				ch := s.GetChannel(m.Target())
-				end.Privmsgf(m.Target(), "Topic is %v", ch.GetTopic())
-			})
-		}
-	}
-}
-
-func conf(c *config.Config) *config.Config {
-	c. // Defaults
-		Nick("nobody__").
-		Altnick("nobody_").
-		Realname("there").
-		Username("guy").
-		Userhost("friend").
-		NoReconnect(true)
-
-	/*
-		c. // First server
-			Server("irc.gamesurge.net1").
-			Host("irc.gamesurge.net").
-			Nick("Aaron").
-			Altnick("nobody1").
-			ReconnectTimeout(5)
-	*/
-
-	c. // Second Server
-		Server("irc.gamesurge.net2").
-		Host("localhost").
-		Nick("nobody2")
-
-	return c
-}
-
 func main() {
 	log.SetOutput(os.Stdout)
 
 	b, err := bot.CreateBot(bot.ConfigureFile("config.yaml"))
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatalln("Error creating bot:", err)
 	}
 	defer b.Close()
 
-	b.Register(irc.PRIVMSG, &Handler{})
+	var handler Handler
+	var queryer Queryer
+	if conf := query.NewConfig("wolfid.toml"); conf != nil {
+		queryConf = *conf
+	}
+	qdb, err := quotes.OpenDB("quotes.sqlite3")
+	if err != nil {
+		log.Fatalln("Error opening quotes db:", err)
+	}
+	defer qdb.Close()
+	var quoter = Quoter{qdb}
+
+	// Quote commands
+	b.RegisterCommand(commander.MkCmd(
+		"quote",
+		"Retrieves a quote. Randomly selects a quote if no id is provided.",
+		"quote",
+		&quoter,
+		commander.PRIVMSG, commander.ALL, "[id]",
+	))
+	b.RegisterCommand(commander.MkCmd(
+		"quote",
+		"Shows the number of quotes in the database.",
+		"quotes",
+		&quoter,
+		commander.PRIVMSG, commander.ALL,
+	))
+	b.RegisterCommand(commander.MkCmd(
+		"quote",
+		"Gets the details for a specific quote.",
+		"details",
+		&quoter,
+		commander.PRIVMSG, commander.ALL, "id",
+	))
+	b.RegisterCommand(commander.MkCmd(
+		"quote",
+		"Adds a quote to the database.",
+		"addquote",
+		&quoter,
+		commander.PRIVMSG, commander.ALL, "quote...",
+	))
+	b.RegisterCommand(commander.MkAuthCmd(
+		"quote",
+		"Removes a quote from the database.",
+		"delquote",
+		&quoter,
+		commander.PRIVMSG, commander.ALL, 0, "Q", "id",
+	))
+	b.RegisterCommand(commander.MkAuthCmd(
+		"quote",
+		"Edits an existing quote.",
+		"editquote",
+		&quoter,
+		commander.PRIVMSG, commander.ALL, 0, "Q", "id", "quote...",
+	))
+
+	// Queryer commands
+	b.Register(irc.PRIVMSG, &queryer)
+	b.RegisterCommand(commander.MkCmd(
+		"query",
+		"Submits a query to Google.",
+		"google",
+		&queryer,
+		commander.PRIVMSG, commander.ALL, "query...",
+	))
+	b.RegisterCommand(commander.MkCmd(
+		"query",
+		"Submits a query to Wolfram Alpha.",
+		"calc",
+		&queryer,
+		commander.PRIVMSG, commander.ALL, "query...",
+	))
+
+	// Handler commands
+	b.Register(irc.PRIVMSG, &handler)
+	b.Register(irc.JOIN, &handler)
+	b.RegisterCommand(commander.MkAuthCmd(
+		"simple",
+		"Gives the user ops or voice if they have o or v flags respectively.",
+		"up",
+		&handler,
+		commander.PRIVMSG, commander.ALL, 0, "", "#chan",
+	))
 
 	end := b.Start()
 

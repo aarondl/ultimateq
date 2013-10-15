@@ -236,9 +236,9 @@ type Endpoint interface {
 type Message struct {
 	// Name of the message. Uppercase constant name or numeric.
 	Name string
-	// The server or user that sent the message, a fullhost if one was supplied.
+	// Sender is the server or user that sent the message, normally a fullhost.
 	Sender string
-	// The args split by space delimiting.
+	// Args split by space delimiting.
 	Args []string
 }
 
