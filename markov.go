@@ -1,3 +1,5 @@
+package main
+
 // Copyright 2011 The Go Authors.  All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
@@ -43,8 +45,6 @@ Markov chain, and writes generated text to standard output.
 The prefix and output lengths can be specified using the -prefix and -words
 flags on the command-line.
 */
-package main
-
 import (
 	"bufio"
 	"fmt"
