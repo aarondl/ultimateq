@@ -12,8 +12,11 @@ import (
 )
 
 const (
-	// IRC_MAX_LENGTH is the maximum length for an irc message.
-	IRC_MAX_LENGTH = 510
+	// IRC_MAX_LENGTH is the maximum length for an irc message. Normally it is
+	// 510 bytes + crlf but the server has to truncate extra to allow for our
+	// fullhost on rebroadcast to clients, so we should send less than
+	// this by an arbitrarily "this probably won't go over this" amount.
+	IRC_MAX_LENGTH = 400
 	// fmtPrivmsgHeader creates the beginning of a privmsg.
 	fmtPrivmsgHeader = PRIVMSG + " %v :"
 	// fmtNoticeHeader creates the beginning of a notice.
