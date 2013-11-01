@@ -200,9 +200,9 @@ func (s *s) TestHelper_splitSend(c *C) {
 	buf = bytes.Buffer{}
 	h = &Helper{&buf}
 	header = "PRIVMSG #chan :"
-	s1 := strings.Repeat("a", 400)
-	s2 := strings.Repeat("b", 400)
-	s3 := strings.Repeat("c", 320)
+	s1 := strings.Repeat("a", IRC_MAX_LENGTH)
+	s2 := strings.Repeat("b", IRC_MAX_LENGTH)
+	s3 := strings.Repeat("c", 300)
 	err := h.splitSend([]byte(header), []byte(s1+s2+s3))
 	c.Check(err, IsNil)
 	c.Check(buf.Len(), Equals, len(header)*3+len(s1)+len(s2)+len(s3))
