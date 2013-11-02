@@ -398,8 +398,10 @@ func (s *State) nick(m *irc.Message) {
 				delete(cus, nick)
 			}
 		}
-		s.userChannels[newnick] = s.userChannels[nick]
-		delete(s.userChannels, nick)
+		if _, ok := s.userChannels[nick]; ok {
+			s.userChannels[newnick] = s.userChannels[nick]
+			delete(s.userChannels, nick)
+		}
 		s.users[newnick] = s.users[nick]
 		delete(s.users, nick)
 	}

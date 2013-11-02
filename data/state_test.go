@@ -351,6 +351,23 @@ func (s *s) TestState_UpdateNick(c *C) {
 	c.Check(st.GetUser(nicks[0]), IsNil)
 }
 
+func (s *s) TestState_UpdateNickSelfNilMaps(c *C) {
+	st, err := CreateState(irc.CreateProtoCaps())
+	c.Check(err, IsNil)
+	m := &irc.Message{
+		Name:   irc.NICK,
+		Sender: users[0],
+		Args:   []string{nicks[1]},
+	}
+	st.addUser(users[0])
+	st.Update(m)
+
+	_, ok := st.userChannels[nicks[0]]
+	c.Check(ok, Equals, false)
+	_, ok = st.userChannels[nicks[1]]
+	c.Check(ok, Equals, false)
+}
+
 func (s *s) TestState_UpdateJoin(c *C) {
 	st, err := CreateState(irc.CreateProtoCaps())
 	st.Self = self
