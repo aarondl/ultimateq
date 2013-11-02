@@ -17,6 +17,10 @@ const (
 	// fullhost on rebroadcast to clients, so we should send less than
 	// this by the maximum allowed fullhost length.
 	IRC_MAX_LENGTH = 510 - 62
+	// SPLIT_BACKWARD is the maximum number of characters split will search
+	// backwards from IRC_MAX_LENGTH for a space when spliting message to long
+	// to fit on one line
+	SPLIT_BACKWARD = 20
 	// fmtPrivmsgHeader creates the beginning of a privmsg.
 	fmtPrivmsgHeader = PRIVMSG + " %v :"
 	// fmtNoticeHeader creates the beginning of a notice.
@@ -374,8 +378,15 @@ func (h *Helper) splitSend(header, msg []byte) error {
 	buf := make([]byte, IRC_MAX_LENGTH)
 	for ln > 0 {
 		size = msgMax
-		if ln < msgMax {
+		if ln <= msgMax {
 			size = ln
+		} else {
+			for i := msgMax; i != 0 && i > msgMax-SPLIT_BACKWARD; i-- {
+				if msg[i] == ' ' {
+					size = i
+					break
+				}
+			}
 		}
 		copy(buf, header)
 		copy(buf[lnh:], msg[:size])

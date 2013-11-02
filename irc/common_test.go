@@ -206,4 +206,23 @@ func (s *s) TestHelper_splitSend(c *C) {
 	err := h.splitSend([]byte(header), []byte(s1+s2+s3))
 	c.Check(err, IsNil)
 	c.Check(buf.Len(), Equals, len(header)*3+len(s1)+len(s2)+len(s3))
+
+	buf = bytes.Buffer{}
+	h = &Helper{&buf}
+	header = "PRIVMSG #chan :"
+	s4 := strings.Repeat("a", IRC_MAX_LENGTH-len(header))
+	s5 := strings.Repeat("b", IRC_MAX_LENGTH-len(header))
+	err = h.splitSend([]byte(header), []byte(s4+s5))
+	c.Check(err, IsNil)
+	c.Check(buf.Len(), Equals, len(header)*2+len(s4)+len(s5))
+
+	buf = bytes.Buffer{}
+	h = &Helper{&buf}
+	header = "PRIVMSG #chan :"
+	s6 := strings.Repeat("a", IRC_MAX_LENGTH-len(header)-SPLIT_BACKWARD+1) + " "
+	s7 := strings.Repeat("b", IRC_MAX_LENGTH-len(header)-1)
+	err = h.splitSend([]byte(header), []byte(s6+s7))
+	c.Check(err, IsNil)
+	c.Check(buf.Len(), Equals, len(header)*2+len(s6)+len(s7))
+	c.Check(buf.Bytes()[len(header)+len(s6)-1], Equals, header[0])
 }
