@@ -364,7 +364,10 @@ func (h *Helper) Quit(msg string) error {
 }
 
 // splitSend breaks a message down into irc-digestable chunks based on
-// IRC_MAX_LENGTH, and appends the header to each message.
+// IRC_MAX_LENGTH, and appends the header to each message. Will also use
+// SPLIT_BACKWARD character look-back to see if it can split on a space instead
+// of in the middle of a word. If it can, it will eliminate the space from
+// the following message.
 func (h *Helper) splitSend(header, msg []byte) error {
 	var err error
 	ln, lnh := len(msg), len(header)
@@ -377,6 +380,7 @@ func (h *Helper) splitSend(header, msg []byte) error {
 	var size int
 	buf := make([]byte, IRC_MAX_LENGTH)
 	for ln > 0 {
+		nextWriteOffset := 0
 		size = msgMax
 		if ln <= msgMax {
 			size = ln
@@ -384,6 +388,7 @@ func (h *Helper) splitSend(header, msg []byte) error {
 			for i := msgMax; i != 0 && i > msgMax-SPLIT_BACKWARD; i-- {
 				if msg[i] == ' ' {
 					size = i
+					nextWriteOffset = 1
 					break
 				}
 			}
@@ -394,7 +399,7 @@ func (h *Helper) splitSend(header, msg []byte) error {
 		if err != nil {
 			return err
 		}
-		msg = msg[size:]
+		msg = msg[size+nextWriteOffset:]
 		ln, lnh = len(msg), len(header)
 	}
 
