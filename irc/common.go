@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 )
 
 const (
@@ -247,11 +248,47 @@ type Message struct {
 	Sender string
 	// Args split by space delimiting.
 	Args []string
+	// Times is the time this message was received.
+	Time time.Time
 }
 
-// Split splits string arguments. A convenience method to avoid having to call
-// splits and import strings.
-func (m *Message) Split(index int) []string {
+// NewMessage constructs a message object that has a timestamp.
+func NewMessage(name, sender string, args ...string) *Message {
+	var setArgs []string
+	if len(args) > 0 {
+		setArgs = make([]string, len(args))
+		copy(setArgs, args)
+	}
+	return &Message{name, sender, setArgs, time.Now()}
+}
+
+// Nick returns the nick of the sender. Will be empty string if it was
+// not able to parse the sender.
+func (m *Message) Nick() string {
+	return Nick(m.Sender)
+}
+
+// Username returns the username of the sender. Will be empty string if it was
+// not able to parse the sender.
+func (m *Message) Username() string {
+	return Username(m.Sender)
+}
+
+// Hostname returns the host of the sender. Will be empty string if it was
+// not able to parse the sender.
+func (m *Message) Hostname() string {
+	return Hostname(m.Sender)
+}
+
+// Split splits the sender into it's fragments: nick, user, and hostname. If the
+// format is not acceptable empty string is returned for everything.
+func (m *Message) Split() (nick, user, hostname string) {
+	return Split(m.Sender)
+}
+
+// SplitArgs splits string arguments. A convenience method to avoid having to
+// call splits and import strings.
+func (m *Message) SplitArgs(index int) []string {
 	return strings.Split(m.Args[index], ",")
 }
 

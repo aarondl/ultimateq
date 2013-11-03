@@ -49,7 +49,7 @@ func (h Host) Split() (nick, user, hostname string) {
 	return Split(string(h))
 }
 
-// GetFullhost returns the fullhost of this host.
+// String returns the fullhost of this host.
 func (h Host) String() string {
 	return string(h)
 }

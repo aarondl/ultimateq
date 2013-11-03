@@ -51,11 +51,6 @@ var (
 	// errServerKilledReconn occurs when the server is killed during a
 	// reconnection pause.
 	errServerKilledReconn = errors.New("bot: Server reconnection aborted.")
-
-	// connMessage is a pseudo message sent to servers upon connect.
-	connMessage = &irc.Message{Name: irc.CONNECT}
-	// discMessage is a pseudo message sent to servers upon disconnect.
-	discMessage = &irc.Message{Name: irc.DISCONNECT}
 )
 
 type (
@@ -263,7 +258,7 @@ func (b *Bot) dispatch(srv *Server) (disconnect bool, err error) {
 	var parseErr error
 	readCh := srv.client.ReadChannel()
 
-	b.dispatchMessage(srv, connMessage)
+	b.dispatchMessage(srv, irc.NewMessage(irc.CONNECT, ""))
 	for err == nil && !disconnect {
 		select {
 		case msg, ok := <-readCh:
@@ -288,7 +283,7 @@ func (b *Bot) dispatch(srv *Server) (disconnect bool, err error) {
 		}
 	}
 
-	b.dispatchMessage(srv, discMessage)
+	b.dispatchMessage(srv, irc.NewMessage(irc.DISCONNECT, ""))
 	return
 }
 

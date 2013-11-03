@@ -16,12 +16,18 @@ var _ = Suite(&s{})
 
 func (s *s) TestIrcMessage_Test(c *C) {
 	args := []string{"#chan1", "#chan2"}
-	msg := Message{
-		Args: []string{strings.Join(args, ",")},
-	}
-	for i, v := range msg.Split(0) {
+	msg := NewMessage("", "nick!user@host", strings.Join(args, ","))
+	for i, v := range msg.SplitArgs(0) {
 		c.Check(args[i], Equals, v)
 	}
+	c.Check(msg.Nick(), Equals, "nick")
+	c.Check(msg.Username(), Equals, "user")
+	c.Check(msg.Hostname(), Equals, "host")
+	n, u, h := msg.Split()
+	c.Check(n, Equals, "nick")
+	c.Check(u, Equals, "user")
+	c.Check(h, Equals, "host")
+	c.Check(msg.Time.Unix(), Not(Equals), 0)
 }
 
 func (s *s) TestMsgTypes_Privmsg(c *C) {

@@ -43,20 +43,20 @@ func Parse(str []byte) (*irc.Message, error) {
 		return nil, ParseError{Msg: errMsgParseFailure, Irc: string(str)}
 	}
 
-	msg := &irc.Message{}
-	msg.Sender = string(parts[1])
-	msg.Name = string(parts[2])
+	sender := string(parts[1])
+	name := string(parts[2])
+	var args []string
 	if len(parts[3]) != 0 {
-		msg.Args = strings.Fields(string(parts[3]))
+		args = strings.Fields(string(parts[3]))
 	}
 
 	if len(parts[4]) != 0 {
-		if msg.Args != nil {
-			msg.Args = append(msg.Args, string(parts[4]))
+		if args != nil {
+			args = append(args, string(parts[4]))
 		} else {
-			msg.Args = []string{string(parts[4])}
+			args = []string{string(parts[4])}
 		}
 	}
 
-	return msg, nil
+	return irc.NewMessage(name, sender, args...), nil
 }

@@ -383,7 +383,7 @@ func (s *State) Update(m *irc.Message) {
 
 // nick alters the state of the database when a NICK message is received.
 func (s *State) nick(m *irc.Message) {
-	nick, username, host := irc.Host(m.Sender).Split()
+	nick, username, host := m.Split()
 	newnick := m.Args[0]
 	newuser := irc.Host(newnick + "!" + username + "@" + host)
 
