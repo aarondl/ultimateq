@@ -95,7 +95,7 @@ func rspChk(ts *tSetup, expected, sender string, args ...string) error {
 
 func prvRspChk(ts *tSetup, expected, to, sender string, args ...string) error {
 	ts.buffer.Reset()
-	err := ts.b.commander.Dispatch(serverID, &irc.Message{
+	err := ts.b.commander.Dispatch(serverID, 0, &irc.Message{
 		Name: irc.PRIVMSG, Sender: sender,
 		Args: []string{to, strings.Join(args, " ")},
 	}, ts.ep)
