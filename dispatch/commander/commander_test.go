@@ -498,7 +498,7 @@ func TestCommander_Dispatch(t *T) {
 			Name:   test.Name,
 			Args:   test.MsgArgs,
 		}
-		err = c.Dispatch(server, msg, dataEndpoint)
+		err = c.Dispatch(server, 0, msg, dataEndpoint)
 		c.WaitForHandlers()
 		if handler.called != test.Called {
 			if handler.called {
@@ -623,7 +623,7 @@ func TestCommander_DispatchAuthed(t *T) {
 			Args:   []string{channel, string(prefix) + cmd},
 		}
 
-		err = c.Dispatch(server, msg, dataEndpoint)
+		err = c.Dispatch(server, 0, msg, dataEndpoint)
 		c.WaitForHandlers()
 		if handler.called != test.Called {
 			if handler.called {
@@ -707,7 +707,7 @@ func TestCommander_DispatchNils(t *T) {
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
-	err = c.Dispatch(server, msg, dataEndpoint)
+	err = c.Dispatch(server, 0, msg, dataEndpoint)
 	c.WaitForHandlers()
 	err = chkErr(err, errMsgStoreDisabled)
 	if err != nil {
@@ -721,7 +721,7 @@ func TestCommander_DispatchNils(t *T) {
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
-	err = c.Dispatch(server, msg, dataEndpoint)
+	err = c.Dispatch(server, 0, msg, dataEndpoint)
 	c.WaitForHandlers()
 	if handler.channel != nil {
 		t.Error("Channel should just be nil when state is disabled.")
@@ -778,7 +778,7 @@ func TestCommander_DispatchReturns(t *T) {
 	for _, test := range errors {
 		buffer.Reset()
 		handler.Error = test.Error
-		err = c.Dispatch(server, msg, dataEndpoint)
+		err = c.Dispatch(server, 0, msg, dataEndpoint)
 		c.WaitForHandlers()
 		err = chkStr(string(buffer.Bytes()), `NOTICE nick :`+test.ErrorMsg)
 		if err != nil {
@@ -816,7 +816,7 @@ func TestCommander_DispatchChannel(t *T) {
 	}
 
 	msg.Args = []string{channel, string(prefix) + cmd}
-	err = c.Dispatch(server, msg, dataEndpoint)
+	err = c.Dispatch(server, 0, msg, dataEndpoint)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -831,7 +831,7 @@ func TestCommander_DispatchChannel(t *T) {
 	handler.targChan = nil
 	handler.args = nil
 	msg.Args = []string{channel, string(prefix) + cmd + " " + channel}
-	err = c.Dispatch(server, msg, dataEndpoint)
+	err = c.Dispatch(server, 0, msg, dataEndpoint)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -846,7 +846,7 @@ func TestCommander_DispatchChannel(t *T) {
 	handler.targChan = nil
 	handler.args = nil
 	msg.Args = []string{nick, cmd}
-	err = c.Dispatch(server, msg, dataEndpoint)
+	err = c.Dispatch(server, 0, msg, dataEndpoint)
 	c.WaitForHandlers()
 	err = chkErr(err, errFmtNArguments)
 	if err != nil {
@@ -856,7 +856,7 @@ func TestCommander_DispatchChannel(t *T) {
 	msg.Args = []string{nick, cmd + " " + channel}
 	noState := data.CreateDataEndpoint(server, buffer, nil, store,
 		&stateMutex, &storeMutex)
-	err = c.Dispatch(server, msg, noState)
+	err = c.Dispatch(server, 0, msg, noState)
 	c.WaitForHandlers()
 	err = chkErr(err, errMsgStateDisabled)
 	if err != nil {
@@ -866,7 +866,7 @@ func TestCommander_DispatchChannel(t *T) {
 	handler.targChan = nil
 	handler.args = nil
 	msg.Args = []string{nick, cmd + " " + channel}
-	err = c.Dispatch(server, msg, dataEndpoint)
+	err = c.Dispatch(server, 0, msg, dataEndpoint)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -879,7 +879,7 @@ func TestCommander_DispatchChannel(t *T) {
 	}
 
 	msg.Args = []string{channel, string(prefix) + cmd + " " + channel + " arg"}
-	err = c.Dispatch(server, msg, dataEndpoint)
+	err = c.Dispatch(server, 0, msg, dataEndpoint)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtNArguments, errAtMost, 1, "%v"))
 	if err != nil {
@@ -887,7 +887,7 @@ func TestCommander_DispatchChannel(t *T) {
 	}
 
 	msg.Args = []string{nick, cmd}
-	err = c.Dispatch(server, msg, dataEndpoint)
+	err = c.Dispatch(server, 0, msg, dataEndpoint)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtNArguments, errAtLeast, 1, "%v"))
 	if err != nil {
@@ -923,7 +923,7 @@ func TestCommander_DispatchUsers(t *T) {
 	}
 
 	msg.Args = []string{nick, cmd + " nick nick"}
-	err = c.Dispatch(server, msg, dataEndpoint)
+	err = c.Dispatch(server, 0, msg, dataEndpoint)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -940,7 +940,7 @@ func TestCommander_DispatchUsers(t *T) {
 	}
 
 	msg.Args = []string{nick, cmd + " *user nick"}
-	err = c.Dispatch(server, msg, dataEndpoint)
+	err = c.Dispatch(server, 0, msg, dataEndpoint)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -954,7 +954,7 @@ func TestCommander_DispatchUsers(t *T) {
 	}
 
 	msg.Args = []string{nick, cmd + " *user nick *user"}
-	err = c.Dispatch(server, msg, dataEndpoint)
+	err = c.Dispatch(server, 0, msg, dataEndpoint)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -971,7 +971,7 @@ func TestCommander_DispatchUsers(t *T) {
 	}
 
 	msg.Args = []string{nick, cmd + " *user nick *user nick nick"}
-	err = c.Dispatch(server, msg, dataEndpoint)
+	err = c.Dispatch(server, 0, msg, dataEndpoint)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -1020,7 +1020,7 @@ func TestCommander_DispatchErrors(t *T) {
 	}
 
 	msg.Args = []string{nick, cmd + " *baduser nick"}
-	err = c.Dispatch(server, msg, dataEndpoint)
+	err = c.Dispatch(server, 0, msg, dataEndpoint)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtUserNotRegistered, "baduser"))
 	if err != nil {
@@ -1028,7 +1028,7 @@ func TestCommander_DispatchErrors(t *T) {
 	}
 
 	msg.Args = []string{nick, cmd + " * nick"}
-	err = c.Dispatch(server, msg, dataEndpoint)
+	err = c.Dispatch(server, 0, msg, dataEndpoint)
 	c.WaitForHandlers()
 	err = chkErr(err, errMsgMissingUsername)
 	if err != nil {
@@ -1036,7 +1036,7 @@ func TestCommander_DispatchErrors(t *T) {
 	}
 
 	msg.Args = []string{nick, cmd + " self nick"}
-	err = c.Dispatch(server, msg, dataEndpoint)
+	err = c.Dispatch(server, 0, msg, dataEndpoint)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtUserNotAuthed, "self"))
 	if err != nil {
@@ -1044,7 +1044,7 @@ func TestCommander_DispatchErrors(t *T) {
 	}
 
 	msg.Args = []string{nick, cmd + " nick badnick"}
-	err = c.Dispatch(server, msg, dataEndpoint)
+	err = c.Dispatch(server, 0, msg, dataEndpoint)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtUserNotFound, "badnick"))
 	if err != nil {
@@ -1052,7 +1052,7 @@ func TestCommander_DispatchErrors(t *T) {
 	}
 
 	msg.Args = []string{nick, cmd + " nick nick nick badnick"}
-	err = c.Dispatch(server, msg, dataEndpoint)
+	err = c.Dispatch(server, 0, msg, dataEndpoint)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtUserNotFound, "badnick"))
 	if err != nil {
@@ -1062,7 +1062,7 @@ func TestCommander_DispatchErrors(t *T) {
 	disableStoreEp := data.CreateDataEndpoint(server, buffer, state, nil,
 		&stateMutex, &storeMutex)
 	msg.Args = []string{nick, cmd + " *user nick"}
-	err = c.Dispatch(server, msg, disableStoreEp)
+	err = c.Dispatch(server, 0, msg, disableStoreEp)
 	c.WaitForHandlers()
 	err = chkErr(err, errMsgStoreDisabled)
 	if err != nil {
@@ -1072,7 +1072,7 @@ func TestCommander_DispatchErrors(t *T) {
 	disableStateEp := data.CreateDataEndpoint(server, buffer, nil, store,
 		&stateMutex, &storeMutex)
 	msg.Args = []string{nick, cmd + " nick nick"}
-	err = c.Dispatch(server, msg, disableStateEp)
+	err = c.Dispatch(server, 0, msg, disableStateEp)
 	c.WaitForHandlers()
 	err = chkErr(err, errMsgStateDisabled)
 	if err != nil {
@@ -1090,7 +1090,7 @@ func TestCommander_DispatchErrors(t *T) {
 	}
 
 	msg.Args = []string{nick, cmd + " nick"}
-	err = c.Dispatch(server, msg, disableStateEp)
+	err = c.Dispatch(server, 0, msg, disableStateEp)
 	c.WaitForHandlers()
 	err = chkErr(err, errMsgStateDisabled)
 	if err != nil {
@@ -1126,7 +1126,7 @@ func TestCommander_DispatchVariadicUsers(t *T) {
 	}
 
 	msg.Args = []string{nick, cmd + " *user nick"}
-	err = c.Dispatch(server, msg, dataEndpoint)
+	err = c.Dispatch(server, 0, msg, dataEndpoint)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -1159,7 +1159,7 @@ func TestCommander_DispatchVariadicUsers(t *T) {
 	}
 
 	msg.Args = []string{nick, cmd + " nick nick badnick"}
-	err = c.Dispatch(server, msg, dataEndpoint)
+	err = c.Dispatch(server, 0, msg, dataEndpoint)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtUserNotFound, "badnick"))
 	if err != nil {
@@ -1167,7 +1167,7 @@ func TestCommander_DispatchVariadicUsers(t *T) {
 	}
 
 	msg.Args = []string{nick, cmd + " nick nick self"}
-	err = c.Dispatch(server, msg, dataEndpoint)
+	err = c.Dispatch(server, 0, msg, dataEndpoint)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtUserNotAuthed, "self"))
 	if err != nil {
@@ -1175,7 +1175,7 @@ func TestCommander_DispatchVariadicUsers(t *T) {
 	}
 
 	msg.Args = []string{nick, cmd + " nick nick *badusername"}
-	err = c.Dispatch(server, msg, dataEndpoint)
+	err = c.Dispatch(server, 0, msg, dataEndpoint)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtUserNotRegistered, "badusername"))
 	if err != nil {
@@ -1211,7 +1211,7 @@ func TestCommander_DispatchMixUserAndChan(t *T) {
 	}
 
 	msg.Args = []string{nick, cmd + " " + channel + " nick"}
-	err = c.Dispatch(server, msg, dataEndpoint)
+	err = c.Dispatch(server, 0, msg, dataEndpoint)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error(err)
@@ -1250,7 +1250,7 @@ func TestCommander_DispatchReflection(t *T) {
 
 	msg := &irc.Message{Name: irc.PRIVMSG, Sender: host,
 		Args: []string{"a", cmd}}
-	err = c.Dispatch(server, msg, dataEndpoint)
+	err = c.Dispatch(server, 0, msg, dataEndpoint)
 	c.WaitForHandlers()
 
 	if handler.CalledBad {
@@ -1265,7 +1265,7 @@ func TestCommander_DispatchReflection(t *T) {
 
 	handler.Called, handler.CalledBad = false, false
 	msg.Args = []string{"a", "badargnum"}
-	err = c.Dispatch(server, msg, dataEndpoint)
+	err = c.Dispatch(server, 0, msg, dataEndpoint)
 	c.WaitForHandlers()
 
 	if !handler.CalledBad {
@@ -1277,7 +1277,7 @@ func TestCommander_DispatchReflection(t *T) {
 
 	handler.Called, handler.CalledBad = false, false
 	msg.Args = []string{"a", "noreturn"}
-	err = c.Dispatch(server, msg, dataEndpoint)
+	err = c.Dispatch(server, 0, msg, dataEndpoint)
 	c.WaitForHandlers()
 
 	if !handler.CalledBad {
@@ -1289,7 +1289,7 @@ func TestCommander_DispatchReflection(t *T) {
 
 	handler.Called, handler.CalledBad = false, false
 	msg.Args = []string{"a", "badargs"}
-	err = c.Dispatch(server, msg, dataEndpoint)
+	err = c.Dispatch(server, 0, msg, dataEndpoint)
 	c.WaitForHandlers()
 
 	if !handler.CalledBad {
@@ -1304,6 +1304,66 @@ func TestCommander_DispatchReflection(t *T) {
 		if !success {
 			t.Error(command, "handler could not be unregistered.")
 		}
+	}
+}
+
+func TestCommander_DispatchOverridePrefix(t *T) {
+	c := CreateCommander(prefix, core)
+	var buffer = &bytes.Buffer{}
+	var err error
+	var stateMutex, storeMutex sync.RWMutex
+
+	state, _ := setup()
+	var dataEndpoint = data.CreateDataEndpoint(server, buffer, state, nil,
+		&stateMutex, &storeMutex)
+
+	handler := &commandHandler{}
+	msg := &irc.Message{Name: irc.PRIVMSG, Sender: host}
+
+	err = c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALL, ALL))
+	if err != nil {
+		t.Error("Unexpected:", cmd, err)
+	}
+
+	handler.called = false
+	msg.Args = []string{channel, string(prefix) + cmd}
+	err = c.Dispatch(server, 0, msg, dataEndpoint)
+	c.WaitForHandlers()
+
+	if !handler.called {
+		t.Error("Expected a call to Cmd.")
+	}
+
+	handler.called = false
+	msg.Args = []string{channel, string(prefix) + cmd}
+	err = c.Dispatch(server, '!', msg, dataEndpoint)
+	c.WaitForHandlers()
+
+	if handler.called {
+		t.Error("Expected no call to Cmd.")
+	}
+
+	handler.called = false
+	msg.Args = []string{channel, "!" + cmd}
+	err = c.Dispatch(server, '!', msg, dataEndpoint)
+	c.WaitForHandlers()
+
+	if !handler.called {
+		t.Error("Expected a call to Cmd.")
+	}
+
+	handler.called = false
+	msg.Args = []string{channel, ":" + cmd}
+	err = c.Dispatch(server, '!', msg, dataEndpoint)
+	c.WaitForHandlers()
+
+	if handler.called {
+		t.Error("Expected no call to Cmd.")
+	}
+
+	success := c.Unregister(GLOBAL, cmd)
+	if !success {
+		t.Error(cmd, "handler could not be unregistered.")
 	}
 }
 

@@ -296,8 +296,9 @@ func (b *Bot) dispatch(srv *Server) (disconnect bool, err error) {
 func (b *Bot) dispatchMessage(s *Server, msg *irc.Message) {
 	b.dispatcher.Dispatch(msg, s.endpoint)
 	s.dispatcher.Dispatch(msg, s.endpoint)
-	b.commander.Dispatch(s.name, msg, s.endpoint.DataEndpoint)
-	s.commander.Dispatch(s.name, msg, s.endpoint.DataEndpoint)
+	b.commander.Dispatch(s.name, s.commander.GetPrefix(), msg,
+		s.endpoint.DataEndpoint)
+	s.commander.Dispatch(s.name, 0, msg, s.endpoint.DataEndpoint)
 }
 
 // Stop shuts down all connections and exits.

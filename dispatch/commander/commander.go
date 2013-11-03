@@ -135,7 +135,7 @@ type CommandHandler interface {
 type commandTable map[string]*Command
 
 // Commander allows for registration of commands that can involve user access,
-// and provides rich programming interface for command handling.
+// and provides a rich programming interface for command handling.
 type Commander struct {
 	*dispatch.DispatchCore
 	prefix          rune
@@ -162,7 +162,6 @@ func CreateCommander(prefix rune, core *dispatch.DispatchCore) *Commander {
 // global to the bot. This ensures that no command can be registered to a single
 // server twice.
 func (c *Commander) Register(server string, cmd *Command) error {
-
 	regName := makeIdentifier(server, cmd.Cmd)
 	globalRegName := makeIdentifier(GLOBAL, cmd.Cmd)
 
@@ -223,8 +222,8 @@ func (c *Commander) Unregister(server, cmd string) (found bool) {
 }
 
 // Dispatch dispatches an IrcEvent into the commander's event handlers.
-func (c *Commander) Dispatch(server string, msg *irc.Message,
-	ep *data.DataEndpoint) (err error) {
+func (c *Commander) Dispatch(server string, overridePrefix rune,
+	msg *irc.Message, ep *data.DataEndpoint) (err error) {
 
 	// Filter non privmsg/notice
 	msgtype := 0
@@ -254,7 +253,10 @@ func (c *Commander) Dispatch(server string, msg *irc.Message,
 	// If it's a channel message, ensure we're active on the channel and
 	// that the user has supplied the prefix in his command.
 	if isChan {
-		if !hasChan || rune(cmd[0]) != c.prefix {
+		firstChar := rune(cmd[0])
+		missingOverride := overridePrefix == 0 || firstChar != overridePrefix
+		missingPrefix := overridePrefix != 0 || firstChar != c.prefix
+		if !hasChan || (missingOverride && missingPrefix) {
 			return nil
 		}
 
@@ -578,6 +580,11 @@ func (c *Commander) parseUserArg(cmdata *CommandData, state *data.State,
 	}
 
 	return nil
+}
+
+// GetPrefix returns the prefix used by this commander instance.
+func (c *Commander) GetPrefix() rune {
+	return c.prefix
 }
 
 // makeIdentifier creates an identifier from a server and a command for
