@@ -129,7 +129,7 @@ func (s *s) TestCoreHandler_Join(c *C) {
 	srv.state.Self.User = data.CreateUser("nick!user@host")
 	msg := &irc.Message{
 		Name:   irc.JOIN,
-		Sender: srv.state.Self.GetFullhost(),
+		Sender: srv.state.Self.Host(),
 		Args:   []string{"#chan"},
 	}
 

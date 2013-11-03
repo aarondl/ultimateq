@@ -62,7 +62,7 @@ func (c *coreHandler) HandleRaw(msg *irc.Message, endpoint irc.Endpoint) {
 		server.protectState.RLock()
 		defer server.protectState.RUnlock()
 		if server.state != nil {
-			if msg.Sender == server.state.Self.GetFullhost() {
+			if msg.Sender == server.state.Self.Host() {
 				endpoint.Send("WHO :", msg.Args[0])
 				endpoint.Send("MODE :", msg.Args[0])
 			}

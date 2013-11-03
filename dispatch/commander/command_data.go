@@ -127,7 +127,7 @@ func (cd *CommandData) FindAccessByUser(server, nickOrUser string) (
 			err = fmt.Errorf(errFmtUserNotFound, nickOrUser)
 			return
 		}
-		access = cd.Store.GetAuthedUser(server, user.GetFullhost())
+		access = cd.Store.GetAuthedUser(server, user.Host())
 		if access == nil {
 			err = fmt.Errorf(errFmtUserNotAuthed, nickOrUser)
 			return

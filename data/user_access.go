@@ -238,7 +238,7 @@ func (a *UserAccess) ValidateMask(mask string) (has bool) {
 	}
 	mask = strings.ToLower(mask)
 	for _, ourMask := range a.Masks {
-		if irc.Mask(mask).Match(irc.WildMask(ourMask)) {
+		if irc.Host(mask).Match(irc.Mask(ourMask)) {
 			has = true
 			break
 		}

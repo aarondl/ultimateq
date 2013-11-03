@@ -246,7 +246,7 @@ func (c *Commander) Dispatch(server string, overridePrefix rune,
 	cmd := fields[0]
 
 	ch := ""
-	nick := irc.Mask(msg.Sender).GetNick()
+	nick := irc.Nick(msg.Sender)
 	msgscope := PRIVATE
 	isChan, hasChan := c.CheckTarget(msg.Args[0])
 

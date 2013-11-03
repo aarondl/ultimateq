@@ -31,29 +31,29 @@ func CreateChannel(name string,
 	}
 }
 
-// GetName gets the name of the channel.
-func (c *Channel) GetName() string {
+// Name gets the name of the channel.
+func (c *Channel) Name() string {
 	return c.name
 }
 
-// Topic sets the topic of the channel.
-func (c *Channel) Topic(topic string) {
+// SetTopic sets the topic of the channel.
+func (c *Channel) SetTopic(topic string) {
 	c.topic = topic
 }
 
-// GetTopic gets the topic of the channel.
-func (c *Channel) GetTopic() string {
+// Topic gets the topic of the channel.
+func (c *Channel) Topic() string {
 	return c.topic
 }
 
-// IsBanned checks a mask to see if it's banned.
-func (c *Channel) IsBanned(mask irc.Mask) bool {
-	if !strings.ContainsAny(string(mask), "!@") {
-		mask += "!@"
+// IsBanned checks a host to see if it's banned.
+func (c *Channel) IsBanned(host irc.Host) bool {
+	if !strings.ContainsAny(string(host), "!@") {
+		host += "!@"
 	}
 	bans := c.GetAddresses(banMode)
 	for i := 0; i < len(bans); i++ {
-		if irc.WildMask(bans[i]).Match(mask) {
+		if irc.Mask(bans[i]).Match(host) {
 			return true
 		}
 	}
@@ -61,8 +61,8 @@ func (c *Channel) IsBanned(mask irc.Mask) bool {
 	return false
 }
 
-// Bans sets the bans of the channel.
-func (c *Channel) Bans(bans []string) {
+// SetBans sets the bans of the channel.
+func (c *Channel) SetBans(bans []string) {
 	delete(c.modes, banMode)
 	for i := 0; i < len(bans); i++ {
 		c.setAddress(banMode, bans[i])
@@ -74,8 +74,8 @@ func (c *Channel) AddBan(ban string) {
 	c.setAddress(banMode, ban)
 }
 
-// GetBans gets the bans of the channel.
-func (c *Channel) GetBans() []string {
+// Bans gets the bans of the channel.
+func (c *Channel) Bans() []string {
 	getBans := c.GetAddresses(banMode)
 	if getBans == nil {
 		return nil
@@ -101,7 +101,7 @@ func (c *Channel) String() string {
 }
 
 // DeleteBans deletes all bans that match a mask.
-func (c *Channel) DeleteBans(mask irc.Mask) {
+func (c *Channel) DeleteBans(mask irc.Host) {
 	bans := c.GetAddresses(banMode)
 	if 0 == len(bans) {
 		return
@@ -113,7 +113,7 @@ func (c *Channel) DeleteBans(mask irc.Mask) {
 
 	toRemove := make([]string, 0, 1) // Assume only one ban will match.
 	for i := 0; i < len(bans); i++ {
-		if irc.WildMask(bans[i]).Match(mask) {
+		if irc.Mask(bans[i]).Match(mask) {
 			toRemove = append(toRemove, bans[i])
 		}
 	}

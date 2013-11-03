@@ -279,12 +279,12 @@ func (c *coreCommands) register(d *data.DataEndpoint,
 	pwd := cd.GetArg("password")
 	uname := cd.GetArg("username")
 	if len(uname) == 0 {
-		uname = strings.TrimLeft(cd.User.GetUsername(), "~")
+		uname = strings.TrimLeft(cd.User.Username(), "~")
 	}
 
 	access = cd.UserAccess
 	if access == nil {
-		access = cd.GetAuthedUser(d.GetKey(), cd.User.GetFullhost())
+		access = cd.GetAuthedUser(d.GetKey(), cd.User.Host())
 	}
 	if access != nil {
 		return nil, fmt.Errorf(errMsgAuthed)
@@ -303,7 +303,7 @@ func (c *coreCommands) register(d *data.DataEndpoint,
 		return
 	}
 
-	host, nick := cd.User.GetFullhost(), cd.User.GetNick()
+	host, nick := cd.User.Host(), cd.User.Nick()
 
 	cd.Close()
 	c.b.protectStore.Lock()
@@ -345,10 +345,10 @@ func (c *coreCommands) auth(d *data.DataEndpoint, cd *cmds.CommandData) (
 	pwd := cd.GetArg("password")
 	uname := cd.GetArg("username")
 	if len(uname) == 0 {
-		uname = strings.TrimLeft(cd.User.GetUsername(), "~")
+		uname = strings.TrimLeft(cd.User.Username(), "~")
 	}
 
-	host, nick := cd.User.GetFullhost(), cd.User.GetNick()
+	host, nick := cd.User.Host(), cd.User.Nick()
 
 	access = cd.UserAccess
 	if access == nil {
@@ -384,7 +384,7 @@ func (c *coreCommands) logout(d *data.DataEndpoint, cd *cmds.CommandData) (
 
 	user := cd.TargetUserAccess["user"]
 	uname := ""
-	host, nick := cd.User.GetFullhost(), cd.User.GetNick()
+	host, nick := cd.User.Host(), cd.User.Nick()
 	if user != nil {
 		if !cd.UserAccess.HasGlobalFlag('G') {
 			external = cmds.MakeGlobalFlagsError("G")
@@ -419,9 +419,9 @@ func (c *coreCommands) access(d *data.DataEndpoint, cd *cmds.CommandData) (
 
 	ch := ""
 	if cd.Channel != nil {
-		ch = cd.Channel.GetName()
+		ch = cd.Channel.Name()
 	}
-	d.Noticef(cd.User.GetNick(), accessSuccess,
+	d.Noticef(cd.User.Nick(), accessSuccess,
 		access.Username, access.String(d.GetKey(), ch))
 
 	return
@@ -438,7 +438,7 @@ func (c *coreCommands) deluser(d *data.DataEndpoint, cd *cmds.CommandData) (
 	}
 	uname := cd.TargetUserAccess["user"].Username
 
-	nick := cd.User.GetNick()
+	nick := cd.User.Nick()
 	cd.Close()
 	c.b.protectStore.Lock()
 	defer c.b.protectStore.Unlock()
@@ -465,7 +465,7 @@ func (c *coreCommands) deluser(d *data.DataEndpoint, cd *cmds.CommandData) (
 func (c *coreCommands) delme(d *data.DataEndpoint, cd *cmds.CommandData) (
 	internal, external error) {
 
-	host, nick := cd.User.GetFullhost(), cd.User.GetNick()
+	host, nick := cd.User.Host(), cd.User.Nick()
 	uname := cd.UserAccess.Username
 	cd.Close()
 	c.b.protectStore.Lock()
@@ -492,7 +492,7 @@ func (c *coreCommands) passwd(d *data.DataEndpoint, cd *cmds.CommandData) (
 
 	oldpasswd := cd.GetArg("oldpassword")
 	newpasswd := cd.GetArg("newpassword")
-	nick := cd.User.GetNick()
+	nick := cd.User.Nick()
 	uname := cd.UserAccess.Username
 	if !cd.UserAccess.VerifyPassword(oldpasswd) {
 		d.Notice(nick, passwdFailure)
@@ -541,10 +541,10 @@ func (c *coreCommands) masks(d *data.DataEndpoint, cd *cmds.CommandData) (
 	}
 
 	if len(access.Masks) > 0 {
-		d.Noticef(cd.User.GetNick(), masksSuccess,
+		d.Noticef(cd.User.Nick(), masksSuccess,
 			strings.Join(access.Masks, " "))
 	} else {
-		d.Notice(cd.User.GetNick(), masksFailure)
+		d.Notice(cd.User.Nick(), masksFailure)
 	}
 
 	return
@@ -555,7 +555,7 @@ func (c *coreCommands) addmask(d *data.DataEndpoint, cd *cmds.CommandData) (
 	internal, external error) {
 
 	mask := cd.GetArg("mask")
-	nick := cd.User.GetNick()
+	nick := cd.User.Nick()
 	uname := cd.UserAccess.Username
 
 	user := cd.TargetUserAccess["user"]
@@ -600,7 +600,7 @@ func (c *coreCommands) delmask(d *data.DataEndpoint, cd *cmds.CommandData) (
 	internal, external error) {
 
 	mask := cd.GetArg("mask")
-	nick := cd.User.GetNick()
+	nick := cd.User.Nick()
 	uname := cd.UserAccess.Username
 
 	user := cd.TargetUserAccess["user"]
@@ -645,8 +645,8 @@ func (c *coreCommands) resetpasswd(d *data.DataEndpoint, cd *cmds.CommandData) (
 	internal, external error) {
 
 	uname := cd.TargetUserAccess["user"].Username
-	resetnick := cd.TargetUsers["nick"].GetNick()
-	nick := cd.User.GetNick()
+	resetnick := cd.TargetUsers["nick"].Nick()
+	nick := cd.User.Nick()
 	newpasswd := ""
 
 	cd.Close()
@@ -838,7 +838,7 @@ func (c *coreCommands) giveHelper(d *data.DataEndpoint, cd *cmds.CommandData,
 
 	uname := cd.TargetUserAccess["user"].Username
 	args := cd.SplitArg("levelOrFlags")
-	nick := cd.User.GetNick()
+	nick := cd.User.Nick()
 
 	cd.Close()
 	c.b.protectStore.Lock()
@@ -886,7 +886,7 @@ func (c *coreCommands) takeHelper(d *data.DataEndpoint, cd *cmds.CommandData,
 
 	uname := cd.TargetUserAccess["user"].Username
 	arg := cd.GetArg("allOrFlags")
-	nick := cd.User.GetNick()
+	nick := cd.User.Nick()
 
 	cd.Close()
 	c.b.protectStore.Lock()
@@ -934,7 +934,7 @@ func (c *coreCommands) help(d *data.DataEndpoint, cd *cmds.CommandData) (
 	internal, external error) {
 
 	search := strings.ToLower(cd.GetArg("command"))
-	nick := cd.User.GetNick()
+	nick := cd.User.Nick()
 
 	var output = make(map[string][]string)
 	var exactMatches []*cmds.Command

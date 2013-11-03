@@ -101,11 +101,11 @@ func (s *s) TestState_GetUser(c *C) {
 	oldHost := "nick!user@host.com"
 	newHost := "nick!user@host.net"
 	st.addUser(oldHost)
-	c.Check(st.GetUser(oldHost).GetFullhost(), Equals, oldHost)
-	c.Check(st.GetUser(newHost).GetFullhost(), Not(Equals), newHost)
+	c.Check(st.GetUser(oldHost).Host(), Equals, oldHost)
+	c.Check(st.GetUser(newHost).Host(), Not(Equals), newHost)
 	st.addUser(newHost)
-	c.Check(st.GetUser(oldHost).GetFullhost(), Not(Equals), oldHost)
-	c.Check(st.GetUser(newHost).GetFullhost(), Equals, newHost)
+	c.Check(st.GetUser(oldHost).Host(), Not(Equals), oldHost)
+	c.Check(st.GetUser(newHost).Host(), Equals, newHost)
 }
 
 func (s *s) TestState_GetChannel(c *C) {
@@ -199,7 +199,7 @@ func (s *s) TestState_EachUser(c *C) {
 	st.addUser(users[1])
 	i := 0
 	st.EachUser(func(u *User) {
-		c.Check(users[i], Equals, u.GetFullhost())
+		c.Check(users[i], Equals, u.Host())
 		i++
 	})
 	c.Check(i, Equals, 2)
@@ -244,7 +244,7 @@ func (s *s) TestState_EachChanUser(c *C) {
 	st.addToChannel(users[1], channels[0])
 	i := 0
 	st.EachChanUser(channels[0], func(cu *ChannelUser) {
-		c.Check(users[i], Equals, cu.User.GetFullhost())
+		c.Check(users[i], Equals, cu.User.Host())
 		i++
 	})
 	c.Check(i, Equals, 2)
@@ -398,15 +398,15 @@ func (s *s) TestState_UpdateJoinSelf(c *C) {
 	c.Check(err, IsNil)
 	m := &irc.Message{
 		Name:   irc.JOIN,
-		Sender: string(self.mask),
+		Sender: self.Host(),
 		Args:   []string{channels[0]},
 	}
 
 	c.Check(st.GetChannel(channels[0]), IsNil)
-	c.Check(st.IsOn(st.Self.GetNick(), channels[0]), Equals, false)
+	c.Check(st.IsOn(st.Self.Nick(), channels[0]), Equals, false)
 	st.Update(m)
 	c.Check(st.GetChannel(channels[0]), NotNil)
-	c.Check(st.IsOn(st.Self.GetNick(), channels[0]), Equals, true)
+	c.Check(st.IsOn(st.Self.Nick(), channels[0]), Equals, true)
 }
 
 func (s *s) TestState_UpdatePart(c *C) {
@@ -468,25 +468,25 @@ func (s *s) TestState_UpdatePartSelf(c *C) {
 	c.Check(err, IsNil)
 	m := &irc.Message{
 		Name:   irc.PART,
-		Sender: string(self.mask),
+		Sender: self.Host(),
 		Args:   []string{channels[0]},
 	}
 
 	st.addUser(users[0])
-	st.addUser(self.GetFullhost())
+	st.addUser(self.Host())
 	st.addChannel(channels[0])
 	st.addChannel(channels[1])
 	st.addToChannel(users[0], channels[0])
 	st.addToChannel(users[0], channels[1])
-	st.addToChannel(self.GetNick(), channels[0])
+	st.addToChannel(self.Nick(), channels[0])
 
 	c.Check(st.IsOn(users[0], channels[0]), Equals, true)
 	c.Check(st.IsOn(users[0], channels[1]), Equals, true)
-	c.Check(st.IsOn(self.GetNick(), channels[0]), Equals, true)
+	c.Check(st.IsOn(self.Nick(), channels[0]), Equals, true)
 	st.Update(m)
 	c.Check(st.IsOn(users[0], channels[0]), Equals, false)
 	c.Check(st.IsOn(users[0], channels[1]), Equals, true)
-	c.Check(st.IsOn(self.GetNick(), channels[0]), Equals, false)
+	c.Check(st.IsOn(self.Nick(), channels[0]), Equals, false)
 }
 
 func (s *s) TestState_UpdateQuit(c *C) {
@@ -556,10 +556,10 @@ func (s *s) TestState_UpdateKickSelf(c *C) {
 	m := &irc.Message{
 		Name:   irc.KICK,
 		Sender: users[1],
-		Args:   []string{channels[0], st.Self.GetNick()},
+		Args:   []string{channels[0], st.Self.Nick()},
 	}
 
-	st.addUser(st.Self.GetFullhost())
+	st.addUser(st.Self.Host())
 	st.addChannel(channels[0])
 	st.addToChannel(users[0], channels[0])
 
@@ -615,8 +615,8 @@ func (s *s) TestState_UpdateModeSelf(c *C) {
 
 	m := &irc.Message{
 		Name:   irc.MODE,
-		Sender: self.GetFullhost(),
-		Args:   []string{self.GetNick(), "+i-o"},
+		Sender: self.Host(),
+		Args:   []string{self.Nick(), "+i-o"},
 	}
 
 	st.Self.Set("o")
@@ -641,9 +641,9 @@ func (s *s) TestState_UpdateTopic(c *C) {
 
 	st.addChannel(channels[0])
 
-	c.Check(st.GetChannel(channels[0]).GetTopic(), Equals, "")
+	c.Check(st.GetChannel(channels[0]).Topic(), Equals, "")
 	st.Update(m)
-	c.Check(st.GetChannel(channels[0]).GetTopic(), Equals, "topic topic")
+	c.Check(st.GetChannel(channels[0]).Topic(), Equals, "topic topic")
 }
 
 func (s *s) TestState_UpdateRplTopic(c *C) {
@@ -654,14 +654,14 @@ func (s *s) TestState_UpdateRplTopic(c *C) {
 	m := &irc.Message{
 		Name:   irc.RPL_TOPIC,
 		Sender: server,
-		Args:   []string{self.GetNick(), channels[0], "topic topic"},
+		Args:   []string{self.Nick(), channels[0], "topic topic"},
 	}
 
 	st.addChannel(channels[0])
 
-	c.Check(st.GetChannel(channels[0]).GetTopic(), Equals, "")
+	c.Check(st.GetChannel(channels[0]).Topic(), Equals, "")
 	st.Update(m)
-	c.Check(st.GetChannel(channels[0]).GetTopic(), Equals, "topic topic")
+	c.Check(st.GetChannel(channels[0]).Topic(), Equals, "topic topic")
 }
 
 func (s *s) TestState_UpdatePrivmsg(c *C) {
@@ -722,8 +722,8 @@ func (s *s) TestState_UpdateWelcome(c *C) {
 	}
 
 	st.Update(m)
-	c.Check(st.Self.GetFullhost(), Equals, nicks[1])
-	c.Check(st.users[nicks[1]].GetFullhost(), Equals, st.Self.GetFullhost())
+	c.Check(st.Self.Host(), Equals, nicks[1])
+	c.Check(st.users[nicks[1]].Host(), Equals, st.Self.Host())
 
 	m = &irc.Message{
 		Name:   irc.RPL_WELCOME,
@@ -732,8 +732,8 @@ func (s *s) TestState_UpdateWelcome(c *C) {
 	}
 
 	st.Update(m)
-	c.Check(st.Self.GetFullhost(), Equals, users[1])
-	c.Check(st.users[nicks[1]].GetFullhost(), Equals, st.Self.GetFullhost())
+	c.Check(st.Self.Host(), Equals, users[1])
+	c.Check(st.users[nicks[1]].Host(), Equals, st.Self.Host())
 }
 
 func (s *s) TestState_UpdateRplNamereply(c *C) {
@@ -744,8 +744,8 @@ func (s *s) TestState_UpdateRplNamereply(c *C) {
 		Name:   irc.RPL_NAMREPLY,
 		Sender: server,
 		Args: []string{
-			self.GetNick(), "=", channels[0],
-			"@" + nicks[0] + " +" + nicks[1] + " " + self.GetNick(),
+			self.Nick(), "=", channels[0],
+			"@" + nicks[0] + " +" + nicks[1] + " " + self.Nick(),
 		},
 	}
 
@@ -753,14 +753,14 @@ func (s *s) TestState_UpdateRplNamereply(c *C) {
 
 	c.Check(st.GetUsersChannelModes(users[0], channels[0]), IsNil)
 	c.Check(st.GetUsersChannelModes(users[1], channels[0]), IsNil)
-	c.Check(st.GetUsersChannelModes(self.GetNick(), channels[0]), IsNil)
+	c.Check(st.GetUsersChannelModes(self.Nick(), channels[0]), IsNil)
 	st.Update(m)
 	c.Check(
 		st.GetUsersChannelModes(users[0], channels[0]).String(), Equals, "o")
 	c.Check(
 		st.GetUsersChannelModes(users[1], channels[0]).String(), Equals, "v")
 	c.Check(st.GetUsersChannelModes(
-		self.GetNick(), channels[0]).String(), Equals, "")
+		self.Nick(), channels[0]).String(), Equals, "")
 }
 
 func (s *s) TestState_RplWhoReply(c *C) {
@@ -771,8 +771,8 @@ func (s *s) TestState_RplWhoReply(c *C) {
 		Name:   irc.RPL_WHOREPLY,
 		Sender: server,
 		Args: []string{
-			self.GetNick(), channels[0], irc.Mask(users[0]).GetUsername(),
-			irc.Mask(users[0]).GetHost(), "*.server.net", nicks[0], "Hx@d",
+			self.Nick(), channels[0], irc.Username(users[0]),
+			irc.Hostname(users[0]), "*.server.net", nicks[0], "Hx@d",
 			"3 real name",
 		},
 	}
@@ -783,8 +783,8 @@ func (s *s) TestState_RplWhoReply(c *C) {
 	c.Check(st.GetUsersChannelModes(users[0], channels[0]), IsNil)
 	st.Update(m)
 	c.Check(st.GetUser(users[0]), NotNil)
-	c.Check(st.GetUser(users[0]).GetFullhost(), Equals, users[0])
-	c.Check(st.GetUser(users[0]).GetRealname(), Equals, "real name")
+	c.Check(st.GetUser(users[0]).Host(), Equals, users[0])
+	c.Check(st.GetUser(users[0]).Realname(), Equals, "real name")
 	c.Check(
 		st.GetUsersChannelModes(users[0], channels[0]).String(), Equals, "o")
 }
@@ -796,7 +796,7 @@ func (s *s) TestState_UpdateRplMode(c *C) {
 	m := &irc.Message{
 		Name:   irc.RPL_CHANNELMODEIS,
 		Sender: server,
-		Args:   []string{self.GetNick(), channels[0], "+ntzl", "10"},
+		Args:   []string{self.Nick(), channels[0], "+ntzl", "10"},
 	}
 
 	st.addChannel(channels[0])
@@ -813,7 +813,7 @@ func (s *s) TestState_UpdateRplBanlist(c *C) {
 	m := &irc.Message{
 		Name:   irc.RPL_BANLIST,
 		Sender: server,
-		Args: []string{self.GetNick(), channels[0], nicks[0] + "!*@*", nicks[1],
+		Args: []string{self.Nick(), channels[0], nicks[0] + "!*@*", nicks[1],
 			"1367197165"},
 	}
 

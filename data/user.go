@@ -6,7 +6,7 @@ import (
 
 // User encapsulates all the data associated with a user.
 type User struct {
-	mask irc.Mask
+	host irc.Host
 	name string
 }
 
@@ -17,44 +17,44 @@ func CreateUser(nickorhost string) *User {
 	}
 
 	return &User{
-		mask: irc.Mask(nickorhost),
+		host: irc.Host(nickorhost),
 	}
 }
 
-// GetNick returns the nick of this user.
-func (u *User) GetNick() string {
-	return u.mask.GetNick()
+// Nick returns the nick of this user.
+func (u *User) Nick() string {
+	return u.host.Nick()
 }
 
-// GetUsername returns the username of this user.
-func (u *User) GetUsername() string {
-	return u.mask.GetUsername()
+// Username returns the username of this user.
+func (u *User) Username() string {
+	return u.host.Username()
 }
 
-// GetHost returns the host of this user.
-func (u *User) GetHost() string {
-	return u.mask.GetHost()
+// Host returns the host of this user.
+func (u *User) Hostname() string {
+	return u.host.Hostname()
 }
 
-// GetFullhost returns the fullhost of this user.
-func (u *User) GetFullhost() string {
-	return u.mask.GetFullhost()
+// Host returns the string version of the user's host.
+func (u *User) Host() string {
+	return u.host.String()
 }
 
-// Realname sets the real name of this user.
-func (u *User) Realname(realname string) {
+// SetRealname sets the real name of this user.
+func (u *User) SetRealname(realname string) {
 	u.name = realname
 }
 
-// GetRealname returns the real name of this user.
-func (u *User) GetRealname() string {
+// Realname returns the real name of this user.
+func (u *User) Realname() string {
 	return u.name
 }
 
 // String returns a one-line representation of this user.
 func (u *User) String() string {
-	str := u.mask.GetNick()
-	if fh := u.mask.GetFullhost(); len(fh) > 0 && str != fh {
+	str := u.host.Nick()
+	if fh := u.host.String(); len(fh) > 0 && str != fh {
 		str += " " + fh
 	}
 	if len(u.name) > 0 {
