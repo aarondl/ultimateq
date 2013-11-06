@@ -4,80 +4,118 @@
 
 An irc bot written in Go.
 
-ultimateq is designed as a distributed irc bot framework. Where a bot can be
-just one file, or a collection of extensions running alongside the bot. A
-key feature in this bot is that the extensions are actually processes
-themselves which will connect to a bot, or allow bots to connect to them
-via unix or tcp sockets using RPC mechanisms to communicate.
+ultimateq is a distributed irc bot framework. It allows you to create a bot
+with a single file (see simple.go for a good example), or to create many
+extensions that can run independently and hook them up to one bot, or allow
+many bots to connect to them.
 
-There are two advantages behind this model. One is that several bots can use
-a single extension. This has advantages if the extension is holding a
-database meant to be shared (although for scalability you might consider
-database level scaling with replication, but this is just an example).
-
-The other advantage is that the bot has failure isolation. Because each
-extension is running in it's own process, even a fatal and unrecoverable
-crash in an extension means nothing to the bot. This adds a resilency to
-this bot that not many other bots share.
-
-Here's a sample taste of what the bot api might look like for some do-nothing
-connection to an irc server.
+Here's a sample of the bot api for some do-nothing connection to an irc server.
 
 ```go
-import bot "github.com/aarondl/ultimateq"
+
+import (
+    "github.com/aarondl/ultimateq/bot"
+    "os/signal"
+    "log"
+)
+
 func main() {
-  bot.Nick("mybot").Channels("#C++").Run()
+    b, err := bot.CreateBot(bot.ConfigureFile("config.yaml"))
+    if err != nil {
+        log.Fatalln("Error creating bot:", err)
+    }
+    defer b.Close() // Required to close the database.
+    
+    end := b.Start()
+    
+    quit := make(chan os.Signal, 1)
+    signal.Notify(quit, os.Interrupt, os.Kill)
+
+    stop := false
+    for !stop {
+        select {
+        case <-quit:
+            b.Stop()
+            stop = true
+        case err, ok := <-end:
+            log.Println("Server death:", err)
+            stop = !ok
+        }
+    }    
+    log.Println("Shutting down...")
 }
 ```
 
+Here's a quick sample config.yaml for use with the above:
+
+```yaml
+global:
+    nick: Bot
+    altnick: Bot_
+    username: notabot
+    realname: No Bot Here
+servers:
+    irc.test.com:
+        port: 3333
+        ssl: true
+```
+
+##Package status
+
+The bot is roughly 60% complete. The internal packages are nearly 100%
+complete except the outstanding issues that don't involve extensions here:
+https://github.com/aarondl/ultimateq/issues/
+
+The following major pieces are currently missing:
+
+* Front ends for people who want an out of the box bot.
+* Extensions.
+* Nice way to create static modules without the boilerplate of loading a config,
+starting the bot etc.
+
 ##Packages
 
-###bot
+####bot
 This package ties all the low level plumbing together, using this package's
 helpers it should be easy to create a bot and deploy him into the dying world
 of irc.
 
-###irc
+####irc
 This package houses the common irc constants and types necessary throughout
 the bot. It's supposed to remain a small and dependency-less package that all
 packages can utilize.
 
-###config
+####config
 Config package is used to present a fluent style configuration builder for an
 irc bot. It also provides some validation, and file reading/writing.
 
-###parse
+####parse
 This package deals with parsing irc protocols. It is able to consume irc
 protocol messages using the Parse method, returning the common irc.Message
 type from the irc package.
 
-###dispatch
+####dispatch
 Dispatch package is meant to register callbacks and dispatch irc.Messages onto
 them in an asynchronous method. It also presents many handler types that will
 be easy to use for bot-writers.
 
-###dispatch/commander
+####dispatch/commander
 Commander package is a much more involved version of the dispatcher. Instead of
 simply responding to irc raw messages, the commander parses arguments, handles
 user authentication and privelege checks. It can also do advanced argument
 handling such as returning a user message's target channels or users from the
 command.
 
-###inet
+####inet
 Implements the actual connection to an irc server, handles buffering, \r\n
 splitting and appending, and logarithmic write-speed throttling.
 
-###extension
+####extension
 This package defines helpers to create an extension for the bot. It should
 expose a way to connect/allow connections to the bot via TCP or Unix socket.
 And have simple helpers for some network RPC mechanism.
 
-###data
-This package holds data for irc based services. It supplies information
-about channels, and users that the bot is aware of.
-
-Persistence may need some attention. Does this bot have built-in user
-levels and modes for users? Does it have arbitrary key-value
-store for extensions? How do extensions keep this data up to date? Will
-they have their own copy of the data or do they need to query the data on the
-master bot all the time?
+####data
+This package holds state information for irc. As well as stores user authentication
+and access information in a key-value database. (Many thanks to Jan Merci for this
+great package: https://github.com/cznic/kv)
