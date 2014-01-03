@@ -496,7 +496,7 @@ func (s *State) rplWelcome(m *irc.Message) {
 	}
 	user := CreateUser(host)
 	s.Self.User = user
-	s.users[user.Nick()] = user
+	s.users[strings.ToLower(user.Nick())] = user
 }
 
 // rplNameReply alters the state of the database when a RPL_NAMEREPLY
