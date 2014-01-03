@@ -29,6 +29,9 @@ const (
 	dateFormat = "January 02, 2006 at 3:04pm MST"
 )
 
+/* =====================
+ Helper methods.
+===================== */
 func sanitize(str string) string {
 	return rgxSpace.ReplaceAllString(sanitizeNewline.Replace(str), " ")
 }
@@ -40,6 +43,16 @@ func isNick(potential string) (is bool) {
 			(first >= 'A' && first <= 'Z')
 	}
 	return
+}
+
+func respond(e *data.DataEndpoint, target, caller, message string) {
+	// If this is a PM then notice user
+	if isNick(target) {
+		e.Noticef(caller, message)
+	} else {
+		// Otherwise, msg channel
+		e.Privmsgf(target, message)
+	}
 }
 
 type Quoter struct {
@@ -85,9 +98,9 @@ func (q *Quoter) Addquote(m *irc.Message, e *data.DataEndpoint,
 
 	err := q.db.AddQuote(nick, quote)
 	if err != nil {
-		e.Noticef(nick, "\x02Quote:\x02 %v", err)
+		respond(e, m.Target(), nick, fmt.Sprintf("\x02Quote:\x02 %v", err))
 	}
-	e.Notice(nick, "\x02Quote:\x02 Added.")
+	respond(e, m.Target(), nick, "\x02Quote:\x02 Added.")
 	return nil
 }
 
@@ -99,15 +112,15 @@ func (q *Quoter) Delquote(m *irc.Message, e *data.DataEndpoint,
 	nick := m.Nick()
 	id, err := strconv.Atoi(c.GetArg("id"))
 	if err != nil {
-		e.Notice(nick, "\x02Quote:\x02 Not a valid id.")
+		respond(e, m.Target(), nick, "\x02Quote:\x02 Not a valid id.")
 		return nil
 	}
 	if did, err := q.db.DelQuote(int(id)); err != nil {
-		e.Noticef(nick, "\x02Quote:\x02 %v", err)
+		respond(e, m.Target(), nick, fmt.Sprintf("\x02Quote:\x02 %v", err))
 	} else if !did {
-		e.Notice(nick, "\x02Quote:\x02 Could not find quote %d.", id)
+		respond(e, m.Target(), nick, fmt.Sprintf("\x02Quote:\x02 Could not find quote %d.", id))
 	} else {
-		e.Noticef(nick, "\x02Quote:\x02 Quote %d deleted.", id)
+		respond(e, m.Target(), nick, fmt.Sprintf("\x02Quote:\x02 Quote %d deleted.", id))
 	}
 	return nil
 }
@@ -125,15 +138,15 @@ func (q *Quoter) Editquote(m *irc.Message, e *data.DataEndpoint,
 	nick := m.Nick()
 	id, err := strconv.Atoi(c.GetArg("id"))
 	if err != nil {
-		e.Notice(nick, "\x02Quote:\x02 Not a valid id.")
+		respond(e, m.Target(), nick, "\x02Quote:\x02 Not a valid id.")
 		return nil
 	}
 	if did, err := q.db.EditQuote(int(id), quote); err != nil {
-		e.Noticef(nick, "\x02Quote:\x02 %v", err)
+		respond(e, m.Target(), nick, fmt.Sprintf("\x02Quote:\x02 %v", err))
 	} else if !did {
-		e.Notice(nick, "\x02Quote:\x02 Could not find quote %d.", id)
+		respond(e, m.Target(), nick, fmt.Sprintf("\x02Quote:\x02 Could not find quote %d.", id))
 	} else {
-		e.Noticef(nick, "\x02Quote:\x02 Quote %d updated.", id)
+		respond(e, m.Target(), nick, fmt.Sprintf("\x02Quote:\x02 Quote %d updated.", id))
 	}
 	return nil
 }
@@ -152,7 +165,7 @@ func (q *Quoter) Quote(m *irc.Message, e *data.DataEndpoint,
 		getid, err := strconv.Atoi(strid)
 		id = int(getid)
 		if err != nil {
-			e.Notice(nick, "\x02Quote:\x02 Not a valid id.")
+			respond(e, m.Target(), nick, "\x02Quote:\x02 Not a valid id.")
 			return nil
 		}
 		quote, err = q.db.GetQuote(id)
@@ -160,14 +173,15 @@ func (q *Quoter) Quote(m *irc.Message, e *data.DataEndpoint,
 		id, quote, err = q.db.RandomQuote()
 	}
 	if err != nil {
-		e.Noticef(nick, "\x02Quote:\x02 %v", err)
+		// TODO: Should be logging this error?
+		respond(e, m.Target(), nick, "\x02Quote:\x02 Error.")
 		return nil
 	}
 
 	if len(quote) == 0 {
-		e.Privmsgf(m.Target(), "\x02Quote:\x02 Does not exist.")
+		respond(e, m.Target(), nick, "\x02Quote:\x02 Does not exist.")
 	} else {
-		e.Privmsgf(m.Target(), "\x02Quote (\x02#%d\x02):\x02 %s", id, quote)
+		respond(e, m.Target(), nick, fmt.Sprintf("\x02Quote (\x02#%d\x02):\x02 %s", id, quote))
 	}
 	return nil
 }
@@ -177,7 +191,7 @@ func (q *Quoter) Quotes(m *irc.Message, e *data.DataEndpoint,
 
 	c.Close()
 
-	e.Privmsgf(m.Target(), "\x02Quote:\x02 %d quote(s) in database.", q.db.NQuotes())
+	respond(e, m.Target(), m.Nick(), fmt.Sprintf("\x02Quote:\x02 %d quote(s) in database.", q.db.NQuotes()))
 	return nil
 }
 
@@ -189,15 +203,15 @@ func (q *Quoter) Details(m *irc.Message, e *data.DataEndpoint,
 	nick := m.Nick()
 	id, err := strconv.Atoi(c.GetArg("id"))
 	if err != nil {
-		e.Notice(nick, "\x02Quote:\x02 Not a valid id.")
+		respond(e, m.Target(), nick, "\x02Quote:\x02 Not a valid id.")
 		return nil
 	}
 
 	if date, author, err := q.db.GetDetails(int(id)); err != nil {
-		e.Noticef(nick, "\x02Quote:\x02 %v", err)
+		respond(e, m.Target(), nick, fmt.Sprintf("\x02Quote:\x02 %v", err))
 	} else {
-		e.Privmsgf(m.Target(), "\x02Quote (\x02#%d\x02):\x02 Created on %s by %s",
-			id, time.Unix(date, 0).UTC().Format(dateFormat), author)
+		respond(e, m.Target(), nick, fmt.Sprintf("\x02Quote (\x02#%d\x02):\x02 Created on %s by %s",
+			id, time.Unix(date, 0).UTC().Format(dateFormat), author))
 	}
 
 	return nil
