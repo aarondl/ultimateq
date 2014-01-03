@@ -346,7 +346,7 @@ func (s *s) TestIrcClient_calcSleepTime(c *C) {
 	client = CreateIrcClient(nil, "", penFact, timeout, step, keepalive, scale)
 	client.lastwrite = time.Now()
 	sleep = client.calcSleepTime(time.Time{}, 0)
-	c.Check(sleep, Equals, client.timeout)
+	c.Check(sleep, Equals, time.Duration(0))
 	sleep = client.calcSleepTime(time.Now().Add(5*time.Hour), 0)
 	c.Check(sleep, Equals, time.Duration(0))
 }
