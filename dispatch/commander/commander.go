@@ -55,7 +55,7 @@ const (
 		"nick or user parameters when store is disabled."
 	errMsgStateDisabled = "Error: Cannot use nick or user parameter commands " +
 		"when state is disabled."
-	errMsgNotAuthed          = "Access Denied: You are not authenticated."
+	errMsgNotAuthed          = "Access Denied: You are not authenticated. To authenticate message me AUTH <password> [username]. If you need to create an account message me REGISTER <password> [username]."
 	errFmtInsuffLevel        = "Access Denied: (%v) level required."
 	errFmtInsuffGlobalLevel  = "Access Denied: (%v) global level required."
 	errFmtInsuffServerLevel  = "Access Denied: (%v) server level required."
