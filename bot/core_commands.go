@@ -710,7 +710,7 @@ func (c *coreCommands) sgive(d *data.DataEndpoint, cd *cmds.CommandData) (
 	)
 }
 
-// give gives global access to a user.
+// give gives channel access to a user.
 func (c *coreCommands) give(d *data.DataEndpoint, cd *cmds.CommandData) (
 	internal, external error) {
 	server := d.GetKey()
