@@ -85,6 +85,90 @@ func (s *Store) Close() error {
 	return s.db.Close()
 }
 
+// ChanUsers gets users with access to a channel
+func (s *Store) ChanUsers(server, channel string) (list []UserAccess, err error) {
+	var val []byte
+	var e *kv.Enumerator
+	var ua *UserAccess
+	var a *Access
+	var stop error
+
+	e, err = s.db.SeekFirst()
+	if err != nil {
+		return nil, err
+	}
+
+	for ; stop == nil; _, val, stop = e.Next() {
+		ua, err = deserialize(val)
+		if err != nil {
+			err = nil
+			continue
+		}
+
+		if a = ua.GetChannel(server, channel); a != nil {
+			list = append(list, *ua)
+		}
+	}
+
+	return
+}
+
+// GlobalUsers gets users with global access
+func (s *Store) GlobalUsers() (list []UserAccess, err error) {
+	var val []byte
+	var e *kv.Enumerator
+	var ua *UserAccess
+	var a *Access
+	var stop error
+
+	e, err = s.db.SeekFirst()
+	if err != nil {
+		return nil, err
+	}
+
+	for ; stop == nil; _, val, stop = e.Next() {
+		ua, err = deserialize(val)
+		if err != nil {
+			err = nil
+			continue
+		}
+
+		if a = ua.GetGlobal(); a != nil {
+			list = append(list, *ua)
+		}
+	}
+
+	return
+}
+
+// ServerUsers gets users with Server access
+func (s *Store) ServerUsers(server string) (list []UserAccess, err error) {
+	var val []byte
+	var e *kv.Enumerator
+	var ua *UserAccess
+	var a *Access
+	var stop error
+
+	e, err = s.db.SeekFirst()
+	if err != nil {
+		return nil, err
+	}
+
+	for ; stop == nil; _, val, stop = e.Next() {
+		ua, err = deserialize(val)
+		if err != nil {
+			err = nil
+			continue
+		}
+
+		if a = ua.GetServer(server); a != nil {
+			list = append(list, *ua)
+		}
+	}
+
+	return
+}
+
 // AddUser adds a user to the database.
 func (s *Store) AddUser(ua *UserAccess) error {
 	var err error
