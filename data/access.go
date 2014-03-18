@@ -5,13 +5,14 @@ import (
 )
 
 const (
-	ascA      = 65
-	ascZ      = 90
-	asca      = 97
-	ascz      = 122
-	nAlphabet = 26
-	none      = "none"
-	allFlags  = `-ALL-`
+	ascA               = 65
+	ascZ               = 90
+	asca               = 97
+	ascz               = 122
+	nAlphabet          = 26
+	none               = "none"
+	allFlags           = `-ALL-`
+	allFlagsNum uint64 = 0x3FFFFFFFFFFFFF
 
 	wholeAlphabet = `ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz`
 )
@@ -137,6 +138,11 @@ func getFlagBit(flag rune) (bit uint64) {
 func getFlagString(bits uint64) (flags string) {
 	var bit uint64 = 1
 	var n = nAlphabet * 2
+
+	if bits == allFlagsNum {
+		return allFlags
+	}
+
 	for i := 0; i < n; i, bit = i+1, bit<<1 {
 		if bit&bits != bit {
 			continue
@@ -147,9 +153,6 @@ func getFlagString(bits uint64) (flags string) {
 		} else {
 			flags += string(i - nAlphabet + asca)
 		}
-	}
-	if flags == wholeAlphabet {
-		flags = allFlags
 	}
 	return
 }
