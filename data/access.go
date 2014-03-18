@@ -12,7 +12,7 @@ const (
 	nAlphabet          = 26
 	none               = "none"
 	allFlags           = `-ALL-`
-	allFlagsNum uint64 = 0x3FFFFFFFFFFFFF
+	allFlagsNum uint64 = 0xFFFFFFFFFFFFF
 
 	wholeAlphabet = `ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz`
 )
@@ -139,7 +139,7 @@ func getFlagString(bits uint64) (flags string) {
 	var bit uint64 = 1
 	var n = nAlphabet * 2
 
-	if bits == allFlagsNum {
+	if (bits & allFlagsNum) == allFlagsNum {
 		return allFlags
 	}
 
