@@ -87,6 +87,10 @@ func (a *Access) ClearAllFlags() {
 	a.Flags = 0
 }
 
+func (a *Access) IsZero() bool {
+	return a.Flags == 0 && a.Level == 0
+}
+
 // String transforms the Access into a human-readable format.
 func (a *Access) String() (str string) {
 	if a == nil {

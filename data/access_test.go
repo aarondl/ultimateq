@@ -131,6 +131,17 @@ func TestAccess_ClearAllFlags(t *T) {
 	}
 }
 
+func TestAccess_IsZero(t *T) {
+	a := Access{}
+	if !a.IsZero() {
+		t.Error("Should be zero.")
+	}
+	a.SetAccess(1, "a")
+	if a.IsZero() {
+		t.Error("Should not be zero.")
+	}
+}
+
 func TestAccess_String(t *T) {
 	t.Parallel()
 

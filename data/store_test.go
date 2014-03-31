@@ -348,6 +348,117 @@ func TestStore_IsFirst(t *T) {
 	}
 }
 
+func TestStore_GlobalUsers(t *T) {
+	t.Parallel()
+	s, err := CreateStore(MemStoreProvider)
+	defer s.Close()
+	if err != nil {
+		t.Error("Unexpected error:", err)
+	}
+
+	list, err := s.GlobalUsers()
+	if list != nil || err != nil {
+		t.Error("When db is empty both return params should be nil.")
+	}
+
+	ua1 := &UserAccess{Username: uname}
+	ua1.GrantGlobalLevel(5)
+	ua2 := &UserAccess{Username: uname + uname}
+	ua2.GrantServerLevel(server, 5)
+	ua2.GrantChannelLevel(server, channel, 5)
+
+	err = s.AddUser(ua1)
+	if err != nil {
+		t.Fatal("Error adding user:", err)
+	}
+	err = s.AddUser(ua2)
+	if err != nil {
+		t.Fatal("Error adding user:", err)
+	}
+
+	list, err = s.GlobalUsers()
+	if len(list) != 1 {
+		t.Error("There should be exactly 1 global user now.")
+	}
+	if list[0].Username != ua1.Username {
+		t.Error("The wrong user was found!")
+	}
+}
+
+func TestStore_ServerUsers(t *T) {
+	t.Parallel()
+	s, err := CreateStore(MemStoreProvider)
+	defer s.Close()
+	if err != nil {
+		t.Error("Unexpected error:", err)
+	}
+
+	list, err := s.ServerUsers(server)
+	if list != nil || err != nil {
+		t.Error("When db is empty both return params should be nil.")
+	}
+
+	ua1 := &UserAccess{Username: uname}
+	ua1.GrantServerLevel(server, 5)
+	ua2 := &UserAccess{Username: uname + uname}
+	ua2.GrantGlobalLevel(5)
+	ua2.GrantChannelLevel(server, channel, 5)
+
+	err = s.AddUser(ua1)
+	if err != nil {
+		t.Fatal("Error adding user:", err)
+	}
+	err = s.AddUser(ua2)
+	if err != nil {
+		t.Fatal("Error adding user:", err)
+	}
+
+	list, err = s.ServerUsers(server)
+	if len(list) != 1 {
+		t.Error("There should be exactly 1 global user now.")
+	}
+	if list[0].Username != ua1.Username {
+		t.Error("The wrong user was found!")
+	}
+}
+
+func TestStore_ChanUsers(t *T) {
+	t.Parallel()
+	s, err := CreateStore(MemStoreProvider)
+	defer s.Close()
+	if err != nil {
+		t.Error("Unexpected error:", err)
+	}
+
+	list, err := s.ChanUsers(server, channel)
+	if list != nil || err != nil {
+		t.Error("When db is empty both return params should be nil.")
+	}
+
+	ua1 := &UserAccess{Username: uname}
+	ua1.GrantChannelLevel(server, channel, 5)
+	ua2 := &UserAccess{Username: uname + uname}
+	ua2.GrantGlobalLevel(5)
+	ua2.GrantServerLevel(server, 5)
+
+	err = s.AddUser(ua1)
+	if err != nil {
+		t.Fatal("Error adding user:", err)
+	}
+	err = s.AddUser(ua2)
+	if err != nil {
+		t.Fatal("Error adding user:", err)
+	}
+
+	list, err = s.ChanUsers(server, channel)
+	if len(list) != 1 {
+		t.Error("There should be exactly 1 global user now.")
+	}
+	if list[0].Username != ua1.Username {
+		t.Error("The wrong user was found!")
+	}
+}
+
 func TestStore_AuthError(t *T) {
 	var err1 error = AuthError{
 		errFmtBadHost,

@@ -123,21 +123,22 @@ const (
 	takeFailureNo = `No action taken. User [%v](%v) has none of the given ` +
 		`accesses to remove.`
 
+	gusersDesc    = `Lists all the users added to the global access list.`
+	gusersNoUsers = `No users for %v`
+	gusersHead    = `Showing %v users:`
+
 	usersDesc = `Lists all the users added to the channel's access list. ` +
 		`If no channel specified then list for current channel.`
-	usersNoUsers = `No users for %s`
-	usersHead    = `Showing %v users for %s:`
-	usersMsg     = `User: %s Access: %s`
-
-	gusersDesc    = `Lists all the users added to the global access list.`
-	gusersNoUsers = `No users for %s`
-	gusersHead    = `Showing %v users:`
-	gusersMsg     = `User: %s Access: %s`
+	usersNoUsers = `No users for %v`
+	usersHead    = `Showing %v users for %v:`
 
 	susersDesc    = `Lists all the users added to the server's access list. `
-	susersNoUsers = `No users for %s`
-	susersHead    = `Showing %v users for %s:`
-	susersMsg     = `User: %s Access: %s`
+	susersNoUsers = `No users for %v`
+	susersHead    = `Showing %v users for %v:`
+
+	usersListHeadUser   = `User`
+	usersListHeadAccess = `Access`
+	usersList           = `%-*v %v`
 
 	helpSuccess      = `Commands:`
 	helpSuccessUsage = `Usage: `
@@ -168,9 +169,9 @@ var commands = []struct {
 	{auth, authDesc, false, false, 0, ``, argv{`password`, `[username]`}},
 	{logout, logoutDesc, true, true, 0, ``, argv{`[*user]`}},
 	{access, accessDesc, true, true, 0, ``, argv{`[*user]`}},
-	{users, usersDesc, false, true, 0, ``, argv{`[chan]`}},
 	{gusers, gusersDesc, false, true, 0, ``, nil},
 	{susers, susersDesc, false, true, 0, ``, nil},
+	{users, usersDesc, false, true, 0, ``, argv{`[chan]`}},
 	{deluser, deluserDesc, true, true, 0, ``, argv{`*user`}},
 	{delme, delmeDesc, true, true, 0, ``, nil},
 	{passwd, passwdDesc, true, false, 0, ``,
@@ -255,12 +256,12 @@ func (c *coreCommands) Command(cmd string, m *irc.Message, d *data.DataEndpoint,
 		internal, external = c.logout(d, cd)
 	case access:
 		internal, external = c.access(d, cd)
-	case users:
-		internal, external = c.users(d, cd)
 	case gusers:
 		internal, external = c.gusers(d, cd)
 	case susers:
 		internal, external = c.susers(d, cd)
+	case users:
+		internal, external = c.users(d, cd)
 	case deluser:
 		internal, external = c.deluser(d, cd)
 	case delme:
@@ -455,6 +456,70 @@ func (c *coreCommands) access(d *data.DataEndpoint, cd *cmds.CommandData) (
 	return
 }
 
+//gusers provides a list of users with global access
+func (c *coreCommands) gusers(d *data.DataEndpoint, cd *cmds.CommandData) (
+	internal, external error) {
+
+	var list []data.UserAccess
+	var ua data.UserAccess
+
+	nick := cd.User.Nick()
+
+	list, internal = c.b.store.GlobalUsers()
+	if internal != nil {
+		return
+	}
+
+	if len(list) == 0 {
+		d.Noticef(nick, gusersNoUsers)
+		return
+	}
+
+	usersWidth := userListWidth(list) + 1
+	d.Noticef(nick, gusersHead, len(list))
+	d.Noticef(nick, usersList, usersWidth,
+		usersListHeadUser, usersListHeadAccess)
+
+	for _, ua = range list {
+		ga := ua.GetGlobal()
+		d.Noticef(nick, usersList, usersWidth, ua.Username, ga)
+	}
+
+	return
+}
+
+//susers provides a list of users with server access
+func (c *coreCommands) susers(d *data.DataEndpoint, cd *cmds.CommandData) (
+	internal, external error) {
+
+	var list []data.UserAccess
+	var ua data.UserAccess
+
+	nick := cd.User.Nick()
+
+	list, internal = c.b.store.ServerUsers(d.GetKey())
+	if internal != nil {
+		return
+	}
+
+	if len(list) == 0 {
+		d.Noticef(nick, susersNoUsers, d.GetKey())
+		return
+	}
+
+	usersWidth := userListWidth(list) + 1
+	d.Noticef(nick, susersHead, len(list), d.GetKey())
+	d.Noticef(nick, usersList, usersWidth,
+		usersListHeadUser, usersListHeadAccess)
+
+	for _, ua = range list {
+		sa := ua.GetServer(d.GetKey())
+		d.Noticef(nick, usersList, usersWidth, ua.Username, sa)
+	}
+
+	return
+}
+
 // users provides a list of users added to a channel
 func (c *coreCommands) users(d *data.DataEndpoint, cd *cmds.CommandData) (
 	internal, external error) {
@@ -474,10 +539,6 @@ func (c *coreCommands) users(d *data.DataEndpoint, cd *cmds.CommandData) (
 	}
 
 	nick := cd.User.Nick()
-	cd.Close()
-
-	c.b.protectStore.Lock()
-	defer c.b.protectStore.Unlock()
 
 	list, internal = c.b.store.ChanUsers(d.GetKey(), ch)
 	if internal != nil {
@@ -489,79 +550,14 @@ func (c *coreCommands) users(d *data.DataEndpoint, cd *cmds.CommandData) (
 		return
 	}
 
+	usersWidth := userListWidth(list) + 1
 	d.Noticef(nick, usersHead, len(list), ch)
+	d.Noticef(nick, usersList, usersWidth,
+		usersListHeadUser, usersListHeadAccess)
 
 	for _, ua = range list {
-		d.Noticef(nick, usersMsg, ua.Username,
-			ua.String(d.GetKey(), ch))
-	}
-
-	return
-}
-
-//gusers provides a list of users with global access
-func (c *coreCommands) gusers(d *data.DataEndpoint, cd *cmds.CommandData) (
-	internal, external error) {
-
-	var list []data.UserAccess
-	var ua data.UserAccess
-
-	nick := cd.User.Nick()
-	cd.Close()
-
-	c.b.protectStore.Lock()
-	defer c.b.protectStore.Unlock()
-
-	list, internal = c.b.store.GlobalUsers()
-	if internal != nil {
-		return
-	}
-
-	if len(list) == 0 {
-		d.Noticef(nick, gusersNoUsers)
-		return
-	}
-
-	d.Noticef(nick, gusersHead, len(list))
-
-	for _, ua = range list {
-		ga := ua.GetGlobal()
-		d.Noticef(nick, gusersMsg, ua.Username,
-			ga.String())
-	}
-
-	return
-}
-
-//susers provides a list of users with server access
-func (c *coreCommands) susers(d *data.DataEndpoint, cd *cmds.CommandData) (
-	internal, external error) {
-
-	var list []data.UserAccess
-	var ua data.UserAccess
-
-	nick := cd.User.Nick()
-	cd.Close()
-
-	c.b.protectStore.Lock()
-	defer c.b.protectStore.Unlock()
-
-	list, internal = c.b.store.ServerUsers(d.GetKey())
-	if internal != nil {
-		return
-	}
-
-	if len(list) == 0 {
-		d.Noticef(nick, susersNoUsers, d.GetKey())
-		return
-	}
-
-	d.Noticef(nick, susersHead, len(list), d.GetKey())
-
-	for _, ua = range list {
-		sa := ua.GetServer(d.GetKey())
-		d.Noticef(nick, susersMsg, ua.Username,
-			sa.String())
+		ca := ua.GetChannel(d.GetKey(), ch)
+		d.Noticef(nick, usersList, usersWidth, ua.Username, ca)
 	}
 
 	return
@@ -1139,4 +1135,17 @@ func (c *coreCommands) help(d *data.DataEndpoint, cd *cmds.CommandData) (
 	}
 
 	return
+}
+
+// userListWidth calculates the width of the userList's "User" column.
+func userListWidth(users []data.UserAccess) int {
+	minl := len(usersListHeadUser)
+	for _, u := range users {
+		l := len(u.Username)
+		if l > minl {
+			minl = l
+		}
+	}
+
+	return minl
 }

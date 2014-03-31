@@ -882,3 +882,145 @@ func TestCoreCommands_Help(t *T) {
 		t.Error(err)
 	}
 }
+
+func TestCoreCommands_Gusers(t *T) {
+	ts := commandsSetup(t)
+	defer commandsTeardown(ts, t)
+	var a1, a2 *data.UserAccess
+	var err error
+
+	err = rspChk(ts, gusersNoUsers, u1host, gusers)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = rspChk(ts, registerSuccessFirst, u1host, register, password, u1user)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = rspChk(ts, registerSuccess, u2host, register, password)
+	if err != nil {
+		t.Error(err)
+	}
+
+	a1, err = ts.store.FindUser(u1user)
+	if err != nil {
+		t.Fatal("Could not find user1.")
+	}
+	a2, err = ts.store.FindUser(u2user)
+	if err != nil {
+		t.Fatal("Could not find user1.")
+	}
+	a2.GrantGlobal(100, "abc")
+	if err = ts.store.AddUser(a2); err != nil {
+		t.Fatal("Could not save user.")
+	}
+
+	check := gusersHead +
+		`NOTICE .* :` + usersListHeadUser + `.*` + usersListHeadAccess +
+		`NOTICE .* :` + u1user + `.*` + a1.Global.String() +
+		`NOTICE .* :` + u2user + `.*` + a2.Global.String()
+	err = rspChk(ts, check, u1host, gusers)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestCoreCommands_Susers(t *T) {
+	ts := commandsSetup(t)
+	defer commandsTeardown(ts, t)
+	var a1, a2 *data.UserAccess
+	var err error
+
+	err = rspChk(ts, susersNoUsers, u1host, susers)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = rspChk(ts, registerSuccessFirst, u1host, register, password, u1user)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = rspChk(ts, registerSuccess, u2host, register, password)
+	if err != nil {
+		t.Error(err)
+	}
+
+	a1, err = ts.store.FindUser(u1user)
+	if err != nil {
+		t.Fatal("Could not find user1.")
+	}
+	a1.GrantServer(serverID, 2, "b")
+	a2, err = ts.store.FindUser(u2user)
+	if err != nil {
+		t.Fatal("Could not find user1.")
+	}
+	a2.GrantServer(serverID, 100, "abc")
+
+	if err = ts.store.AddUser(a1); err != nil {
+		t.Fatal("Could not save user.")
+	}
+	if err = ts.store.AddUser(a2); err != nil {
+		t.Fatal("Could not save user.")
+	}
+
+	check := susersHead +
+		`NOTICE .* :` + usersListHeadUser + `.*` + usersListHeadAccess +
+		`NOTICE .* :` + u1user + `.*` + a1.GetServer(serverID).String() +
+		`NOTICE .* :` + u2user + `.*` + a2.GetServer(serverID).String()
+	err = rspChk(ts, check, u1host, susers)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestCoreCommands_Users(t *T) {
+	ts := commandsSetup(t)
+	defer commandsTeardown(ts, t)
+	var a1, a2 *data.UserAccess
+	var err error
+
+	err = rspChk(ts, gusersNoUsers, u1host, gusers)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = rspChk(ts, registerSuccessFirst, u1host, register, password, u1user)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = rspChk(ts, registerSuccess, u2host, register, password)
+	if err != nil {
+		t.Error(err)
+	}
+
+	a1, err = ts.store.FindUser(u1user)
+	if err != nil {
+		t.Fatal("Could not find user1.")
+	}
+	a1.GrantChannel(serverID, channel, 3, "c")
+	a2, err = ts.store.FindUser(u2user)
+	if err != nil {
+		t.Fatal("Could not find user1.")
+	}
+	a2.GrantChannel(serverID, channel, 100, "abc")
+
+	if err = ts.store.AddUser(a1); err != nil {
+		t.Fatal("Could not save user.")
+	}
+	if err = ts.store.AddUser(a2); err != nil {
+		t.Fatal("Could not save user.")
+	}
+
+	check := usersHead +
+		`NOTICE .* :` + usersListHeadUser + `.*` + usersListHeadAccess +
+		`NOTICE .* :` + u1user + `.*` + a1.GetChannel(serverID, channel).String() +
+		`NOTICE .* :` + u2user + `.*` + a2.GetChannel(serverID, channel).String()
+	err = rspChk(ts, check, u1host, users, channel)
+	if err != nil {
+		t.Error(err)
+	}
+}
