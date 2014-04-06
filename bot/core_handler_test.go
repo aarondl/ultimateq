@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/irc"
-	. "launchpad.net/gocheck"
+	. "gopkg.in/check.v1"
 	"net"
 )
 

@@ -3,7 +3,7 @@ package irc
 import (
 	"bytes"
 	"fmt"
-	. "launchpad.net/gocheck"
+	. "gopkg.in/check.v1"
 	"strings"
 	"testing"
 )

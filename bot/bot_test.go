@@ -7,7 +7,7 @@ import (
 	"github.com/aarondl/ultimateq/irc"
 	"github.com/aarondl/ultimateq/mocks"
 	"io"
-	"launchpad.net/gocheck"
+	"gopkg.in/check.v1"
 	"log"
 	"net"
 	"os"
@@ -15,10 +15,10 @@ import (
 	"time"
 )
 
-func Test(t *T) { gocheck.TestingT(t) } //Hook into testing package
+func Test(t *T) { check.TestingT(t) } //Hook into testing package
 type s struct{}
 
-var _ = gocheck.Suite(&s{})
+var _ = check.Suite(&s{})
 
 type testHandler struct {
 	callback func(*irc.Message, irc.Endpoint)

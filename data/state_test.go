@@ -3,7 +3,7 @@ package data
 import (
 	"code.google.com/p/go.crypto/bcrypt"
 	"github.com/aarondl/ultimateq/irc"
-	. "launchpad.net/gocheck"
+	. "gopkg.in/check.v1"
 	"strings"
 	"testing"
 )

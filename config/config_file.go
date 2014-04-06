@@ -3,7 +3,7 @@ package config
 import (
 	"io"
 	"io/ioutil"
-	"launchpad.net/goyaml"
+	"gopkg.in/yaml.v1"
 	"os"
 )
 
@@ -55,7 +55,7 @@ func CreateConfigFromReader(reader io.Reader) *Config {
 		c.addError(errMsgInvalidConfigFile, err)
 		return c
 	}
-	err = goyaml.Unmarshal(buf, c)
+	err = yaml.Unmarshal(buf, c)
 	if err != nil {
 		c.addError(errMsgInvalidConfigFile, err)
 	}
@@ -124,7 +124,7 @@ func flushConfigToFile(conf *Config, filename string,
 
 // FlushConfigToWriter writes a config out to a writer
 func FlushConfigToWriter(conf *Config, writer io.Writer) (err error) {
-	marshalled, err := goyaml.Marshal(conf)
+	marshalled, err := yaml.Marshal(conf)
 	if err != nil {
 		return
 	}

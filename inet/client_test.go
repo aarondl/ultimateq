@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"github.com/aarondl/ultimateq/mocks"
 	"io"
-	. "launchpad.net/gocheck"
+	. "gopkg.in/check.v1"
 	"log"
 	"os"
 	"sync"

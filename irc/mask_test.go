@@ -1,7 +1,7 @@
 package irc
 
 import (
-	. "launchpad.net/gocheck"
+	. "gopkg.in/check.v1"
 )
 
 func (s *s) TestHost(c *C) {

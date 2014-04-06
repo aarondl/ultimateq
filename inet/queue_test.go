@@ -2,7 +2,7 @@ package inet
 
 import (
 	"bytes"
-	. "launchpad.net/gocheck"
+	. "gopkg.in/check.v1"
 )
 
 func (s *s) TestQueue(c *C) {

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	. "launchpad.net/gocheck"
+	. "gopkg.in/check.v1"
 )
 
 type testBuffer struct {

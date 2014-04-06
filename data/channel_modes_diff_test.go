@@ -1,7 +1,7 @@
 package data
 
 import (
-	. "launchpad.net/gocheck"
+	. "gopkg.in/check.v1"
 )
 
 func (s *s) TestModeDiff_Create(c *C) {
