@@ -1,6 +1,6 @@
 #ultimateq
 
-[![Build Status](https://drone.io/github.com/aarondl/ultimateq/status.png)](https://drone.io/github.com/aarondl/ultimateq/latest)
+[![Build Status](https://drone.io/github.com/aarondl/ultimateq/status.png)](https://drone.io/github.com/aarondl/ultimateq/latest) [![Coverage Status](http://coveralls.io/repos/aarondl/ultimateq/badge.png?branch=master)](http://coveralls.io/r/aarondl/ultimateq?branch=master)
 
 An irc bot written in Go.
 
