@@ -262,7 +262,7 @@ func NewMessage(name, sender string, args ...string) *Message {
 		setArgs = make([]string, len(args))
 		copy(setArgs, args)
 	}
-	return &Message{name, sender, setArgs, time.Now()}
+	return &Message{name, sender, setArgs, time.Now().UTC()}
 }
 
 // Nick returns the nick of the sender. Will be empty string if it was
@@ -307,6 +307,18 @@ func (p *Message) Target() string {
 // type of message in Message.Name.
 func (p *Message) Message() string {
 	return p.Args[1]
+}
+
+// IsCTCP checks if this message is a CTCP message. This means it's delimited
+// by the CTCPDelim as well as being PRIVMSG or NOTICE only.
+func (p *Message) IsCTCP() bool {
+	return (p.Name == PRIVMSG || p.Name == NOTICE) && len(p.Args) >= 2 &&
+		IsCTCPString(p.Args[1])
+}
+
+// UnpackCTCP can be called to retrieve a tag and data from a CTCP message.
+func (p *Message) UnpackCTCP() (tag, data string) {
+	return CTCPunpackString(p.Args[1])
 }
 
 // Helper fullfills the Endpoint's many interface requirements.

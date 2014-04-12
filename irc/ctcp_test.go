@@ -5,6 +5,41 @@ import (
 	. "testing"
 )
 
+func TestIsCTCPHelper(t *T) {
+	msg := NewMessage(PRIVMSG, "", "user", "\x01DCC SEND\x01")
+	if !msg.IsCTCP() {
+		t.Error("Expected it to be a CTCP Message.")
+	}
+
+	msg = NewMessage(NOTICE, "", "user", "\x01DCC SEND\x01")
+	if !msg.IsCTCP() {
+		t.Error("Expected it to be a CTCP Message.")
+	}
+
+	msg = NewMessage(PRIVMSG, "", "user", "DCC SEND")
+	if msg.IsCTCP() {
+		t.Error("CTCP cannot be missing delimiter bytes.")
+	}
+
+	msg = NewMessage(JOIN, "", "user", "\x01DCC SEND\x01")
+	if msg.IsCTCP() {
+		t.Error("Only PRIVMSG and NOTICE can be CTCP messages.")
+	}
+}
+
+func TestUnpackCTCPHelper(t *T) {
+	msg := NewMessage(PRIVMSG, "", "user", "\x01DCC SEND\x01")
+	tag, data := msg.UnpackCTCP()
+	expectTag, expectData := CTCPunpackString(msg.Message())
+
+	if tag != expectTag {
+		t.Error("Expected the tag to be the same as the helper it calls.")
+	}
+	if data != expectData {
+		t.Error("Expected the data to be the same as the helper it calls.")
+	}
+}
+
 func TestIsCTCP(t *T) {
 	yes, no := []byte("\x01yes\x01"), []byte("no")
 	if !IsCTCP(yes) {
