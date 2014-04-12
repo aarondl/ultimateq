@@ -31,3 +31,21 @@ type NoticeUserHandler interface {
 type NoticeChannelHandler interface {
 	NoticeChannel(*irc.Message, irc.Endpoint)
 }
+
+// CTCPHandler is for handling ctcp messages that are directly to the bot.
+// Automatically parses the tag & data portions out.
+type CTCPHandler interface {
+	CTCP(*irc.Message, string, string, irc.Endpoint)
+}
+
+// CTCPChannelHandler is for handling ctcp messages that go to a channel.
+// Automatically parses the tag & data portions out.
+type CTCPChannelHandler interface {
+	CTCPChannel(*irc.Message, string, string, irc.Endpoint)
+}
+
+// CTCPReplyHandler is for handling ctcp replies from clients.
+// Automatically parses the tag & data portions out.
+type CTCPReplyHandler interface {
+	CTCPReply(*irc.Message, string, string, irc.Endpoint)
+}

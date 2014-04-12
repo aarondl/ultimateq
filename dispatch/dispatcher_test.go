@@ -149,6 +149,7 @@ func TestDispatcher_RawDispatch(t *T) {
 // Testing types
 // ================================
 type testCallbackMsg func(*irc.Message, irc.Endpoint)
+type testCTCPCallbackMsg func(*irc.Message, string, string, irc.Endpoint)
 
 type testPrivmsgHandler struct {
 	callback testCallbackMsg
@@ -173,6 +174,18 @@ type testNoticeChannelHandler struct {
 }
 type testNoticeAllHandler struct {
 	testCallbackNormal, testCallbackUser, testCallbackChannel testCallbackMsg
+}
+type testCTCPHandler struct {
+	callback testCTCPCallbackMsg
+}
+type testCTCPChannelHandler struct {
+	callback testCTCPCallbackMsg
+}
+type testCTCPAllHandler struct {
+	testCallbackNormal, testCallbackChannel testCTCPCallbackMsg
+}
+type testCTCPReplyHandler struct {
+	callback testCTCPCallbackMsg
 }
 
 // ================================
@@ -234,6 +247,29 @@ func (t testNoticeAllHandler) NoticeChannel(
 
 	t.testCallbackChannel(msg, ep)
 }
+func (t testCTCPHandler) CTCP(msg *irc.Message, a, b string, ep irc.Endpoint) {
+	t.callback(msg, a, b, ep)
+}
+func (t testCTCPChannelHandler) CTCPChannel(
+	msg *irc.Message, a, b string, ep irc.Endpoint) {
+
+	t.callback(msg, a, b, ep)
+}
+func (t testCTCPAllHandler) CTCP(
+	msg *irc.Message, a, b string, ep irc.Endpoint) {
+
+	t.testCallbackNormal(msg, a, b, ep)
+}
+func (t testCTCPAllHandler) CTCPChannel(
+	msg *irc.Message, a, b string, ep irc.Endpoint) {
+
+	t.testCallbackChannel(msg, a, b, ep)
+}
+func (t testCTCPReplyHandler) CTCPReply(
+	msg *irc.Message, a, b string, ep irc.Endpoint) {
+
+	t.callback(msg, a, b, ep)
+}
 
 var privChanmsg = &irc.Message{
 	Name:   irc.PRIVMSG,
@@ -272,12 +308,18 @@ func TestDispatcher_Privmsg(t *T) {
 	if pu != p {
 		t.Error("Failed to dispatch to user handler.")
 	}
+	if pc != nil {
+		t.Error("Erroneously to dispatched to channel handler.")
+	}
 
 	p, pu, pc = nil, nil, nil
 	d.Dispatch(privChanmsg, nil)
 	d.WaitForHandlers()
 	if p == nil {
 		t.Error("Failed to dispatch to handler.")
+	}
+	if pu != nil {
+		t.Error("Erroneously dispatched to user handler.")
 	}
 	if pc != p {
 		t.Error("Failed to dispatch to channel handler.")
@@ -366,12 +408,18 @@ func TestDispatcher_Notice(t *T) {
 	if nu != n {
 		t.Error("Failed to dispatch to user handler.")
 	}
+	if nc != nil {
+		t.Error("Erroneously dispatched to channel handler.")
+	}
 
 	n, nu, nc = nil, nil, nil
 	d.Dispatch(noticeChanmsg, nil)
 	d.WaitForHandlers()
 	if n == nil {
 		t.Error("Failed to dispatch to handler.")
+	}
+	if nu != nil {
+		t.Error("Erroneously dispatched to user handler.")
 	}
 	if nc != n {
 		t.Error("Failed to dispatch to channel handler.")
@@ -423,6 +471,115 @@ func TestDispatcher_NoticeMultiple(t *T) {
 	}
 }
 
+var ctcpChanmsg = &irc.Message{
+	Name:   irc.CTCP,
+	Args:   []string{"#chan", "\x01msg args\x01"},
+	Sender: "nick!user@host.com",
+}
+var ctcpMsg = &irc.Message{
+	Name:   irc.CTCP,
+	Args:   []string{"user", "\x01msg args\x01"},
+	Sender: "nick!user@host.com",
+}
+
+func TestDispatcher_CTCP(t *T) {
+	t.Parallel()
+	var c, cc *irc.Message
+	ch := testCTCPHandler{func(m *irc.Message, tag, data string,
+		_ irc.Endpoint) {
+
+		c = m
+	}}
+	cch := testCTCPChannelHandler{func(m *irc.Message, tag, data string,
+		_ irc.Endpoint) {
+
+		cc = m
+	}}
+
+	d := CreateDispatcher(core)
+	d.Register(irc.CTCP, ch)
+	d.Register(irc.CTCP, cch)
+
+	d.Dispatch(ctcpMsg, nil)
+	d.WaitForHandlers()
+	if c == nil {
+		t.Error("Failed to dispatch to handler.")
+	}
+	if cc != nil {
+		t.Error("Erroneously dispatched to channel handler.")
+	}
+
+	c, cc = nil, nil
+	d.Dispatch(ctcpChanmsg, nil)
+	d.WaitForHandlers()
+	if c == nil {
+		t.Error("Failed to dispatch to handler.")
+	}
+	if cc == nil {
+		t.Error("Failed to dispatch to channel handler.")
+	}
+}
+
+func TestDispatcher_CTCPMultiple(t *T) {
+	t.Parallel()
+	var c, cc *irc.Message
+	call := testCTCPAllHandler{
+		func(m *irc.Message, a, b string, _ irc.Endpoint) {
+			c = m
+		},
+		func(m *irc.Message, a, b string, _ irc.Endpoint) {
+			cc = m
+		},
+	}
+
+	d := CreateDispatcher(core)
+	d.Register(irc.CTCP, call)
+
+	c, cc = nil, nil
+	d.Dispatch(ctcpChanmsg, nil)
+	d.WaitForHandlers()
+	if c != nil {
+		t.Error("Erroneously dispatched to handler.")
+	}
+	if cc == nil {
+		t.Error("Failed to dispatch to channel handler.")
+	}
+
+	c, cc = nil, nil
+	d.Dispatch(ctcpMsg, nil)
+	d.WaitForHandlers()
+	if c == nil {
+		t.Error("Failed to dispatch to handler.")
+	}
+	if cc != nil {
+		t.Error("Erroneously dispatched to user handler.")
+	}
+}
+
+var ctcpReplyMsg = &irc.Message{
+	Name:   irc.CTCPReply,
+	Args:   []string{"user", "\x01msg args\x01"},
+	Sender: "nick!user@host.com",
+}
+
+func TestDispatcher_CTCPReply(t *T) {
+	t.Parallel()
+	var c *irc.Message
+	ch := testCTCPReplyHandler{func(m *irc.Message, tag, data string,
+		_ irc.Endpoint) {
+
+		c = m
+	}}
+
+	d := CreateDispatcher(core)
+	d.Register(irc.CTCPReply, ch)
+
+	d.Dispatch(ctcpReplyMsg, nil)
+	d.WaitForHandlers()
+	if c == nil {
+		t.Error("Failed to dispatch to handler.")
+	}
+}
 func TestDispatcher_FilterPrivmsgChannels(t *T) {
 	t.Parallel()
 	chanmsg2 := &irc.Message{

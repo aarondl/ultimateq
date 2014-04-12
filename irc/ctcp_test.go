@@ -1,8 +1,8 @@
 package irc
 
 import (
-	. "testing"
 	"bytes"
+	. "testing"
 )
 
 func TestIsCTCP(t *T) {

@@ -3,10 +3,10 @@ package irc
 import "bytes"
 
 const (
-	CTCPDelim = '\x01'
-	CTCPLowQuote = '\x10'
+	CTCPDelim     = '\x01'
+	CTCPLowQuote  = '\x10'
 	CTCPHighQuote = '\x5C'
-	CTCPSep = '\x20'
+	CTCPSep       = '\x20'
 )
 
 func IsCTCP(msg []byte) bool {
@@ -19,7 +19,7 @@ func IsCTCPString(msg string) bool {
 
 // CTCPunpack unpacks a CTCP message.
 func CTCPunpack(msg []byte) (tag []byte, data []byte) {
-	msg = msg[1:len(msg)-1]
+	msg = msg[1 : len(msg)-1]
 
 	msg = ctcpLowLevelUnescape(msg)
 	tag, data = ctcpUnpack(msg)
@@ -74,12 +74,12 @@ func ctcpUnpack(in []byte) ([]byte, []byte) {
 }
 
 // ctcpPack packs tagging data in with the message data.
-func ctcpPack(tag []byte, data []byte) ([]byte) {
+func ctcpPack(tag []byte, data []byte) []byte {
 	if len(data) == 0 {
 		return tag
 	}
 
-	ret := make([]byte, len(tag) + len(data) + 1)
+	ret := make([]byte, len(tag)+len(data)+1)
 	copy(ret, tag)
 	ret[len(tag)] = CTCPSep
 	copy(ret[len(tag)+1:], data)

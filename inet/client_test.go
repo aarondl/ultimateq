@@ -3,8 +3,8 @@ package inet
 import (
 	"bytes"
 	"github.com/aarondl/ultimateq/mocks"
-	"io"
 	. "gopkg.in/check.v1"
+	"io"
 	"log"
 	"os"
 	"sync"

@@ -1,9 +1,9 @@
 package config
 
 import (
+	"gopkg.in/yaml.v1"
 	"io"
 	"io/ioutil"
-	"gopkg.in/yaml.v1"
 	"os"
 )
 

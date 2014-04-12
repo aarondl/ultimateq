@@ -114,10 +114,20 @@ func (d *Dispatcher) resolveHandler(
 
 	var handled bool
 	switch msg.Name {
-	case irc.PRIVMSG:
-		handled = d.dispatchPrivmsg(handler, msg, ep)
-	case irc.NOTICE:
-		handled = d.dispatchNotice(handler, msg, ep)
+	case irc.PRIVMSG, irc.NOTICE:
+		if len(msg.Args) >= 2 && irc.IsCTCPString(msg.Message()) {
+			if msg.Name == irc.PRIVMSG {
+				handled = d.dispatchCTCP(handler, msg, ep)
+			} else {
+				handled = d.dispatchCTCPReply(handler, msg, ep)
+			}
+		} else {
+			if msg.Name == irc.PRIVMSG {
+				handled = d.dispatchPrivmsg(handler, msg, ep)
+			} else {
+				handled = d.dispatchNotice(handler, msg, ep)
+			}
+		}
 	}
 
 	if !handled {
@@ -163,6 +173,38 @@ func (d *Dispatcher) dispatchNotice(
 		handled = true
 	} else if noticeHandler, ok := handler.(NoticeHandler); ok {
 		noticeHandler.Notice(msg, ep)
+		handled = true
+	}
+	return
+}
+
+// dispatchCTCP dispatches only a ctcp message. Returns true if the
+// event was handled.
+func (d *Dispatcher) dispatchCTCP(
+	handler interface{}, msg *irc.Message, ep irc.Endpoint) (handled bool) {
+
+	tag, data := irc.CTCPunpackString(msg.Message())
+
+	if channelHandler, ok := handler.(CTCPChannelHandler); ok &&
+		d.shouldDispatch(true, msg.Args[0]) {
+		channelHandler.CTCPChannel(msg, tag, data, ep)
+		handled = true
+	} else if directHandler, ok := handler.(CTCPHandler); ok {
+		directHandler.CTCP(msg, tag, data, ep)
+		handled = true
+	}
+	return
+}
+
+// dispatchCTCPReply dispatches only a ctcpreply message. Returns true if the
+// event was handled.
+func (d *Dispatcher) dispatchCTCPReply(
+	handler interface{}, msg *irc.Message, ep irc.Endpoint) (handled bool) {
+
+	tag, data := irc.CTCPunpackString(msg.Message())
+
+	if directHandler, ok := handler.(CTCPReplyHandler); ok {
+		directHandler.CTCPReply(msg, tag, data, ep)
 		handled = true
 	}
 	return

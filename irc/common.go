@@ -48,6 +48,9 @@ const (
 	PRIVMSG = "PRIVMSG"
 	QUIT    = "QUIT"
 	TOPIC   = "TOPIC"
+
+	CTCP      = PRIVMSG
+	CTCPReply = NOTICE
 )
 
 // IRC Reply and Error Messages. These are sent in reply to a previous message.
