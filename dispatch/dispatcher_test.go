@@ -1,11 +1,19 @@
 package dispatch
 
 import (
-	"github.com/aarondl/ultimateq/irc"
+	"bytes"
+	"log"
 	. "testing"
+
+	"github.com/aarondl/ultimateq/irc"
 )
 
 var core = CreateDispatchCore(irc.CreateProtoCaps())
+var logBuffer = &bytes.Buffer{}
+
+func init() {
+	log.SetOutput(logBuffer)
+}
 
 //===========================================================
 // Set up a type that can be used to mock irc.Endpoint
@@ -683,5 +691,36 @@ func TestDispatchCore_ShouldDispatch(t *T) {
 			t.Error("Fail:", test)
 			t.Error("Expected:", test.Expect, "got:", should)
 		}
+	}
+}
+
+func TestDispatch_Panic(t *T) {
+	logBuffer.Reset()
+	d := CreateDispatcher(core)
+	panicMsg := "dispatch panic"
+
+	handler := testHandler{
+		func(msg *irc.Message, ep irc.Endpoint) {
+			panic(panicMsg)
+		},
+	}
+
+	d.Register(irc.RAW, handler)
+	msg := irc.NewMessage("dispatcher", irc.PRIVMSG, "panic test")
+	d.Dispatch(msg, testPoint{&irc.Helper{}})
+	d.WaitForHandlers()
+	logStr := logBuffer.String()
+
+	if logStr == "" {
+		t.Error("Expected not empty log.")
+	}
+
+	logBytes := logBuffer.Bytes()
+	if !bytes.Contains(logBytes, []byte(panicMsg)) {
+		t.Errorf("Log does not contain: %s\n%s", panicMsg, logBytes)
+	}
+
+	if !bytes.Contains(logBytes, []byte("dispatcher_test.go")) {
+		t.Error("Does not contain a reference to file that panic'd")
 	}
 }

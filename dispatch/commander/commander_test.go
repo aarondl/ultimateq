@@ -3,17 +3,22 @@ package commander
 import (
 	"bytes"
 	"fmt"
-	"github.com/aarondl/ultimateq/data"
-	"github.com/aarondl/ultimateq/dispatch"
-	"github.com/aarondl/ultimateq/irc"
+	"log"
 	"regexp"
 	"strings"
 	"sync"
 	. "testing"
+
+	"github.com/aarondl/ultimateq/data"
+	"github.com/aarondl/ultimateq/dispatch"
+	"github.com/aarondl/ultimateq/irc"
 )
+
+var logBuffer = &bytes.Buffer{}
 
 func init() {
 	data.UserAccessPwdCost = 4 // See constant for bcrypt.MinCost
+	log.SetOutput(logBuffer)
 }
 
 type commandHandler struct {
@@ -116,6 +121,16 @@ func (b *reflectCommandHandler) Badargs(msg *irc.Message,
 	end *data.DataEndpoint, cmdata *data.DataEndpoint) (err error) {
 	b.Called = true
 	return
+}
+
+type panicHandler struct {
+	PanicMessage string
+}
+
+func (p panicHandler) Command(cmd string, msg *irc.Message,
+	end *data.DataEndpoint, cmdata *CommandData) error {
+	panic(p.PanicMessage)
+	return nil
 }
 
 const (
@@ -1404,5 +1419,46 @@ func TestCommander_EachCommand(t *T) {
 	success = c.Unregister(GLOBAL, "other")
 	if !success {
 		t.Error("other handler could not be unregistered.")
+	}
+}
+
+func TestCommander_Panic(t *T) {
+	logBuffer.Reset()
+	c := CreateCommander(prefix, core)
+	panicMsg := "dispatch panic"
+
+	var buffer = &bytes.Buffer{}
+	var stateMutex, storeMutex sync.RWMutex
+	state, store := setup()
+	var dataEndpoint = data.CreateDataEndpoint(server, buffer, state, store,
+		&stateMutex, &storeMutex)
+
+	handler := panicHandler{
+		panicMsg,
+	}
+
+	tmpCmd := MkCmd("panic", "panic desc", "panic", handler, ALL, ALL)
+	c.Register(GLOBAL, tmpCmd)
+
+	msg := irc.NewMessage(irc.PRIVMSG, host, self, "panic")
+	err := c.Dispatch(server, 0, msg, dataEndpoint)
+	if err != nil {
+		t.Error(err)
+	}
+
+	c.WaitForHandlers()
+	logStr := logBuffer.String()
+
+	if logStr == "" {
+		t.Error("Expected not empty log.")
+	}
+
+	logBytes := logBuffer.Bytes()
+	if !bytes.Contains(logBytes, []byte(panicMsg)) {
+		t.Errorf("Log does not contain: %s\n%s", panicMsg, logBytes)
+	}
+
+	if !bytes.Contains(logBytes, []byte("commander_test.go")) {
+		t.Error("Does not contain a reference to file that panic'd")
 	}
 }

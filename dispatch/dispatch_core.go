@@ -7,9 +7,12 @@ package dispatch
 
 import (
 	"errors"
-	"github.com/aarondl/ultimateq/irc"
+	"log"
+	"runtime"
 	"strings"
 	"sync"
+
+	"github.com/aarondl/ultimateq/irc"
 )
 
 var (
@@ -181,4 +184,15 @@ func (d *DispatchCore) hasChannel(channel string) bool {
 		}
 	}
 	return false
+}
+
+// PanicHandler catches any panics and logs a stack trace
+func PanicHandler() {
+	recovered := recover()
+	if recovered == nil {
+		return
+	}
+	buf := make([]byte, 1024)
+	runtime.Stack(buf, false)
+	log.Printf("Handler failed: %v\n%s", recovered, buf)
 }

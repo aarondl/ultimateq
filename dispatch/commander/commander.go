@@ -13,12 +13,13 @@ package commander
 import (
 	"errors"
 	"fmt"
-	"github.com/aarondl/ultimateq/data"
-	"github.com/aarondl/ultimateq/dispatch"
-	"github.com/aarondl/ultimateq/irc"
 	"reflect"
 	"strings"
 	"sync"
+
+	"github.com/aarondl/ultimateq/data"
+	"github.com/aarondl/ultimateq/dispatch"
+	"github.com/aarondl/ultimateq/irc"
 )
 
 // Constants used for defining the targets/scope of a command.
@@ -321,6 +322,8 @@ func (c *Commander) Dispatch(server string, overridePrefix rune,
 
 	c.HandlerStarted()
 	go func() {
+		defer dispatch.PanicHandler()
+		defer c.HandlerFinished()
 		defer cmdata.Close()
 		ok, err := cmdNameDispatch(command.Handler, cmd, msg, ep, cmdata)
 		if !ok {
@@ -329,7 +332,6 @@ func (c *Commander) Dispatch(server string, overridePrefix rune,
 		if err != nil {
 			ep.Notice(nick, err.Error())
 		}
-		c.HandlerFinished()
 	}()
 
 	return nil
