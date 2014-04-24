@@ -157,6 +157,76 @@ func (s *s) TestHelper_Noticef(c *C) {
 		NOTICE, ch, fmt.Sprintf(format, s1, s2)))
 }
 
+func (s *s) TestHelper_CTCP(c *C) {
+	buf := bytes.Buffer{}
+	h := &Helper{&buf}
+	ch := "#chan"
+	s1, s2 := "string1", "string2"
+	tag := "tag"
+	h.CTCP(ch, tag, s1, s2)
+	c.Check(string(buf.Bytes()), Equals, fmt.Sprintf("%v %v :\x01%v %v\x01",
+		PRIVMSG, ch, tag, fmt.Sprint(s1, s2)))
+}
+
+func (s *s) TestHelper_CTCPln(c *C) {
+	buf := bytes.Buffer{}
+	h := &Helper{&buf}
+	ch := "#chan"
+	s1, s2 := "string1", "string2"
+	tag := "tag"
+	expect := fmt.Sprintln(s1, s2)
+	h.CTCPln(ch, tag, s1, s2)
+	c.Check(string(buf.Bytes()), Equals, fmt.Sprintf("%v %v :\x01%v %v\x01",
+		PRIVMSG, ch, tag, expect[:len(expect)-1]))
+}
+
+func (s *s) TestHelper_CTCPf(c *C) {
+	buf := bytes.Buffer{}
+	h := &Helper{&buf}
+	ch := "#chan"
+	format := "%v - %v"
+	s1, s2 := "string1", "string2"
+	tag := "tag"
+	h.CTCPf(ch, tag, format, s1, s2)
+	c.Check(string(buf.Bytes()), Equals, fmt.Sprintf("%v %v :\x01%v %v\x01",
+		PRIVMSG, ch, tag, fmt.Sprintf(format, s1, s2)))
+}
+
+func (s *s) TestHelper_CTCPReply(c *C) {
+	buf := bytes.Buffer{}
+	h := &Helper{&buf}
+	ch := "#chan"
+	s1, s2 := "string1", "string2"
+	tag := "tag"
+	h.CTCPReply(ch, tag, s1, s2)
+	c.Check(string(buf.Bytes()), Equals, fmt.Sprintf("%v %v :\x01%v %v\x01",
+		NOTICE, ch, tag, fmt.Sprint(s1, s2)))
+}
+
+func (s *s) TestHelper_CTCPReplyln(c *C) {
+	buf := bytes.Buffer{}
+	h := &Helper{&buf}
+	ch := "#chan"
+	s1, s2 := "string1", "string2"
+	tag := "tag"
+	expect := fmt.Sprintln(s1, s2)
+	h.CTCPReplyln(ch, tag, s1, s2)
+	c.Check(string(buf.Bytes()), Equals, fmt.Sprintf("%v %v :\x01%v %v\x01",
+		NOTICE, ch, tag, expect[:len(expect)-1]))
+}
+
+func (s *s) TestHelper_CTCPReplyf(c *C) {
+	buf := bytes.Buffer{}
+	h := &Helper{&buf}
+	ch := "#chan"
+	format := "%v - %v"
+	s1, s2 := "string1", "string2"
+	tag := "tag"
+	h.CTCPReplyf(ch, tag, format, s1, s2)
+	c.Check(string(buf.Bytes()), Equals, fmt.Sprintf("%v %v :\x01%v %v\x01",
+		NOTICE, ch, tag, fmt.Sprintf(format, s1, s2)))
+}
+
 func (s *s) TestHelper_Join(c *C) {
 	buf := bytes.Buffer{}
 	h := &Helper{&buf}

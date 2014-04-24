@@ -23,15 +23,19 @@ const (
 	// to fit on one line
 	SPLIT_BACKWARD = 20
 	// fmtPrivmsgHeader creates the beginning of a privmsg.
-	fmtPrivmsgHeader = PRIVMSG + " %v :"
+	fmtPrivmsgHeader = PRIVMSG + " %s :"
 	// fmtNoticeHeader creates the beginning of a notice.
-	fmtNoticeHeader = NOTICE + " %v :"
+	fmtNoticeHeader = NOTICE + " %s :"
+	// fmtCTCP creates a CTCP message.
+	fmtCTCP = PRIVMSG + " %s :%s"
+	// fmtCTCPReply creates a CTCPReply message.
+	fmtCTCPReply = NOTICE + " %s :%s"
 	// fmtJoin creates a join message.
-	fmtJoin = JOIN + " :%v"
+	fmtJoin = JOIN + " :%s"
 	// fmtPart creates a part message.
-	fmtPart = PART + " :%v"
+	fmtPart = PART + " :%s"
 	// fmtQuit creates a quit message.
-	fmtQuit = QUIT + " :%v"
+	fmtQuit = QUIT + " :%s"
 )
 
 // IRC Messages, these messages are 1-1 constant to string lookups for ease of
@@ -228,6 +232,7 @@ type Endpoint interface {
 	Privmsgln(string, ...interface{}) error
 	// Privmsgf sends a formatted privmsg.
 	Privmsgf(string, string, ...interface{}) error
+
 	// Notice sends a string with spaces between non-strings.
 	Notice(string, ...interface{}) error
 	// Noticeln sends a notice with spaces between everything.
@@ -235,6 +240,23 @@ type Endpoint interface {
 	Noticeln(string, ...interface{}) error
 	// Noticef sends a formatted notice.
 	Noticef(string, string, ...interface{}) error
+
+	// CTCP sends a string with spaces between non-strings.
+	CTCP(string, string, ...interface{}) error
+	// CTCPln sends a CTCP with spaces between everything.
+	// Does not send newline.
+	CTCPln(string, string, ...interface{}) error
+	// CTCPf sends a formatted CTCP.
+	CTCPf(string, string, string, ...interface{}) error
+	// CTCPReply sends a string with spaces between non-strings.
+
+	CTCPReply(string, string, ...interface{}) error
+	// CTCPReplyln sends a CTCPReply with spaces between everything.
+	// Does not send newline.
+	CTCPReplyln(string, string, ...interface{}) error
+	// CTCPReplyf sends a formatted CTCPReply.
+	CTCPReplyf(string, string, string, ...interface{}) error
+
 	// Sends a join message to the endpoint.
 	Join(...string) error
 	// Sends a part message to the endpoint.
@@ -389,6 +411,56 @@ func (h *Helper) Noticef(target, format string, args ...interface{}) error {
 	header := []byte(fmt.Sprintf(fmtNoticeHeader, target))
 	msg := []byte(fmt.Sprintf(format, args...))
 	return h.splitSend(header, msg)
+}
+
+// CTCP sends a string with spaces between non-strings.
+func (h *Helper) CTCP(target, tag string, data ...interface{}) error {
+	msg := CTCPpack([]byte(tag), []byte(fmt.Sprint(data...)))
+	_, err := fmt.Fprintf(h, fmtCTCP, target, msg)
+	return err
+}
+
+// CTCPln sends a CTCP with spaces between everything.
+// Does not send newline.
+func (h *Helper) CTCPln(target, tag string, data ...interface{}) error {
+	str := fmt.Sprintln(data...)
+	str = str[:len(str)-1]
+	msg := CTCPpack([]byte(tag), []byte(str))
+	_, err := fmt.Fprintf(h, fmtCTCP, target, msg)
+	return err
+}
+
+// CTCPf sends a formatted CTCP.
+func (h *Helper) CTCPf(target, tag, format string, data ...interface{}) error {
+	msg := CTCPpack([]byte(tag), []byte(fmt.Sprintf(format, data...)))
+	_, err := fmt.Fprintf(h, fmtCTCP, target, msg)
+	return err
+}
+
+// CTCPReply sends a string with spaces between non-strings.
+func (h *Helper) CTCPReply(target, tag string, data ...interface{}) error {
+	msg := CTCPpack([]byte(tag), []byte(fmt.Sprint(data...)))
+	_, err := fmt.Fprintf(h, fmtCTCPReply, target, msg)
+	return err
+}
+
+// CTCPReplyln sends a CTCPReply with spaces between everything.
+// Does not send newline.
+func (h *Helper) CTCPReplyln(target, tag string, data ...interface{}) error {
+	str := fmt.Sprintln(data...)
+	str = str[:len(str)-1]
+	msg := CTCPpack([]byte(tag), []byte(str))
+	_, err := fmt.Fprintf(h, fmtCTCPReply, target, msg)
+	return err
+}
+
+// CTCPReplyf sends a formatted CTCPReply.
+func (h *Helper) CTCPReplyf(target, tag, format string,
+	data ...interface{}) error {
+
+	msg := CTCPpack([]byte(tag), []byte(fmt.Sprintf(format, data...)))
+	_, err := fmt.Fprintf(h, fmtCTCPReply, target, msg)
+	return err
 }
 
 // Join sends a join message to the endpoint.
