@@ -1,10 +1,11 @@
 package dispatch
 
 import (
-	"github.com/aarondl/ultimateq/irc"
 	"math/rand"
 	"strings"
 	"sync"
+
+	"github.com/aarondl/ultimateq/irc"
 )
 
 // EventHandler is the basic interface that will deal with handling any message
@@ -112,6 +113,9 @@ func (d *Dispatcher) dispatchHelper(event string,
 func (d *Dispatcher) resolveHandler(
 	handler interface{}, event string, msg *irc.Message, ep irc.Endpoint) {
 
+	defer PanicHandler()
+	defer d.HandlerFinished()
+
 	var handled bool
 	switch msg.Name {
 	case irc.PRIVMSG, irc.NOTICE:
@@ -135,7 +139,6 @@ func (d *Dispatcher) resolveHandler(
 			evHandler.HandleRaw(msg, ep)
 		}
 	}
-	d.HandlerFinished()
 }
 
 // dispatchPrivmsg dispatches only a private message. Returns true if the
