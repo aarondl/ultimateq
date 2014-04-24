@@ -258,7 +258,7 @@ func (b *Bot) dispatch(srv *Server) (disconnect bool, err error) {
 	var parseErr error
 	readCh := srv.client.ReadChannel()
 
-	b.dispatchMessage(srv, irc.NewMessage(irc.CONNECT, ""))
+	b.dispatchMessage(srv, irc.NewMessage(irc.CONNECT, srv.name))
 	for err == nil && !disconnect {
 		select {
 		case msg, ok := <-readCh:
@@ -283,7 +283,7 @@ func (b *Bot) dispatch(srv *Server) (disconnect bool, err error) {
 		}
 	}
 
-	b.dispatchMessage(srv, irc.NewMessage(irc.DISCONNECT, ""))
+	b.dispatchMessage(srv, irc.NewMessage(irc.DISCONNECT, srv.name))
 	return
 }
 
