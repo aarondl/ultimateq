@@ -2,7 +2,7 @@ package irc
 
 import (
 	"strings"
-	. "testing"
+	"testing"
 )
 
 var (
@@ -16,26 +16,26 @@ var (
 	_s2 = `NICK CHANNELLEN=49 NICKLEN=8 TOPICLEN=489 AWAYLEN=126 KICKLEN=399 ` +
 		`MODES=4 MAXLIST=beI:49 EXCEPTS=e INVEX=I PENALTY`
 
-	capsTest0 = &Message{
+	capsTest0 = &Event{
 		Name:   RPL_MYINFO,
 		Args:   strings.Split(_s0, " "),
 		Sender: serverID,
 	}
-	capsTest1 = &Message{
+	capsTest1 = &Event{
 		Name:   RPL_ISUPPORT,
 		Args:   append(strings.Split(_s1, " "), "are supported by this server"),
 		Sender: serverID,
 	}
-	capsTest2 = &Message{
+	capsTest2 = &Event{
 		Name:   RPL_ISUPPORT,
 		Args:   append(strings.Split(_s2, " "), "are supported by this server"),
 		Sender: serverID,
 	}
 )
 
-func TestProtoCaps_Parse(t *T) {
+func TestNetworkInfo_Parse(t *testing.T) {
 	t.Parallel()
-	p := CreateProtoCaps()
+	p := NewNetworkInfo()
 
 	p.ParseMyInfo(capsTest0)
 	p.ParseISupport(capsTest1)
@@ -106,12 +106,12 @@ func TestProtoCaps_Parse(t *T) {
 	}
 }
 
-func TestProtoCaps_Clone(t *T) {
+func TestNetworkInfo_Clone(t *testing.T) {
 	t.Parallel()
 	other := "other"
 	diff := "different"
 
-	p1 := CreateProtoCaps()
+	p1 := NewNetworkInfo()
 	p1.extras[other] = other
 	p2 := p1.Clone()
 	p1.chantypes = other
@@ -125,9 +125,9 @@ func TestProtoCaps_Clone(t *T) {
 	}
 }
 
-func TestProtoCaps_IsChannel(t *T) {
+func TestNetworkInfo_IsChannel(t *testing.T) {
 	t.Parallel()
-	p := CreateProtoCaps()
+	p := NewNetworkInfo()
 	p.chantypes = "#&~"
 	if test := "#channel"; !p.IsChannel(test) {
 		t.Error("Expected:", test, "to be a channel.")
@@ -140,31 +140,5 @@ func TestProtoCaps_IsChannel(t *T) {
 	}
 	if p.IsChannel("") {
 		t.Error("It should return false when empty.")
-	}
-}
-
-func TestProtoCaps_Merge(t *T) {
-	t.Parallel()
-	p1 := CreateProtoCaps()
-	p2 := CreateProtoCaps()
-
-	mergeTest1 := &Message{
-		Args: []string{"NICK", "CHANTYPES=#&"},
-	}
-	mergeTest2 := &Message{
-		Args: []string{"NICK", "CHANTYPES=~"},
-	}
-
-	p1.ParseISupport(mergeTest1)
-	p2.ParseISupport(mergeTest2)
-	if p1.Chantypes() != "#&" {
-		t.Error("Parse failed to set chantypes correctly.")
-	}
-	if p2.Chantypes() != "~" {
-		t.Error("Parse failed to set chantypes correctly.")
-	}
-	p1.Merge(p2)
-	if p1.Chantypes() != "#&~" {
-		t.Error("Merge failed to produce a merged version of chantypes.")
 	}
 }

@@ -2,35 +2,35 @@ package irc
 
 import (
 	"bytes"
-	. "testing"
+	"testing"
 )
 
-func TestIsCTCPHelper(t *T) {
-	msg := NewMessage(PRIVMSG, "", "user", "\x01DCC SEND\x01")
-	if !msg.IsCTCP() {
-		t.Error("Expected it to be a CTCP Message.")
+func TestIsCTCPHelper(t *testing.T) {
+	ev := NewEvent("", nil, PRIVMSG, "", "user", "\x01DCC SEND\x01")
+	if !ev.IsCTCP() {
+		t.Error("Expected it to be a CTCP Event.")
 	}
 
-	msg = NewMessage(NOTICE, "", "user", "\x01DCC SEND\x01")
-	if !msg.IsCTCP() {
-		t.Error("Expected it to be a CTCP Message.")
+	ev = NewEvent("", nil, NOTICE, "", "user", "\x01DCC SEND\x01")
+	if !ev.IsCTCP() {
+		t.Error("Expected it to be a CTCP Event.")
 	}
 
-	msg = NewMessage(PRIVMSG, "", "user", "DCC SEND")
-	if msg.IsCTCP() {
+	ev = NewEvent("", nil, PRIVMSG, "", "user", "DCC SEND")
+	if ev.IsCTCP() {
 		t.Error("CTCP cannot be missing delimiter bytes.")
 	}
 
-	msg = NewMessage(JOIN, "", "user", "\x01DCC SEND\x01")
-	if msg.IsCTCP() {
-		t.Error("Only PRIVMSG and NOTICE can be CTCP messages.")
+	ev = NewEvent("", nil, JOIN, "", "user", "\x01DCC SEND\x01")
+	if ev.IsCTCP() {
+		t.Error("Only PRIVMSG and NOTICE can be CTCP events.")
 	}
 }
 
-func TestUnpackCTCPHelper(t *T) {
-	msg := NewMessage(PRIVMSG, "", "user", "\x01DCC SEND\x01")
-	tag, data := msg.UnpackCTCP()
-	expectTag, expectData := CTCPunpackString(msg.Message())
+func TestUnpackCTCPHelper(t *testing.T) {
+	ev := NewEvent("", nil, PRIVMSG, "", "user", "\x01DCC SEND\x01")
+	tag, data := ev.UnpackCTCP()
+	expectTag, expectData := CTCPunpackString(ev.Message())
 
 	if tag != expectTag {
 		t.Error("Expected the tag to be the same as the helper it calls.")
@@ -40,7 +40,7 @@ func TestUnpackCTCPHelper(t *T) {
 	}
 }
 
-func TestIsCTCP(t *T) {
+func TestIsCTCP(t *testing.T) {
 	yes, no := []byte("\x01yes\x01"), []byte("no")
 	if !IsCTCP(yes) {
 		t.Errorf("Expected (% X) to be a CTCP.", yes)
@@ -50,7 +50,7 @@ func TestIsCTCP(t *T) {
 	}
 }
 
-func TestIsCTCPString(t *T) {
+func TestIsCTCPString(t *testing.T) {
 	yes, no := "\x01yes\x01", "no"
 	if !IsCTCPString(yes) {
 		t.Errorf("Expected (%s) to be a CTCP.", yes)
@@ -60,7 +60,7 @@ func TestIsCTCPString(t *T) {
 	}
 }
 
-func TestCTCPUnpack(t *T) {
+func TestCTCPUnpack(t *testing.T) {
 	in := []byte("\x01\x10\r\x10\n\x10\x10 \x5Ca\x5C\x5C\x01")
 	expect1 := []byte("\r\n\x10")
 	expect2 := []byte("\x01\x5C")
@@ -74,7 +74,7 @@ func TestCTCPUnpack(t *T) {
 	}
 }
 
-func TestCTCPPack(t *T) {
+func TestCTCPPack(t *testing.T) {
 	in1 := []byte("\r\n\x10")
 	in2 := []byte("\x01\x5C")
 	expect := []byte("\x01\x10\r\x10\n\x10\x10 \x5Ca\x5C\x5C\x01")
@@ -85,7 +85,7 @@ func TestCTCPPack(t *T) {
 	}
 }
 
-func TestCTCPUnpackString(t *T) {
+func TestCTCPUnpackString(t *testing.T) {
 	in := "\x01DCC SEND moozic.txt 1122250358 37294 130\x01"
 	expect1 := "DCC"
 	expect2 := "SEND moozic.txt 1122250358 37294 130"
@@ -99,7 +99,7 @@ func TestCTCPUnpackString(t *T) {
 	}
 }
 
-func TestCTCPPackString(t *T) {
+func TestCTCPPackString(t *testing.T) {
 	in1 := "DCC"
 	in2 := "SEND moozic.txt 1122250358 37294 130"
 	expect := "\x01DCC SEND moozic.txt 1122250358 37294 130\x01"
@@ -110,7 +110,7 @@ func TestCTCPPackString(t *T) {
 	}
 }
 
-func TestCTCPunpack(t *T) {
+func TestCTCPunpack(t *testing.T) {
 	in := []byte("a b c d")
 	expect1 := []byte("a")
 	expect2 := []byte("b c d")
@@ -134,7 +134,7 @@ func TestCTCPunpack(t *T) {
 	}
 }
 
-func TestCTCPpack(t *T) {
+func TestCTCPpack(t *testing.T) {
 	in1 := []byte("a")
 	in2 := []byte("b c d")
 	expect := []byte("a b c d")
@@ -159,7 +159,7 @@ func TestCTCPpack(t *T) {
 	}
 }
 
-func TestCTCPHighLevelEscape(t *T) {
+func TestCTCPHighLevelEscape(t *testing.T) {
 	in := []byte("\x01\x5C")
 	expect := []byte("\x5Ca\x5C\x5C")
 
@@ -168,7 +168,7 @@ func TestCTCPHighLevelEscape(t *T) {
 	}
 }
 
-func TestCTCPHighLevelUnescape(t *T) {
+func TestCTCPHighLevelUnescape(t *testing.T) {
 	in := []byte("\x5Ca\x5C\x5C")
 	expect := []byte("\x01\x5C")
 
@@ -177,7 +177,7 @@ func TestCTCPHighLevelUnescape(t *T) {
 	}
 }
 
-func TestCTCPLowLevelEscape(t *T) {
+func TestCTCPLowLevelEscape(t *testing.T) {
 	in := []byte("\n\r\x00\x10")
 	expect := []byte("\x10\n\x10\r\x10\x00\x10\x10")
 
@@ -186,7 +186,7 @@ func TestCTCPLowLevelEscape(t *T) {
 	}
 }
 
-func TestCTCPLowLevelUnescape(t *T) {
+func TestCTCPLowLevelUnescape(t *testing.T) {
 	in := []byte("\x10\n\x10\r\x10\x00\x10\x10")
 	expect := []byte("\n\r\x00\x10")
 
