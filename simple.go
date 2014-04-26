@@ -8,7 +8,7 @@ import (
 	"github.com/aarondl/quotes"
 	"github.com/aarondl/ultimateq/bot"
 	"github.com/aarondl/ultimateq/data"
-	"github.com/aarondl/ultimateq/dispatch/commander"
+	"github.com/aarondl/ultimateq/dispatch/cmd"
 	"github.com/aarondl/ultimateq/irc"
 	"log"
 	"os"
@@ -64,18 +64,15 @@ type Handler struct {
 }
 
 // Let reflection hook up the commands, instead of doing it here.
-func (_ *Quoter) Command(_ string, _ *irc.Message,
-	_ *data.DataEndpoint, _ *commander.CommandData) error {
+func (_ *Quoter) Cmd(_ string, _ *data.DataEndpoint, _ *cmd.Event) error {
 	return nil
 }
 
-func (_ *Queryer) Command(_ string, _ *irc.Message,
-	_ *data.DataEndpoint, _ *commander.CommandData) error {
+func (_ *Queryer) Cmd(_ string, _ *data.DataEndpoint, _ *cmd.Event) error {
 	return nil
 }
 
-func (_ *Handler) Command(_ string, _ *irc.Message,
-	_ *data.DataEndpoint, _ *commander.CommandData) error {
+func (_ *Handler) Cmd(_ string, _ *data.DataEndpoint, _ *cmd.Event) error {
 	return nil
 }
 
@@ -83,16 +80,14 @@ func (_ *Handler) Command(_ string, _ *irc.Message,
  Quoter methods.
 ===================== */
 
-func (q *Quoter) Addquote(m *irc.Message, e *data.DataEndpoint,
-	c *commander.CommandData) error {
-
-	c.Close()
-
-	nick := m.Nick()
-	quote := c.GetArg("quote")
+func (q *Quoter) Addquote(e *data.DataEndpoint, ev cmd.Event) error {
+	nick := ev.Nick()
+	quote := ev.GetArg("quote")
 	if len(quote) == 0 {
 		return nil
 	}
+
+	ev.Close()
 
 	err := q.db.AddQuote(nick, quote)
 	if err != nil {
@@ -102,13 +97,11 @@ func (q *Quoter) Addquote(m *irc.Message, e *data.DataEndpoint,
 	return nil
 }
 
-func (q *Quoter) Delquote(m *irc.Message, e *data.DataEndpoint,
-	c *commander.CommandData) error {
+func (q *Quoter) Delquote(e *data.DataEndpoint, ev cmd.Event) error {
+	nick := ev.Nick()
+	id, err := strconv.Atoi(ev.GetArg("id"))
+	ev.Close()
 
-	c.Close()
-
-	nick := m.Nick()
-	id, err := strconv.Atoi(c.GetArg("id"))
 	if err != nil {
 		e.Notice(nick, "\x02Quote:\x02 Not a valid id.")
 		return nil
@@ -123,18 +116,16 @@ func (q *Quoter) Delquote(m *irc.Message, e *data.DataEndpoint,
 	return nil
 }
 
-func (q *Quoter) Editquote(m *irc.Message, e *data.DataEndpoint,
-	c *commander.CommandData) error {
+func (q *Quoter) Editquote(e *data.DataEndpoint, ev cmd.Event) error {
+	nick := ev.Nick()
+	quote := ev.GetArg("quote")
+	id, err := strconv.Atoi(ev.GetArg("id"))
+	ev.Close()
 
-	c.Close()
-
-	quote := c.GetArg("quote")
 	if len(quote) == 0 {
 		return nil
 	}
 
-	nick := m.Nick()
-	id, err := strconv.Atoi(c.GetArg("id"))
 	if err != nil {
 		e.Notice(nick, "\x02Quote:\x02 Not a valid id.")
 		return nil
@@ -149,13 +140,12 @@ func (q *Quoter) Editquote(m *irc.Message, e *data.DataEndpoint,
 	return nil
 }
 
-func (q *Quoter) Quote(m *irc.Message, e *data.DataEndpoint,
-	c *commander.CommandData) error {
+func (q *Quoter) Quote(e *data.DataEndpoint, ev cmd.Event) error {
+	strid := ev.GetArg("id")
+	nick := ev.Nick()
+	targ := ev.Target()
+	ev.Close()
 
-	c.Close()
-
-	strid := c.GetArg("id")
-	nick := m.Nick()
 	var quote string
 	var id int
 	var err error
@@ -176,31 +166,29 @@ func (q *Quoter) Quote(m *irc.Message, e *data.DataEndpoint,
 	}
 
 	if len(quote) == 0 {
-		respond(e, m.Target(), nick, "\x02Quote:\x02 Does not exist.")
+		respond(e, targ, nick, "\x02Quote:\x02 Does not exist.")
 	} else {
-		respond(e, m.Target(), nick,
+		respond(e, targ, nick,
 			fmt.Sprintf("\x02Quote (\x02#%d\x02):\x02 %s", id, quote))
 	}
 	return nil
 }
 
-func (q *Quoter) Quotes(m *irc.Message, e *data.DataEndpoint,
-	c *commander.CommandData) error {
+func (q *Quoter) Quotes(e *data.DataEndpoint, ev cmd.Event) error {
+	targ, nick := ev.Target(), ev.Nick()
+	ev.Close()
 
-	c.Close()
-
-	respond(e, m.Target(), m.Nick(),
+	respond(e, targ, nick,
 		fmt.Sprintf("\x02Quote:\x02 %d quote(s) in database.", q.db.NQuotes()))
 	return nil
 }
 
-func (q *Quoter) Details(m *irc.Message, e *data.DataEndpoint,
-	c *commander.CommandData) error {
+func (q *Quoter) Details(e *data.DataEndpoint, ev cmd.Event) error {
+	nick := ev.Nick()
+	id, err := strconv.Atoi(ev.GetArg("id"))
+	targ := ev.Target()
+	ev.Close()
 
-	c.Close()
-
-	nick := m.Nick()
-	id, err := strconv.Atoi(c.GetArg("id"))
 	if err != nil {
 		e.Notice(nick, "\x02Quote:\x02 Not a valid id.")
 		return nil
@@ -209,7 +197,7 @@ func (q *Quoter) Details(m *irc.Message, e *data.DataEndpoint,
 	if date, author, err := q.db.GetDetails(int(id)); err != nil {
 		e.Noticef(nick, "\x02Quote:\x02 %v", err)
 	} else {
-		respond(e, m.Target(), nick,
+		respond(e, targ, nick,
 			fmt.Sprintf("\x02Quote (\x02#%d\x02):\x02 Created on %s by %s",
 				id, time.Unix(date, 0).UTC().Format(dateFormat), author))
 	}
@@ -230,16 +218,14 @@ func (_ *Queryer) PrivmsgChannel(m *irc.Message, endpoint irc.Endpoint) {
 	}
 }
 
-func (_ *Queryer) Calc(m *irc.Message, e *data.DataEndpoint,
-	c *commander.CommandData) error {
+func (_ *Queryer) Calc(e *data.DataEndpoint, ev cmd.Event) error {
+	q := ev.GetArg("query")
+	nick, targ := ev.Nick(), ev.Target()
+	ev.Close()
 
-	c.Close()
-
-	q := c.GetArg("query")
-	nick := m.Nick()
 	if out, err := query.Wolfram(q, &queryConf); len(out) != 0 {
 		out = sanitize(out)
-		if targ := m.Target(); isNick(targ) {
+		if targ := targ; isNick(targ) {
 			e.Notice(nick, out)
 		} else {
 			e.Privmsg(targ, out)
@@ -251,16 +237,14 @@ func (_ *Queryer) Calc(m *irc.Message, e *data.DataEndpoint,
 	return nil
 }
 
-func (_ *Queryer) Google(m *irc.Message, e *data.DataEndpoint,
-	c *commander.CommandData) error {
+func (_ *Queryer) Google(e *data.DataEndpoint, ev cmd.Event) error {
+	q := ev.GetArg("query")
+	nick, targ := ev.Nick(), ev.Target()
+	ev.Close()
 
-	c.Close()
-
-	q := c.GetArg("query")
-	nick := m.Nick()
 	if out, err := query.Google(q); len(out) != 0 {
 		out = sanitize(out)
-		if targ := m.Target(); isNick(targ) {
+		if targ := targ; isNick(targ) {
 			e.Notice(nick, out)
 		} else {
 			e.Privmsg(targ, out)
@@ -276,18 +260,16 @@ func (_ *Queryer) Google(m *irc.Message, e *data.DataEndpoint,
  Handler methods.
 ===================== */
 
-func (h *Handler) Up(m *irc.Message, e *data.DataEndpoint,
-	c *commander.CommandData) error {
-
-	user := c.UserAccess
-	ch := c.TargetChannel
+func (h *Handler) Up(e *data.DataEndpoint, ev cmd.Event) error {
+	user := ev.UserAccess
+	ch := ev.TargetChannel
 	if ch == nil {
 		return fmt.Errorf("Must be a channel that the bot is on.")
 	}
 	chname := ch.Name()
 
-	if !putPeopleUp(m, chname, user, e) {
-		return commander.MakeFlagsError("ov")
+	if !putPeopleUp(ev.Message, chname, user, e) {
+		return cmd.MakeFlagsError("ov")
 	}
 	return nil
 }
@@ -347,75 +329,75 @@ func main() {
 	var quoter = Quoter{qdb}
 
 	// Quote commands
-	b.RegisterCommand(commander.MkCmd(
+	b.RegisterCmd(cmd.MkCmd(
 		"quote",
 		"Retrieves a quote. Randomly selects a quote if no id is provided.",
 		"quote",
 		&quoter,
-		commander.PRIVMSG, commander.ALL, "[id]",
+		cmd.PRIVMSG, cmd.ALL, "[id]",
 	))
-	b.RegisterCommand(commander.MkCmd(
+	b.RegisterCmd(cmd.MkCmd(
 		"quote",
 		"Shows the number of quotes in the database.",
 		"quotes",
 		&quoter,
-		commander.PRIVMSG, commander.ALL,
+		cmd.PRIVMSG, cmd.ALL,
 	))
-	b.RegisterCommand(commander.MkCmd(
+	b.RegisterCmd(cmd.MkCmd(
 		"quote",
 		"Gets the details for a specific quote.",
 		"details",
 		&quoter,
-		commander.PRIVMSG, commander.ALL, "id",
+		cmd.PRIVMSG, cmd.ALL, "id",
 	))
-	b.RegisterCommand(commander.MkCmd(
+	b.RegisterCmd(cmd.MkCmd(
 		"quote",
 		"Adds a quote to the database.",
 		"addquote",
 		&quoter,
-		commander.PRIVMSG, commander.ALL, "quote...",
+		cmd.PRIVMSG, cmd.ALL, "quote...",
 	))
-	b.RegisterCommand(commander.MkAuthCmd(
+	b.RegisterCmd(cmd.MkAuthCmd(
 		"quote",
 		"Removes a quote from the database.",
 		"delquote",
 		&quoter,
-		commander.PRIVMSG, commander.ALL, 0, "Q", "id",
+		cmd.PRIVMSG, cmd.ALL, 0, "Q", "id",
 	))
-	b.RegisterCommand(commander.MkAuthCmd(
+	b.RegisterCmd(cmd.MkAuthCmd(
 		"quote",
 		"Edits an existing quote.",
 		"editquote",
 		&quoter,
-		commander.PRIVMSG, commander.ALL, 0, "Q", "id", "quote...",
+		cmd.PRIVMSG, cmd.ALL, 0, "Q", "id", "quote...",
 	))
 
 	// Queryer commands
 	b.Register(irc.PRIVMSG, &queryer)
-	b.RegisterCommand(commander.MkCmd(
+	b.RegisterCmd(cmd.MkCmd(
 		"query",
 		"Submits a query to Google.",
 		"google",
 		&queryer,
-		commander.PRIVMSG, commander.ALL, "query...",
+		cmd.PRIVMSG, cmd.ALL, "query...",
 	))
-	b.RegisterCommand(commander.MkCmd(
+	b.RegisterCmd(cmd.MkCmd(
 		"query",
 		"Submits a query to Wolfram Alpha.",
 		"calc",
 		&queryer,
-		commander.PRIVMSG, commander.ALL, "query...",
+		cmd.PRIVMSG, cmd.ALL, "query...",
 	))
 
 	// Handler commands
 	b.Register(irc.PRIVMSG, &handler)
 	b.Register(irc.JOIN, &handler)
-	b.RegisterCommand(commander.MkAuthCmd(
+	b.RegisterCmd(cmd.MkAuthCmd(
 		"simple",
 		"Gives the user ops or voice if they have o or v flags respectively.",
 		"up",
 		&handler,
-		commander.PRIVMSG, commander.ALL, 0, "", "#chan",
+		cmd.PRIVMSG, cmd.ALL, 0, "", "#chan",
 	))
 
 	end := b.Start()

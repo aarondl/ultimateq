@@ -4,8 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/aarondl/ultimateq/data"
-	cmds "github.com/aarondl/ultimateq/dispatch/commander"
-	"github.com/aarondl/ultimateq/irc"
+	"github.com/aarondl/ultimateq/dispatch/cmd"
 	"log"
 	"regexp"
 	"sort"
@@ -48,7 +47,7 @@ const (
 	errFmtInternal = `commander: Error processing command %v (%v)`
 	errFmtExpired  = `commander: Data expired between locks. ` +
 		`Could not find user [%v]`
-	fmtCommandExec      = "bot: Core command executed (%v)"
+	fmtCmdExec      = "bot: Core command executed (%v)"
 	errFmtInternalError = "bot: Core command (%v) error: %v"
 	errFmtInternalPanic = "bot: Core command (%v) error: %v"
 
@@ -140,7 +139,7 @@ const (
 	usersListHeadAccess = `Access`
 	usersList           = `%-*v %v`
 
-	helpSuccess      = `Commands:`
+	helpSuccess      = `Cmds:`
 	helpSuccessUsage = `Usage: `
 	helpFailure      = `No help available for (%v), try "help" for a list of ` +
 		`all commands.`
@@ -191,55 +190,55 @@ var commands = []struct {
 	{help, helpDesc, true, true, 0, ``, argv{`[command]`}},
 }
 
-// coreCommands is the bot's command handling struct. The bot itself uses
+// coreCmds is the bot's command handling struct. The bot itself uses
 // the cmds to implement user management.
-type coreCommands struct {
+type coreCmds struct {
 	b *Bot
 }
 
-// CreateCoreCommands initializes the core commands and registers them with the
+// CreateCoreCmds initializes the core commands and registers them with the
 // bot.
-func CreateCoreCommands(b *Bot) (*coreCommands, error) {
-	c := &coreCommands{b}
-	for _, cmd := range commands {
-		privacy := cmds.PRIVATE
-		if cmd.Public {
-			privacy = cmds.ALL
+func CreateCoreCmds(b *Bot) (*coreCmds, error) {
+	c := &coreCmds{b}
+	for _, command := range commands {
+		privacy := cmd.PRIVATE
+		if command.Public {
+			privacy = cmd.ALL
 		}
-		err := b.RegisterCommand(&cmds.Command{
-			Cmd:         cmd.Name,
+		err := b.RegisterCmd(&cmd.Cmd{
+			Cmd:         command.Name,
 			Extension:   extension,
-			Description: cmd.Desc,
+			Description: command.Desc,
 			Handler:     c,
-			Msgtype:     cmds.PRIVMSG,
+			Msgtype:     cmd.PRIVMSG,
 			Msgscope:    privacy,
-			Args:        cmd.Args,
-			RequireAuth: cmd.Authed,
-			ReqLevel:    cmd.Level,
-			ReqFlags:    cmd.Flags,
+			Args:        command.Args,
+			RequireAuth: command.Authed,
+			ReqLevel:    command.Level,
+			ReqFlags:    command.Flags,
 		})
 		if err != nil {
 			return nil, fmt.Errorf(errFmtRegister, err)
 		}
 	}
 
-	return &coreCommands{b}, nil
+	return &coreCmds{b}, nil
 }
 
-// unregisterCoreCommands unregisters all core commands. Made for testing.
-func (c *coreCommands) unregisterCoreCommands() {
+// unregisterCoreCmds unregisters all core commands. Made for testing.
+func (c *coreCmds) unregisterCoreCmds() {
 	for _, cmd := range commands {
-		c.b.UnregisterCommand(cmd.Name)
+		c.b.UnregisterCmd(cmd.Name)
 	}
 }
 
-// Command is responsible for parsing all of the commands.
-func (c *coreCommands) Command(cmd string, m *irc.Message, d *data.DataEndpoint,
-	cd *cmds.CommandData) (internal error) {
+// Cmd is responsible for parsing all of the commands.
+func (c *coreCmds) Cmd(cmd string, d *data.DataEndpoint,
+	cd *cmd.Event) (internal error) {
 
 	var external error
 
-	log.Printf(fmtCommandExec, cmd)
+	log.Printf(fmtCmdExec, cmd)
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -300,8 +299,8 @@ func (c *coreCommands) Command(cmd string, m *irc.Message, d *data.DataEndpoint,
 }
 
 // register register's a user to the bot with an optional user name.
-func (c *coreCommands) register(d *data.DataEndpoint,
-	cd *cmds.CommandData) (internal, external error) {
+func (c *coreCmds) register(d *data.DataEndpoint,
+	cd *cmd.Event) (internal, external error) {
 
 	var access *data.UserAccess
 
@@ -367,7 +366,7 @@ func (c *coreCommands) register(d *data.DataEndpoint,
 }
 
 // auth authenticates a user.
-func (c *coreCommands) auth(d *data.DataEndpoint, cd *cmds.CommandData) (
+func (c *coreCmds) auth(d *data.DataEndpoint, cd *cmd.Event) (
 	internal, external error) {
 
 	var access *data.UserAccess
@@ -408,7 +407,7 @@ func (c *coreCommands) auth(d *data.DataEndpoint, cd *cmds.CommandData) (
 }
 
 // logout logs out a user.
-func (c *coreCommands) logout(d *data.DataEndpoint, cd *cmds.CommandData) (
+func (c *coreCmds) logout(d *data.DataEndpoint, cd *cmd.Event) (
 	internal, external error) {
 
 	user := cd.TargetUserAccess["user"]
@@ -416,7 +415,7 @@ func (c *coreCommands) logout(d *data.DataEndpoint, cd *cmds.CommandData) (
 	host, nick := cd.User.Host(), cd.User.Nick()
 	if user != nil {
 		if !cd.UserAccess.HasGlobalFlag('G') {
-			external = cmds.MakeGlobalFlagsError("G")
+			external = cmd.MakeGlobalFlagsError("G")
 			return
 		}
 		uname = user.Username
@@ -438,7 +437,7 @@ func (c *coreCommands) logout(d *data.DataEndpoint, cd *cmds.CommandData) (
 }
 
 // access outputs the access for the user.
-func (c *coreCommands) access(d *data.DataEndpoint, cd *cmds.CommandData) (
+func (c *coreCmds) access(d *data.DataEndpoint, cd *cmd.Event) (
 	internal, external error) {
 
 	access := cd.TargetUserAccess["user"]
@@ -457,7 +456,7 @@ func (c *coreCommands) access(d *data.DataEndpoint, cd *cmds.CommandData) (
 }
 
 //gusers provides a list of users with global access
-func (c *coreCommands) gusers(d *data.DataEndpoint, cd *cmds.CommandData) (
+func (c *coreCmds) gusers(d *data.DataEndpoint, cd *cmd.Event) (
 	internal, external error) {
 
 	var list []data.UserAccess
@@ -489,7 +488,7 @@ func (c *coreCommands) gusers(d *data.DataEndpoint, cd *cmds.CommandData) (
 }
 
 //susers provides a list of users with server access
-func (c *coreCommands) susers(d *data.DataEndpoint, cd *cmds.CommandData) (
+func (c *coreCmds) susers(d *data.DataEndpoint, cd *cmd.Event) (
 	internal, external error) {
 
 	var list []data.UserAccess
@@ -521,7 +520,7 @@ func (c *coreCommands) susers(d *data.DataEndpoint, cd *cmds.CommandData) (
 }
 
 // users provides a list of users added to a channel
-func (c *coreCommands) users(d *data.DataEndpoint, cd *cmds.CommandData) (
+func (c *coreCmds) users(d *data.DataEndpoint, cd *cmd.Event) (
 	internal, external error) {
 
 	var list []data.UserAccess
@@ -564,12 +563,12 @@ func (c *coreCommands) users(d *data.DataEndpoint, cd *cmds.CommandData) (
 }
 
 // deluser deletes a user
-func (c *coreCommands) deluser(d *data.DataEndpoint, cd *cmds.CommandData) (
+func (c *coreCmds) deluser(d *data.DataEndpoint, cd *cmd.Event) (
 	internal, external error) {
 
 	param := cd.GetArg("user")
 	if !cd.UserAccess.HasGlobalFlag('G') {
-		external = cmds.MakeGlobalFlagsError("G")
+		external = cmd.MakeGlobalFlagsError("G")
 		return
 	}
 	uname := cd.TargetUserAccess["user"].Username
@@ -598,7 +597,7 @@ func (c *coreCommands) deluser(d *data.DataEndpoint, cd *cmds.CommandData) (
 }
 
 // delme deletes self
-func (c *coreCommands) delme(d *data.DataEndpoint, cd *cmds.CommandData) (
+func (c *coreCmds) delme(d *data.DataEndpoint, cd *cmd.Event) (
 	internal, external error) {
 
 	host, nick := cd.User.Host(), cd.User.Nick()
@@ -623,7 +622,7 @@ func (c *coreCommands) delme(d *data.DataEndpoint, cd *cmds.CommandData) (
 }
 
 // passwd changes a user's password
-func (c *coreCommands) passwd(d *data.DataEndpoint, cd *cmds.CommandData) (
+func (c *coreCmds) passwd(d *data.DataEndpoint, cd *cmd.Event) (
 	internal, external error) {
 
 	oldpasswd := cd.GetArg("oldpassword")
@@ -663,14 +662,14 @@ func (c *coreCommands) passwd(d *data.DataEndpoint, cd *cmds.CommandData) (
 }
 
 // masks outputs the masks of the user.
-func (c *coreCommands) masks(d *data.DataEndpoint, cd *cmds.CommandData) (
+func (c *coreCmds) masks(d *data.DataEndpoint, cd *cmd.Event) (
 	internal, external error) {
 
 	access := cd.UserAccess
 	user := cd.TargetUserAccess["user"]
 	if user != nil {
 		if !cd.UserAccess.HasGlobalFlag('G') {
-			external = cmds.MakeGlobalFlagsError("G")
+			external = cmd.MakeGlobalFlagsError("G")
 			return
 		}
 		access = user
@@ -687,7 +686,7 @@ func (c *coreCommands) masks(d *data.DataEndpoint, cd *cmds.CommandData) (
 }
 
 // addmask adds a mask to a user.
-func (c *coreCommands) addmask(d *data.DataEndpoint, cd *cmds.CommandData) (
+func (c *coreCmds) addmask(d *data.DataEndpoint, cd *cmd.Event) (
 	internal, external error) {
 
 	mask := cd.GetArg("mask")
@@ -697,7 +696,7 @@ func (c *coreCommands) addmask(d *data.DataEndpoint, cd *cmds.CommandData) (
 	user := cd.TargetUserAccess["user"]
 	if user != nil {
 		if !cd.UserAccess.HasGlobalFlag('G') {
-			external = cmds.MakeGlobalFlagsError("G")
+			external = cmd.MakeGlobalFlagsError("G")
 			return
 		}
 		uname = user.Username
@@ -732,7 +731,7 @@ func (c *coreCommands) addmask(d *data.DataEndpoint, cd *cmds.CommandData) (
 }
 
 // delmask deletes a mask from a user.
-func (c *coreCommands) delmask(d *data.DataEndpoint, cd *cmds.CommandData) (
+func (c *coreCmds) delmask(d *data.DataEndpoint, cd *cmd.Event) (
 	internal, external error) {
 
 	mask := cd.GetArg("mask")
@@ -742,7 +741,7 @@ func (c *coreCommands) delmask(d *data.DataEndpoint, cd *cmds.CommandData) (
 	user := cd.TargetUserAccess["user"]
 	if user != nil {
 		if !cd.UserAccess.HasGlobalFlag('G') {
-			external = cmds.MakeGlobalFlagsError("G")
+			external = cmd.MakeGlobalFlagsError("G")
 			return
 		}
 		uname = user.Username
@@ -777,7 +776,7 @@ func (c *coreCommands) delmask(d *data.DataEndpoint, cd *cmds.CommandData) (
 }
 
 // resetpasswd resets a user's password
-func (c *coreCommands) resetpasswd(d *data.DataEndpoint, cd *cmds.CommandData) (
+func (c *coreCmds) resetpasswd(d *data.DataEndpoint, cd *cmd.Event) (
 	internal, external error) {
 
 	uname := cd.TargetUserAccess["user"].Username
@@ -814,7 +813,7 @@ func (c *coreCommands) resetpasswd(d *data.DataEndpoint, cd *cmds.CommandData) (
 }
 
 // ggive gives global access to a user.
-func (c *coreCommands) ggive(d *data.DataEndpoint, cd *cmds.CommandData) (
+func (c *coreCmds) ggive(d *data.DataEndpoint, cd *cmd.Event) (
 	internal, external error) {
 	return c.giveHelper(d, cd,
 		func(a *data.UserAccess, level uint8, flags string) string {
@@ -830,7 +829,7 @@ func (c *coreCommands) ggive(d *data.DataEndpoint, cd *cmds.CommandData) (
 }
 
 // sgive gives server access to a user.
-func (c *coreCommands) sgive(d *data.DataEndpoint, cd *cmds.CommandData) (
+func (c *coreCmds) sgive(d *data.DataEndpoint, cd *cmd.Event) (
 	internal, external error) {
 	server := d.GetKey()
 	return c.giveHelper(d, cd,
@@ -847,7 +846,7 @@ func (c *coreCommands) sgive(d *data.DataEndpoint, cd *cmds.CommandData) (
 }
 
 // give gives channel access to a user.
-func (c *coreCommands) give(d *data.DataEndpoint, cd *cmds.CommandData) (
+func (c *coreCmds) give(d *data.DataEndpoint, cd *cmd.Event) (
 	internal, external error) {
 	server := d.GetKey()
 	channel := cd.GetArg("chan")
@@ -866,7 +865,7 @@ func (c *coreCommands) give(d *data.DataEndpoint, cd *cmds.CommandData) (
 }
 
 // gtake takes global access from a user.
-func (c *coreCommands) gtake(d *data.DataEndpoint, cd *cmds.CommandData) (
+func (c *coreCmds) gtake(d *data.DataEndpoint, cd *cmd.Event) (
 	internal, external error) {
 	return c.takeHelper(d, cd,
 		func(a *data.UserAccess, all, level bool, flags string) (string, bool) {
@@ -898,7 +897,7 @@ func (c *coreCommands) gtake(d *data.DataEndpoint, cd *cmds.CommandData) (
 }
 
 // stake takes server access from a user.
-func (c *coreCommands) stake(d *data.DataEndpoint, cd *cmds.CommandData) (
+func (c *coreCmds) stake(d *data.DataEndpoint, cd *cmd.Event) (
 	internal, external error) {
 	server := d.GetKey()
 	return c.takeHelper(d, cd,
@@ -933,7 +932,7 @@ func (c *coreCommands) stake(d *data.DataEndpoint, cd *cmds.CommandData) (
 }
 
 // take takes global access from a user.
-func (c *coreCommands) take(d *data.DataEndpoint, cd *cmds.CommandData) (
+func (c *coreCmds) take(d *data.DataEndpoint, cd *cmd.Event) (
 	internal, external error) {
 	server := d.GetKey()
 	channel := cd.GetArg("chan")
@@ -969,7 +968,7 @@ func (c *coreCommands) take(d *data.DataEndpoint, cd *cmds.CommandData) (
 }
 
 // giveHelper parses the args to a give function and executes them in context
-func (c *coreCommands) giveHelper(d *data.DataEndpoint, cd *cmds.CommandData,
+func (c *coreCmds) giveHelper(d *data.DataEndpoint, cd *cmd.Event,
 	g giveHelperFunc) (internal, external error) {
 
 	uname := cd.TargetUserAccess["user"].Username
@@ -1017,7 +1016,7 @@ func (c *coreCommands) giveHelper(d *data.DataEndpoint, cd *cmds.CommandData,
 }
 
 // takeHelper parses the args to a take function and executes them in context
-func (c *coreCommands) takeHelper(d *data.DataEndpoint, cd *cmds.CommandData,
+func (c *coreCmds) takeHelper(d *data.DataEndpoint, cd *cmd.Event,
 	t takeHelperFunc) (internal, external error) {
 
 	uname := cd.TargetUserAccess["user"].Username
@@ -1066,25 +1065,25 @@ func (c *coreCommands) takeHelper(d *data.DataEndpoint, cd *cmds.CommandData,
 }
 
 // help searches for commands, and also provides details for specific commands
-func (c *coreCommands) help(d *data.DataEndpoint, cd *cmds.CommandData) (
+func (c *coreCmds) help(d *data.DataEndpoint, cd *cmd.Event) (
 	internal, external error) {
 
 	search := strings.ToLower(cd.GetArg("command"))
 	nick := cd.User.Nick()
 
 	var output = make(map[string][]string)
-	var exactMatches []*cmds.Command
+	var exactMatches []*cmd.Cmd
 
-	cmds.EachCommand(func(cmd *cmds.Command) bool {
+	cmd.EachCmd(func(command *cmd.Cmd) bool {
 		write := true
 
 		if len(search) > 0 {
-			combined := cmd.Extension + "." + cmd.Cmd
-			if perfect := combined == search; cmd.Cmd == search || perfect {
+			combined := command.Extension + "." + command.Cmd
+			if perfect := combined == search; command.Cmd == search || perfect {
 				if exactMatches == nil || perfect {
-					exactMatches = []*cmds.Command{cmd}
+					exactMatches = []*cmd.Cmd{command}
 				} else {
-					exactMatches = append(exactMatches, cmd)
+					exactMatches = append(exactMatches, command)
 					write = false
 				}
 				if perfect {
@@ -1096,21 +1095,21 @@ func (c *coreCommands) help(d *data.DataEndpoint, cd *cmds.CommandData) (
 		}
 
 		if write {
-			if arr, ok := output[cmd.Extension]; ok {
-				output[cmd.Extension] = append(arr, cmd.Cmd)
+			if arr, ok := output[command.Extension]; ok {
+				output[command.Extension] = append(arr, command.Cmd)
 			} else {
-				output[cmd.Extension] = []string{cmd.Cmd}
+				output[command.Extension] = []string{command.Cmd}
 			}
 		}
 		return false
 	})
 
 	if len(exactMatches) > 1 {
-		for _, cmd := range exactMatches {
-			if arr, ok := output[cmd.Extension]; ok {
-				output[cmd.Extension] = append(arr, cmd.Cmd)
+		for _, command := range exactMatches {
+			if arr, ok := output[command.Extension]; ok {
+				output[command.Extension] = append(arr, command.Cmd)
 			} else {
-				output[cmd.Extension] = []string{cmd.Cmd}
+				output[command.Extension] = []string{command.Cmd}
 			}
 		}
 		exactMatches = nil

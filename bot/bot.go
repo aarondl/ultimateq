@@ -9,7 +9,7 @@ import (
 	"github.com/aarondl/ultimateq/config"
 	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/dispatch"
-	"github.com/aarondl/ultimateq/dispatch/commander"
+	"github.com/aarondl/ultimateq/dispatch/cmd"
 	"github.com/aarondl/ultimateq/irc"
 	"github.com/aarondl/ultimateq/parse"
 	"log"
@@ -85,8 +85,8 @@ type Bot struct {
 	caps         *irc.ProtoCaps
 	dispatchCore *dispatch.DispatchCore
 	dispatcher   *dispatch.Dispatcher
-	commander    *commander.Commander
-	coreCommands *coreCommands
+	cmds         *cmd.Cmds
+	coreCommands *coreCmds
 
 	// IoC and DI components mostly for testing.
 	attachHandlers bool
@@ -291,9 +291,9 @@ func (b *Bot) dispatch(srv *Server) (disconnect bool, err error) {
 func (b *Bot) dispatchMessage(s *Server, msg *irc.Message) {
 	b.dispatcher.Dispatch(msg, s.endpoint)
 	s.dispatcher.Dispatch(msg, s.endpoint)
-	b.commander.Dispatch(s.name, s.commander.GetPrefix(), msg,
+	b.cmds.Dispatch(s.name, s.cmds.GetPrefix(), msg,
 		s.endpoint.DataEndpoint)
-	s.commander.Dispatch(s.name, 0, msg, s.endpoint.DataEndpoint)
+	s.cmds.Dispatch(s.name, 0, msg, s.endpoint.DataEndpoint)
 }
 
 // Stop shuts down all connections and exits.
@@ -371,37 +371,37 @@ func (b *Bot) UnregisterServer(
 	return false, errUnknownServerID
 }
 
-// RegisterCommand registers a command with the bot.
-// See Commander.Register for in-depth documentation.
-func (b *Bot) RegisterCommand(cmd *commander.Command) error {
-	return b.commander.Register(commander.GLOBAL, cmd)
+// RegisterCmd registers a command with the bot.
+// See Cmder.Register for in-depth documentation.
+func (b *Bot) RegisterCmd(command *cmd.Cmd) error {
+	return b.cmds.Register(cmd.GLOBAL, command)
 }
 
-// RegisterServerCommand registers a command with the server.
-// See Commander.Register for in-depth documentation.
-func (b *Bot) RegisterServerCommand(srv string, cmd *commander.Command) error {
+// RegisterServerCmd registers a command with the server.
+// See Cmder.Register for in-depth documentation.
+func (b *Bot) RegisterServerCmd(srv string, command *cmd.Cmd) error {
 
 	b.protectServers.RLock()
 	defer b.protectServers.RUnlock()
 
 	if s, ok := b.servers[srv]; ok {
-		return s.commander.Register(srv, cmd)
+		return s.cmds.Register(srv, command)
 	}
 	return errUnknownServerID
 }
 
-// UnregisterCommand unregister's a command from the bot.
-func (b *Bot) UnregisterCommand(cmd string) bool {
-	return b.commander.Unregister(commander.GLOBAL, cmd)
+// UnregisterCmd unregister's a command from the bot.
+func (b *Bot) UnregisterCmd(command string) bool {
+	return b.cmds.Unregister(cmd.GLOBAL, command)
 }
 
-// UnregisterServerCommand unregister's a command from the server.
-func (b *Bot) UnregisterServerCommand(server, cmd string) bool {
+// UnregisterServerCmd unregister's a command from the server.
+func (b *Bot) UnregisterServerCmd(server, command string) bool {
 	b.protectServers.RLock()
 	defer b.protectServers.RUnlock()
 
 	if s, ok := b.servers[server]; ok {
-		return s.commander.Unregister(server, cmd)
+		return s.cmds.Unregister(server, command)
 	}
 	return false
 }
@@ -461,7 +461,7 @@ func createBot(conf *config.Config, connProv ConnProvider,
 	}
 
 	if attachCommands && !conf.Global.GetNoStore() {
-		b.coreCommands, err = CreateCoreCommands(b)
+		b.coreCommands, err = CreateCoreCmds(b)
 		if err != nil {
 			return nil, err
 		}
@@ -504,7 +504,7 @@ func (b *Bot) createServer(conf *config.Server) (*Server, error) {
 func (b *Bot) createDispatching(prefix rune, channels []string) {
 	b.dispatchCore = dispatch.CreateDispatchCore(b.caps, channels...)
 	b.dispatcher = dispatch.CreateDispatcher(b.dispatchCore)
-	b.commander = commander.CreateCommander(prefix, b.dispatchCore)
+	b.cmds = cmd.CreateCmds(prefix, b.dispatchCore)
 }
 
 // createStore creates a store from a filename.

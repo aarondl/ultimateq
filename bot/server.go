@@ -8,7 +8,7 @@ import (
 	"github.com/aarondl/ultimateq/config"
 	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/dispatch"
-	"github.com/aarondl/ultimateq/dispatch/commander"
+	"github.com/aarondl/ultimateq/dispatch/cmd"
 	"github.com/aarondl/ultimateq/inet"
 	"github.com/aarondl/ultimateq/irc"
 	"io/ioutil"
@@ -71,7 +71,7 @@ type Server struct {
 	// Dispatching
 	dispatchCore *dispatch.DispatchCore
 	dispatcher   *dispatch.Dispatcher
-	commander    *commander.Commander
+	cmds         *cmd.Cmds
 	endpoint     *ServerEndpoint
 
 	handlerID int
@@ -131,7 +131,7 @@ func (s *Server) createEndpoint(store *data.Store, mutex *sync.RWMutex) {
 func (s *Server) createDispatching(prefix rune, channels []string) {
 	s.dispatchCore = dispatch.CreateDispatchCore(s.caps, channels...)
 	s.dispatcher = dispatch.CreateDispatcher(s.dispatchCore)
-	s.commander = commander.CreateCommander(prefix, s.dispatchCore)
+	s.cmds = cmd.CreateCmds(prefix, s.dispatchCore)
 }
 
 // createState uses the server's current ProtoCaps to create a state.

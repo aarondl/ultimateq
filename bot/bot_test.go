@@ -3,7 +3,7 @@ package bot
 import (
 	"github.com/aarondl/ultimateq/config"
 	"github.com/aarondl/ultimateq/data"
-	"github.com/aarondl/ultimateq/dispatch/commander"
+	"github.com/aarondl/ultimateq/dispatch/cmd"
 	"github.com/aarondl/ultimateq/irc"
 	"github.com/aarondl/ultimateq/mocks"
 	"gopkg.in/check.v1"
@@ -31,15 +31,14 @@ func (h testHandler) HandleRaw(m *irc.Message, send irc.Endpoint) {
 }
 
 type testCommand struct {
-	callback func(string, *irc.Message,
-		*data.DataEndpoint, *commander.CommandData) error
+	callback func(string, *data.DataEndpoint, *cmd.Event) error
 }
 
-func (h testCommand) Command(cmd string, msg *irc.Message,
-	ep *data.DataEndpoint, cdata *commander.CommandData) error {
+func (h testCommand) Cmd(cmd string, 
+	ep *data.DataEndpoint, cdata *cmd.Event) error {
 
 	if h.callback != nil {
-		return h.callback(cmd, msg, ep, cdata)
+		return h.callback(cmd, ep, cdata)
 	}
 	return nil
 }
@@ -183,16 +182,14 @@ func TestBot_Dispatching(t *T) {
 	}
 	cresult := make(chan string)
 	tcommand := &testCommand{
-		func(cmd string, _ *irc.Message, _ *data.DataEndpoint,
-			_ *commander.CommandData) error {
-
-			cresult <- cmd
+		func(command string, _ *data.DataEndpoint, _ *cmd.Event) error {
+			cresult <- command
 			return nil
 		},
 	}
 	b.Register(irc.PRIVMSG, thandler)
-	if err := b.RegisterCommand(commander.MkCmd(
-		"a", "b", "cmd", tcommand, commander.ALL, commander.ALL)); err != nil {
+	if err := b.RegisterCmd(cmd.MkCmd(
+		"a", "b", "cmd", tcommand, cmd.ALL, cmd.ALL)); err != nil {
 		t.Error("Should have registered a command successfully.")
 	}
 
@@ -216,7 +213,7 @@ func TestBot_Dispatching(t *T) {
 	for _ = range end {
 	}
 
-	if !b.UnregisterCommand("cmd") {
+	if !b.UnregisterCmd("cmd") {
 		t.Error("Should have unregistered a command.")
 	}
 }
@@ -379,43 +376,43 @@ func TestBot_Register(t *T) {
 	}
 }
 
-func TestBot_RegisterCommand(t *T) {
+func TestBot_RegisterCmd(t *T) {
 	// t.Parallel() Cannot be parallel due to the nature of command registration
 	var err error
 	var success bool
 	b, _ := createBot(fakeConfig, nil, nil, false, false)
-	cmd := "cmd"
-	err = b.RegisterCommand(commander.MkCmd("ext", "desc", cmd, &testCommand{},
-		commander.ALL, commander.ALL))
+	command := "cmd"
+	err = b.RegisterCmd(cmd.MkCmd("ext", "desc", command, &testCommand{},
+		cmd.ALL, cmd.ALL))
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
 
-	err = b.RegisterCommand(commander.MkCmd("ext", "desc", cmd, &testCommand{},
-		commander.ALL, commander.ALL))
+	err = b.RegisterCmd(cmd.MkCmd("ext", "desc", command, &testCommand{},
+		cmd.ALL, cmd.ALL))
 	if err == nil {
 		t.Error("Expecting error about duplicates.")
 	}
-	if success = b.UnregisterCommand(cmd); !success {
+	if success = b.UnregisterCmd(command); !success {
 		t.Error("It should unregister correctly.")
 	}
 
-	err = b.RegisterServerCommand(serverID, commander.MkCmd("e", "d", cmd,
-		&testCommand{}, commander.ALL, commander.ALL))
+	err = b.RegisterServerCmd(serverID, cmd.MkCmd("e", "d", command,
+		&testCommand{}, cmd.ALL, cmd.ALL))
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
-	if success = b.UnregisterServerCommand(serverID, cmd); !success {
+	if success = b.UnregisterServerCmd(serverID, command); !success {
 		t.Error("It should unregister correctly.")
 	}
 
-	err = b.RegisterServerCommand("badServer", commander.MkCmd("e", "d", cmd,
-		&testCommand{}, commander.ALL, commander.ALL))
+	err = b.RegisterServerCmd("badServer", cmd.MkCmd("e", "d", command,
+		&testCommand{}, cmd.ALL, cmd.ALL))
 	if err != errUnknownServerID {
 		t.Error("Expecting:", errUnknownServerID, "got:", err)
 	}
 
-	if success = b.UnregisterServerCommand("badServer", cmd); success {
+	if success = b.UnregisterServerCmd("badServer", command); success {
 		t.Error("It should not unregister from non existent servers.")
 	}
 }
