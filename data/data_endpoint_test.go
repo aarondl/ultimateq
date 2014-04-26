@@ -10,7 +10,7 @@ import (
 
 func TestDataEndpoint(t *T) {
 	var stateMutex, storeMutex sync.RWMutex
-	state, err := CreateState(irc.CreateProtoCaps())
+	state, err := NewState(irc.NewNetworkInfo())
 	if err != nil {
 		t.Error("Could not create state:", err)
 	}

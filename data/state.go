@@ -33,13 +33,12 @@ type State struct {
 
 	kinds  ChannelModeKinds
 	umodes UserModeKinds
-	caps   *irc.ProtoCaps
 }
 
-// CreateState creates a state from an irc protocaps instance.
-func CreateState(caps *irc.ProtoCaps) (*State, error) {
+// NewState creates a state from an irc protocaps instance.
+func NewState(netInfo *irc.NetworkInfo) (*State, error) {
 	state := &State{}
-	if err := state.Protocaps(caps); err != nil {
+	if err := state.SetNetworkInfo(netInfo); err != nil {
 		return nil, err
 	}
 	state.Self.ChannelModes = CreateChannelModes(&ChannelModeKinds{}, nil)
@@ -53,16 +52,15 @@ func CreateState(caps *irc.ProtoCaps) (*State, error) {
 }
 
 // Protocaps updates the protocaps of the state.
-func (s *State) Protocaps(caps *irc.ProtoCaps) error {
-	if caps == nil {
+func (s *State) SetNetworkInfo(ni *irc.NetworkInfo) error {
+	if ni == nil {
 		return errProtoCapsMissing
 	}
-	s.caps = caps
-	kinds, err := CreateChannelModeKindsCSV(caps.Chanmodes())
+	kinds, err := CreateChannelModeKindsCSV(ni.Chanmodes())
 	if err != nil {
 		return err
 	}
-	modes, err := CreateUserModeKinds(caps.Prefix())
+	modes, err := CreateUserModeKinds(ni.Prefix())
 	if err != nil {
 		return err
 	}
@@ -344,48 +342,48 @@ func (s *State) removeFromChannel(nickorhost, channel string) {
 }
 
 // Update uses the irc.IrcMessage to modify the database accordingly.
-func (s *State) Update(m *irc.Message) {
-	if len(m.Sender) > 0 {
-		s.addUser(m.Sender)
+func (s *State) Update(ev *irc.Event) {
+	if len(ev.Sender) > 0 {
+		s.addUser(ev.Sender)
 	}
-	switch m.Name {
+	switch ev.Name {
 	case irc.NICK:
-		s.nick(m)
+		s.nick(ev)
 	case irc.JOIN:
-		s.join(m)
+		s.join(ev)
 	case irc.PART:
-		s.part(m)
+		s.part(ev)
 	case irc.QUIT:
-		s.quit(m)
+		s.quit(ev)
 	case irc.KICK:
-		s.kick(m)
+		s.kick(ev)
 	case irc.MODE:
-		s.mode(m)
+		s.mode(ev)
 	case irc.TOPIC:
-		s.topic(m)
+		s.topic(ev)
 	case irc.RPL_TOPIC:
-		s.rplTopic(m)
+		s.rplTopic(ev)
 	case irc.PRIVMSG, irc.NOTICE:
-		s.msg(m)
+		s.msg(ev)
 	case irc.RPL_WELCOME:
-		s.rplWelcome(m)
+		s.rplWelcome(ev)
 	case irc.RPL_NAMREPLY:
-		s.rplNameReply(m)
+		s.rplNameReply(ev)
 	case irc.RPL_WHOREPLY:
-		s.rplWhoReply(m)
+		s.rplWhoReply(ev)
 	case irc.RPL_CHANNELMODEIS:
-		s.rplChannelModeIs(m)
+		s.rplChannelModeIs(ev)
 	case irc.RPL_BANLIST:
-		s.rplBanList(m)
+		s.rplBanList(ev)
 
 		// TODO: Handle Whois
 	}
 }
 
 // nick alters the state of the database when a NICK message is received.
-func (s *State) nick(m *irc.Message) {
-	nick, username, host := m.Split()
-	newnick := m.Args[0]
+func (s *State) nick(ev *irc.Event) {
+	nick, username, host := ev.SplitHost()
+	newnick := ev.Args[0]
 	newuser := irc.Host(newnick + "!" + username + "@" + host)
 
 	nick = strings.ToLower(nick)
@@ -409,44 +407,44 @@ func (s *State) nick(m *irc.Message) {
 }
 
 // join alters the state of the database when a JOIN message is received.
-func (s *State) join(m *irc.Message) {
-	if m.Sender == s.Self.Host() {
-		s.addChannel(m.Args[0])
+func (s *State) join(ev *irc.Event) {
+	if ev.Sender == s.Self.Host() {
+		s.addChannel(ev.Args[0])
 	}
-	s.addToChannel(m.Sender, m.Args[0])
+	s.addToChannel(ev.Sender, ev.Args[0])
 }
 
 // part alters the state of the database when a PART message is received.
-func (s *State) part(m *irc.Message) {
-	if m.Sender == s.Self.Host() {
-		s.removeChannel(m.Args[0])
+func (s *State) part(ev *irc.Event) {
+	if ev.Sender == s.Self.Host() {
+		s.removeChannel(ev.Args[0])
 	} else {
-		s.removeFromChannel(m.Sender, m.Args[0])
+		s.removeFromChannel(ev.Sender, ev.Args[0])
 	}
 }
 
 // quit alters the state of the database when a QUIT message is received.
-func (s *State) quit(m *irc.Message) {
-	if m.Sender != s.Self.Host() {
-		s.removeUser(m.Sender)
+func (s *State) quit(ev *irc.Event) {
+	if ev.Sender != s.Self.Host() {
+		s.removeUser(ev.Sender)
 	}
 }
 
 // kick alters the state of the database when a KICK message is received.
-func (s *State) kick(m *irc.Message) {
-	if m.Args[1] == s.Self.Nick() {
-		s.removeChannel(m.Args[0])
+func (s *State) kick(ev *irc.Event) {
+	if ev.Args[1] == s.Self.Nick() {
+		s.removeChannel(ev.Args[0])
 	} else {
-		s.removeFromChannel(m.Args[1], m.Args[0])
+		s.removeFromChannel(ev.Args[1], ev.Args[0])
 	}
 }
 
 // mode alters the state of the database when a MODE message is received.
-func (s *State) mode(m *irc.Message) {
-	target := strings.ToLower(m.Args[0])
-	if s.caps.IsChannel(target) {
+func (s *State) mode(ev *irc.Event) {
+	target := strings.ToLower(ev.Args[0])
+	if ev.IsTargetChan() {
 		if ch, ok := s.channels[target]; ok {
-			pos, neg := ch.Apply(strings.Join(m.Args[1:], " "))
+			pos, neg := ch.Apply(strings.Join(ev.Args[1:], " "))
 			for i := 0; i < len(pos); i++ {
 				nick := strings.ToLower(pos[i].Arg)
 				s.channelUsers[target][nick].SetMode(pos[i].Mode)
@@ -457,43 +455,43 @@ func (s *State) mode(m *irc.Message) {
 			}
 		}
 	} else if target == s.Self.Nick() {
-		s.Self.Apply(m.Args[1])
+		s.Self.Apply(ev.Args[1])
 	}
 }
 
 // topic alters the state of the database when a TOPIC message is received.
-func (s *State) topic(m *irc.Message) {
-	chname := strings.ToLower(m.Args[0])
+func (s *State) topic(ev *irc.Event) {
+	chname := strings.ToLower(ev.Args[0])
 	if ch, ok := s.channels[chname]; ok {
-		ch.SetTopic(m.Args[1])
+		ch.SetTopic(ev.Args[1])
 	}
 }
 
 // rplTopic alters the state of the database when a RPL_TOPIC message is
 // received.
-func (s *State) rplTopic(m *irc.Message) {
-	chname := strings.ToLower(m.Args[1])
+func (s *State) rplTopic(ev *irc.Event) {
+	chname := strings.ToLower(ev.Args[1])
 	if ch, ok := s.channels[chname]; ok {
-		ch.SetTopic(m.Args[2])
+		ch.SetTopic(ev.Args[2])
 	}
 }
 
 // msg alters the state of the database when a PRIVMSG or NOTICE message is
 // received.
-func (s *State) msg(m *irc.Message) {
-	if s.caps.IsChannel(m.Args[0]) {
-		s.addToChannel(m.Sender, m.Args[0])
+func (s *State) msg(ev *irc.Event) {
+	if ev.IsTargetChan() {
+		s.addToChannel(ev.Sender, ev.Args[0])
 	}
 }
 
 // rplWelcome alters the state of the database when a RPL_WELCOME message is
 // received.
-func (s *State) rplWelcome(m *irc.Message) {
-	splits := strings.Fields(m.Args[1])
+func (s *State) rplWelcome(ev *irc.Event) {
+	splits := strings.Fields(ev.Args[1])
 	host := splits[len(splits)-1]
 
 	if !strings.ContainsRune(host, '!') || !strings.ContainsRune(host, '@') {
-		host = m.Args[0]
+		host = ev.Args[0]
 	}
 	user := CreateUser(host)
 	s.Self.User = user
@@ -502,9 +500,9 @@ func (s *State) rplWelcome(m *irc.Message) {
 
 // rplNameReply alters the state of the database when a RPL_NAMEREPLY
 // message is received.
-func (s *State) rplNameReply(m *irc.Message) {
-	channel := m.Args[2]
-	users := strings.Fields(m.Args[3])
+func (s *State) rplNameReply(ev *irc.Event) {
+	channel := ev.Args[2]
+	users := strings.Fields(ev.Args[3])
 	for i := 0; i < len(users); i++ {
 		j := 0
 		mode := rune(0)
@@ -528,11 +526,11 @@ func (s *State) rplNameReply(m *irc.Message) {
 
 // rplWhoReply alters the state of the database when a RPL_WHOREPLY message
 // is received.
-func (s *State) rplWhoReply(m *irc.Message) {
-	channel := m.Args[1]
-	fullhost := m.Args[5] + "!" + m.Args[2] + "@" + m.Args[3]
-	modes := m.Args[6]
-	realname := strings.SplitN(m.Args[7], " ", 2)[1]
+func (s *State) rplWhoReply(ev *irc.Event) {
+	channel := ev.Args[1]
+	fullhost := ev.Args[5] + "!" + ev.Args[2] + "@" + ev.Args[3]
+	modes := ev.Args[6]
+	realname := strings.SplitN(ev.Args[7], " ", 2)[1]
 
 	s.addUser(fullhost)
 	s.addToChannel(fullhost, channel)
@@ -546,15 +544,15 @@ func (s *State) rplWhoReply(m *irc.Message) {
 
 // rplChannelModeIs alters the state of the database when a RPL_CHANNELMODEIS
 // message is received.
-func (s *State) rplChannelModeIs(m *irc.Message) {
-	channel := m.Args[1]
-	modes := strings.Join(m.Args[2:], " ")
+func (s *State) rplChannelModeIs(ev *irc.Event) {
+	channel := ev.Args[1]
+	modes := strings.Join(ev.Args[2:], " ")
 	s.GetChannel(channel).Apply(modes)
 }
 
 // rplBanList alters the state of the database when a RPL_BANLIST message is
 // received.
-func (s *State) rplBanList(m *irc.Message) {
-	channel := m.Args[1]
-	s.GetChannel(channel).AddBan(m.Args[2])
+func (s *State) rplBanList(ev *irc.Event) {
+	channel := ev.Args[1]
+	s.GetChannel(channel).AddBan(ev.Args[2])
 }
