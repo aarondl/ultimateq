@@ -2,8 +2,9 @@ package parse
 
 import (
 	"strings"
-	"github.com/aarondl/ultimateq/irc"
 	"testing"
+
+	"github.com/aarondl/ultimateq/irc"
 )
 
 func b(s string) []byte {
@@ -22,12 +23,12 @@ func TestParse(t *testing.T) {
 	wholeMsg := sender + " " + irc.PRIVMSG + " " + strings.Join(testargs, " ")
 	noSender := irc.PRIVMSG + " " + strings.Join(testargs, " ")
 
-	tests := []struct{
-		Msg []byte
-		Name string
+	tests := []struct {
+		Msg    []byte
+		Name   string
 		Sender string
-		Args []string
-		Error bool
+		Args   []string
+		Error  bool
 	}{
 		{b(wholeMsg), irc.PRIVMSG, sender, testargs, false},
 		{b(noSender), irc.PRIVMSG, "", testargs, false},

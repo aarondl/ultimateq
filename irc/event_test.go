@@ -7,7 +7,7 @@ import (
 
 var (
 	testArgs = []string{"#chan1", "#chan2"}
-	testEv = NewEvent("", nil, "", "nick!user@host",
+	testEv   = NewEvent("", nil, "", "nick!user@host",
 		strings.Join(testArgs, ","))
 )
 

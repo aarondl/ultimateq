@@ -130,7 +130,7 @@ func EachCmd(fn func(*Cmd) bool) {
 //
 // !supercommand in a channel would invoke the bottom handler.
 type CmdHandler interface {
-	Cmd(string, *data.DataEndpoint, *Event) error
+	Cmd(string, irc.Writer, *Event) error
 }
 
 // commandTable is used to store all the string->command assocations.
@@ -225,11 +225,11 @@ func (c *Cmds) Unregister(server, cmd string) (found bool) {
 
 // Dispatch dispatches an IrcEvent into the cmds event handlers.
 func (c *Cmds) Dispatch(server string, overridePrefix rune,
-	msg *irc.Message, ep *data.DataEndpoint) (err error) {
+	ev *irc.Event, ep *data.DataEndpoint) (err error) {
 
 	// Filter non privmsg/notice
 	msgtype := 0
-	switch msg.Name {
+	switch ev.Name {
 	case irc.PRIVMSG:
 		msgtype = PRIVMSG
 	case irc.NOTICE:
@@ -241,16 +241,16 @@ func (c *Cmds) Dispatch(server string, overridePrefix rune,
 	}
 
 	// Get command name or die trying
-	fields := strings.Fields(msg.Args[1])
+	fields := strings.Fields(ev.Args[1])
 	if len(fields) == 0 {
 		return nil
 	}
 	cmd := fields[0]
 
 	ch := ""
-	nick := irc.Nick(msg.Sender)
+	nick := irc.Nick(ev.Sender)
 	msgscope := PRIVATE
-	isChan, hasChan := c.CheckTarget(msg.Args[0])
+	isChan, hasChan := c.CheckTarget(ev)
 
 	// If it's a channel message, ensure we're active on the channel and
 	// that the user has supplied the prefix in his command.
@@ -263,7 +263,7 @@ func (c *Cmds) Dispatch(server string, overridePrefix rune,
 		}
 
 		cmd = cmd[1:]
-		ch = msg.Args[0]
+		ch = ev.Target()
 		msgscope = PUBLIC
 	}
 
@@ -279,9 +279,9 @@ func (c *Cmds) Dispatch(server string, overridePrefix rune,
 		return nil
 	}
 
-	var ev = &Event{
-		ep:      ep,
-		Message: msg,
+	var cmdEv = &Event{
+		ep:    ep,
+		Event: ev,
 	}
 
 	var args []string
@@ -291,34 +291,34 @@ func (c *Cmds) Dispatch(server string, overridePrefix rune,
 
 	state := ep.OpenState()
 	store := ep.OpenStore()
-	ev.State = state
-	ev.Store = store
+	cmdEv.State = state
+	cmdEv.Store = store
 
 	if command.RequireAuth {
-		if ev.UserAccess, err = filterAccess(store, command,
-			server, ch, ep, msg); err != nil {
+		if cmdEv.UserAccess, err = filterAccess(store, command,
+			server, ch, ep, ev); err != nil {
 
-			ev.Close()
+			cmdEv.Close()
 			ep.Notice(nick, err.Error())
 			return
 		}
 	}
 
-	if err = c.filterArgs(server, command, ch, isChan, args, ev, state,
+	if err = c.filterArgs(server, command, ch, isChan, args, cmdEv, ev, state,
 		store); err != nil {
 
-		ev.Close()
+		cmdEv.Close()
 		ep.Notice(nick, err.Error())
 		return
 	}
 
 	if state != nil {
-		ev.User = state.GetUser(msg.Sender)
+		cmdEv.User = state.GetUser(ev.Sender)
 		if isChan {
-			if ev.Channel == nil {
-				ev.Channel = state.GetChannel(ch)
+			if cmdEv.Channel == nil {
+				cmdEv.Channel = state.GetChannel(ch)
 			}
-			ev.UserChannelModes = state.GetUsersChannelModes(msg.Sender, ch)
+			cmdEv.UserChannelModes = state.GetUsersChannelModes(ev.Sender, ch)
 		}
 	}
 
@@ -326,10 +326,10 @@ func (c *Cmds) Dispatch(server string, overridePrefix rune,
 	go func() {
 		defer dispatch.PanicHandler()
 		defer c.HandlerFinished()
-		defer ev.Close()
-		ok, err := cmdNameDispatch(command.Handler, cmd, ep, ev)
+		defer cmdEv.Close()
+		ok, err := cmdNameDispatch(command.Handler, cmd, ep, cmdEv)
 		if !ok {
-			err = command.Handler.Cmd(cmd, ep, ev)
+			err = command.Handler.Cmd(cmd, ep, cmdEv)
 		}
 		if err != nil {
 			ep.Notice(nick, err.Error())
@@ -380,7 +380,7 @@ func cmdNameDispatch(handler CmdHandler, cmd string, ep *data.DataEndpoint,
 // filterAccess ensures that a user has the correct access to perform the given
 // command.
 func filterAccess(store *data.Store, command *Cmd, server, channel string,
-	ep *data.DataEndpoint, msg *irc.Message) (*data.UserAccess, error) {
+	ep *data.DataEndpoint, ev *irc.Event) (*data.UserAccess, error) {
 
 	hasLevel := command.ReqLevel != 0
 	hasFlags := len(command.ReqFlags) != 0
@@ -389,7 +389,7 @@ func filterAccess(store *data.Store, command *Cmd, server, channel string,
 		return nil, errors.New(errMsgStoreDisabled)
 	}
 
-	var access = store.GetAuthedUser(ep.GetKey(), msg.Sender)
+	var access = store.GetAuthedUser(ep.GetKey(), ev.Sender)
 	if access == nil {
 		return nil, errors.New(errMsgNotAuthed)
 	}
@@ -407,7 +407,7 @@ func filterAccess(store *data.Store, command *Cmd, server, channel string,
 // using the state and store, and generally populates the Event struct
 // with argument information.
 func (c *Cmds) filterArgs(server string, command *Cmd, channel string,
-	isChan bool, msgArgs []string, ev *Event,
+	isChan bool, msgArgs []string, ev *Event, ircEvent *irc.Event,
 	state *data.State, store *data.Store) (err error) {
 
 	ev.args = make(map[string]string)
@@ -492,7 +492,7 @@ func (c *Cmds) parseChanArg(command *Cmd, ev *Event,
 
 	var isFirstChan bool
 	if index < len(msgArgs) {
-		isFirstChan, _ = c.CheckTarget(msgArgs[index])
+		isFirstChan = ev.Event.NetworkInfo.IsChannel(msgArgs[index])
 	} else if !isChan {
 		return false, fmt.Errorf(errFmtNArguments, errAtLeast,
 			command.reqArgs, strings.Join(command.Args, " "))

@@ -31,7 +31,7 @@ import (
 // for further information.
 type Event struct {
 	ep *data.DataEndpoint
-	*irc.Message
+	*irc.Event
 	*data.State
 	*data.Store
 	// User can be nil if the bot's State is disabled.

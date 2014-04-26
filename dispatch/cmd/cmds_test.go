@@ -14,7 +14,10 @@ import (
 	"github.com/aarondl/ultimateq/irc"
 )
 
-var logBuffer = &bytes.Buffer{}
+var (
+	logBuffer = &bytes.Buffer{}
+	netInfo   = irc.NewNetworkInfo()
+)
 
 func init() {
 	data.UserAccessPwdCost = 4 // See constant for bcrypt.MinCost
@@ -24,8 +27,8 @@ func init() {
 type commandHandler struct {
 	called          bool
 	cmd             string
-	end             irc.Endpoint
-	msg             *irc.Message
+	w               irc.Writer
+	ev              *irc.Event
 	user            *data.User
 	channel         *data.Channel
 	targChan        *data.Channel
@@ -41,12 +44,12 @@ type commandHandler struct {
 }
 
 func (b *commandHandler) Cmd(cmd string,
-	end *data.DataEndpoint, ev *Event) (err error) {
+	w irc.Writer, ev *Event) (err error) {
 
 	b.called = true
 	b.cmd = cmd
-	b.end = end
-	b.msg = ev.Message
+	b.w = w
+	b.ev = ev.Event
 	b.user = ev.User
 	b.access = ev.UserAccess
 	b.usrchanmodes = ev.UserChannelModes
@@ -79,7 +82,7 @@ type errorHandler struct {
 	Error error
 }
 
-func (e *errorHandler) Cmd(_ string, _ *data.DataEndpoint, _ *Event) error {
+func (e *errorHandler) Cmd(_ string, _ irc.Writer, _ *Event) error {
 
 	return e.Error
 }
@@ -90,26 +93,23 @@ type reflectCmdHandler struct {
 	Error     error
 }
 
-func (b *reflectCmdHandler) Cmd(cmd string, end *data.DataEndpoint,
+func (b *reflectCmdHandler) Cmd(cmd string, w irc.Writer,
 	ev *Event) (err error) {
 	b.CalledBad = true
 	return
 }
 
-func (b *reflectCmdHandler) Reflect(end *data.DataEndpoint,
-	ev *Event) (err error) {
+func (b *reflectCmdHandler) Reflect(_ irc.Writer, _ *Event) (err error) {
 	b.Called = true
 	return b.Error
 }
 
-func (b *reflectCmdHandler) Badargnum(end *data.DataEndpoint,
-	ev *data.DataEndpoint) (err error) {
+func (b *reflectCmdHandler) Badargnum(_ irc.Writer, _ irc.Writer) (err error) {
 	b.Called = true
 	return
 }
 
-func (b *reflectCmdHandler) Noreturn(end *data.DataEndpoint,
-	ev *data.DataEndpoint) {
+func (b *reflectCmdHandler) Noreturn(_ irc.Writer, _ irc.Writer) {
 	b.Called = true
 	return
 }
@@ -124,8 +124,7 @@ type panicHandler struct {
 	PanicMessage string
 }
 
-func (p panicHandler) Cmd(cmd string, end *data.DataEndpoint,
-	ev *Event) error {
+func (p panicHandler) Cmd(cmd string, w irc.Writer, ev *Event) error {
 	panic(p.PanicMessage)
 	return nil
 }
@@ -151,22 +150,25 @@ var (
 
 func setup() (state *data.State, store *data.Store) {
 	var err error
-	state, err = data.CreateState(irc.CreateProtoCaps())
+	state, err = data.NewState(netInfo)
 	if err != nil {
 		panic(err)
 	}
 
-	state.Update(&irc.Message{
+	state.Update(&irc.Event{
 		Sender: server, Name: irc.RPL_WELCOME,
-		Args: []string{"welcome", self},
+		Args:        []string{"welcome", self},
+		NetworkInfo: netInfo,
 	})
-	state.Update(&irc.Message{
+	state.Update(&irc.Event{
 		Sender: self, Name: irc.JOIN,
-		Args: []string{channel},
+		Args:        []string{channel},
+		NetworkInfo: netInfo,
 	})
-	state.Update(&irc.Message{
+	state.Update(&irc.Event{
 		Sender: host, Name: irc.JOIN,
-		Args: []string{channel},
+		Args:        []string{channel},
+		NetworkInfo: netInfo,
 	})
 	return
 }
@@ -196,7 +198,7 @@ func setupForAuth() (state *data.State, store *data.Store,
 	return
 }
 
-var core = dispatch.CreateDispatchCore(irc.CreateProtoCaps())
+var core = dispatch.NewDispatchCore()
 var prefix = '.'
 
 func TestCmds(t *T) {
@@ -383,7 +385,7 @@ func TestCmds_RegisterProtected(t *T) {
 }
 
 func TestCmds_Dispatch(t *T) {
-	dcore := dispatch.CreateDispatchCore(irc.CreateProtoCaps())
+	dcore := dispatch.NewDispatchCore()
 	c := CreateCmds(prefix, dcore)
 	c.AddChannels(channel)
 	if c == nil {
@@ -505,12 +507,13 @@ func TestCmds_Dispatch(t *T) {
 			continue
 		}
 
-		msg := &irc.Message{
-			Sender: host,
-			Name:   test.Name,
-			Args:   test.MsgArgs,
+		ev := &irc.Event{
+			Sender:      host,
+			Name:        test.Name,
+			Args:        test.MsgArgs,
+			NetworkInfo: netInfo,
 		}
-		err = c.Dispatch(server, 0, msg, dataEndpoint)
+		err = c.Dispatch(server, 0, ev, dataEndpoint)
 		c.WaitForHandlers()
 		if handler.called != test.Called {
 			if handler.called {
@@ -555,11 +558,11 @@ func TestCmds_Dispatch(t *T) {
 					t.Error("The user modes were not passed to the handler.")
 				}
 			}
-			if handler.end == nil {
-				t.Error("The endpoint was not passed to the handler.")
+			if handler.w == nil {
+				t.Error("The writer was not passed to the handler.")
 			}
-			if handler.msg == nil {
-				t.Error("The message was not passed to the handler.")
+			if handler.ev == nil {
+				t.Error("The event was not passed to the handler.")
 			}
 			if handler.state == nil {
 				t.Error("The state was not set in the command data.")
@@ -629,13 +632,14 @@ func TestCmds_DispatchAuthed(t *T) {
 			continue
 		}
 
-		msg := &irc.Message{
-			Sender: test.Sender,
-			Name:   irc.PRIVMSG,
-			Args:   []string{channel, string(prefix) + cmd},
+		ev := &irc.Event{
+			Sender:      test.Sender,
+			Name:        irc.PRIVMSG,
+			Args:        []string{channel, string(prefix) + cmd},
+			NetworkInfo: netInfo,
 		}
 
-		err = c.Dispatch(server, 0, msg, dataEndpoint)
+		err = c.Dispatch(server, 0, ev, dataEndpoint)
 		c.WaitForHandlers()
 		if handler.called != test.Called {
 			if handler.called {
@@ -661,11 +665,11 @@ func TestCmds_DispatchAuthed(t *T) {
 			if handler.channel == nil {
 				t.Error("The channel was not passed to the handler.")
 			}
-			if handler.msg == nil {
-				t.Error("The message was not passed to the handler.")
+			if handler.ev == nil {
+				t.Error("The event was not passed to the handler.")
 			}
-			if handler.end == nil {
-				t.Error("The endpoint was not passed to the handler.")
+			if handler.w == nil {
+				t.Error("The writer was not passed to the handler.")
 			}
 			if handler.state == nil {
 				t.Error("The state was not set in the command data.")
@@ -706,10 +710,11 @@ func TestCmds_DispatchNils(t *T) {
 	var dataEndpoint = data.CreateDataEndpoint(server, buffer, nil, nil,
 		&stateMutex, &storeMutex)
 
-	msg := &irc.Message{
-		Sender: host,
-		Name:   irc.PRIVMSG,
-		Args:   []string{channel, string(prefix) + cmd},
+	ev := &irc.Event{
+		Sender:      host,
+		Name:        irc.PRIVMSG,
+		Args:        []string{channel, string(prefix) + cmd},
+		NetworkInfo: netInfo,
 	}
 
 	handler := &commandHandler{}
@@ -719,7 +724,7 @@ func TestCmds_DispatchNils(t *T) {
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
-	err = c.Dispatch(server, 0, msg, dataEndpoint)
+	err = c.Dispatch(server, 0, ev, dataEndpoint)
 	c.WaitForHandlers()
 	err = chkErr(err, errMsgStoreDisabled)
 	if err != nil {
@@ -733,7 +738,7 @@ func TestCmds_DispatchNils(t *T) {
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
-	err = c.Dispatch(server, 0, msg, dataEndpoint)
+	err = c.Dispatch(server, 0, ev, dataEndpoint)
 	c.WaitForHandlers()
 	if handler.channel != nil {
 		t.Error("Channel should just be nil when state is disabled.")
@@ -757,10 +762,11 @@ func TestCmds_DispatchReturns(t *T) {
 	var dataEndpoint = data.CreateDataEndpoint(server, buffer, nil, nil,
 		&stateMutex, &storeMutex)
 
-	msg := &irc.Message{
-		Sender: host,
-		Name:   irc.PRIVMSG,
-		Args:   []string{channel, string(prefix) + cmd},
+	ev := &irc.Event{
+		Sender:      host,
+		Name:        irc.PRIVMSG,
+		Args:        []string{channel, string(prefix) + cmd},
+		NetworkInfo: netInfo,
 	}
 
 	handler := &errorHandler{}
@@ -790,7 +796,7 @@ func TestCmds_DispatchReturns(t *T) {
 	for _, test := range errors {
 		buffer.Reset()
 		handler.Error = test.Error
-		err = c.Dispatch(server, 0, msg, dataEndpoint)
+		err = c.Dispatch(server, 0, ev, dataEndpoint)
 		c.WaitForHandlers()
 		err = chkStr(string(buffer.Bytes()), `NOTICE nick :`+test.ErrorMsg)
 		if err != nil {
@@ -815,8 +821,9 @@ func TestCmds_DispatchChannel(t *T) {
 	var dataEndpoint = data.CreateDataEndpoint(server, buffer, state, store,
 		&stateMutex, &storeMutex)
 
-	msg := &irc.Message{
+	ev := &irc.Event{
 		Sender: host, Name: irc.PRIVMSG,
+		NetworkInfo: netInfo,
 	}
 
 	handler := &commandHandler{}
@@ -827,8 +834,8 @@ func TestCmds_DispatchChannel(t *T) {
 		t.Error("Unexpected error:", err)
 	}
 
-	msg.Args = []string{channel, string(prefix) + cmd}
-	err = c.Dispatch(server, 0, msg, dataEndpoint)
+	ev.Args = []string{channel, string(prefix) + cmd}
+	err = c.Dispatch(server, 0, ev, dataEndpoint)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -842,8 +849,8 @@ func TestCmds_DispatchChannel(t *T) {
 
 	handler.targChan = nil
 	handler.args = nil
-	msg.Args = []string{channel, string(prefix) + cmd + " " + channel}
-	err = c.Dispatch(server, 0, msg, dataEndpoint)
+	ev.Args = []string{channel, string(prefix) + cmd + " " + channel}
+	err = c.Dispatch(server, 0, ev, dataEndpoint)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -857,18 +864,18 @@ func TestCmds_DispatchChannel(t *T) {
 
 	handler.targChan = nil
 	handler.args = nil
-	msg.Args = []string{nick, cmd}
-	err = c.Dispatch(server, 0, msg, dataEndpoint)
+	ev.Args = []string{nick, cmd}
+	err = c.Dispatch(server, 0, ev, dataEndpoint)
 	c.WaitForHandlers()
 	err = chkErr(err, errFmtNArguments)
 	if err != nil {
 		t.Error(err)
 	}
 
-	msg.Args = []string{nick, cmd + " " + channel}
+	ev.Args = []string{nick, cmd + " " + channel}
 	noState := data.CreateDataEndpoint(server, buffer, nil, store,
 		&stateMutex, &storeMutex)
-	err = c.Dispatch(server, 0, msg, noState)
+	err = c.Dispatch(server, 0, ev, noState)
 	c.WaitForHandlers()
 	err = chkErr(err, errMsgStateDisabled)
 	if err != nil {
@@ -877,8 +884,8 @@ func TestCmds_DispatchChannel(t *T) {
 
 	handler.targChan = nil
 	handler.args = nil
-	msg.Args = []string{nick, cmd + " " + channel}
-	err = c.Dispatch(server, 0, msg, dataEndpoint)
+	ev.Args = []string{nick, cmd + " " + channel}
+	err = c.Dispatch(server, 0, ev, dataEndpoint)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -890,16 +897,16 @@ func TestCmds_DispatchChannel(t *T) {
 		t.Error("The channel argument was not set.")
 	}
 
-	msg.Args = []string{channel, string(prefix) + cmd + " " + channel + " arg"}
-	err = c.Dispatch(server, 0, msg, dataEndpoint)
+	ev.Args = []string{channel, string(prefix) + cmd + " " + channel + " arg"}
+	err = c.Dispatch(server, 0, ev, dataEndpoint)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtNArguments, errAtMost, 1, "%v"))
 	if err != nil {
 		t.Error(err)
 	}
 
-	msg.Args = []string{nick, cmd}
-	err = c.Dispatch(server, 0, msg, dataEndpoint)
+	ev.Args = []string{nick, cmd}
+	err = c.Dispatch(server, 0, ev, dataEndpoint)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtNArguments, errAtLeast, 1, "%v"))
 	if err != nil {
@@ -921,8 +928,9 @@ func TestCmds_DispatchUsers(t *T) {
 	var dataEndpoint = data.CreateDataEndpoint(server, buffer, state, store,
 		&stateMutex, &storeMutex)
 
-	msg := &irc.Message{
+	ev := &irc.Event{
 		Sender: host, Name: irc.PRIVMSG,
+		NetworkInfo: netInfo,
 	}
 
 	handler := &commandHandler{}
@@ -934,8 +942,8 @@ func TestCmds_DispatchUsers(t *T) {
 		t.Error("Unexpected error:", err)
 	}
 
-	msg.Args = []string{nick, cmd + " nick nick"}
-	err = c.Dispatch(server, 0, msg, dataEndpoint)
+	ev.Args = []string{nick, cmd + " nick nick"}
+	err = c.Dispatch(server, 0, ev, dataEndpoint)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -951,8 +959,8 @@ func TestCmds_DispatchUsers(t *T) {
 		t.Error("User2 was not set.")
 	}
 
-	msg.Args = []string{nick, cmd + " *user nick"}
-	err = c.Dispatch(server, 0, msg, dataEndpoint)
+	ev.Args = []string{nick, cmd + " *user nick"}
+	err = c.Dispatch(server, 0, ev, dataEndpoint)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -965,8 +973,8 @@ func TestCmds_DispatchUsers(t *T) {
 		t.Error("User2 was not set.")
 	}
 
-	msg.Args = []string{nick, cmd + " *user nick *user"}
-	err = c.Dispatch(server, 0, msg, dataEndpoint)
+	ev.Args = []string{nick, cmd + " *user nick *user"}
+	err = c.Dispatch(server, 0, ev, dataEndpoint)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -982,8 +990,8 @@ func TestCmds_DispatchUsers(t *T) {
 		t.Error("User3 was not set.")
 	}
 
-	msg.Args = []string{nick, cmd + " *user nick *user nick nick"}
-	err = c.Dispatch(server, 0, msg, dataEndpoint)
+	ev.Args = []string{nick, cmd + " *user nick *user nick nick"}
+	err = c.Dispatch(server, 0, ev, dataEndpoint)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -1019,8 +1027,9 @@ func TestCmds_DispatchErrors(t *T) {
 	var dataEndpoint = data.CreateDataEndpoint(server, buffer, state, store,
 		&stateMutex, &storeMutex)
 
-	msg := &irc.Message{
+	ev := &irc.Event{
 		Sender: host, Name: irc.PRIVMSG,
+		NetworkInfo: netInfo,
 	}
 
 	handler := &commandHandler{}
@@ -1031,40 +1040,40 @@ func TestCmds_DispatchErrors(t *T) {
 		t.Error("Unexpected error:", err)
 	}
 
-	msg.Args = []string{nick, cmd + " *baduser nick"}
-	err = c.Dispatch(server, 0, msg, dataEndpoint)
+	ev.Args = []string{nick, cmd + " *baduser nick"}
+	err = c.Dispatch(server, 0, ev, dataEndpoint)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtUserNotRegistered, "baduser"))
 	if err != nil {
 		t.Error(err)
 	}
 
-	msg.Args = []string{nick, cmd + " * nick"}
-	err = c.Dispatch(server, 0, msg, dataEndpoint)
+	ev.Args = []string{nick, cmd + " * nick"}
+	err = c.Dispatch(server, 0, ev, dataEndpoint)
 	c.WaitForHandlers()
 	err = chkErr(err, errMsgMissingUsername)
 	if err != nil {
 		t.Error(err)
 	}
 
-	msg.Args = []string{nick, cmd + " self nick"}
-	err = c.Dispatch(server, 0, msg, dataEndpoint)
+	ev.Args = []string{nick, cmd + " self nick"}
+	err = c.Dispatch(server, 0, ev, dataEndpoint)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtUserNotAuthed, "self"))
 	if err != nil {
 		t.Error(err)
 	}
 
-	msg.Args = []string{nick, cmd + " nick badnick"}
-	err = c.Dispatch(server, 0, msg, dataEndpoint)
+	ev.Args = []string{nick, cmd + " nick badnick"}
+	err = c.Dispatch(server, 0, ev, dataEndpoint)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtUserNotFound, "badnick"))
 	if err != nil {
 		t.Error(err)
 	}
 
-	msg.Args = []string{nick, cmd + " nick nick nick badnick"}
-	err = c.Dispatch(server, 0, msg, dataEndpoint)
+	ev.Args = []string{nick, cmd + " nick nick nick badnick"}
+	err = c.Dispatch(server, 0, ev, dataEndpoint)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtUserNotFound, "badnick"))
 	if err != nil {
@@ -1073,8 +1082,8 @@ func TestCmds_DispatchErrors(t *T) {
 
 	disableStoreEp := data.CreateDataEndpoint(server, buffer, state, nil,
 		&stateMutex, &storeMutex)
-	msg.Args = []string{nick, cmd + " *user nick"}
-	err = c.Dispatch(server, 0, msg, disableStoreEp)
+	ev.Args = []string{nick, cmd + " *user nick"}
+	err = c.Dispatch(server, 0, ev, disableStoreEp)
 	c.WaitForHandlers()
 	err = chkErr(err, errMsgStoreDisabled)
 	if err != nil {
@@ -1083,8 +1092,8 @@ func TestCmds_DispatchErrors(t *T) {
 
 	disableStateEp := data.CreateDataEndpoint(server, buffer, nil, store,
 		&stateMutex, &storeMutex)
-	msg.Args = []string{nick, cmd + " nick nick"}
-	err = c.Dispatch(server, 0, msg, disableStateEp)
+	ev.Args = []string{nick, cmd + " nick nick"}
+	err = c.Dispatch(server, 0, ev, disableStateEp)
 	c.WaitForHandlers()
 	err = chkErr(err, errMsgStateDisabled)
 	if err != nil {
@@ -1101,8 +1110,8 @@ func TestCmds_DispatchErrors(t *T) {
 		t.Error("Unexpected error:", err)
 	}
 
-	msg.Args = []string{nick, cmd + " nick"}
-	err = c.Dispatch(server, 0, msg, disableStateEp)
+	ev.Args = []string{nick, cmd + " nick"}
+	err = c.Dispatch(server, 0, ev, disableStateEp)
 	c.WaitForHandlers()
 	err = chkErr(err, errMsgStateDisabled)
 	if err != nil {
@@ -1124,8 +1133,9 @@ func TestCmds_DispatchVariadicUsers(t *T) {
 	var dataEndpoint = data.CreateDataEndpoint(server, buffer, state, store,
 		&stateMutex, &storeMutex)
 
-	msg := &irc.Message{
+	ev := &irc.Event{
 		Sender: host, Name: irc.PRIVMSG,
+		NetworkInfo: netInfo,
 	}
 
 	handler := &commandHandler{}
@@ -1137,8 +1147,8 @@ func TestCmds_DispatchVariadicUsers(t *T) {
 		t.Error("Unexpected error:", err)
 	}
 
-	msg.Args = []string{nick, cmd + " *user nick"}
-	err = c.Dispatch(server, 0, msg, dataEndpoint)
+	ev.Args = []string{nick, cmd + " *user nick"}
+	err = c.Dispatch(server, 0, ev, dataEndpoint)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -1170,24 +1180,24 @@ func TestCmds_DispatchVariadicUsers(t *T) {
 		}
 	}
 
-	msg.Args = []string{nick, cmd + " nick nick badnick"}
-	err = c.Dispatch(server, 0, msg, dataEndpoint)
+	ev.Args = []string{nick, cmd + " nick nick badnick"}
+	err = c.Dispatch(server, 0, ev, dataEndpoint)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtUserNotFound, "badnick"))
 	if err != nil {
 		t.Error(err)
 	}
 
-	msg.Args = []string{nick, cmd + " nick nick self"}
-	err = c.Dispatch(server, 0, msg, dataEndpoint)
+	ev.Args = []string{nick, cmd + " nick nick self"}
+	err = c.Dispatch(server, 0, ev, dataEndpoint)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtUserNotAuthed, "self"))
 	if err != nil {
 		t.Error(err)
 	}
 
-	msg.Args = []string{nick, cmd + " nick nick *badusername"}
-	err = c.Dispatch(server, 0, msg, dataEndpoint)
+	ev.Args = []string{nick, cmd + " nick nick *badusername"}
+	err = c.Dispatch(server, 0, ev, dataEndpoint)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtUserNotRegistered, "badusername"))
 	if err != nil {
@@ -1209,8 +1219,9 @@ func TestCmds_DispatchMixUserAndChan(t *T) {
 	var dataEndpoint = data.CreateDataEndpoint(server, buffer, state, store,
 		&stateMutex, &storeMutex)
 
-	msg := &irc.Message{
+	ev := &irc.Event{
 		Sender: host, Name: irc.PRIVMSG,
+		NetworkInfo: netInfo,
 	}
 
 	handler := &commandHandler{}
@@ -1222,8 +1233,8 @@ func TestCmds_DispatchMixUserAndChan(t *T) {
 		t.Error("Unexpected error:", err)
 	}
 
-	msg.Args = []string{nick, cmd + " " + channel + " nick"}
-	err = c.Dispatch(server, 0, msg, dataEndpoint)
+	ev.Args = []string{nick, cmd + " " + channel + " nick"}
+	err = c.Dispatch(server, 0, ev, dataEndpoint)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error(err)
@@ -1260,9 +1271,12 @@ func TestCmds_DispatchReflection(t *T) {
 		}
 	}
 
-	msg := &irc.Message{Name: irc.PRIVMSG, Sender: host,
-		Args: []string{"a", "reflect"}}
-	err = c.Dispatch(server, 0, msg, dataEndpoint)
+	ev := &irc.Event{
+		Name: irc.PRIVMSG, Sender: host,
+		Args:        []string{"a", "reflect"},
+		NetworkInfo: netInfo,
+	}
+	err = c.Dispatch(server, 0, ev, dataEndpoint)
 	c.WaitForHandlers()
 
 	if handler.CalledBad {
@@ -1276,8 +1290,8 @@ func TestCmds_DispatchReflection(t *T) {
 	}
 
 	handler.Called, handler.CalledBad = false, false
-	msg.Args = []string{"a", "badargnum"}
-	err = c.Dispatch(server, 0, msg, dataEndpoint)
+	ev.Args = []string{"a", "badargnum"}
+	err = c.Dispatch(server, 0, ev, dataEndpoint)
 	c.WaitForHandlers()
 
 	if !handler.CalledBad {
@@ -1288,8 +1302,8 @@ func TestCmds_DispatchReflection(t *T) {
 	}
 
 	handler.Called, handler.CalledBad = false, false
-	msg.Args = []string{"a", "noreturn"}
-	err = c.Dispatch(server, 0, msg, dataEndpoint)
+	ev.Args = []string{"a", "noreturn"}
+	err = c.Dispatch(server, 0, ev, dataEndpoint)
 	c.WaitForHandlers()
 
 	if !handler.CalledBad {
@@ -1300,8 +1314,8 @@ func TestCmds_DispatchReflection(t *T) {
 	}
 
 	handler.Called, handler.CalledBad = false, false
-	msg.Args = []string{"a", "badargs"}
-	err = c.Dispatch(server, 0, msg, dataEndpoint)
+	ev.Args = []string{"a", "badargs"}
+	err = c.Dispatch(server, 0, ev, dataEndpoint)
 	c.WaitForHandlers()
 
 	if !handler.CalledBad {
@@ -1330,7 +1344,10 @@ func TestCmds_DispatchOverridePrefix(t *T) {
 		&stateMutex, &storeMutex)
 
 	handler := &commandHandler{}
-	msg := &irc.Message{Name: irc.PRIVMSG, Sender: host}
+	ev := &irc.Event{
+		Name: irc.PRIVMSG, Sender: host,
+		NetworkInfo: netInfo,
+	}
 
 	err = c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALL, ALL))
 	if err != nil {
@@ -1338,8 +1355,8 @@ func TestCmds_DispatchOverridePrefix(t *T) {
 	}
 
 	handler.called = false
-	msg.Args = []string{channel, string(prefix) + cmd}
-	err = c.Dispatch(server, 0, msg, dataEndpoint)
+	ev.Args = []string{channel, string(prefix) + cmd}
+	err = c.Dispatch(server, 0, ev, dataEndpoint)
 	c.WaitForHandlers()
 
 	if !handler.called {
@@ -1347,8 +1364,8 @@ func TestCmds_DispatchOverridePrefix(t *T) {
 	}
 
 	handler.called = false
-	msg.Args = []string{channel, string(prefix) + cmd}
-	err = c.Dispatch(server, '!', msg, dataEndpoint)
+	ev.Args = []string{channel, string(prefix) + cmd}
+	err = c.Dispatch(server, '!', ev, dataEndpoint)
 	c.WaitForHandlers()
 
 	if handler.called {
@@ -1356,8 +1373,8 @@ func TestCmds_DispatchOverridePrefix(t *T) {
 	}
 
 	handler.called = false
-	msg.Args = []string{channel, "!" + cmd}
-	err = c.Dispatch(server, '!', msg, dataEndpoint)
+	ev.Args = []string{channel, "!" + cmd}
+	err = c.Dispatch(server, '!', ev, dataEndpoint)
 	c.WaitForHandlers()
 
 	if !handler.called {
@@ -1365,8 +1382,8 @@ func TestCmds_DispatchOverridePrefix(t *T) {
 	}
 
 	handler.called = false
-	msg.Args = []string{channel, ":" + cmd}
-	err = c.Dispatch(server, '!', msg, dataEndpoint)
+	ev.Args = []string{channel, ":" + cmd}
+	err = c.Dispatch(server, '!', ev, dataEndpoint)
 	c.WaitForHandlers()
 
 	if handler.called {
@@ -1437,8 +1454,8 @@ func TestCmds_Panic(t *T) {
 	tmpCmd := MkCmd("panic", "panic desc", "panic", handler, ALL, ALL)
 	c.Register(GLOBAL, tmpCmd)
 
-	msg := irc.NewMessage(irc.PRIVMSG, host, self, "panic")
-	err := c.Dispatch(server, 0, msg, dataEndpoint)
+	ev := irc.NewEvent("", netInfo, irc.PRIVMSG, host, self, "panic")
+	err := c.Dispatch(server, 0, ev, dataEndpoint)
 	if err != nil {
 		t.Error(err)
 	}
