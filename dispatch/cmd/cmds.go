@@ -1,14 +1,14 @@
 /*
-Package commander is a more involved dispatcher implementation. In short it
+Package cmd is a more involved dispatcher implementation. In short it
 allows users to create commands very easily rather than doing everything by hand
 in a privmsg handler.
 
 It uses the data package to achieve command access verification. It also
 provides some automatic parsing and handling of the command keyword and
-arguments. Command keywords become unique for each server and may not be
+arguments. Cmd keywords become unique for each server and may not be
 duplicated.
 */
-package commander
+package cmd
 
 import (
 	"errors"
@@ -43,20 +43,21 @@ const (
 
 // Error messages.
 const (
-	errFmtInternal         = "commander: Internal Error Occurred: %v"
-	errFmtDuplicateCommand = `commander: ` +
+	errFmtInternal     = "cmd: Internal Error Occurred: %v"
+	errFmtDuplicateCmd = `cmd: ` +
 		`Duplicate command registration attempted (%v)`
-	errMsgCmdRequired     = `commander: Command name cannot be empty.`
-	errMsgExtRequired     = `commander: Extension name cannot be empty.`
-	errMsgDescRequired    = `commander: Description cannot be empty.`
-	errMsgHandlerRequired = `commander: ` +
-		`Handler required for command registration.`
+	errMsgCmdRequired     = `cmd: Cmd name cannot be empty.`
+	errMsgExtRequired     = `cmd: Extension name cannot be empty.`
+	errMsgDescRequired    = `cmd: Description cannot be empty.`
+	errMsgHandlerRequired = `cmd: Handler required for command registration.`
 
 	errMsgStoreDisabled = "Access Denied: Cannot use authenticated commands, " +
 		"nick or user parameters when store is disabled."
 	errMsgStateDisabled = "Error: Cannot use nick or user parameter commands " +
 		"when state is disabled."
-	errMsgNotAuthed          = "Access Denied: You are not authenticated. To authenticate message me AUTH <password> [username]. If you need to create an account message me REGISTER <password> [username]."
+	errMsgNotAuthed = "Access Denied: You are not authenticated. " +
+		"To authenticate message me: auth <password>. " +
+		"To create an account message me: register <password>."
 	errFmtInsuffLevel        = "Access Denied: (%v) level required."
 	errFmtInsuffGlobalLevel  = "Access Denied: (%v) global level required."
 	errFmtInsuffServerLevel  = "Access Denied: (%v) server level required."
@@ -76,77 +77,77 @@ const (
 	errExactly               = "exactly"
 	errAtMost                = "at most"
 
-	errFmtArgumentForm = `commander: Arguments must look like: ` +
+	errFmtArgumentForm = `cmd: Arguments must look like: ` +
 		`#name OR [~|*]name OR [[~|*]name] OR [~|*]name... (given: %v)`
-	errFmtArgumentOrderReq = `commander: Required arguments must come before ` +
+	errFmtArgumentOrderReq = `cmd: Required arguments must come before ` +
 		`all [optional] and varargs... arguments. (given: %v)`
-	errFmtArgumentOrderOpt = `commander: Optional arguments must come before ` +
+	errFmtArgumentOrderOpt = `cmd: Optional arguments must come before ` +
 		`varargs... arguments. (given: %v)`
-	errFmtArgumentDupName = `commander: Argument names must be unique ` +
+	errFmtArgumentDupName = `cmd: Argument names must be unique ` +
 		`(given: %v)`
-	errFmtArgumentDupVargs = `commander: Only one varargs... argument is ` +
+	errFmtArgumentDupVargs = `cmd: Only one varargs... argument is ` +
 		`allowed (given: %v)`
-	errFmtArgumentOrderChan = `commander: The channel argument must come ` +
+	errFmtArgumentOrderChan = `cmd: The channel argument must come ` +
 		`first. (given: %v)`
-	errFmtArgumentDupChan = `commander: Only one #channel argument is ` +
+	errFmtArgumentDupChan = `cmd: Only one #channel argument is ` +
 		`allowed (given: %v)`
 )
 
 var (
-	// globalCommandRegistry is a singleton throughout the entire bot, and
+	// globalCmdRegistry is a singleton throughout the entire bot, and
 	// ensures that a command can only be registered once for each server.
-	globalCommandRegistry = make(map[string]*Command)
+	globalCmdRegistry = make(map[string]*Cmd)
 	// protectGlobalReg protects the global registry.
 	protectGlobalReg sync.RWMutex
 )
 
-// EachCommand allows safe iteration through each command in the registry. The
+// EachCmd allows safe iteration through each command in the registry. The
 // return value of the callback can be used to stop iteration by returning true.
-func EachCommand(fn func(*Command) bool) {
+func EachCmd(fn func(*Cmd) bool) {
 	protectGlobalReg.RLock()
 	defer protectGlobalReg.RUnlock()
 
-	for _, cmd := range globalCommandRegistry {
+	for _, cmd := range globalCmdRegistry {
 		if fn(cmd) {
 			break
 		}
 	}
 }
 
-// CommandHandler is the interface that Commander expects structs to implement
+// CmdHandler is the interface that Cmds expects structs to implement
 // in order to be able to handle command events. Although this interface must
 // be implemented for fallback, if the type has a method with the same name as
 // the command being invoked with the first letter uppercased and the same
-// arguments and return types as the Command function below (minus the cmd arg),
-// it will be called instead of the Command function.
+// arguments and return types as the Cmd function below (minus the cmd arg),
+// it will be called instead of the Cmd function.
 //
-// Example:
-// type Handler struct {}
-// func (b *Handler) Command(cmd string, m *irc.Message, d *data.DataEndpoint,
-//     c *commander.CommandData) error { return nil }
-// func (b *Handler) Supercommand(m *irc.Message, d *data.DataEndpoint,
-//     c *commander.CommandData) error { return nil }
+//	Example:
+//	type Handler struct {}
+//	func (b *Handler) Cmd(cmd string, d *data.DataEndpoint,
+//	    c *cmd.Event) error { return nil }
+//	func (b *Handler) Supercommand(d *data.DataEndpoint,
+//	    c *cmd.Event) error { return nil }
 //
 // !supercommand in a channel would invoke the bottom handler.
-type CommandHandler interface {
-	Command(string, *irc.Message, *data.DataEndpoint, *CommandData) error
+type CmdHandler interface {
+	Cmd(string, *data.DataEndpoint, *Event) error
 }
 
 // commandTable is used to store all the string->command assocations.
-type commandTable map[string]*Command
+type commandTable map[string]*Cmd
 
-// Commander allows for registration of commands that can involve user access,
+// Cmds allows for registration of commands that can involve user access,
 // and provides a rich programming interface for command handling.
-type Commander struct {
+type Cmds struct {
 	*dispatch.DispatchCore
-	prefix          rune
-	commands        commandTable
-	protectCommands sync.RWMutex
+	prefix      rune
+	commands    commandTable
+	protectCmds sync.RWMutex
 }
 
-// CreateCommander initializes a commander.
-func CreateCommander(prefix rune, core *dispatch.DispatchCore) *Commander {
-	return &Commander{
+// CreateCmds initializes a cmds.
+func CreateCmds(prefix rune, core *dispatch.DispatchCore) *Cmds {
+	return &Cmds{
 		DispatchCore: core,
 		prefix:       prefix,
 		commands:     make(commandTable),
@@ -154,27 +155,27 @@ func CreateCommander(prefix rune, core *dispatch.DispatchCore) *Commander {
 }
 
 // Register register's a command with the bot. See documentation for
-// Command for information about how to use this method, as well as see
-// the documentation for CommandHandler for how to respond to commands
-// registered with a commander.
+// Cmd for information about how to use this method, as well as see
+// the documentation for CmdHandler for how to respond to commands
+// registered with a cmds.
 //
 // The server parameter should be the name of the server that's registering this
 // command. The special constant GLOBAL should be used for commands that are
 // global to the bot. This ensures that no command can be registered to a single
 // server twice.
-func (c *Commander) Register(server string, cmd *Command) error {
+func (c *Cmds) Register(server string, cmd *Cmd) error {
 	regName := makeIdentifier(server, cmd.Cmd)
 	globalRegName := makeIdentifier(GLOBAL, cmd.Cmd)
 
 	protectGlobalReg.RLock()
-	_, hasServer := globalCommandRegistry[regName]
-	_, hasGlobal := globalCommandRegistry[globalRegName]
+	_, hasServer := globalCmdRegistry[regName]
+	_, hasGlobal := globalCmdRegistry[globalRegName]
 	protectGlobalReg.RUnlock()
 	if hasServer {
-		return fmt.Errorf(errFmtDuplicateCommand, regName)
+		return fmt.Errorf(errFmtDuplicateCmd, regName)
 	}
 	if hasGlobal {
-		return fmt.Errorf(errFmtDuplicateCommand, globalRegName)
+		return fmt.Errorf(errFmtDuplicateCmd, globalRegName)
 	}
 
 	switch {
@@ -193,26 +194,26 @@ func (c *Commander) Register(server string, cmd *Command) error {
 	}
 
 	protectGlobalReg.Lock()
-	c.protectCommands.Lock()
+	c.protectCmds.Lock()
 	defer protectGlobalReg.Unlock()
-	defer c.protectCommands.Unlock()
-	globalCommandRegistry[regName] = cmd
+	defer c.protectCmds.Unlock()
+	globalCmdRegistry[regName] = cmd
 	c.commands[cmd.Cmd] = cmd
 	return nil
 }
 
 // Unregister unregisters a command from the bot. server should be the name
 // of a server it was registered to, or the GLOBAL constant.
-func (c *Commander) Unregister(server, cmd string) (found bool) {
+func (c *Cmds) Unregister(server, cmd string) (found bool) {
 	protectGlobalReg.Lock()
-	c.protectCommands.Lock()
-	defer c.protectCommands.Unlock()
+	c.protectCmds.Lock()
+	defer c.protectCmds.Unlock()
 	defer protectGlobalReg.Unlock()
 
 	globalCmd := makeIdentifier(server, cmd)
 
-	if _, has := globalCommandRegistry[globalCmd]; has {
-		delete(globalCommandRegistry, globalCmd)
+	if _, has := globalCmdRegistry[globalCmd]; has {
+		delete(globalCmdRegistry, globalCmd)
 		found = true
 	}
 	if _, has := c.commands[cmd]; has {
@@ -222,8 +223,8 @@ func (c *Commander) Unregister(server, cmd string) (found bool) {
 	return
 }
 
-// Dispatch dispatches an IrcEvent into the commander's event handlers.
-func (c *Commander) Dispatch(server string, overridePrefix rune,
+// Dispatch dispatches an IrcEvent into the cmds event handlers.
+func (c *Cmds) Dispatch(server string, overridePrefix rune,
 	msg *irc.Message, ep *data.DataEndpoint) (err error) {
 
 	// Filter non privmsg/notice
@@ -266,10 +267,10 @@ func (c *Commander) Dispatch(server string, overridePrefix rune,
 		msgscope = PUBLIC
 	}
 
-	var command *Command
+	var command *Cmd
 	var ok bool
-	c.protectCommands.RLock()
-	defer c.protectCommands.RUnlock()
+	c.protectCmds.RLock()
+	defer c.protectCmds.RUnlock()
 	if command, ok = c.commands[cmd]; !ok {
 		return nil
 	}
@@ -278,8 +279,9 @@ func (c *Commander) Dispatch(server string, overridePrefix rune,
 		return nil
 	}
 
-	var cmdata = &CommandData{
-		ep: ep,
+	var ev = &Event{
+		ep:      ep,
+		Message: msg,
 	}
 
 	var args []string
@@ -289,34 +291,34 @@ func (c *Commander) Dispatch(server string, overridePrefix rune,
 
 	state := ep.OpenState()
 	store := ep.OpenStore()
-	cmdata.State = state
-	cmdata.Store = store
+	ev.State = state
+	ev.Store = store
 
 	if command.RequireAuth {
-		if cmdata.UserAccess, err = filterAccess(store, command,
+		if ev.UserAccess, err = filterAccess(store, command,
 			server, ch, ep, msg); err != nil {
 
-			cmdata.Close()
+			ev.Close()
 			ep.Notice(nick, err.Error())
 			return
 		}
 	}
 
-	if err = c.filterArgs(server, command, ch, isChan, args, cmdata, state,
+	if err = c.filterArgs(server, command, ch, isChan, args, ev, state,
 		store); err != nil {
 
-		cmdata.Close()
+		ev.Close()
 		ep.Notice(nick, err.Error())
 		return
 	}
 
 	if state != nil {
-		cmdata.User = state.GetUser(msg.Sender)
+		ev.User = state.GetUser(msg.Sender)
 		if isChan {
-			if cmdata.Channel == nil {
-				cmdata.Channel = state.GetChannel(ch)
+			if ev.Channel == nil {
+				ev.Channel = state.GetChannel(ch)
 			}
-			cmdata.UserChannelModes = state.GetUsersChannelModes(msg.Sender, ch)
+			ev.UserChannelModes = state.GetUsersChannelModes(msg.Sender, ch)
 		}
 	}
 
@@ -324,10 +326,10 @@ func (c *Commander) Dispatch(server string, overridePrefix rune,
 	go func() {
 		defer dispatch.PanicHandler()
 		defer c.HandlerFinished()
-		defer cmdata.Close()
-		ok, err := cmdNameDispatch(command.Handler, cmd, msg, ep, cmdata)
+		defer ev.Close()
+		ok, err := cmdNameDispatch(command.Handler, cmd, ep, ev)
 		if !ok {
-			err = command.Handler.Command(cmd, msg, ep, cmdata)
+			err = command.Handler.Cmd(cmd, ep, ev)
 		}
 		if err != nil {
 			ep.Notice(nick, err.Error())
@@ -339,10 +341,10 @@ func (c *Commander) Dispatch(server string, overridePrefix rune,
 
 // cmdNameDispatch attempts to dispatch an event to a function named the same
 // as the command with an uppercase letter (no camel case). The arguments
-// must be the exact same as the CommandHandler.Command with the cmd string
+// must be the exact same as the CmdHandler.Cmd with the cmd string
 // argument removed for this to work.
-func cmdNameDispatch(handler CommandHandler, cmd string, msg *irc.Message,
-	ep *data.DataEndpoint, cmdata *CommandData) (dispatched bool, err error) {
+func cmdNameDispatch(handler CmdHandler, cmd string, ep *data.DataEndpoint,
+	ev *Event) (dispatched bool, err error) {
 
 	methodName := strings.ToUpper(cmd[:1]) + cmd[1:]
 
@@ -354,22 +356,20 @@ func cmdNameDispatch(handler CommandHandler, cmd string, msg *irc.Message,
 	}
 
 	fnType := fn.Type
-	dispatched = fnType.NumIn() == 4 && fnType.NumOut() == 1
+	dispatched = fnType.NumIn() == 3 && fnType.NumOut() == 1
 	if !dispatched {
 		return
 	}
 
-	dispatched = reflect.TypeOf(msg).AssignableTo(fnType.In(1)) &&
-		reflect.TypeOf(ep).AssignableTo(fnType.In(2)) &&
-		reflect.TypeOf(cmdata).AssignableTo(fnType.In(3)) &&
+	dispatched = reflect.TypeOf(ep).AssignableTo(fnType.In(1)) &&
+		reflect.TypeOf(ev).AssignableTo(fnType.In(2)) &&
 		reflect.TypeOf(errors.New("")).AssignableTo(fnType.Out(0))
 	if !dispatched {
 		return
 	}
 
 	returnVals := fn.Func.Call([]reflect.Value{
-		reflect.ValueOf(handler), reflect.ValueOf(msg),
-		reflect.ValueOf(ep), reflect.ValueOf(cmdata),
+		reflect.ValueOf(handler), reflect.ValueOf(ep), reflect.ValueOf(ev),
 	})
 
 	// We have already verified it's type. So this should never fail.
@@ -379,7 +379,7 @@ func cmdNameDispatch(handler CommandHandler, cmd string, msg *irc.Message,
 
 // filterAccess ensures that a user has the correct access to perform the given
 // command.
-func filterAccess(store *data.Store, command *Command, server, channel string,
+func filterAccess(store *data.Store, command *Cmd, server, channel string,
 	ep *data.DataEndpoint, msg *irc.Message) (*data.UserAccess, error) {
 
 	hasLevel := command.ReqLevel != 0
@@ -404,13 +404,13 @@ func filterAccess(store *data.Store, command *Command, server, channel string,
 }
 
 // filterArgs parses all the arguments. It looks up channel and user arguments
-// using the state and store, and generally populates the CommandData struct
+// using the state and store, and generally populates the Event struct
 // with argument information.
-func (c *Commander) filterArgs(server string, command *Command, channel string,
-	isChan bool, msgArgs []string, cmdata *CommandData,
+func (c *Cmds) filterArgs(server string, command *Cmd, channel string,
+	isChan bool, msgArgs []string, ev *Event,
 	state *data.State, store *data.Store) (err error) {
 
-	cmdata.args = make(map[string]string)
+	ev.args = make(map[string]string)
 
 	i, j := 0, 0
 	for i = 0; i < len(command.args); i, j = i+1, j+1 {
@@ -425,7 +425,7 @@ func (c *Commander) filterArgs(server string, command *Command, channel string,
 				return errors.New(errMsgStateDisabled)
 			}
 			var consumed bool
-			if consumed, err = c.parseChanArg(command, cmdata, state, j,
+			if consumed, err = c.parseChanArg(command, ev, state, j,
 				msgArgs, channel, isChan); err != nil {
 				return
 			} else if !consumed {
@@ -440,25 +440,25 @@ func (c *Commander) filterArgs(server string, command *Command, channel string,
 				return fmt.Errorf(errFmtNArguments, errAtLeast, nReq,
 					strings.Join(command.Args, " "))
 			}
-			cmdata.args[arg.Name] = msgArgs[j]
+			ev.args[arg.Name] = msgArgs[j]
 		case opt:
 			if j >= len(msgArgs) {
 				return
 			}
-			cmdata.args[arg.Name] = msgArgs[j]
+			ev.args[arg.Name] = msgArgs[j]
 		case varg:
 			if j >= len(msgArgs) {
 				return
 			}
-			cmdata.args[arg.Name] = strings.Join(msgArgs[j:], " ")
+			ev.args[arg.Name] = strings.Join(msgArgs[j:], " ")
 		}
 
 		if nick || user {
 			if varg {
-				err = c.parseUserArg(cmdata, state, store, server, arg.Name,
+				err = c.parseUserArg(ev, state, store, server, arg.Name,
 					arg.Type, msgArgs[j:]...)
 			} else {
-				err = c.parseUserArg(cmdata, state, store, server, arg.Name,
+				err = c.parseUserArg(ev, state, store, server, arg.Name,
 					arg.Type, msgArgs[j])
 			}
 			if err != nil {
@@ -486,7 +486,7 @@ func (c *Commander) filterArgs(server string, command *Command, channel string,
 // parseChanArg checks the argument provided and ensures it's a valid situation
 // for the channel arg to be in (isChan & validChan) | (isChan & missing) |
 // (!isChan & validChan)
-func (c *Commander) parseChanArg(command *Command, cmdata *CommandData,
+func (c *Cmds) parseChanArg(command *Cmd, ev *Event,
 	state *data.State,
 	index int, msgArgs []string, channel string, isChan bool) (bool, error) {
 
@@ -501,17 +501,17 @@ func (c *Commander) parseChanArg(command *Command, cmdata *CommandData,
 	name := command.args[index].Name
 	if isChan {
 		if !isFirstChan {
-			cmdata.args[name] = channel
-			cmdata.Channel = state.GetChannel(channel)
-			cmdata.TargetChannel = cmdata.Channel
+			ev.args[name] = channel
+			ev.Channel = state.GetChannel(channel)
+			ev.TargetChannel = ev.Channel
 			return false, nil
 		}
-		cmdata.args[name] = msgArgs[index]
-		cmdata.TargetChannel = state.GetChannel(msgArgs[index])
+		ev.args[name] = msgArgs[index]
+		ev.TargetChannel = state.GetChannel(msgArgs[index])
 		return true, nil
 	} else if isFirstChan {
-		cmdata.args[name] = msgArgs[index]
-		cmdata.TargetChannel = state.GetChannel(msgArgs[index])
+		ev.args[name] = msgArgs[index]
+		ev.TargetChannel = state.GetChannel(msgArgs[index])
 		return true, nil
 	}
 
@@ -520,7 +520,7 @@ func (c *Commander) parseChanArg(command *Command, cmdata *CommandData,
 
 // parseUserArg takes user arguments and assigns them to the correct structures
 // in a command data struct.
-func (c *Commander) parseUserArg(cmdata *CommandData, state *data.State,
+func (c *Cmds) parseUserArg(ev *Event, state *data.State,
 	store *data.Store, srv, name string, t argType, users ...string) error {
 
 	vargs := (t & VARIADIC) != 0
@@ -533,39 +533,39 @@ func (c *Commander) parseUserArg(cmdata *CommandData, state *data.State,
 	addData := func(index int) {
 		if access != nil {
 			if vargs {
-				cmdata.TargetVarUserAccess[index] = access
+				ev.TargetVarUserAccess[index] = access
 			} else {
-				cmdata.TargetUserAccess[name] = access
+				ev.TargetUserAccess[name] = access
 			}
 		}
 		if user != nil {
 			if vargs {
-				cmdata.TargetVarUsers[index] = user
+				ev.TargetVarUsers[index] = user
 			} else {
-				cmdata.TargetUsers[name] = user
+				ev.TargetUsers[name] = user
 			}
 		}
 	}
 
 	if vargs {
-		cmdata.TargetVarUsers = make([]*data.User, nUsers)
+		ev.TargetVarUsers = make([]*data.User, nUsers)
 	} else {
-		if cmdata.TargetUsers == nil {
-			cmdata.TargetUsers = make(map[string]*data.User)
+		if ev.TargetUsers == nil {
+			ev.TargetUsers = make(map[string]*data.User)
 		}
 	}
 
 	switch t & USERMASK {
 	case USER:
 		if vargs {
-			cmdata.TargetVarUserAccess = make([]*data.UserAccess, nUsers)
+			ev.TargetVarUserAccess = make([]*data.UserAccess, nUsers)
 		} else {
-			if cmdata.TargetUserAccess == nil {
-				cmdata.TargetUserAccess = make(map[string]*data.UserAccess)
+			if ev.TargetUserAccess == nil {
+				ev.TargetUserAccess = make(map[string]*data.UserAccess)
 			}
 		}
 		for i, u := range users {
-			access, user, err = cmdata.FindAccessByUser(srv, u)
+			access, user, err = ev.FindAccessByUser(srv, u)
 			if err != nil {
 				return err
 			}
@@ -573,7 +573,7 @@ func (c *Commander) parseUserArg(cmdata *CommandData, state *data.State,
 		}
 	case NICK:
 		for i, u := range users {
-			user, err = cmdata.FindUserByNick(u)
+			user, err = ev.FindUserByNick(u)
 			if err != nil {
 				return err
 			}
@@ -584,8 +584,8 @@ func (c *Commander) parseUserArg(cmdata *CommandData, state *data.State,
 	return nil
 }
 
-// GetPrefix returns the prefix used by this commander instance.
-func (c *Commander) GetPrefix() rune {
+// GetPrefix returns the prefix used by this cmds instance.
+func (c *Cmds) GetPrefix() rune {
 	return c.prefix
 }
 

@@ -1,4 +1,4 @@
-package commander
+package cmd
 
 import (
 	"bytes"
@@ -24,8 +24,8 @@ func init() {
 type commandHandler struct {
 	called          bool
 	cmd             string
-	msg             *irc.Message
 	end             irc.Endpoint
+	msg             *irc.Message
 	user            *data.User
 	channel         *data.Channel
 	targChan        *data.Channel
@@ -40,32 +40,32 @@ type commandHandler struct {
 	store           *data.Store
 }
 
-func (b *commandHandler) Command(cmd string, msg *irc.Message,
-	end *data.DataEndpoint, cmdata *CommandData) (err error) {
+func (b *commandHandler) Cmd(cmd string,
+	end *data.DataEndpoint, ev *Event) (err error) {
 
 	b.called = true
 	b.cmd = cmd
-	b.msg = msg
 	b.end = end
-	b.user = cmdata.User
-	b.access = cmdata.UserAccess
-	b.usrchanmodes = cmdata.UserChannelModes
-	b.channel = cmdata.Channel
-	b.targChan = cmdata.TargetChannel
-	b.targUsers = cmdata.TargetUsers
-	b.targUserAccs = cmdata.TargetUserAccess
-	b.targVarUsers = cmdata.TargetVarUsers
-	b.targVarUserAccs = cmdata.TargetVarUserAccess
-	b.args = cmdata.args
-	b.state = cmdata.State
-	b.store = cmdata.Store
+	b.msg = ev.Message
+	b.user = ev.User
+	b.access = ev.UserAccess
+	b.usrchanmodes = ev.UserChannelModes
+	b.channel = ev.Channel
+	b.targChan = ev.TargetChannel
+	b.targUsers = ev.TargetUsers
+	b.targUserAccs = ev.TargetUserAccess
+	b.targVarUsers = ev.TargetVarUsers
+	b.targVarUserAccs = ev.TargetVarUserAccess
+	b.args = ev.args
+	b.state = ev.State
+	b.store = ev.Store
 
 	// Test Coverage obviously will work.
-	for k, v := range cmdata.args {
-		if cmdata.GetArg(k) != v {
+	for k, v := range ev.args {
+		if ev.GetArg(k) != v {
 			return fmt.Errorf("The argument was not accessible by GetArg")
 		}
-		for _, arg := range cmdata.SplitArg(k) {
+		for _, arg := range ev.SplitArg(k) {
 			if !strings.Contains(v, arg) {
 				return fmt.Errorf("The argument was not accessbile by SplitArg")
 			}
@@ -79,46 +79,43 @@ type errorHandler struct {
 	Error error
 }
 
-func (e *errorHandler) Command(_ string, _ *irc.Message, _ *data.DataEndpoint,
-	_ *CommandData) error {
+func (e *errorHandler) Cmd(_ string, _ *data.DataEndpoint, _ *Event) error {
 
 	return e.Error
 }
 
-type reflectCommandHandler struct {
+type reflectCmdHandler struct {
 	Called    bool
 	CalledBad bool
 	Error     error
 }
 
-func (b *reflectCommandHandler) Command(cmd string, msg *irc.Message,
-	end *data.DataEndpoint, cmdata *CommandData) (err error) {
-
+func (b *reflectCmdHandler) Cmd(cmd string, end *data.DataEndpoint,
+	ev *Event) (err error) {
 	b.CalledBad = true
 	return
 }
 
-func (b *reflectCommandHandler) Cmd(msg *irc.Message,
-	end *data.DataEndpoint, cmdata *CommandData) (err error) {
-
+func (b *reflectCmdHandler) Reflect(end *data.DataEndpoint,
+	ev *Event) (err error) {
 	b.Called = true
 	return b.Error
 }
 
-func (b *reflectCommandHandler) Badargnum(msg *irc.Message,
-	end *data.DataEndpoint, cmdata *data.DataEndpoint) (err error) {
+func (b *reflectCmdHandler) Badargnum(end *data.DataEndpoint,
+	ev *data.DataEndpoint) (err error) {
 	b.Called = true
 	return
 }
 
-func (b *reflectCommandHandler) Noreturn(msg *irc.Message,
-	end *data.DataEndpoint, cmdata *data.DataEndpoint) {
+func (b *reflectCmdHandler) Noreturn(end *data.DataEndpoint,
+	ev *data.DataEndpoint) {
 	b.Called = true
 	return
 }
 
-func (b *reflectCommandHandler) Badargs(msg *irc.Message,
-	end *data.DataEndpoint, cmdata *data.DataEndpoint) (err error) {
+func (b *reflectCmdHandler) Badargs(end *data.DataEndpoint,
+	ev *data.DataEndpoint) (err error) {
 	b.Called = true
 	return
 }
@@ -127,8 +124,8 @@ type panicHandler struct {
 	PanicMessage string
 }
 
-func (p panicHandler) Command(cmd string, msg *irc.Message,
-	end *data.DataEndpoint, cmdata *CommandData) error {
+func (p panicHandler) Cmd(cmd string, end *data.DataEndpoint,
+	ev *Event) error {
 	panic(p.PanicMessage)
 	return nil
 }
@@ -202,10 +199,10 @@ func setupForAuth() (state *data.State, store *data.Store,
 var core = dispatch.CreateDispatchCore(irc.CreateProtoCaps())
 var prefix = '.'
 
-func TestCommander(t *T) {
-	c := CreateCommander(prefix, core)
+func TestCmds(t *T) {
+	c := CreateCmds(prefix, core)
 	if c == nil {
-		t.Fatal("Commander should not be nil.")
+		t.Fatal("Cmds should not be nil.")
 	}
 	if c.prefix != prefix {
 		t.Error("Prefix not set correctly.")
@@ -234,8 +231,8 @@ func chkStr(msg, pattern string) error {
 	return nil
 }
 
-func TestCommander_Register(t *T) {
-	c := CreateCommander(prefix, core)
+func TestCmds_Register(t *T) {
+	c := CreateCmds(prefix, core)
 
 	var handler = &commandHandler{}
 
@@ -247,7 +244,7 @@ func TestCommander_Register(t *T) {
 		t.Error(err)
 	}
 
-	helper := func(args ...string) *Command {
+	helper := func(args ...string) *Cmd {
 		return MkCmd(ext, dsc, cmd, handler, ALL, ALL, args...)
 	}
 
@@ -347,13 +344,13 @@ func TestCommander_Register(t *T) {
 	}
 
 	err = c.Register(GLOBAL, helper())
-	err = chkErr(err, errFmtDuplicateCommand)
+	err = chkErr(err, errFmtDuplicateCmd)
 	if err != nil {
 		t.Error(err)
 	}
 
 	err = c.Register("otherserv", helper())
-	err = chkErr(err, errFmtDuplicateCommand)
+	err = chkErr(err, errFmtDuplicateCmd)
 	if err != nil {
 		t.Error(err)
 	}
@@ -368,8 +365,8 @@ func TestCommander_Register(t *T) {
 	}
 }
 
-func TestCommander_RegisterProtected(t *T) {
-	c := CreateCommander(prefix, core)
+func TestCmds_RegisterProtected(t *T) {
+	c := CreateCmds(prefix, core)
 
 	handler := &commandHandler{}
 	var success bool
@@ -385,12 +382,12 @@ func TestCommander_RegisterProtected(t *T) {
 	}
 }
 
-func TestCommander_Dispatch(t *T) {
+func TestCmds_Dispatch(t *T) {
 	dcore := dispatch.CreateDispatchCore(irc.CreateProtoCaps())
-	c := CreateCommander(prefix, dcore)
+	c := CreateCmds(prefix, dcore)
 	c.AddChannels(channel)
 	if c == nil {
-		t.Error("Commander should not be nil.")
+		t.Error("Cmds should not be nil.")
 	}
 
 	var buffer = &bytes.Buffer{}
@@ -558,11 +555,11 @@ func TestCommander_Dispatch(t *T) {
 					t.Error("The user modes were not passed to the handler.")
 				}
 			}
-			if handler.msg == nil {
-				t.Error("The message was not passed to the handler.")
-			}
 			if handler.end == nil {
 				t.Error("The endpoint was not passed to the handler.")
+			}
+			if handler.msg == nil {
+				t.Error("The message was not passed to the handler.")
 			}
 			if handler.state == nil {
 				t.Error("The state was not set in the command data.")
@@ -595,8 +592,8 @@ func TestCommander_Dispatch(t *T) {
 	}
 }
 
-func TestCommander_DispatchAuthed(t *T) {
-	c := CreateCommander(prefix, core)
+func TestCmds_DispatchAuthed(t *T) {
+	c := CreateCmds(prefix, core)
 
 	var table = []struct {
 		Sender   string
@@ -701,8 +698,8 @@ func TestCommander_DispatchAuthed(t *T) {
 	}
 }
 
-func TestCommander_DispatchNils(t *T) {
-	c := CreateCommander(prefix, core)
+func TestCmds_DispatchNils(t *T) {
+	c := CreateCmds(prefix, core)
 	var buffer = &bytes.Buffer{}
 	var stateMutex, storeMutex sync.RWMutex
 
@@ -752,8 +749,8 @@ func TestCommander_DispatchNils(t *T) {
 	}
 }
 
-func TestCommander_DispatchReturns(t *T) {
-	c := CreateCommander(prefix, core)
+func TestCmds_DispatchReturns(t *T) {
+	c := CreateCmds(prefix, core)
 	var buffer = &bytes.Buffer{}
 	var stateMutex, storeMutex sync.RWMutex
 
@@ -808,8 +805,8 @@ func TestCommander_DispatchReturns(t *T) {
 	}
 }
 
-func TestCommander_DispatchChannel(t *T) {
-	c := CreateCommander(prefix, core)
+func TestCmds_DispatchChannel(t *T) {
+	c := CreateCmds(prefix, core)
 	var buffer = &bytes.Buffer{}
 	var stateMutex, storeMutex sync.RWMutex
 
@@ -915,8 +912,8 @@ func TestCommander_DispatchChannel(t *T) {
 	}
 }
 
-func TestCommander_DispatchUsers(t *T) {
-	c := CreateCommander(prefix, core)
+func TestCmds_DispatchUsers(t *T) {
+	c := CreateCmds(prefix, core)
 	var buffer = &bytes.Buffer{}
 	var stateMutex, storeMutex sync.RWMutex
 
@@ -1013,8 +1010,8 @@ func TestCommander_DispatchUsers(t *T) {
 	}
 }
 
-func TestCommander_DispatchErrors(t *T) {
-	c := CreateCommander(prefix, core)
+func TestCmds_DispatchErrors(t *T) {
+	c := CreateCmds(prefix, core)
 	var buffer = &bytes.Buffer{}
 	var stateMutex, storeMutex sync.RWMutex
 
@@ -1118,8 +1115,8 @@ func TestCommander_DispatchErrors(t *T) {
 	}
 }
 
-func TestCommander_DispatchVariadicUsers(t *T) {
-	c := CreateCommander(prefix, core)
+func TestCmds_DispatchVariadicUsers(t *T) {
+	c := CreateCmds(prefix, core)
 	var buffer = &bytes.Buffer{}
 	var stateMutex, storeMutex sync.RWMutex
 
@@ -1203,8 +1200,8 @@ func TestCommander_DispatchVariadicUsers(t *T) {
 	}
 }
 
-func TestCommander_DispatchMixUserAndChan(t *T) {
-	c := CreateCommander(prefix, core)
+func TestCmds_DispatchMixUserAndChan(t *T) {
+	c := CreateCmds(prefix, core)
 	var buffer = &bytes.Buffer{}
 	var stateMutex, storeMutex sync.RWMutex
 
@@ -1242,8 +1239,8 @@ func TestCommander_DispatchMixUserAndChan(t *T) {
 	}
 }
 
-func TestCommander_DispatchReflection(t *T) {
-	c := CreateCommander(prefix, core)
+func TestCmds_DispatchReflection(t *T) {
+	c := CreateCmds(prefix, core)
 	var buffer = &bytes.Buffer{}
 	var err error
 	var stateMutex, storeMutex sync.RWMutex
@@ -1253,9 +1250,9 @@ func TestCommander_DispatchReflection(t *T) {
 		&stateMutex, &storeMutex)
 
 	errMsg := "error"
-	handler := &reflectCommandHandler{Error: fmt.Errorf(errMsg)}
+	handler := &reflectCmdHandler{Error: fmt.Errorf(errMsg)}
 
-	cmds := []string{cmd, "badargnum", "noreturn", "badargs"}
+	cmds := []string{"reflect", "badargnum", "noreturn", "badargs"}
 	for _, command := range cmds {
 		err = c.Register(GLOBAL, MkCmd(ext, dsc, command, handler, ALL, ALL))
 		if err != nil {
@@ -1264,15 +1261,15 @@ func TestCommander_DispatchReflection(t *T) {
 	}
 
 	msg := &irc.Message{Name: irc.PRIVMSG, Sender: host,
-		Args: []string{"a", cmd}}
+		Args: []string{"a", "reflect"}}
 	err = c.Dispatch(server, 0, msg, dataEndpoint)
 	c.WaitForHandlers()
 
 	if handler.CalledBad {
-		t.Error("The reflection should call Cmd method instead of Command.")
+		t.Error("The reflection should call Reflect method instead of Cmd.")
 	}
 	if !handler.Called {
-		t.Error("Expected a call to Cmd.")
+		t.Error("Expected a call to Reflect.")
 	}
 	if !strings.Contains(buffer.String(), errMsg) {
 		t.Error("Expected:", buffer.String(), "to contain:", errMsg)
@@ -1284,7 +1281,7 @@ func TestCommander_DispatchReflection(t *T) {
 	c.WaitForHandlers()
 
 	if !handler.CalledBad {
-		t.Error("Expecting fallback to Command when reflection fails.")
+		t.Error("Expecting fallback to Cmd when reflection fails.")
 	}
 	if handler.Called {
 		t.Error("Not expecting it to be able to call this handler.")
@@ -1296,7 +1293,7 @@ func TestCommander_DispatchReflection(t *T) {
 	c.WaitForHandlers()
 
 	if !handler.CalledBad {
-		t.Error("Expecting fallback to Command when reflection fails.")
+		t.Error("Expecting fallback to Cmd when reflection fails.")
 	}
 	if handler.Called {
 		t.Error("Not expecting it to be able to call this handler.")
@@ -1308,7 +1305,7 @@ func TestCommander_DispatchReflection(t *T) {
 	c.WaitForHandlers()
 
 	if !handler.CalledBad {
-		t.Error("Expecting fallback to Command when reflection fails.")
+		t.Error("Expecting fallback to Cmd when reflection fails.")
 	}
 	if handler.Called {
 		t.Error("Not expecting it to be able to call this handler.")
@@ -1322,8 +1319,8 @@ func TestCommander_DispatchReflection(t *T) {
 	}
 }
 
-func TestCommander_DispatchOverridePrefix(t *T) {
-	c := CreateCommander(prefix, core)
+func TestCmds_DispatchOverridePrefix(t *T) {
+	c := CreateCmds(prefix, core)
 	var buffer = &bytes.Buffer{}
 	var err error
 	var stateMutex, storeMutex sync.RWMutex
@@ -1382,8 +1379,8 @@ func TestCommander_DispatchOverridePrefix(t *T) {
 	}
 }
 
-func TestCommander_EachCommand(t *T) {
-	c := CreateCommander(prefix, core)
+func TestCmds_EachCmd(t *T) {
+	c := CreateCmds(prefix, core)
 	var err error
 
 	handler := &errorHandler{}
@@ -1398,7 +1395,7 @@ func TestCommander_EachCommand(t *T) {
 	}
 
 	visitedCmd, visitedOther := false, false
-	EachCommand(func(command *Command) bool {
+	EachCmd(func(command *Cmd) bool {
 		visitedCmd = visitedCmd || command.Cmd == cmd
 		visitedOther = visitedOther || command.Cmd == "other"
 		return visitedCmd
@@ -1422,9 +1419,9 @@ func TestCommander_EachCommand(t *T) {
 	}
 }
 
-func TestCommander_Panic(t *T) {
+func TestCmds_Panic(t *T) {
 	logBuffer.Reset()
-	c := CreateCommander(prefix, core)
+	c := CreateCmds(prefix, core)
 	panicMsg := "dispatch panic"
 
 	var buffer = &bytes.Buffer{}
@@ -1458,7 +1455,7 @@ func TestCommander_Panic(t *T) {
 		t.Errorf("Log does not contain: %s\n%s", panicMsg, logBytes)
 	}
 
-	if !bytes.Contains(logBytes, []byte("commander_test.go")) {
+	if !bytes.Contains(logBytes, []byte("cmds_test.go")) {
 		t.Error("Does not contain a reference to file that panic'd")
 	}
 }

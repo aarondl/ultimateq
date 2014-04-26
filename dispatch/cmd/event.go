@@ -1,34 +1,37 @@
-package commander
+package cmd
 
 import (
 	"errors"
 	"fmt"
-	"github.com/aarondl/ultimateq/data"
 	"strings"
 	"sync"
+
+	"github.com/aarondl/ultimateq/data"
+	"github.com/aarondl/ultimateq/irc"
 )
 
-// CommandData represents the data about the event that occurred. The commander
-// fills the CommandData structure with information about the user and channel
+// Event represents the data about the event that occurred. The commander
+// fills the Event structure with information about the user and channel
 // involved. It also embeds the State and Store for easy access.
 //
-// CommandData comes with the implication that the State and Store
+// Event comes with the implication that the State and Store
 // have been locked for reading, A typical event handler that quickly does some
 // work and returns does not need to worry about calling Close() since it is
 // guaranteed to automatically be closed when the
 // handler returns. But a call to Close() must be given in a
 // command handler that will do some long running processes. Note that all data
-// in the CommandData struct becomes volatile and not thread-safe after a call
-// to Close() has been made, so the values in the CommandData struct are set to
+// in the Event struct becomes volatile and not thread-safe after a call
+// to Close() has been made, so the values in the Event struct are set to
 // nil but extra caution should be made when copying data from this struct and
 // calling Close() afterwards since this data is shared between other parts of
 // the bot.
 //
-// Some parts of CommandData will be nil under certain circumstances so elements
+// Some parts of Event will be nil under certain circumstances so elements
 // within must be checked for nil, see each element's documentation
 // for further information.
-type CommandData struct {
+type Event struct {
 	ep *data.DataEndpoint
+	*irc.Message
 	*data.State
 	*data.Store
 	// User can be nil if the bot's State is disabled.
@@ -64,13 +67,13 @@ type CommandData struct {
 
 // GetArg gets an argument that was passed in to the command by the user. The
 // name of the argument passed into Register() is required to get the argument.
-func (cd *CommandData) GetArg(arg string) string {
+func (cd *Event) GetArg(arg string) string {
 	return cd.args[arg]
 }
 
 // SplitArg behaves exactly like GetArg but calls strings.Fields on the
 // argument. Useful for varargs...
-func (cd *CommandData) SplitArg(arg string) (args []string) {
+func (cd *Event) SplitArg(arg string) (args []string) {
 	if str, ok := cd.args[arg]; ok && len(str) > 0 {
 		args = strings.Fields(str)
 	}
@@ -79,7 +82,7 @@ func (cd *CommandData) SplitArg(arg string) (args []string) {
 
 // FindUserByNick finds a user by their nickname. An error is returned if
 // they were not found.
-func (cd *CommandData) FindUserByNick(nick string) (*data.User, error) {
+func (cd *Event) FindUserByNick(nick string) (*data.User, error) {
 	if cd.State == nil {
 		return nil, errors.New(errMsgStateDisabled)
 	}
@@ -97,7 +100,7 @@ func (cd *CommandData) FindUserByNick(nick string) (*data.User, error) {
 // username in the string. The user parameter is returned when a nickname lookup
 // is done. An error occurs if the user is not found, the user is not authed,
 // the username is not registered, etc.
-func (cd *CommandData) FindAccessByUser(server, nickOrUser string) (
+func (cd *Event) FindAccessByUser(server, nickOrUser string) (
 	access *data.UserAccess, user *data.User, err error) {
 	if cd.Store == nil {
 		err = errors.New(errMsgStoreDisabled)
@@ -141,10 +144,10 @@ func (cd *CommandData) FindAccessByUser(server, nickOrUser string) (
 }
 
 // Close closes the handles to the internal structures. Calling Close is not
-// required. See CommandData's documentation for when to call this method.
-// All CommandData's methods and fields become invalid after a call to Close.
-// Close will never return an error so it should be ignored.
-func (cd *CommandData) Close() error {
+// required. See Event's documentation for when to call this method.
+// All Event's methods and fields become invalid after a call to Close.
+// Close will never return an error so it can be safely ignored.
+func (cd *Event) Close() error {
 	cd.once.Do(func() {
 		cd.User = nil
 		cd.UserAccess = nil

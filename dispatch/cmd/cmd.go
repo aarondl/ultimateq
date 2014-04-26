@@ -1,4 +1,4 @@
-package commander
+package cmd
 
 import (
 	"fmt"
@@ -38,8 +38,8 @@ type argument struct {
 	Type     argType
 }
 
-// Command holds all the information about a command.
-type Command struct {
+// Cmd holds all the information about a command.
+type Cmd struct {
 	// The name of the command.
 	Cmd string
 	// Extension is the name of the extension registering this command.
@@ -91,18 +91,18 @@ type Command struct {
 	// ReqFlags is the required flags for use.
 	ReqFlags string
 	// Handler the handler structure that will handle events for this command.
-	Handler CommandHandler
+	Handler CmdHandler
 	// args stores data about each argument after it's parsed.
 	args    []argument
 	reqArgs int
 	optArgs int
 }
 
-// MkCmd is a helper method to easily create a Command. See the documentation
-// for Command on what each parameter is.
-func MkCmd(ext, desc, cmd string, handler CommandHandler, msgtype, msgscope int,
-	args ...string) *Command {
-	return &Command{
+// MkCmd is a helper method to easily create a Cmd. See the documentation
+// for Cmd on what each parameter is.
+func MkCmd(ext, desc, cmd string, handler CmdHandler, msgtype, msgscope int,
+	args ...string) *Cmd {
+	return &Cmd{
 		Cmd:         cmd,
 		Extension:   ext,
 		Description: desc,
@@ -113,11 +113,11 @@ func MkCmd(ext, desc, cmd string, handler CommandHandler, msgtype, msgscope int,
 	}
 }
 
-// MkAuthCmd is a helper method to easily create an authenticated Command. See
-// the documentation on Command for what each parameter is.
-func MkAuthCmd(ext, desc, cmd string, handler CommandHandler,
+// MkAuthCmd is a helper method to easily create an authenticated Cmd. See
+// the documentation on Cmd for what each parameter is.
+func MkAuthCmd(ext, desc, cmd string, handler CmdHandler,
 	msgtype, msgscope int, reqLevel uint8, reqFlags string,
-	args ...string) *Command {
+	args ...string) *Cmd {
 
 	command := MkCmd(ext, desc, cmd, handler, msgtype, msgscope, args...)
 	command.RequireAuth = true
@@ -126,8 +126,8 @@ func MkAuthCmd(ext, desc, cmd string, handler CommandHandler,
 	return command
 }
 
-// setArgs parses and sets the arguments for a command.
-func (c *Command) parseArgs() error {
+// parseArgs parses and sets the arguments for a command.
+func (c *Cmd) parseArgs() error {
 	nArgs := len(c.Args)
 	if nArgs == 0 {
 		return nil
