@@ -2,86 +2,77 @@ package parse
 
 import (
 	"strings"
+	"github.com/aarondl/ultimateq/irc"
 	"testing"
-	. "gopkg.in/check.v1"
 )
 
-func Test(t *testing.T) { TestingT(t) } //Hook into testing package
-
-type s struct{}
-
-var _ = Suite(&s{})
-
-var testargs = []string{
-	":nick!user@host.com",
-	"PRIVMSG",
-	"&channel1,#channel2",
-	":message1 message2",
+func b(s string) []byte {
+	return []byte(s)
 }
 
-func (s *s) TestParse(c *C) {
-	msg, err := Parse([]byte(strings.Join(testargs, " ")))
-	c.Check(err, IsNil)
-	c.Check(msg.Sender, Equals, strings.TrimLeft(testargs[0], ":"))
-	c.Check(msg.Name, Equals, testargs[1])
-	c.Check(len(msg.Args), Equals, 2)
-	c.Check(msg.Args[0], Equals, testargs[2])
-	c.Check(msg.Args[1], Equals, strings.TrimLeft(testargs[3], ":"))
+type a []string
 
-	msg, err = Parse([]byte(strings.Join(testargs[1:], " ")))
-	c.Check(err, IsNil)
-	c.Check(msg.Sender, Equals, "")
-
-	msg, err = Parse([]byte(strings.Join(testargs[:len(testargs)-1], " ")))
-	c.Check(err, IsNil)
-	c.Check(len(msg.Args), Equals, 1)
-	c.Check(msg.Args[0], Equals, testargs[2])
-}
-
-func (s *s) TestParse_Ping(c *C) {
-	test1 := "PING"
-	test2 := ":12312323"
-	msg, err := Parse([]byte(strings.Join([]string{test1, test2}, " ")))
-	c.Check(err, IsNil)
-	c.Check(msg.Name, Equals, test1)
-	c.Check(msg.Args[0], Equals, test2[1:])
-}
-
-func (s *s) TestParse_TrailingSpace(c *C) {
-	test1 := "PING"
-	test2 := "12312323 "
-	msg, err := Parse([]byte(strings.Join([]string{test1, test2}, " ")))
-	c.Check(err, IsNil)
-	c.Check(msg.Name, Equals, test1)
-	c.Check(msg.Args[0], Equals, strings.TrimSpace(test2))
-}
-
-func (s *s) TestParse_ExtraSemicolons(c *C) {
-	sender := ":irc.test.net"
-	name := "005"
-	args := []string{
-		"nobody1", "RFC2812", "CHANLIMIT=#&:+20", ":are supported",
+func TestParse(t *testing.T) {
+	sender := ":nick!user@host.com"
+	testargs := []string{
+		"&channel1,#channel2",
+		":message1 message2",
 	}
-	raw := []byte(strings.Join([]string{
-		sender, name, strings.Join(args, " "),
-	}, " "))
-	msg, err := Parse(raw)
-	c.Check(err, IsNil)
-	c.Check(msg.Name, Equals, name)
-	c.Check(msg.Sender, Equals, sender[1:])
-	c.Check(msg.Args[0], Equals, args[0])
-	c.Check(msg.Args[1], Equals, args[1])
-	c.Check(msg.Args[2], Equals, args[2])
-	c.Check(msg.Args[3], Equals, args[3][1:])
-}
 
-func (s *s) TestParse_Error(c *C) {
-	_, err := Parse([]byte{})
-	c.Check(err.Error(), Equals, errMsgParseFailure)
+	wholeMsg := sender + " " + irc.PRIVMSG + " " + strings.Join(testargs, " ")
+	noSender := irc.PRIVMSG + " " + strings.Join(testargs, " ")
 
-	irc := "invalid irc message"
-	_, err = Parse([]byte(irc))
-	e, ok := err.(ParseError)
-	c.Check(ok, Equals, true)
-	c.Check(e.Irc, Equals, irc)
+	tests := []struct{
+		Msg []byte
+		Name string
+		Sender string
+		Args []string
+		Error bool
+	}{
+		{b(wholeMsg), irc.PRIVMSG, sender, testargs, false},
+		{b(noSender), irc.PRIVMSG, "", testargs, false},
+		{b(":irc PING :4005945"), irc.PING, "irc", a{"4005945"}, false},
+		{b(":irc PING 4005945 "), irc.PING, "irc", a{"4005945"}, false},
+		{b(":irc 005 nobody1 RFC2812 CHANLIMIT=#&:+20 :are supported"),
+			irc.RPL_ISUPPORT, "irc",
+			a{"nobody1", "RFC2812", "CHANLIMIT=#&:+20", "are supported"},
+			false,
+		},
+		{b("irc fail message"), "", "", nil, true},
+	}
+
+	for _, test := range tests {
+		ev, err := Parse(test.Msg)
+
+		if !test.Error && err != nil {
+			t.Errorf("%s => Unexpected Error: %v", test.Msg, err)
+		} else if test.Error && err == nil {
+			t.Errorf("%s => Expected error but got nothing", test.Msg)
+		} else {
+			continue
+		}
+
+		if ev.Name != test.Name {
+			t.Errorf("%s => Expected name: %v got %v",
+				test.Msg, test.Name, ev.Name)
+		}
+
+		if ev.Sender != strings.TrimLeft(test.Sender, ":") {
+			t.Errorf("%s => Expected sender: %v got %v",
+				test.Msg, test.Sender[1:], ev.Sender)
+		}
+
+		if len(test.Args) != len(ev.Args) {
+			t.Errorf("%s => Expected: %d arguments, got: %d",
+				test.Msg, len(test.Args), len(ev.Args))
+		}
+
+		for i, expectArg := range test.Args {
+			expectArg = strings.TrimLeft(expectArg, ":")
+			if ev.Args[i] != expectArg {
+				t.Errorf("%s => Expected Arg[%d]: %s, got: %s",
+					test.Msg, i, expectArg, ev.Args[i])
+			}
+		}
+	}
 }
