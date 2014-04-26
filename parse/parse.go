@@ -4,9 +4,10 @@ Package parse has functions to parse the irc protocol into irc.IrcMessages.
 package parse
 
 import (
-	"github.com/aarondl/ultimateq/irc"
 	"regexp"
 	"strings"
+
+	"github.com/aarondl/ultimateq/irc"
 )
 
 const (

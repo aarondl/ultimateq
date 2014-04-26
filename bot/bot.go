@@ -6,16 +6,17 @@ package bot
 
 import (
 	"errors"
+	"log"
+	"net"
+	"sync"
+	"time"
+
 	"github.com/aarondl/ultimateq/config"
 	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/dispatch"
 	"github.com/aarondl/ultimateq/dispatch/cmd"
 	"github.com/aarondl/ultimateq/irc"
 	"github.com/aarondl/ultimateq/parse"
-	"log"
-	"net"
-	"sync"
-	"time"
 )
 
 const (

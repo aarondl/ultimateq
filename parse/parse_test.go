@@ -1,9 +1,9 @@
 package parse
 
 import (
-	. "gopkg.in/check.v1"
 	"strings"
 	"testing"
+	. "gopkg.in/check.v1"
 )
 
 func Test(t *testing.T) { TestingT(t) } //Hook into testing package

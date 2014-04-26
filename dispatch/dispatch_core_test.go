@@ -2,8 +2,9 @@ package dispatch
 
 import (
 	"fmt"
-	"github.com/aarondl/ultimateq/irc"
 	. "testing"
+
+	"github.com/aarondl/ultimateq/irc"
 )
 
 func checkArrays(expected []string, actual []string) error {

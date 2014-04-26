@@ -4,12 +4,6 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"github.com/aarondl/query"
-	"github.com/aarondl/quotes"
-	"github.com/aarondl/ultimateq/bot"
-	"github.com/aarondl/ultimateq/data"
-	"github.com/aarondl/ultimateq/dispatch/cmd"
-	"github.com/aarondl/ultimateq/irc"
 	"log"
 	"os"
 	"os/signal"
@@ -17,6 +11,13 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/aarondl/query"
+	"github.com/aarondl/quotes"
+	"github.com/aarondl/ultimateq/bot"
+	"github.com/aarondl/ultimateq/data"
+	"github.com/aarondl/ultimateq/dispatch/cmd"
+	"github.com/aarondl/ultimateq/irc"
 )
 
 var (

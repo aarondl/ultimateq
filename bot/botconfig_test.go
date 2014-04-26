@@ -2,11 +2,12 @@ package bot
 
 import (
 	"bytes"
+	"net"
+	. "testing"
+
 	"github.com/aarondl/ultimateq/config"
 	"github.com/aarondl/ultimateq/irc"
 	"github.com/aarondl/ultimateq/mocks"
-	"net"
-	. "testing"
 )
 
 var zeroConnProvider = func(srv string) (net.Conn, error) {

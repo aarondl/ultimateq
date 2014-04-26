@@ -1,10 +1,11 @@
 package config
 
 import (
-	"gopkg.in/yaml.v1"
 	"io"
 	"io/ioutil"
 	"os"
+
+	"gopkg.in/yaml.v1"
 )
 
 const (

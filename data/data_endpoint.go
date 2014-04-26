@@ -1,9 +1,10 @@
 package data
 
 import (
-	"github.com/aarondl/ultimateq/irc"
 	"io"
 	"sync"
+
+	"github.com/aarondl/ultimateq/irc"
 )
 
 // DataEndpoint is an endpoint that can present both state and store data

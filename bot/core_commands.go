@@ -3,13 +3,14 @@ package bot
 import (
 	"errors"
 	"fmt"
-	"github.com/aarondl/ultimateq/data"
-	"github.com/aarondl/ultimateq/dispatch/cmd"
 	"log"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/aarondl/ultimateq/data"
+	"github.com/aarondl/ultimateq/dispatch/cmd"
 )
 
 var rgxFlags = regexp.MustCompile(`[A-Za-z]+`)
@@ -47,7 +48,7 @@ const (
 	errFmtInternal = `commander: Error processing command %v (%v)`
 	errFmtExpired  = `commander: Data expired between locks. ` +
 		`Could not find user [%v]`
-	fmtCmdExec      = "bot: Core command executed (%v)"
+	fmtCmdExec          = "bot: Core command executed (%v)"
 	errFmtInternalError = "bot: Core command (%v) error: %v"
 	errFmtInternalPanic = "bot: Core command (%v) error: %v"
 

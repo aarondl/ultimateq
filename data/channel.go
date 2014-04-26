@@ -1,8 +1,9 @@
 package data
 
 import (
-	"github.com/aarondl/ultimateq/irc"
 	"strings"
+
+	"github.com/aarondl/ultimateq/irc"
 )
 
 const (

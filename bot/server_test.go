@@ -3,12 +3,13 @@ package bot
 import (
 	"bytes"
 	"crypto/x509"
-	"github.com/aarondl/ultimateq/irc"
-	"github.com/aarondl/ultimateq/mocks"
 	"io"
 	"net"
 	. "testing"
 	"time"
+
+	"github.com/aarondl/ultimateq/irc"
+	"github.com/aarondl/ultimateq/mocks"
 )
 
 func TestServer_createIrcClient(t *T) {

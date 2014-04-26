@@ -5,8 +5,9 @@ package data
 
 import (
 	"errors"
-	"github.com/aarondl/ultimateq/irc"
 	"strings"
+
+	"github.com/aarondl/ultimateq/irc"
 )
 
 var (

@@ -2,9 +2,10 @@ package data
 
 import (
 	"bytes"
-	"github.com/aarondl/ultimateq/irc"
 	"sync"
 	. "testing"
+
+	"github.com/aarondl/ultimateq/irc"
 )
 
 func TestDataEndpoint(t *T) {

@@ -5,18 +5,19 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"github.com/aarondl/ultimateq/config"
-	"github.com/aarondl/ultimateq/data"
-	"github.com/aarondl/ultimateq/dispatch"
-	"github.com/aarondl/ultimateq/dispatch/cmd"
-	"github.com/aarondl/ultimateq/inet"
-	"github.com/aarondl/ultimateq/irc"
 	"io/ioutil"
 	"net"
 	"os"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/aarondl/ultimateq/config"
+	"github.com/aarondl/ultimateq/data"
+	"github.com/aarondl/ultimateq/dispatch"
+	"github.com/aarondl/ultimateq/dispatch/cmd"
+	"github.com/aarondl/ultimateq/inet"
+	"github.com/aarondl/ultimateq/irc"
 )
 
 type Status byte

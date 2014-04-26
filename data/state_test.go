@@ -1,11 +1,12 @@
 package data
 
 import (
+	"strings"
+	"testing"
+
 	"code.google.com/p/go.crypto/bcrypt"
 	"github.com/aarondl/ultimateq/irc"
 	. "gopkg.in/check.v1"
-	"strings"
-	"testing"
 )
 
 func Test(t *testing.T) { TestingT(t) } //Hook into testing package

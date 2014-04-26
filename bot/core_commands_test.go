@@ -3,11 +3,12 @@ package bot
 import (
 	"bytes"
 	"fmt"
-	"github.com/aarondl/ultimateq/data"
-	"github.com/aarondl/ultimateq/irc"
 	"regexp"
 	"strings"
 	. "testing"
+
+	"github.com/aarondl/ultimateq/data"
+	"github.com/aarondl/ultimateq/irc"
 )
 
 const (

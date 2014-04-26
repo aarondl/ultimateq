@@ -3,8 +3,8 @@ package config
 import (
 	"bytes"
 	"errors"
-	. "gopkg.in/check.v1"
 	"io"
+	. "gopkg.in/check.v1"
 )
 
 type testBuffer struct {

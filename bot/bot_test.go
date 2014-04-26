@@ -1,18 +1,19 @@
 package bot
 
 import (
-	"github.com/aarondl/ultimateq/config"
-	"github.com/aarondl/ultimateq/data"
-	"github.com/aarondl/ultimateq/dispatch/cmd"
-	"github.com/aarondl/ultimateq/irc"
-	"github.com/aarondl/ultimateq/mocks"
-	"gopkg.in/check.v1"
 	"io"
 	"log"
 	"net"
 	"os"
 	. "testing"
 	"time"
+
+	"github.com/aarondl/ultimateq/config"
+	"github.com/aarondl/ultimateq/data"
+	"github.com/aarondl/ultimateq/dispatch/cmd"
+	"github.com/aarondl/ultimateq/irc"
+	"github.com/aarondl/ultimateq/mocks"
+	"gopkg.in/check.v1"
 )
 
 func Test(t *T) { check.TestingT(t) } //Hook into testing package
@@ -34,7 +35,7 @@ type testCommand struct {
 	callback func(string, *data.DataEndpoint, *cmd.Event) error
 }
 
-func (h testCommand) Cmd(cmd string, 
+func (h testCommand) Cmd(cmd string,
 	ep *data.DataEndpoint, cdata *cmd.Event) error {
 
 	if h.callback != nil {

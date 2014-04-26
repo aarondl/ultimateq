@@ -2,10 +2,10 @@ package config
 
 import (
 	"bytes"
-	. "gopkg.in/check.v1"
 	"log"
 	"os"
 	"testing"
+	. "gopkg.in/check.v1"
 )
 
 func Test(t *testing.T) { TestingT(t) } //Hook into testing package

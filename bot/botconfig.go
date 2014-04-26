@@ -2,6 +2,7 @@ package bot
 
 import (
 	"fmt"
+
 	"github.com/aarondl/ultimateq/config"
 	"github.com/aarondl/ultimateq/irc"
 )

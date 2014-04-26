@@ -2,14 +2,15 @@ package inet
 
 import (
 	"bytes"
-	"github.com/aarondl/ultimateq/mocks"
-	. "gopkg.in/check.v1"
 	"io"
 	"log"
 	"os"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/aarondl/ultimateq/mocks"
+	. "gopkg.in/check.v1"
 )
 
 func Test(t *testing.T) { TestingT(t) } //Hook into testing package

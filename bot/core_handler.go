@@ -1,8 +1,9 @@
 package bot
 
 import (
-	"github.com/aarondl/ultimateq/irc"
 	"sync"
+
+	"github.com/aarondl/ultimateq/irc"
 )
 
 // coreHandler is the bot's main handling struct. As such it has access directly

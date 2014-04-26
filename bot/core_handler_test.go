@@ -3,10 +3,11 @@ package bot
 import (
 	"bytes"
 	"fmt"
+	"net"
+
 	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/irc"
 	. "gopkg.in/check.v1"
-	"net"
 )
 
 //===================================================================

@@ -2,11 +2,12 @@ package data
 
 import (
 	"fmt"
-	"github.com/cznic/kv"
 	"io"
 	"os"
 	"strings"
 	"sync"
+
+	"github.com/cznic/kv"
 )
 
 // These errors are in the AuthError.FailureType field.

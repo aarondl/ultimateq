@@ -2,13 +2,14 @@ package data
 
 import (
 	"bytes"
-	"code.google.com/p/go.crypto/bcrypt"
 	"encoding/gob"
 	"errors"
-	"github.com/aarondl/ultimateq/irc"
 	"math/rand"
 	"strings"
 	"time"
+
+	"code.google.com/p/go.crypto/bcrypt"
+	"github.com/aarondl/ultimateq/irc"
 )
 
 func init() {
