@@ -12,7 +12,7 @@ import (
 // as a raw IrcMessage event. However there are other message types are specific
 // to very common irc events that are more helpful than this interface.
 type EventHandler interface {
-	HandleRaw(event *irc.Message, endpoint irc.Endpoint)
+	HandleRaw(event *irc.Event, w irc.Writer)
 }
 
 type (
@@ -30,8 +30,8 @@ type Dispatcher struct {
 	protectEvents sync.RWMutex
 }
 
-// CreateDispatcher initializes an empty dispatcher ready to register events.
-func CreateDispatcher(core *DispatchCore) *Dispatcher {
+// NewDispatcher initializes an empty dispatcher ready to register events.
+func NewDispatcher(core *DispatchCore) *Dispatcher {
 	return &Dispatcher{
 		DispatchCore: core,
 		events:       make(eventTableState),
@@ -80,14 +80,14 @@ func (d *Dispatcher) Unregister(event string, id int) bool {
 // Dispatch an IrcMessage to event handlers handling event also ensures all raw
 // handlers receive all messages. Returns false if no eventtable was found for
 // the primary sent event.
-func (d *Dispatcher) Dispatch(msg *irc.Message, ep irc.Endpoint) bool {
-	event := strings.ToUpper(msg.Name)
+func (d *Dispatcher) Dispatch(ev *irc.Event, w irc.Writer) bool {
+	event := strings.ToUpper(ev.Name)
 
 	d.protectEvents.RLock()
 	defer d.protectEvents.RUnlock()
 
-	handled := d.dispatchHelper(event, msg, ep)
-	d.dispatchHelper(irc.RAW, msg, ep)
+	handled := d.dispatchHelper(event, ev, w)
+	d.dispatchHelper(irc.RAW, ev, w)
 
 	return handled
 }
@@ -95,12 +95,12 @@ func (d *Dispatcher) Dispatch(msg *irc.Message, ep irc.Endpoint) bool {
 // dispatchHelper locates a handler and attempts to resolve it with
 // resolveHandler. It returns true if it was able to find an event table.
 func (d *Dispatcher) dispatchHelper(event string,
-	msg *irc.Message, ep irc.Endpoint) bool {
+	ev *irc.Event, w irc.Writer) bool {
 
 	if evtable, ok := d.events[event]; ok {
 		for _, handler := range evtable {
 			d.HandlerStarted()
-			go d.resolveHandler(handler, event, msg, ep)
+			go d.resolveHandler(handler, event, ev, w)
 		}
 		return true
 	}
@@ -111,32 +111,32 @@ func (d *Dispatcher) dispatchHelper(event string,
 // real type, coerces the IrcMessage in whatever way necessary and then
 // calls that handlers primary dispatch method with the coerced message.
 func (d *Dispatcher) resolveHandler(
-	handler interface{}, event string, msg *irc.Message, ep irc.Endpoint) {
+	handler interface{}, event string, ev *irc.Event, w irc.Writer) {
 
 	defer PanicHandler()
 	defer d.HandlerFinished()
 
 	var handled bool
-	switch msg.Name {
+	switch ev.Name {
 	case irc.PRIVMSG, irc.NOTICE:
-		if len(msg.Args) >= 2 && irc.IsCTCPString(msg.Message()) {
-			if msg.Name == irc.PRIVMSG {
-				handled = d.dispatchCTCP(handler, msg, ep)
+		if len(ev.Args) >= 2 && irc.IsCTCPString(ev.Message()) {
+			if ev.Name == irc.PRIVMSG {
+				handled = d.dispatchCTCP(handler, ev, w)
 			} else {
-				handled = d.dispatchCTCPReply(handler, msg, ep)
+				handled = d.dispatchCTCPReply(handler, ev, w)
 			}
 		} else {
-			if msg.Name == irc.PRIVMSG {
-				handled = d.dispatchPrivmsg(handler, msg, ep)
+			if ev.Name == irc.PRIVMSG {
+				handled = d.dispatchPrivmsg(handler, ev, w)
 			} else {
-				handled = d.dispatchNotice(handler, msg, ep)
+				handled = d.dispatchNotice(handler, ev, w)
 			}
 		}
 	}
 
 	if !handled {
 		if evHandler, ok := handler.(EventHandler); ok {
-			evHandler.HandleRaw(msg, ep)
+			evHandler.HandleRaw(ev, w)
 		}
 	}
 }
@@ -144,18 +144,18 @@ func (d *Dispatcher) resolveHandler(
 // dispatchPrivmsg dispatches only a private message. Returns true if the
 // event was handled.
 func (d *Dispatcher) dispatchPrivmsg(
-	handler interface{}, msg *irc.Message, ep irc.Endpoint) (handled bool) {
+	handler interface{}, ev *irc.Event, w irc.Writer) (handled bool) {
 
 	if channelHandler, ok := handler.(PrivmsgChannelHandler); ok &&
-		d.shouldDispatch(true, msg.Args[0]) {
-		channelHandler.PrivmsgChannel(msg, ep)
+		d.shouldDispatch(true, ev) {
+		channelHandler.PrivmsgChannel(ev, w)
 		handled = true
 	} else if userHandler, ok := handler.(PrivmsgUserHandler); ok &&
-		d.shouldDispatch(false, msg.Args[0]) {
-		userHandler.PrivmsgUser(msg, ep)
+		d.shouldDispatch(false, ev) {
+		userHandler.PrivmsgUser(ev, w)
 		handled = true
 	} else if privmsgHandler, ok := handler.(PrivmsgHandler); ok {
-		privmsgHandler.Privmsg(msg, ep)
+		privmsgHandler.Privmsg(ev, w)
 		handled = true
 	}
 	return
@@ -164,18 +164,18 @@ func (d *Dispatcher) dispatchPrivmsg(
 // dispatchNotice dispatches only a notice message. Returns true if the
 // event was handled.
 func (d *Dispatcher) dispatchNotice(
-	handler interface{}, msg *irc.Message, ep irc.Endpoint) (handled bool) {
+	handler interface{}, ev *irc.Event, w irc.Writer) (handled bool) {
 
 	if channelHandler, ok := handler.(NoticeChannelHandler); ok &&
-		d.shouldDispatch(true, msg.Args[0]) {
-		channelHandler.NoticeChannel(msg, ep)
+		d.shouldDispatch(true, ev) {
+		channelHandler.NoticeChannel(ev, w)
 		handled = true
 	} else if userHandler, ok := handler.(NoticeUserHandler); ok &&
-		d.shouldDispatch(false, msg.Args[0]) {
-		userHandler.NoticeUser(msg, ep)
+		d.shouldDispatch(false, ev) {
+		userHandler.NoticeUser(ev, w)
 		handled = true
 	} else if noticeHandler, ok := handler.(NoticeHandler); ok {
-		noticeHandler.Notice(msg, ep)
+		noticeHandler.Notice(ev, w)
 		handled = true
 	}
 	return
@@ -184,16 +184,16 @@ func (d *Dispatcher) dispatchNotice(
 // dispatchCTCP dispatches only a ctcp message. Returns true if the
 // event was handled.
 func (d *Dispatcher) dispatchCTCP(
-	handler interface{}, msg *irc.Message, ep irc.Endpoint) (handled bool) {
+	handler interface{}, ev *irc.Event, w irc.Writer) (handled bool) {
 
-	tag, data := irc.CTCPunpackString(msg.Message())
+	tag, data := irc.CTCPunpackString(ev.Message())
 
 	if channelHandler, ok := handler.(CTCPChannelHandler); ok &&
-		d.shouldDispatch(true, msg.Args[0]) {
-		channelHandler.CTCPChannel(msg, tag, data, ep)
+		d.shouldDispatch(true, ev) {
+		channelHandler.CTCPChannel(ev, tag, data, w)
 		handled = true
 	} else if directHandler, ok := handler.(CTCPHandler); ok {
-		directHandler.CTCP(msg, tag, data, ep)
+		directHandler.CTCP(ev, tag, data, w)
 		handled = true
 	}
 	return
@@ -202,12 +202,12 @@ func (d *Dispatcher) dispatchCTCP(
 // dispatchCTCPReply dispatches only a ctcpreply message. Returns true if the
 // event was handled.
 func (d *Dispatcher) dispatchCTCPReply(
-	handler interface{}, msg *irc.Message, ep irc.Endpoint) (handled bool) {
+	handler interface{}, ev *irc.Event, w irc.Writer) (handled bool) {
 
-	tag, data := irc.CTCPunpackString(msg.Message())
+	tag, data := irc.CTCPunpackString(ev.Message())
 
 	if directHandler, ok := handler.(CTCPReplyHandler); ok {
-		directHandler.CTCPReply(msg, tag, data, ep)
+		directHandler.CTCPReply(ev, tag, data, w)
 		handled = true
 	}
 	return
@@ -215,7 +215,7 @@ func (d *Dispatcher) dispatchCTCPReply(
 
 // shouldDispatch checks if we should dispatch this event. Works for user and
 // channel based messages.
-func (d *DispatchCore) shouldDispatch(channelMsg bool, channel string) bool {
-	isChan, hasChan := d.CheckTarget(channel)
+func (d *DispatchCore) shouldDispatch(channelMsg bool, ev *irc.Event) bool {
+	isChan, hasChan := d.CheckTarget(ev)
 	return channelMsg == isChan && (!channelMsg || hasChan)
 }

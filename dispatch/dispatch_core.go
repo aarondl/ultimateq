@@ -6,7 +6,6 @@ extract information from events, as well as define more succint handlers.
 package dispatch
 
 import (
-	"errors"
 	"log"
 	"runtime"
 	"strings"
@@ -15,50 +14,32 @@ import (
 	"github.com/aarondl/ultimateq/irc"
 )
 
-var (
-	// errProtoCapsMissing is returned when a core is instantiated with a nil
-	// protocaps.
-	errProtoCapsMissing = errors.New(
-		"dispatching: Cannot create a dispatcher without ProtoCaps.")
-)
-
 // DispatchCore is a core for any dispatching mechanisms that includes a sync'd
 // list of channels, channel identification services, and a waiter to
 // synchronize the exit of all the event handlers sharing this core.
 type DispatchCore struct {
 	waiter  sync.WaitGroup
-	caps    *irc.ProtoCaps
 	chans   []string
 	protect sync.RWMutex
 }
 
-// CreateDispatchCore initializes a dispatch core, it takes a protocaps in order
-// to filter between channel and other messages and a list of active channels.
-func CreateDispatchCore(caps *irc.ProtoCaps, chans ...string) *DispatchCore {
-	d := &DispatchCore{
-		caps: caps,
-	}
+// NewDispatchCore initializes a dispatch core
+func NewDispatchCore(chans ...string) *DispatchCore {
+	d := &DispatchCore{}
 	d.channels(chans)
 
 	return d
 }
 
-// Protocaps sets the protocaps for this dispatcher.
-func (d *DispatchCore) Protocaps(caps *irc.ProtoCaps) {
-	d.protect.Lock()
-	defer d.protect.Unlock()
-	d.caps = caps
-}
-
-// Channels sets the active channels for this dispatcher.
-func (d *DispatchCore) Channels(chans []string) {
+// SetChannels sets the active channels for this dispatcher.
+func (d *DispatchCore) SetChannels(chans []string) {
 	d.protect.Lock()
 	d.channels(chans)
 	d.protect.Unlock()
 }
 
-// GetChannels gets the active channels for this dispatcher.
-func (d *DispatchCore) GetChannels() (chans []string) {
+// Channels gets the active channels for this dispatcher.
+func (d *DispatchCore) Channels() (chans []string) {
 	d.protect.Lock()
 	defer d.protect.Unlock()
 
@@ -161,13 +142,13 @@ func (d *DispatchCore) WaitForHandlers() {
 // CheckTarget describes a dispatching target. It checks both if it is a
 // channel, and if it is a channel, if that channel is an active one for
 // this dispatchcore.
-func (d *DispatchCore) CheckTarget(target string) (isChan, hasChan bool) {
+func (d *DispatchCore) CheckTarget(ev *irc.Event) (isChan, hasChan bool) {
 	d.protect.RLock()
 	defer d.protect.RUnlock()
-	target = strings.ToLower(target)
-	isChan = d.caps != nil && d.caps.IsChannel(target)
-	hasChan = isChan && d.hasChannel(target)
-	return
+
+	isChan = ev.IsTargetChan()
+	hasChan = isChan && d.hasChannel(strings.ToLower(ev.Target()))
+	return isChan, hasChan
 }
 
 // hasChannel checks to see if the dispatch core's channel list includes a

@@ -3,12 +3,12 @@ package dispatch
 import (
 	"bytes"
 	"log"
-	. "testing"
+	"testing"
 
 	"github.com/aarondl/ultimateq/irc"
 )
 
-var core = CreateDispatchCore(irc.CreateProtoCaps())
+var core = NewDispatchCore()
 var logBuffer = &bytes.Buffer{}
 
 func init() {
@@ -16,7 +16,7 @@ func init() {
 }
 
 //===========================================================
-// Set up a type that can be used to mock irc.Endpoint
+// Set up a type that can be used to mock irc.Writer
 //===========================================================
 type testPoint struct {
 	*irc.Helper
@@ -29,32 +29,32 @@ func (tsender testPoint) GetKey() string {
 //===========================================================
 // Set up a type that can be used to mock a callback for raw.
 //===========================================================
-type testCallback func(msg *irc.Message, ep irc.Endpoint)
+type testCallback func(ev *irc.Event, w irc.Writer)
 
 type testHandler struct {
 	callback testCallback
 }
 
-func (handler testHandler) HandleRaw(msg *irc.Message, ep irc.Endpoint) {
+func (handler testHandler) HandleRaw(ev *irc.Event, w irc.Writer) {
 	if handler.callback != nil {
-		handler.callback(msg, ep)
+		handler.callback(ev, w)
 	}
 }
 
 //===========================================================
 // Tests
 //===========================================================
-func TestDispatcher(t *T) {
+func TestDispatcher(t *testing.T) {
 	t.Parallel()
-	d := CreateDispatcher(core)
+	d := NewDispatcher(core)
 	if d == nil || d.events == nil {
 		t.Error("Initialization failed.")
 	}
 }
 
-func TestDispatcher_Registration(t *T) {
+func TestDispatcher_Registration(t *testing.T) {
 	t.Parallel()
-	d := CreateDispatcher(core)
+	d := NewDispatcher(core)
 	handler := testHandler{}
 
 	id := d.Register(irc.PRIVMSG, handler)
@@ -73,31 +73,31 @@ func TestDispatcher_Registration(t *T) {
 	}
 }
 
-func TestDispatcher_Dispatching(t *T) {
+func TestDispatcher_Dispatching(t *testing.T) {
 	t.Parallel()
-	var msg1, msg2, msg3 *irc.Message
-	var s1, s2 irc.Endpoint
-	h1 := testHandler{func(m *irc.Message, s irc.Endpoint) {
+	var msg1, msg2, msg3 *irc.Event
+	var s1, s2 irc.Writer
+	h1 := testHandler{func(m *irc.Event, s irc.Writer) {
 		msg1 = m
 		s1 = s
 	}}
-	h2 := testHandler{func(m *irc.Message, s irc.Endpoint) {
+	h2 := testHandler{func(m *irc.Event, s irc.Writer) {
 		msg2 = m
 		s2 = s
 	}}
-	h3 := testHandler{func(m *irc.Message, s irc.Endpoint) {
+	h3 := testHandler{func(m *irc.Event, s irc.Writer) {
 		msg3 = m
 	}}
 
-	d := CreateDispatcher(core)
+	d := NewDispatcher(core)
 	send := testPoint{&irc.Helper{}}
 
 	d.Register(irc.PRIVMSG, h1)
 	d.Register(irc.PRIVMSG, h2)
 	d.Register(irc.QUIT, h3)
 
-	privmsg := &irc.Message{Name: irc.PRIVMSG}
-	quitmsg := &irc.Message{Name: irc.QUIT}
+	privmsg := &irc.Event{Name: irc.PRIVMSG}
+	quitmsg := &irc.Event{Name: irc.QUIT}
 	d.Dispatch(privmsg, send)
 	d.WaitForHandlers()
 
@@ -105,10 +105,10 @@ func TestDispatcher_Dispatching(t *T) {
 		t.Error("Failed to dispatch to h1.")
 	}
 	if msg1.Name != irc.PRIVMSG {
-		t.Error("Got the wrong msg name:", msg1.Name)
+		t.Error("Got the wrong ev name:", msg1.Name)
 	}
 	if msg1 != msg2 {
-		t.Error("Failed to dispatch to msg2, or the msg data is not shared.")
+		t.Error("Failed to dispatch to msg2, or the ev data is not shared.")
 	}
 	if s1 == nil {
 		t.Error("The endpoint should never be nil.")
@@ -127,22 +127,22 @@ func TestDispatcher_Dispatching(t *T) {
 	}
 }
 
-func TestDispatcher_RawDispatch(t *T) {
+func TestDispatcher_RawDispatch(t *testing.T) {
 	t.Parallel()
-	var msg1, msg2 *irc.Message
-	h1 := testHandler{func(m *irc.Message, send irc.Endpoint) {
+	var msg1, msg2 *irc.Event
+	h1 := testHandler{func(m *irc.Event, send irc.Writer) {
 		msg1 = m
 	}}
-	h2 := testHandler{func(m *irc.Message, send irc.Endpoint) {
+	h2 := testHandler{func(m *irc.Event, send irc.Writer) {
 		msg2 = m
 	}}
 
-	d := CreateDispatcher(core)
+	d := NewDispatcher(core)
 	send := testPoint{&irc.Helper{}}
 	d.Register(irc.PRIVMSG, h1)
 	d.Register(irc.RAW, h2)
 
-	privmsg := &irc.Message{Name: irc.PRIVMSG}
+	privmsg := &irc.Event{Name: irc.PRIVMSG}
 	d.Dispatch(privmsg, send)
 	d.WaitForHandlers()
 	if msg1 != privmsg {
@@ -156,8 +156,8 @@ func TestDispatcher_RawDispatch(t *T) {
 // ================================
 // Testing types
 // ================================
-type testCallbackMsg func(*irc.Message, irc.Endpoint)
-type testCTCPCallbackMsg func(*irc.Message, string, string, irc.Endpoint)
+type testCallbackMsg func(*irc.Event, irc.Writer)
+type testCTCPCallbackMsg func(*irc.Event, string, string, irc.Writer)
 
 type testPrivmsgHandler struct {
 	callback testCallbackMsg
@@ -199,111 +199,113 @@ type testCTCPReplyHandler struct {
 // ================================
 // Testing Callbacks
 // ================================
-func (t testPrivmsgHandler) Privmsg(msg *irc.Message, ep irc.Endpoint) {
-	t.callback(msg, ep)
+func (t testPrivmsgHandler) Privmsg(ev *irc.Event, w irc.Writer) {
+	t.callback(ev, w)
 }
 func (t testPrivmsgUserHandler) PrivmsgUser(
-	msg *irc.Message, ep irc.Endpoint) {
+	ev *irc.Event, w irc.Writer) {
 
-	t.callback(msg, ep)
+	t.callback(ev, w)
 }
 func (t testPrivmsgChannelHandler) PrivmsgChannel(
-	msg *irc.Message, ep irc.Endpoint) {
+	ev *irc.Event, w irc.Writer) {
 
-	t.callback(msg, ep)
+	t.callback(ev, w)
 }
 func (t testPrivmsgAllHandler) Privmsg(
-	msg *irc.Message, ep irc.Endpoint) {
+	ev *irc.Event, w irc.Writer) {
 
-	t.testCallbackNormal(msg, ep)
+	t.testCallbackNormal(ev, w)
 }
 func (t testPrivmsgAllHandler) PrivmsgUser(
-	msg *irc.Message, ep irc.Endpoint) {
+	ev *irc.Event, w irc.Writer) {
 
-	t.testCallbackUser(msg, ep)
+	t.testCallbackUser(ev, w)
 }
 func (t testPrivmsgAllHandler) PrivmsgChannel(
-	msg *irc.Message, ep irc.Endpoint) {
+	ev *irc.Event, w irc.Writer) {
 
-	t.testCallbackChannel(msg, ep)
+	t.testCallbackChannel(ev, w)
 }
-func (t testNoticeHandler) Notice(msg *irc.Message, ep irc.Endpoint) {
-	t.callback(msg, ep)
+func (t testNoticeHandler) Notice(ev *irc.Event, w irc.Writer) {
+	t.callback(ev, w)
 }
 func (t testNoticeUserHandler) NoticeUser(
-	msg *irc.Message, ep irc.Endpoint) {
+	ev *irc.Event, w irc.Writer) {
 
-	t.callback(msg, ep)
+	t.callback(ev, w)
 }
 func (t testNoticeChannelHandler) NoticeChannel(
-	msg *irc.Message, ep irc.Endpoint) {
+	ev *irc.Event, w irc.Writer) {
 
-	t.callback(msg, ep)
+	t.callback(ev, w)
 }
 func (t testNoticeAllHandler) Notice(
-	msg *irc.Message, ep irc.Endpoint) {
+	ev *irc.Event, w irc.Writer) {
 
-	t.testCallbackNormal(msg, ep)
+	t.testCallbackNormal(ev, w)
 }
 func (t testNoticeAllHandler) NoticeUser(
-	msg *irc.Message, ep irc.Endpoint) {
+	ev *irc.Event, w irc.Writer) {
 
-	t.testCallbackUser(msg, ep)
+	t.testCallbackUser(ev, w)
 }
 func (t testNoticeAllHandler) NoticeChannel(
-	msg *irc.Message, ep irc.Endpoint) {
+	ev *irc.Event, w irc.Writer) {
 
-	t.testCallbackChannel(msg, ep)
+	t.testCallbackChannel(ev, w)
 }
-func (t testCTCPHandler) CTCP(msg *irc.Message, a, b string, ep irc.Endpoint) {
-	t.callback(msg, a, b, ep)
+func (t testCTCPHandler) CTCP(ev *irc.Event, a, b string, w irc.Writer) {
+	t.callback(ev, a, b, w)
 }
 func (t testCTCPChannelHandler) CTCPChannel(
-	msg *irc.Message, a, b string, ep irc.Endpoint) {
+	ev *irc.Event, a, b string, w irc.Writer) {
 
-	t.callback(msg, a, b, ep)
+	t.callback(ev, a, b, w)
 }
 func (t testCTCPAllHandler) CTCP(
-	msg *irc.Message, a, b string, ep irc.Endpoint) {
+	ev *irc.Event, a, b string, w irc.Writer) {
 
-	t.testCallbackNormal(msg, a, b, ep)
+	t.testCallbackNormal(ev, a, b, w)
 }
 func (t testCTCPAllHandler) CTCPChannel(
-	msg *irc.Message, a, b string, ep irc.Endpoint) {
+	ev *irc.Event, a, b string, w irc.Writer) {
 
-	t.testCallbackChannel(msg, a, b, ep)
+	t.testCallbackChannel(ev, a, b, w)
 }
 func (t testCTCPReplyHandler) CTCPReply(
-	msg *irc.Message, a, b string, ep irc.Endpoint) {
+	ev *irc.Event, a, b string, w irc.Writer) {
 
-	t.callback(msg, a, b, ep)
+	t.callback(ev, a, b, w)
 }
 
-var privChanmsg = &irc.Message{
-	Name:   irc.PRIVMSG,
-	Args:   []string{"#chan", "msg"},
-	Sender: "nick!user@host.com",
+var privChanmsg = &irc.Event{
+	Name:        irc.PRIVMSG,
+	Args:        []string{"#chan", "ev"},
+	Sender:      "nick!user@host.com",
+	NetworkInfo: netInfo,
 }
-var privUsermsg = &irc.Message{
-	Name:   irc.PRIVMSG,
-	Args:   []string{"user", "msg"},
-	Sender: "nick!user@host.com",
+var privUsermsg = &irc.Event{
+	Name:        irc.PRIVMSG,
+	Args:        []string{"user", "ev"},
+	Sender:      "nick!user@host.com",
+	NetworkInfo: netInfo,
 }
 
-func TestDispatcher_Privmsg(t *T) {
+func TestDispatcher_Privmsg(t *testing.T) {
 	t.Parallel()
-	var p, pu, pc *irc.Message
-	ph := testPrivmsgHandler{func(m *irc.Message, _ irc.Endpoint) {
+	var p, pu, pc *irc.Event
+	ph := testPrivmsgHandler{func(m *irc.Event, _ irc.Writer) {
 		p = m
 	}}
-	puh := testPrivmsgUserHandler{func(m *irc.Message, _ irc.Endpoint) {
+	puh := testPrivmsgUserHandler{func(m *irc.Event, _ irc.Writer) {
 		pu = m
 	}}
-	pch := testPrivmsgChannelHandler{func(m *irc.Message, _ irc.Endpoint) {
+	pch := testPrivmsgChannelHandler{func(m *irc.Event, _ irc.Writer) {
 		pc = m
 	}}
 
-	d := CreateDispatcher(core)
+	d := NewDispatcher(core)
 	d.Register(irc.PRIVMSG, ph)
 	d.Register(irc.PRIVMSG, puh)
 	d.Register(irc.PRIVMSG, pch)
@@ -334,22 +336,22 @@ func TestDispatcher_Privmsg(t *T) {
 	}
 }
 
-func TestDispatcher_PrivmsgMultiple(t *T) {
+func TestDispatcher_PrivmsgMultiple(t *testing.T) {
 	t.Parallel()
-	var p, pu, pc *irc.Message
+	var p, pu, pc *irc.Event
 	pall := testPrivmsgAllHandler{
-		func(m *irc.Message, _ irc.Endpoint) {
+		func(m *irc.Event, _ irc.Writer) {
 			p = m
 		},
-		func(m *irc.Message, _ irc.Endpoint) {
+		func(m *irc.Event, _ irc.Writer) {
 			pu = m
 		},
-		func(m *irc.Message, _ irc.Endpoint) {
+		func(m *irc.Event, _ irc.Writer) {
 			pc = m
 		},
 	}
 
-	d := CreateDispatcher(core)
+	d := NewDispatcher(core)
 	d.Register(irc.PRIVMSG, pall)
 
 	p, pu, pc = nil, nil, nil
@@ -379,31 +381,33 @@ func TestDispatcher_PrivmsgMultiple(t *T) {
 	}
 }
 
-var noticeChanmsg = &irc.Message{
-	Name:   irc.NOTICE,
-	Args:   []string{"#chan", "msg"},
-	Sender: "nick!user@host.com",
+var noticeChanmsg = &irc.Event{
+	Name:        irc.NOTICE,
+	Args:        []string{"#chan", "ev"},
+	Sender:      "nick!user@host.com",
+	NetworkInfo: netInfo,
 }
-var noticeUsermsg = &irc.Message{
-	Name:   irc.NOTICE,
-	Args:   []string{"user", "msg"},
-	Sender: "nick!user@host.com",
+var noticeUsermsg = &irc.Event{
+	Name:        irc.NOTICE,
+	Args:        []string{"user", "ev"},
+	Sender:      "nick!user@host.com",
+	NetworkInfo: netInfo,
 }
 
-func TestDispatcher_Notice(t *T) {
+func TestDispatcher_Notice(t *testing.T) {
 	t.Parallel()
-	var n, nu, nc *irc.Message
-	nh := testNoticeHandler{func(m *irc.Message, _ irc.Endpoint) {
+	var n, nu, nc *irc.Event
+	nh := testNoticeHandler{func(m *irc.Event, _ irc.Writer) {
 		n = m
 	}}
-	nuh := testNoticeUserHandler{func(m *irc.Message, _ irc.Endpoint) {
+	nuh := testNoticeUserHandler{func(m *irc.Event, _ irc.Writer) {
 		nu = m
 	}}
-	nch := testNoticeChannelHandler{func(m *irc.Message, _ irc.Endpoint) {
+	nch := testNoticeChannelHandler{func(m *irc.Event, _ irc.Writer) {
 		nc = m
 	}}
 
-	d := CreateDispatcher(core)
+	d := NewDispatcher(core)
 	d.Register(irc.NOTICE, nh)
 	d.Register(irc.NOTICE, nuh)
 	d.Register(irc.NOTICE, nch)
@@ -434,22 +438,22 @@ func TestDispatcher_Notice(t *T) {
 	}
 }
 
-func TestDispatcher_NoticeMultiple(t *T) {
+func TestDispatcher_NoticeMultiple(t *testing.T) {
 	t.Parallel()
-	var n, nu, nc *irc.Message
+	var n, nu, nc *irc.Event
 	nall := testNoticeAllHandler{
-		func(m *irc.Message, _ irc.Endpoint) {
+		func(m *irc.Event, _ irc.Writer) {
 			n = m
 		},
-		func(m *irc.Message, _ irc.Endpoint) {
+		func(m *irc.Event, _ irc.Writer) {
 			nu = m
 		},
-		func(m *irc.Message, _ irc.Endpoint) {
+		func(m *irc.Event, _ irc.Writer) {
 			nc = m
 		},
 	}
 
-	d := CreateDispatcher(core)
+	d := NewDispatcher(core)
 	d.Register(irc.NOTICE, nall)
 
 	n, nu, nc = nil, nil, nil
@@ -479,32 +483,34 @@ func TestDispatcher_NoticeMultiple(t *T) {
 	}
 }
 
-var ctcpChanmsg = &irc.Message{
-	Name:   irc.CTCP,
-	Args:   []string{"#chan", "\x01msg args\x01"},
-	Sender: "nick!user@host.com",
+var ctcpChanmsg = &irc.Event{
+	Name:        irc.CTCP,
+	Args:        []string{"#chan", "\x01msg args\x01"},
+	Sender:      "nick!user@host.com",
+	NetworkInfo: netInfo,
 }
-var ctcpMsg = &irc.Message{
-	Name:   irc.CTCP,
-	Args:   []string{"user", "\x01msg args\x01"},
-	Sender: "nick!user@host.com",
+var ctcpMsg = &irc.Event{
+	Name:        irc.CTCP,
+	Args:        []string{"user", "\x01msg args\x01"},
+	Sender:      "nick!user@host.com",
+	NetworkInfo: netInfo,
 }
 
-func TestDispatcher_CTCP(t *T) {
+func TestDispatcher_CTCP(t *testing.T) {
 	t.Parallel()
-	var c, cc *irc.Message
-	ch := testCTCPHandler{func(m *irc.Message, tag, data string,
-		_ irc.Endpoint) {
+	var c, cc *irc.Event
+	ch := testCTCPHandler{func(m *irc.Event, tag, data string,
+		_ irc.Writer) {
 
 		c = m
 	}}
-	cch := testCTCPChannelHandler{func(m *irc.Message, tag, data string,
-		_ irc.Endpoint) {
+	cch := testCTCPChannelHandler{func(m *irc.Event, tag, data string,
+		_ irc.Writer) {
 
 		cc = m
 	}}
 
-	d := CreateDispatcher(core)
+	d := NewDispatcher(core)
 	d.Register(irc.CTCP, ch)
 	d.Register(irc.CTCP, cch)
 
@@ -528,19 +534,19 @@ func TestDispatcher_CTCP(t *T) {
 	}
 }
 
-func TestDispatcher_CTCPMultiple(t *T) {
+func TestDispatcher_CTCPMultiple(t *testing.T) {
 	t.Parallel()
-	var c, cc *irc.Message
+	var c, cc *irc.Event
 	call := testCTCPAllHandler{
-		func(m *irc.Message, a, b string, _ irc.Endpoint) {
+		func(m *irc.Event, a, b string, _ irc.Writer) {
 			c = m
 		},
-		func(m *irc.Message, a, b string, _ irc.Endpoint) {
+		func(m *irc.Event, a, b string, _ irc.Writer) {
 			cc = m
 		},
 	}
 
-	d := CreateDispatcher(core)
+	d := NewDispatcher(core)
 	d.Register(irc.CTCP, call)
 
 	c, cc = nil, nil
@@ -564,22 +570,23 @@ func TestDispatcher_CTCPMultiple(t *T) {
 	}
 }
 
-var ctcpReplyMsg = &irc.Message{
-	Name:   irc.CTCPReply,
-	Args:   []string{"user", "\x01msg args\x01"},
-	Sender: "nick!user@host.com",
+var ctcpReplyMsg = &irc.Event{
+	Name:        irc.CTCPReply,
+	Args:        []string{"user", "\x01msg args\x01"},
+	Sender:      "nick!user@host.com",
+	NetworkInfo: netInfo,
 }
 
-func TestDispatcher_CTCPReply(t *T) {
+func TestDispatcher_CTCPReply(t *testing.T) {
 	t.Parallel()
-	var c *irc.Message
-	ch := testCTCPReplyHandler{func(m *irc.Message, tag, data string,
-		_ irc.Endpoint) {
+	var c *irc.Event
+	ch := testCTCPReplyHandler{func(m *irc.Event, tag, data string,
+		_ irc.Writer) {
 
 		c = m
 	}}
 
-	d := CreateDispatcher(core)
+	d := NewDispatcher(core)
 	d.Register(irc.CTCPReply, ch)
 
 	d.Dispatch(ctcpReplyMsg, nil)
@@ -588,24 +595,24 @@ func TestDispatcher_CTCPReply(t *T) {
 		t.Error("Failed to dispatch to handler.")
 	}
 }
-func TestDispatcher_FilterPrivmsgChannels(t *T) {
+func TestDispatcher_FilterPrivmsgChannels(t *testing.T) {
 	t.Parallel()
-	chanmsg2 := &irc.Message{
+	chanmsg2 := &irc.Event{
 		Name:   irc.PRIVMSG,
-		Args:   []string{"#chan2", "msg"},
+		Args:   []string{"#chan2", "ev"},
 		Sender: "nick!user@host.com",
 	}
 
-	var p, pc *irc.Message
-	ph := testPrivmsgHandler{func(m *irc.Message, _ irc.Endpoint) {
+	var p, pc *irc.Event
+	ph := testPrivmsgHandler{func(m *irc.Event, _ irc.Writer) {
 		p = m
 	}}
-	pch := testPrivmsgChannelHandler{func(m *irc.Message, _ irc.Endpoint) {
+	pch := testPrivmsgChannelHandler{func(m *irc.Event, _ irc.Writer) {
 		pc = m
 	}}
 
-	dcore := CreateDispatchCore(irc.CreateProtoCaps(), "#CHAN")
-	d := CreateDispatcher(dcore)
+	dcore := NewDispatchCore("#CHAN")
+	d := NewDispatcher(dcore)
 	d.Register(irc.PRIVMSG, ph)
 	d.Register(irc.PRIVMSG, pch)
 
@@ -629,24 +636,24 @@ func TestDispatcher_FilterPrivmsgChannels(t *T) {
 	}
 }
 
-func TestDispatcher_FilterNoticeChannels(t *T) {
+func TestDispatcher_FilterNoticeChannels(t *testing.T) {
 	t.Parallel()
-	chanmsg2 := &irc.Message{
+	chanmsg2 := &irc.Event{
 		Name:   irc.NOTICE,
-		Args:   []string{"#chan2", "msg"},
+		Args:   []string{"#chan2", "ev"},
 		Sender: "nick!user@host.com",
 	}
 
-	var u, uc *irc.Message
-	uh := testNoticeHandler{func(m *irc.Message, _ irc.Endpoint) {
+	var u, uc *irc.Event
+	uh := testNoticeHandler{func(m *irc.Event, _ irc.Writer) {
 		u = m
 	}}
-	uch := testNoticeChannelHandler{func(m *irc.Message, _ irc.Endpoint) {
+	uch := testNoticeChannelHandler{func(m *irc.Event, _ irc.Writer) {
 		uc = m
 	}}
 
-	dcore := CreateDispatchCore(irc.CreateProtoCaps(), "#CHAN")
-	d := CreateDispatcher(dcore)
+	dcore := NewDispatchCore("#CHAN")
+	d := NewDispatcher(dcore)
 	d.Register(irc.NOTICE, uh)
 	d.Register(irc.NOTICE, uch)
 
@@ -670,13 +677,13 @@ func TestDispatcher_FilterNoticeChannels(t *T) {
 	}
 }
 
-func TestDispatchCore_ShouldDispatch(t *T) {
+func TestDispatchCore_ShouldDispatch(t *testing.T) {
 	t.Parallel()
-	d := CreateDispatcher(core)
+	d := NewDispatcher(core)
 
 	var tests = []struct {
 		IsChan bool
-		Chan   string
+		Target string
 		Expect bool
 	}{
 		{true, "#chan", true},
@@ -686,7 +693,8 @@ func TestDispatchCore_ShouldDispatch(t *T) {
 	}
 
 	for _, test := range tests {
-		should := d.shouldDispatch(test.IsChan, test.Chan)
+		ev := irc.NewEvent("", netInfo, irc.PRIVMSG, "", test.Target)
+		should := d.shouldDispatch(test.IsChan, ev)
 		if should != test.Expect {
 			t.Error("Fail:", test)
 			t.Error("Expected:", test.Expect, "got:", should)
@@ -694,20 +702,20 @@ func TestDispatchCore_ShouldDispatch(t *T) {
 	}
 }
 
-func TestDispatch_Panic(t *T) {
+func TestDispatch_Panic(t *testing.T) {
 	logBuffer.Reset()
-	d := CreateDispatcher(core)
+	d := NewDispatcher(core)
 	panicMsg := "dispatch panic"
 
 	handler := testHandler{
-		func(msg *irc.Message, ep irc.Endpoint) {
+		func(ev *irc.Event, w irc.Writer) {
 			panic(panicMsg)
 		},
 	}
 
 	d.Register(irc.RAW, handler)
-	msg := irc.NewMessage("dispatcher", irc.PRIVMSG, "panic test")
-	d.Dispatch(msg, testPoint{&irc.Helper{}})
+	ev := irc.NewEvent("", netInfo, "dispatcher", irc.PRIVMSG, "panic test")
+	d.Dispatch(ev, testPoint{&irc.Helper{}})
 	d.WaitForHandlers()
 	logStr := logBuffer.String()
 
