@@ -32,7 +32,7 @@ var (
 	channel  = "#CHAN1"
 
 	self = Self{
-		User: CreateUser("me!my@host.com"),
+		User: NewUser("me!my@host.com"),
 	}
 
 	netInfo = irc.NewNetworkInfo()

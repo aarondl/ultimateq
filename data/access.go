@@ -23,8 +23,8 @@ type Access struct {
 	Flags uint64
 }
 
-// CreateAccess creates an access type with the permissions.
-func CreateAccess(level uint8, flags ...string) *Access {
+// NewAccess creates an access type with the permissions.
+func NewAccess(level uint8, flags ...string) *Access {
 	a := &Access{}
 	a.SetAccess(level, flags...)
 	return a

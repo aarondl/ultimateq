@@ -41,7 +41,7 @@ func NewState(netInfo *irc.NetworkInfo) (*State, error) {
 	if err := state.SetNetworkInfo(netInfo); err != nil {
 		return nil, err
 	}
-	state.Self.ChannelModes = CreateChannelModes(&ChannelModeKinds{}, nil)
+	state.Self.ChannelModes = NewChannelModes(&ChannelModeKinds{}, nil)
 
 	state.channels = make(map[string]*Channel)
 	state.users = make(map[string]*User)
@@ -56,11 +56,11 @@ func (s *State) SetNetworkInfo(ni *irc.NetworkInfo) error {
 	if ni == nil {
 		return errProtoCapsMissing
 	}
-	kinds, err := CreateChannelModeKindsCSV(ni.Chanmodes())
+	kinds, err := NewChannelModeKindsCSV(ni.Chanmodes())
 	if err != nil {
 		return err
 	}
-	modes, err := CreateUserModeKinds(ni.Prefix())
+	modes, err := NewUserModeKinds(ni.Prefix())
 	if err != nil {
 		return err
 	}
@@ -242,7 +242,7 @@ func (s *State) addUser(nickorhost string) *User {
 			user.host = irc.Host(nickorhost)
 		}
 	} else {
-		user = CreateUser(nickorhost)
+		user = NewUser(nickorhost)
 		s.users[nick] = user
 	}
 	return user
@@ -264,7 +264,7 @@ func (s *State) addChannel(channel string) *Channel {
 	chankey := strings.ToLower(channel)
 	var ch *Channel
 	if ch, ok := s.channels[chankey]; !ok {
-		ch = CreateChannel(channel, &s.kinds, &s.umodes)
+		ch = NewChannel(channel, &s.kinds, &s.umodes)
 		s.channels[chankey] = ch
 	}
 	return ch
@@ -316,9 +316,9 @@ func (s *State) addToChannel(nickorhost, channel string) {
 		return
 	}
 
-	modes := CreateUserModes(&s.umodes)
-	cu[nick] = CreateChannelUser(user, modes)
-	uc[channel] = CreateUserChannel(ch, modes)
+	modes := NewUserModes(&s.umodes)
+	cu[nick] = NewChannelUser(user, modes)
+	uc[channel] = NewUserChannel(ch, modes)
 	s.channelUsers[channel] = cu
 	s.userChannels[nick] = uc
 }
@@ -493,7 +493,7 @@ func (s *State) rplWelcome(ev *irc.Event) {
 	if !strings.ContainsRune(host, '!') || !strings.ContainsRune(host, '@') {
 		host = ev.Args[0]
 	}
-	user := CreateUser(host)
+	user := NewUser(host)
 	s.Self.User = user
 	s.users[strings.ToLower(user.Nick())] = user
 }

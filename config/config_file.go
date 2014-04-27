@@ -23,8 +23,8 @@ type (
 	roFileCallback func(string) (io.ReadCloser, error)
 )
 
-// CreateConfigFromFile initializes a Config object from a file.
-func CreateConfigFromFile(filename string) *Config {
+// NewConfigFromFile initializes a Config object from a file.
+func NewConfigFromFile(filename string) *Config {
 	provider := func(name string) (io.ReadCloser, error) {
 		return os.Open(name)
 	}
@@ -36,18 +36,18 @@ func CreateConfigFromFile(filename string) *Config {
 func createConfigFromFile(filename string, fn roFileCallback) (conf *Config) {
 	file, err := fn(filename)
 	if err != nil {
-		conf = CreateConfig()
+		conf = NewConfig()
 		conf.addError(errMsgInvalidConfigFile, err)
 	} else {
-		conf = CreateConfigFromReader(file)
+		conf = NewConfigFromReader(file)
 		conf.filename = filename
 		file.Close()
 	}
 	return
 }
 
-// CreateConfigFromReader initializes a Config object from a reader.
-func CreateConfigFromReader(reader io.Reader) *Config {
+// NewConfigFromReader initializes a Config object from a reader.
+func NewConfigFromReader(reader io.Reader) *Config {
 	c := &Config{
 		Errors: make([]error, 0),
 	}

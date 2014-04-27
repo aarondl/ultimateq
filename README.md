@@ -20,7 +20,7 @@ import (
 )
 
 func main() {
-    b, err := bot.CreateBot(bot.ConfigureFile("config.yaml"))
+    b, err := bot.NewBot(bot.ConfigureFile("config.yaml"))
     if err != nil {
         log.Fatalln("Error creating bot:", err)
     }

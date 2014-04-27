@@ -37,10 +37,10 @@ type UserModeKinds struct {
 	modeInfo [][2]rune
 }
 
-// CreateUserModeKinds creates an object that can be used to get/set user
+// NewUserModeKinds creates an object that can be used to get/set user
 // channel modes on a user. Prefix should be in IRC PREFIX style string. Of the
 // form (ov)@+ where the letters map to symbols
-func CreateUserModeKinds(prefix string) (*UserModeKinds, error) {
+func NewUserModeKinds(prefix string) (*UserModeKinds, error) {
 	modes, err := parsePrefixString(prefix)
 	if err != nil {
 		return nil, err
@@ -123,9 +123,9 @@ type ChannelModeKinds struct {
 	kinds map[rune]int
 }
 
-// CreateChannelModeKindsCSV creates ChannelModeKinds from an IRC CHANMODES csv
+// NewChannelModeKindsCSV creates ChannelModeKinds from an IRC CHANMODES csv
 // string. The format of which is ARGS_ADDRESS,ARGS_ALWAYS,ARGS_ONSET,ARGS_NONE
-func CreateChannelModeKindsCSV(kindstr string) (*ChannelModeKinds, error) {
+func NewChannelModeKindsCSV(kindstr string) (*ChannelModeKinds, error) {
 	kinds, err := parseChannelModeKindsCSV(kindstr)
 	if err != nil {
 		return nil, err
@@ -133,9 +133,9 @@ func CreateChannelModeKindsCSV(kindstr string) (*ChannelModeKinds, error) {
 	return &ChannelModeKinds{kinds}, nil
 }
 
-// CreateChannelModeKinds creates a mode kinds structure taking in a string,
+// NewChannelModeKinds creates a mode kinds structure taking in a string,
 // one for each kind of mode.
-func CreateChannelModeKinds(
+func NewChannelModeKinds(
 	address, always, onset, none string) *ChannelModeKinds {
 
 	return &ChannelModeKinds{

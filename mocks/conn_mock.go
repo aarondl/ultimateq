@@ -29,7 +29,7 @@ type Conn struct {
 	deathWaiter sync.WaitGroup
 }
 
-func CreateConn() (conn *Conn) {
+func NewConn() (conn *Conn) {
 	conn = &Conn{
 		writechan:   make(chan []byte),
 		writereturn: make(chan IOReturn),

@@ -128,10 +128,10 @@ func createIrcClient(conn net.Conn, name string) *IrcClient {
 	}
 }
 
-// CreateIrcClient creates an irc client with optional flood protection and
+// NewIrcClient creates an irc client with optional flood protection and
 // keep alive. scale is used to round the final sleeping values as well as
 // scale the penalties incurred by lenPenaltyFactor, if 0 it is time.Second.
-func CreateIrcClient(conn net.Conn, name string, lenPenaltyFactor int,
+func NewIrcClient(conn net.Conn, name string, lenPenaltyFactor int,
 	timeout, basestep, keepalive, scale time.Duration) *IrcClient {
 
 	c := createIrcClient(conn, name)

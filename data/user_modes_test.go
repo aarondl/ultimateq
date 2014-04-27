@@ -5,7 +5,7 @@ import (
 )
 
 func (s *s) TestUserModes(c *C) {
-	m := CreateUserModes(testUserKinds)
+	m := NewUserModes(testUserKinds)
 	c.Check(m.HasMode('o'), Equals, false)
 	c.Check(m.HasMode('v'), Equals, false)
 
@@ -25,7 +25,7 @@ func (s *s) TestUserModes(c *C) {
 }
 
 func (s *s) TestUserModes_String(c *C) {
-	m := CreateUserModes(testUserKinds)
+	m := NewUserModes(testUserKinds)
 	c.Check(m.String(), Equals, "")
 	c.Check(m.StringSymbols(), Equals, "")
 	m.SetMode('o')

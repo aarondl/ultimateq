@@ -311,7 +311,7 @@ func (h *Handler) PrivmsgUser(m *irc.Message, endpoint irc.Endpoint) {
 func main() {
 	log.SetOutput(os.Stdout)
 
-	b, err := bot.CreateBot(bot.ConfigureFile("config.yaml"))
+	b, err := bot.NewBot(bot.ConfigureFile("config.yaml"))
 	if err != nil {
 		log.Fatalln("Error creating bot:", err)
 	}

@@ -83,13 +83,13 @@ var srv2 = &Server{
 }
 
 func (s *s) TestConfig(c *C) {
-	config := CreateConfig()
+	config := NewConfig()
 	c.Check(config.Servers, NotNil)
 	c.Check(config.Global, NotNil)
 }
 
 func (s *s) TestConfig_Fallbacks(c *C) {
-	config := CreateConfig()
+	config := NewConfig()
 
 	host, name := "irc.gamesurge.net", "gamesurge"
 
@@ -130,7 +130,7 @@ func (s *s) TestConfig_Fallbacks(c *C) {
 func (s *s) TestConfig_Fluent(c *C) {
 	srv2host := "znc.gamesurge.net"
 
-	conf := CreateConfig().
+	conf := NewConfig().
 		// Setting Globals
 		Host(""). // Should not break anything
 		Port(srv2.GetPort()).
@@ -230,7 +230,7 @@ func (s *s) TestConfig_Fluent(c *C) {
 }
 
 func (s *s) TestConfig_Globals(c *C) {
-	conf := CreateConfig().
+	conf := NewConfig().
 		StoreFile("store").
 		Nick(srv1.Nick).
 		Realname(srv1.Realname).
@@ -243,7 +243,7 @@ func (s *s) TestConfig_Globals(c *C) {
 }
 
 func (s *s) TestConfig_Defaults(c *C) {
-	conf := CreateConfig().
+	conf := NewConfig().
 		Nick(srv1.Nick).
 		Realname(srv1.Realname).
 		Username(srv1.Username).
@@ -267,7 +267,7 @@ func (s *s) TestConfig_Defaults(c *C) {
 }
 
 func (s *s) TestConfig_InvalidValues(c *C) {
-	conf := CreateConfig().
+	conf := NewConfig().
 		Nick(srv1.Nick).
 		Realname(srv1.Realname).
 		Username(srv1.Username).
@@ -312,14 +312,14 @@ func (s *s) TestConfig_InvalidValues(c *C) {
 }
 
 func (s *s) TestConfig_ValidationEmpty(c *C) {
-	conf := CreateConfig()
+	conf := NewConfig()
 	c.Check(conf.IsValid(), Equals, false)
 	c.Check(len(conf.Errors), Equals, 1)
 	c.Check(conf.Errors[0].Error(), Equals, errMsgServersRequired)
 }
 
 func (s *s) TestConfig_ValidationNoHost(c *C) {
-	conf := CreateConfig().
+	conf := NewConfig().
 		Server("").
 		Port(srv1.Port)
 	c.Check(len(conf.Servers), Equals, 0)
@@ -331,7 +331,7 @@ func (s *s) TestConfig_ValidationNoHost(c *C) {
 }
 
 func (s *s) TestConfig_ValidationInvalidHost(c *C) {
-	conf := CreateConfig().
+	conf := NewConfig().
 		Nick(srv1.Nick).
 		Realname(srv1.Realname).
 		Username(srv1.Username).
@@ -343,7 +343,7 @@ func (s *s) TestConfig_ValidationInvalidHost(c *C) {
 }
 
 func (s *s) TestConfig_ValidationNoHostInternal(c *C) {
-	conf := CreateConfig().
+	conf := NewConfig().
 		Server(srv1.Host).
 		Nick(srv1.Nick).
 		Channels(srv1.Channels...).
@@ -357,7 +357,7 @@ func (s *s) TestConfig_ValidationNoHostInternal(c *C) {
 }
 
 func (s *s) TestConfig_ValidationDuplicateName(c *C) {
-	conf := CreateConfig().
+	conf := NewConfig().
 		Nick(srv1.Nick).
 		Realname(srv1.Realname).
 		Username(srv1.Username).
@@ -371,7 +371,7 @@ func (s *s) TestConfig_ValidationDuplicateName(c *C) {
 }
 
 func (s *s) TestConfig_ValidationMissing(c *C) {
-	conf := CreateConfig().
+	conf := NewConfig().
 		Server(srv1.Host)
 	c.Check(conf.IsValid(), Equals, false)
 	// Missing: Nick, Username, Userhost, Realname
@@ -383,7 +383,7 @@ func (s *s) TestConfig_ValidationMissing(c *C) {
 }
 
 func (s *s) TestConfig_ValidationRegex(c *C) {
-	conf := CreateConfig().
+	conf := NewConfig().
 		Server(srv1.Host).
 		Nick(`@Nick`).              // no special chars
 		Channels(`chan`).           // must start with valid prefix
@@ -403,7 +403,7 @@ func (s *s) TestConfig_DisplayErrors(c *C) {
 	buf := &bytes.Buffer{}
 	log.SetOutput(buf)
 	c.Check(buf.Len(), Equals, 0)
-	conf := CreateConfig().
+	conf := NewConfig().
 		Server("localhost")
 	c.Check(conf.IsValid(), Equals, false)
 	c.Check(len(conf.Errors), Equals, 4)
@@ -413,7 +413,7 @@ func (s *s) TestConfig_DisplayErrors(c *C) {
 }
 
 func (s *s) TestConfig_GetServer(c *C) {
-	conf := CreateConfig()
+	conf := NewConfig()
 	conf.Servers[srv1.GetName()] = srv1
 	conf.Servers[srv2.GetName()] = srv2
 	c.Check(conf.GetServer(srv1.GetName()), Equals, srv1)
@@ -421,7 +421,7 @@ func (s *s) TestConfig_GetServer(c *C) {
 }
 
 func (s *s) TestConfig_RemoveServer(c *C) {
-	conf := CreateConfig()
+	conf := NewConfig()
 	conf.Servers[srv1.GetName()] = srv1
 	conf.Servers[srv2.GetName()] = srv2
 	c.Check(conf.GetServer(srv1.GetName()), Equals, srv1)
@@ -440,7 +440,7 @@ func (s *s) TestConfig_RemoveServer(c *C) {
 }
 
 func (s *s) TestConfig_SetContext(c *C) {
-	conf := CreateConfig()
+	conf := NewConfig()
 	srv := *srv1
 	conf.Servers[srv1.GetName()] = &srv
 
@@ -491,7 +491,7 @@ func (s *s) TestValidNames(c *C) {
 }
 
 func (s *s) TestConfig_Clone(c *C) {
-	conf := CreateConfig()
+	conf := NewConfig()
 
 	srv := *srv1
 	srv.parent = conf
@@ -525,7 +525,7 @@ func (s *s) TestConfig_Clone(c *C) {
 }
 
 func (s *s) TestConfig_Filename(c *C) {
-	conf := CreateConfig()
+	conf := NewConfig()
 	filename := "file.yaml"
 	c.Check(conf.GetFilename(), Equals, defaultConfigFileName)
 	conf.filename = filename

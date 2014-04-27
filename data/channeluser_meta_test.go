@@ -7,10 +7,10 @@ import (
 var modes = new(int)
 
 func (s *s) TestChannelUser(c *C) {
-	user := CreateUser("nick")
-	modes := CreateUserModes(testUserKinds)
+	user := NewUser("nick")
+	modes := NewUserModes(testUserKinds)
 
-	cu := CreateChannelUser(
+	cu := NewChannelUser(
 		user,
 		modes,
 	)
@@ -21,10 +21,10 @@ func (s *s) TestChannelUser(c *C) {
 }
 
 func (s *s) TestUserChannel(c *C) {
-	ch := CreateChannel("", testChannelKinds, testUserKinds)
-	modes := CreateUserModes(testUserKinds)
+	ch := NewChannel("", testChannelKinds, testUserKinds)
+	modes := NewUserModes(testUserKinds)
 
-	uc := CreateUserChannel(
+	uc := NewUserChannel(
 		ch,
 		modes,
 	)

@@ -198,9 +198,9 @@ type coreCmds struct {
 	b *Bot
 }
 
-// CreateCoreCmds initializes the core commands and registers them with the
+// NewCoreCmds initializes the core commands and registers them with the
 // bot.
-func CreateCoreCmds(b *Bot) (*coreCmds, error) {
+func NewCoreCmds(b *Bot) (*coreCmds, error) {
 	c := &coreCmds{b}
 	for _, command := range commands {
 		privacy := cmd.PRIVATE
@@ -328,7 +328,7 @@ func (c *coreCmds) register(w irc.Writer,
 		return nil, fmt.Errorf(registerFailure, uname)
 	}
 
-	access, internal = data.CreateUserAccess(uname, pwd)
+	access, internal = data.NewUserAccess(uname, pwd)
 	if internal != nil {
 		return
 	}

@@ -18,8 +18,8 @@ type DataEndpoint struct {
 	protectStore *sync.RWMutex
 }
 
-// CreateDataEndpoint creates a data endpoint for use.
-func CreateDataEndpoint(key string, write io.Writer, state *State, store *Store,
+// NewDataEndpoint creates a data endpoint for use.
+func NewDataEndpoint(key string, write io.Writer, state *State, store *Store,
 	stateMutex, storeMutex *sync.RWMutex) *DataEndpoint {
 
 	return &DataEndpoint{

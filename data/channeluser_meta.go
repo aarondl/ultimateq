@@ -6,9 +6,9 @@ type ChannelUser struct {
 	*UserModes
 }
 
-// CreateChannelUser creates a channel user that represents a channel that
+// NewChannelUser creates a channel user that represents a channel that
 // contains a user.
-func CreateChannelUser(u *User, m *UserModes) *ChannelUser {
+func NewChannelUser(u *User, m *UserModes) *ChannelUser {
 	return &ChannelUser{
 		User:      u,
 		UserModes: m,
@@ -21,9 +21,9 @@ type UserChannel struct {
 	*UserModes
 }
 
-// CreateUserChannel creates a user channel that represents a user that is
+// NewUserChannel creates a user channel that represents a user that is
 // on a channel.
-func CreateUserChannel(c *Channel, m *UserModes) *UserChannel {
+func NewUserChannel(c *Channel, m *UserModes) *UserChannel {
 	return &UserChannel{
 		Channel:   c,
 		UserModes: m,

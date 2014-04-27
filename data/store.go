@@ -66,8 +66,8 @@ type Store struct {
 	checkedFirst bool
 }
 
-// CreateStore initializes a store type.
-func CreateStore(prov DbProvider) (*Store, error) {
+// NewStore initializes a store type.
+func NewStore(prov DbProvider) (*Store, error) {
 	db, err := prov()
 	if err != nil {
 		return nil, err

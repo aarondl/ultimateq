@@ -75,19 +75,19 @@ var fakeConfig = Configure().
 //==================================
 func TestBot_Create(t *testing.T) {
 	t.Parallel()
-	bot, err := CreateBot(fakeConfig)
+	bot, err := NewBot(fakeConfig)
 	if bot == nil {
 		t.Error("Bot should be created.")
 	}
 	if err != nil {
 		t.Error(err)
 	}
-	_, err = CreateBot(Configure())
+	_, err = NewBot(Configure())
 	if err != errInvalidConfig {
 		t.Error("Expected error:", errInvalidConfig, "got", err)
 	}
 
-	_, err = CreateBot(ConfigureFunction(
+	_, err = NewBot(ConfigureFunction(
 		func(conf *config.Config) *config.Config {
 			return fakeConfig
 		}),
@@ -120,8 +120,8 @@ func TestBot_Start(t *testing.T) {
 
 func TestBot_StartStopServer(t *testing.T) {
 	t.Parallel()
-	conn1 := mocks.CreateConn()
-	conn2 := mocks.CreateConn()
+	conn1 := mocks.NewConn()
+	conn2 := mocks.NewConn()
 	connProvider := func(srv string) (net.Conn, error) {
 		if srv == "other:6667" {
 			return conn1, nil
@@ -169,7 +169,7 @@ func TestBot_StartStopServer(t *testing.T) {
 
 func TestBot_Dispatching(t *testing.T) {
 	t.Parallel()
-	conn := mocks.CreateConn()
+	conn := mocks.NewConn()
 	connProvider := func(srv string) (net.Conn, error) {
 		return conn, nil
 	}
@@ -221,7 +221,7 @@ func TestBot_Dispatching(t *testing.T) {
 
 func TestBot_Dispatch_ConnectDisconnect(t *testing.T) {
 	t.Parallel()
-	conn := mocks.CreateConn()
+	conn := mocks.NewConn()
 	connProvider := func(srv string) (net.Conn, error) {
 		return conn, nil
 	}
@@ -255,7 +255,7 @@ func TestBot_Dispatch_ConnectDisconnect(t *testing.T) {
 
 func TestBot_Reconnect(t *testing.T) {
 	t.Parallel()
-	conn := mocks.CreateConn()
+	conn := mocks.NewConn()
 	wantedConn := make(chan int)
 	connProvider := func(srv string) (net.Conn, error) {
 		<-wantedConn
@@ -458,7 +458,7 @@ func TestBot_Store(t *testing.T) {
 	t.Parallel()
 	conf := fakeConfig.Clone().GlobalContext().NoStore(false)
 	goodStoreProv := func(s string) (*data.Store, error) {
-		return data.CreateStore(data.MemStoreProvider)
+		return data.NewStore(data.MemStoreProvider)
 	}
 	b, err := createBot(conf, nil, goodStoreProv, false, false)
 	if err != nil {
@@ -473,7 +473,7 @@ func TestBot_Store(t *testing.T) {
 
 func TestBot_Stop(t *testing.T) {
 	t.Parallel()
-	conn := mocks.CreateConn()
+	conn := mocks.NewConn()
 	connProvider := func(srv string) (net.Conn, error) {
 		return conn, nil
 	}
@@ -494,7 +494,7 @@ func TestBot_Stop(t *testing.T) {
 
 func TestBot_GetEndpoint(t *testing.T) {
 	t.Parallel()
-	conn := mocks.CreateConn()
+	conn := mocks.NewConn()
 	connProvider := func(srv string) (net.Conn, error) {
 		return conn, nil
 	}

@@ -106,7 +106,7 @@ func TestServerSender(t *testing.T) {
 func TestServer_Close(t *testing.T) {
 	t.Parallel()
 	errch := make(chan error)
-	conn := mocks.CreateConn()
+	conn := mocks.NewConn()
 	connProvider := func(srv string) (net.Conn, error) {
 		return conn, nil
 	}
@@ -205,7 +205,7 @@ func TestServer_rehashNetworkInfo(t *testing.T) {
 
 func TestServer_Write(t *testing.T) {
 	t.Parallel()
-	conn := mocks.CreateConn()
+	conn := mocks.NewConn()
 	connProvider := func(srv string) (net.Conn, error) {
 		return conn, nil
 	}

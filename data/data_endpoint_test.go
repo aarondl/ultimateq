@@ -14,11 +14,11 @@ func TestDataEndpoint(t *testing.T) {
 	if err != nil {
 		t.Error("Could not create state:", err)
 	}
-	store, err := CreateStore(MemStoreProvider)
+	store, err := NewStore(MemStoreProvider)
 	if err != nil {
 		t.Error("Could not create store:", err)
 	}
-	ep := CreateDataEndpoint("key", &bytes.Buffer{}, state, store,
+	ep := NewDataEndpoint("key", &bytes.Buffer{}, state, store,
 		&stateMutex, &storeMutex)
 	if ep == nil {
 		t.Fatal("EP was not created.")

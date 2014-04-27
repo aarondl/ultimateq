@@ -145,8 +145,8 @@ type Cmds struct {
 	protectCmds sync.RWMutex
 }
 
-// CreateCmds initializes a cmds.
-func CreateCmds(prefix rune, core *dispatch.DispatchCore) *Cmds {
+// NewCmds initializes a cmds.
+func NewCmds(prefix rune, core *dispatch.DispatchCore) *Cmds {
 	return &Cmds{
 		DispatchCore: core,
 		prefix:       prefix,

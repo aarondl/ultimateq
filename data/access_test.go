@@ -6,7 +6,7 @@ import (
 
 func TestAccess(t *testing.T) {
 	t.Parallel()
-	a := CreateAccess(0)
+	a := NewAccess(0)
 	if a == nil {
 		t.Fatal("Failed to Create")
 	}
@@ -14,7 +14,7 @@ func TestAccess(t *testing.T) {
 		t.Error("Bad init")
 	}
 
-	a = CreateAccess(100, "aBC", "d")
+	a = NewAccess(100, "aBC", "d")
 	if a.Level != 100 {
 		t.Error("Level was not set")
 	}
@@ -26,7 +26,7 @@ func TestAccess(t *testing.T) {
 }
 
 func TestAccess_HasLevel(t *testing.T) {
-	a := CreateAccess(50)
+	a := NewAccess(50)
 
 	var table = map[uint8]bool{
 		50: true,
@@ -43,7 +43,7 @@ func TestAccess_HasLevel(t *testing.T) {
 
 func TestAccess_HasFlag(t *testing.T) {
 	t.Parallel()
-	a := CreateAccess(0, "aBC", "d")
+	a := NewAccess(0, "aBC", "d")
 	for _, v := range "aBCd" {
 		if !a.HasFlag(v) {
 			t.Errorf("Flag %c was not found.", v)
@@ -53,7 +53,7 @@ func TestAccess_HasFlag(t *testing.T) {
 
 func TestAccess_HasFlags(t *testing.T) {
 	t.Parallel()
-	a := CreateAccess(0, "aBC", "d")
+	a := NewAccess(0, "aBC", "d")
 	if !a.HasFlags("aBCd") {
 		t.Error("Flags were not all found.")
 	}
@@ -64,7 +64,7 @@ func TestAccess_HasFlags(t *testing.T) {
 
 func TestAccess_SetFlag(t *testing.T) {
 	t.Parallel()
-	a := CreateAccess(0)
+	a := NewAccess(0)
 	if a.HasFlag('a') {
 		t.Error("Really bad init.")
 	}
@@ -84,7 +84,7 @@ func TestAccess_SetFlag(t *testing.T) {
 
 func TestAccess_MultiEffects(t *testing.T) {
 	t.Parallel()
-	a := CreateAccess(0)
+	a := NewAccess(0)
 	a.SetFlags("ab", "A")
 	if !a.HasFlags("ab", "A") {
 		t.Error("Set flags failed")
@@ -97,7 +97,7 @@ func TestAccess_MultiEffects(t *testing.T) {
 
 func TestAccess_ClearFlag(t *testing.T) {
 	t.Parallel()
-	a := CreateAccess(0, "aBCd")
+	a := NewAccess(0, "aBCd")
 	for _, v := range "aBCd" {
 		if !a.HasFlag(v) {
 			t.Errorf("Flag %c was not found.", v)
@@ -121,7 +121,7 @@ func TestAccess_ClearFlag(t *testing.T) {
 
 func TestAccess_ClearAllFlags(t *testing.T) {
 	t.Parallel()
-	a := CreateAccess(0, "aBCd")
+	a := NewAccess(0, "aBCd")
 	a.ClearAllFlags()
 
 	for _, v := range "aBCd" {
@@ -158,7 +158,7 @@ func TestAccess_String(t *testing.T) {
 	}
 
 	for _, test := range table {
-		a := CreateAccess(test.Level, test.Flags)
+		a := NewAccess(test.Level, test.Flags)
 		if was := a.String(); was != test.Expect {
 			t.Errorf("Expected: %s, was: %s", test.Expect, was)
 		}

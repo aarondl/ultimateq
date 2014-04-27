@@ -77,9 +77,9 @@ func TestBotConfig_ReplaceConfig(t *testing.T) {
 	nick := []byte(irc.NICK + " :newnick\r\n")
 
 	conns := map[string]*mocks.Conn{
-		netID + ":6667":         mocks.CreateConn(),
-		"newserver:6667":        mocks.CreateConn(),
-		"anothernewserver:6667": mocks.CreateConn(),
+		netID + ":6667":         mocks.NewConn(),
+		"newserver:6667":        mocks.NewConn(),
+		"anothernewserver:6667": mocks.NewConn(),
 	}
 	connProvider := func(srv string) (net.Conn, error) {
 		c := conns[srv]

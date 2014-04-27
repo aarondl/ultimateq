@@ -10,8 +10,8 @@ type User struct {
 	name string
 }
 
-// CreateUser creates a user object from a nickname or fullhost.
-func CreateUser(nickorhost string) *User {
+// NewUser creates a user object from a nickname or fullhost.
+func NewUser(nickorhost string) *User {
 	if len(nickorhost) == 0 {
 		return nil
 	}

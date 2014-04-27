@@ -42,7 +42,7 @@ const (
 )
 
 var (
-	// errInvalidConfig is when CreateBot was given an invalid configuration.
+	// errInvalidConfig is when NewBot was given an invalid configuration.
 	errInvalidConfig = errors.New("bot: Invalid Configuration")
 	// errInvalidServerId occurs when the user passes in an unknown
 	// server id to a method requiring a server id.
@@ -102,21 +102,21 @@ type Bot struct {
 	protectConfig sync.RWMutex
 }
 
-// Configure starts a configuration by calling CreateConfig. Alias for
-// config.CreateConfig
+// Configure starts a configuration by calling NewConfig. Alias for
+// config.NewConfig
 func Configure() *config.Config {
-	return config.CreateConfig()
+	return config.NewConfig()
 }
 
 // ConfigureFile starts a configuration by reading in a file. Alias for
-// config.CreateConfigFromFile
+// config.NewConfigFromFile
 func ConfigureFile(filename string) *config.Config {
-	return config.CreateConfigFromFile(filename)
+	return config.NewConfigFromFile(filename)
 }
 
 // ConfigureFunction creates a blank configuration and passes it into a function
 func ConfigureFunction(cnf func(*config.Config) *config.Config) *config.Config {
-	return cnf(config.CreateConfig())
+	return cnf(config.NewConfig())
 }
 
 // CheckConfig checks a bots config for validity.
@@ -128,9 +128,9 @@ func CheckConfig(c *config.Config) bool {
 	return true
 }
 
-// CreateBot simplifies the call to createBotFull by using default
+// NewBot simplifies the call to createBotFull by using default
 // caps and conn provider functions.
-func CreateBot(conf *config.Config) (*Bot, error) {
+func NewBot(conf *config.Config) (*Bot, error) {
 	if !CheckConfig(conf) {
 		return nil, errInvalidConfig
 	}
@@ -466,7 +466,7 @@ func createBot(conf *config.Config, connProv ConnProvider,
 	}
 
 	if attachCommands && !conf.Global.GetNoStore() {
-		b.coreCommands, err = CreateCoreCmds(b)
+		b.coreCommands, err = NewCoreCmds(b)
 		if err != nil {
 			return nil, err
 		}
@@ -509,13 +509,13 @@ func (b *Bot) createServer(conf *config.Server) (*Server, error) {
 func (b *Bot) createDispatching(prefix rune, channels []string) {
 	b.dispatchCore = dispatch.NewDispatchCore(channels...)
 	b.dispatcher = dispatch.NewDispatcher(b.dispatchCore)
-	b.cmds = cmd.CreateCmds(prefix, b.dispatchCore)
+	b.cmds = cmd.NewCmds(prefix, b.dispatchCore)
 }
 
 // createStore creates a store from a filename.
 func (b *Bot) createStore(filename string) (err error) {
 	if b.storeProvider == nil {
-		b.store, err = data.CreateStore(data.MakeFileStoreProvider(filename))
+		b.store, err = data.NewStore(data.MakeFileStoreProvider(filename))
 	} else {
 		b.store, err = b.storeProvider(filename)
 	}

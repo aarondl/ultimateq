@@ -4,17 +4,17 @@ import (
 	. "gopkg.in/check.v1"
 )
 
-var testUserKinds, _ = CreateUserModeKinds("(ov)@+")
-var testChannelKinds = CreateChannelModeKinds("b", "c", "d", "axyz")
+var testUserKinds, _ = NewUserModeKinds("(ov)@+")
+var testChannelKinds = NewChannelModeKinds("b", "c", "d", "axyz")
 
 func (s *s) TestChannelModeKinds_Create(c *C) {
-	m := CreateChannelModeKinds("a", "b", "c", "d")
+	m := NewChannelModeKinds("a", "b", "c", "d")
 	c.Check(m.kinds['a'], Equals, ARGS_ADDRESS)
 	c.Check(m.kinds['b'], Equals, ARGS_ALWAYS)
 	c.Check(m.kinds['c'], Equals, ARGS_ONSET)
 	c.Check(m.kinds['d'], Equals, ARGS_NONE)
 
-	m = CreateChannelModeKinds("a", "b", "c", "d")
+	m = NewChannelModeKinds("a", "b", "c", "d")
 	c.Check(m.kinds['a'], Equals, ARGS_ADDRESS)
 	c.Check(m.kinds['b'], Equals, ARGS_ALWAYS)
 	c.Check(m.kinds['c'], Equals, ARGS_ONSET)
@@ -27,16 +27,16 @@ func (s *s) TestChannelModeKinds_Create(c *C) {
 	c.Check(m.kinds['a'], Equals, ARGS_NONE)
 }
 
-func (s *s) TestChannelModeKinds_CreateCSV(c *C) {
-	m, err := CreateChannelModeKindsCSV("")
+func (s *s) TestChannelModeKinds_NewCSV(c *C) {
+	m, err := NewChannelModeKindsCSV("")
 	c.Check(err, NotNil)
 
-	m, err = CreateChannelModeKindsCSV(",,,")
+	m, err = NewChannelModeKindsCSV(",,,")
 	c.Check(err, IsNil)
-	m, err = CreateChannelModeKindsCSV(",")
+	m, err = NewChannelModeKindsCSV(",")
 	c.Check(err, NotNil)
 
-	m, err = CreateChannelModeKindsCSV("a,b,c,d")
+	m, err = NewChannelModeKindsCSV("a,b,c,d")
 	c.Check(m.kinds['a'], Equals, ARGS_ADDRESS)
 	c.Check(m.kinds['b'], Equals, ARGS_ALWAYS)
 	c.Check(m.kinds['c'], Equals, ARGS_ONSET)
@@ -44,7 +44,7 @@ func (s *s) TestChannelModeKinds_CreateCSV(c *C) {
 }
 
 func (s *s) TestChannelModeKindsUpdate(c *C) {
-	m := CreateChannelModeKinds("a", "b", "c", "d")
+	m := NewChannelModeKinds("a", "b", "c", "d")
 	c.Check(m.kinds['a'], Equals, ARGS_ADDRESS)
 	c.Check(m.kinds['b'], Equals, ARGS_ALWAYS)
 	c.Check(m.kinds['c'], Equals, ARGS_ONSET)
@@ -68,21 +68,21 @@ func (s *s) TestChannelModeKindsUpdate(c *C) {
 }
 
 func (s *s) TestUserModeKinds_Create(c *C) {
-	u, err := CreateUserModeKinds("")
+	u, err := NewUserModeKinds("")
 	c.Check(u, IsNil)
 	c.Check(err, NotNil)
-	u, err = CreateUserModeKinds("a")
+	u, err = NewUserModeKinds("a")
 	c.Check(u, IsNil)
 	c.Check(err, NotNil)
-	u, err = CreateUserModeKinds("(a")
-	c.Check(u, IsNil)
-	c.Check(err, NotNil)
-
-	u, err = CreateUserModeKinds("(abcdefghi)!@#$%^&*_")
+	u, err = NewUserModeKinds("(a")
 	c.Check(u, IsNil)
 	c.Check(err, NotNil)
 
-	u, err = CreateUserModeKinds("(ov)@+")
+	u, err = NewUserModeKinds("(abcdefghi)!@#$%^&*_")
+	c.Check(u, IsNil)
+	c.Check(err, NotNil)
+
+	u, err = NewUserModeKinds("(ov)@+")
 	c.Check(u, NotNil)
 	c.Check(err, IsNil)
 	c.Check(u.modeInfo[0], Equals, [2]rune{'o', '@'})
@@ -90,28 +90,28 @@ func (s *s) TestUserModeKinds_Create(c *C) {
 }
 
 func (s *s) TestUserModeKinds_GetSymbol(c *C) {
-	u, err := CreateUserModeKinds("(ov)@+")
+	u, err := NewUserModeKinds("(ov)@+")
 	c.Check(err, IsNil)
 	c.Check(u.GetSymbol('o'), Equals, '@')
 	c.Check(u.GetSymbol(' '), Equals, rune(0))
 }
 
 func (s *s) TestUserModeKinds_GetMode(c *C) {
-	u, err := CreateUserModeKinds("(ov)@+")
+	u, err := NewUserModeKinds("(ov)@+")
 	c.Check(err, IsNil)
 	c.Check(u.GetMode('@'), Equals, 'o')
 	c.Check(u.GetMode(' '), Equals, rune(0))
 }
 
 func (s *s) TestUserModeKinds_Update(c *C) {
-	u, err := CreateUserModeKinds("(ov)@+")
+	u, err := NewUserModeKinds("(ov)@+")
 	c.Check(err, IsNil)
 	c.Check(u.GetModeBit('o'), Not(Equals), 0)
 	err = u.UpdateModes("(v)+")
 	c.Check(err, IsNil)
 	c.Check(u.GetModeBit('o'), Equals, byte(0))
 
-	u, err = CreateUserModeKinds("(ov)@+")
+	u, err = NewUserModeKinds("(ov)@+")
 	err = u.UpdateModes("")
 	c.Check(err, NotNil)
 }

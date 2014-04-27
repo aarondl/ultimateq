@@ -21,7 +21,7 @@ var (
 	// a user is empty string.
 	errMissingUnameOrPwd = errors.New("data: Missing username or password.")
 	// errDuplicateMask is given when a duplicate mask is passed into the
-	// CreateUserAccess method.
+	// NewUserAccess method.
 	errDuplicateMask = errors.New("data: Duplicate mask in user creation.")
 )
 
@@ -50,9 +50,9 @@ type UserAccess struct {
 // unless the reasoning is good and the consequences are known.
 var UserAccessPwdCost = bcrypt.DefaultCost
 
-// CreateUserAccess initializes an access user. Requires username and password,
+// NewUserAccess initializes an access user. Requires username and password,
 // but masks are optional.
-func CreateUserAccess(un, pw string,
+func NewUserAccess(un, pw string,
 	masks ...string) (*UserAccess, error) {
 
 	if len(un) == 0 || len(pw) == 0 {
@@ -97,7 +97,7 @@ func (a *UserAccess) ensureServer(server string) (access *Access) {
 		a.Server = make(map[string]*Access)
 	}
 	if access = a.Server[server]; access == nil {
-		access = CreateAccess(0)
+		access = NewAccess(0)
 		a.Server[server] = access
 	}
 	return
@@ -116,7 +116,7 @@ func (a *UserAccess) ensureChannel(server, channel string) (access *Access) {
 		chans = a.Channel[server]
 	}
 	if access = chans[channel]; access == nil {
-		access = CreateAccess(0)
+		access = NewAccess(0)
 		chans[channel] = access
 	}
 	return

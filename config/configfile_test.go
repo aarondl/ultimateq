@@ -58,7 +58,7 @@ func verifyFakeConfig(c *C, conf *Config) {
 
 func (s *s) TestConfig_FromReader(c *C) {
 	buf := bytes.NewBufferString(configuration)
-	conf := CreateConfigFromReader(buf)
+	conf := NewConfigFromReader(buf)
 	c.Check(len(conf.Errors), Equals, 0)
 
 	verifyFakeConfig(c, conf)
@@ -67,13 +67,13 @@ func (s *s) TestConfig_FromReader(c *C) {
 }
 
 func (s *s) TestConfig_FromReaderErrors(c *C) {
-	conf := CreateConfigFromReader(&dyingReader{})
+	conf := NewConfigFromReader(&dyingReader{})
 	c.Check(len(conf.Errors), Equals, 1)
 	c.Check(conf.Errors[0].Error(), Matches,
 		errMsgInvalidConfigFile[:len(errMsgInvalidConfigFile)-4]+`.*`)
 
 	buf := bytes.NewBufferString("defaults:\n\tport: 5555")
-	conf = CreateConfigFromReader(buf)
+	conf = NewConfigFromReader(buf)
 	c.Check(len(conf.Errors), Equals, 1)
 	c.Check(conf.Errors[0].Error(), Matches,
 		errMsgInvalidConfigFile[:len(errMsgInvalidConfigFile)-4]+`.*`)
@@ -81,13 +81,13 @@ func (s *s) TestConfig_FromReaderErrors(c *C) {
 
 func (s *s) TestConfig_ToWriter(c *C) {
 	outbuf := bytes.NewBufferString(configuration)
-	conf := CreateConfigFromReader(outbuf)
+	conf := NewConfigFromReader(outbuf)
 	c.Check(len(conf.Errors), Equals, 0)
 
 	inbuf := &bytes.Buffer{}
 	FlushConfigToWriter(conf, inbuf)
 
-	conf = CreateConfigFromReader(inbuf)
+	conf = NewConfigFromReader(inbuf)
 	verifyFakeConfig(c, conf)
 }
 
@@ -112,7 +112,7 @@ func (s *s) TestConfig_FromFile(c *C) {
 
 func (s *s) TestConfig_ToFile(c *C) {
 	outbuf := bytes.NewBufferString(configuration)
-	conf := CreateConfigFromReader(outbuf)
+	conf := NewConfigFromReader(outbuf)
 	c.Check(len(conf.Errors), Equals, 0)
 
 	inbuf := &testBuffer{&bytes.Buffer{}, false}
@@ -149,7 +149,7 @@ func (s *s) TestConfig_ToFile(c *C) {
 	c.Check(err, NotNil)
 	c.Check(inbuf.closed, Equals, false)
 
-	conf = CreateConfigFromReader(inbuf)
+	conf = NewConfigFromReader(inbuf)
 	verifyFakeConfig(c, conf)
 }
 

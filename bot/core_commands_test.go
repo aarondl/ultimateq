@@ -26,8 +26,8 @@ const (
 )
 
 var (
-	channelKinds = data.CreateChannelModeKinds("a", "b", "c", "d")
-	userKinds, _ = data.CreateUserModeKinds("(ov)@+")
+	channelKinds = data.NewChannelModeKinds("a", "b", "c", "d")
+	userKinds, _ = data.NewUserModeKinds("(ov)@+")
 	rgxCreator   = strings.NewReplacer(
 		`(`, `\(`, `)`, `\)`, `]`, `\]`, `[`,
 		`\[`, `\`, `\\`, `/`, `\/`, `%v`, `.*`,
@@ -50,7 +50,7 @@ func commandsSetup(t *testing.T) *tSetup {
 		Ssl(true).Prefix(prefix).Server(netID)
 
 	b, err := createBot(conf, nil, func(_ string) (*data.Store, error) {
-		return data.CreateStore(data.MemStoreProvider)
+		return data.NewStore(data.MemStoreProvider)
 	}, true, true)
 
 	if err != nil {
@@ -124,7 +124,7 @@ func TestCoreCommands(t *testing.T) {
 		Ssl(true).Server(netID)
 
 	b, err := createBot(conf, nil, func(_ string) (*data.Store, error) {
-		return data.CreateStore(data.MemStoreProvider)
+		return data.NewStore(data.MemStoreProvider)
 	}, true, true)
 
 	if err != nil {

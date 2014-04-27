@@ -6,7 +6,7 @@ import (
 
 func TestStore(t *testing.T) {
 	t.Parallel()
-	s, err := CreateStore(MemStoreProvider)
+	s, err := NewStore(MemStoreProvider)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -23,7 +23,7 @@ func TestStore(t *testing.T) {
 
 func TestStore_AddUser(t *testing.T) {
 	t.Parallel()
-	s, err := CreateStore(MemStoreProvider)
+	s, err := NewStore(MemStoreProvider)
 	defer s.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -73,7 +73,7 @@ func TestStore_AddUser(t *testing.T) {
 
 func TestStore_RemoveUser(t *testing.T) {
 	t.Parallel()
-	s, err := CreateStore(MemStoreProvider)
+	s, err := NewStore(MemStoreProvider)
 	defer s.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -120,13 +120,13 @@ func TestStore_RemoveUser(t *testing.T) {
 
 func TestStore_AuthUser(t *testing.T) {
 	t.Parallel()
-	s, err := CreateStore(MemStoreProvider)
+	s, err := NewStore(MemStoreProvider)
 	defer s.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ua1, err := CreateUserAccess(uname, password, `*!*@host`)
+	ua1, err := NewUserAccess(uname, password, `*!*@host`)
 	if err != nil {
 		t.Fatal("Error creating user:", err)
 	}
@@ -195,13 +195,13 @@ func TestStore_AuthUser(t *testing.T) {
 
 func TestStore_AuthLogout(t *testing.T) {
 	t.Parallel()
-	s, err := CreateStore(MemStoreProvider)
+	s, err := NewStore(MemStoreProvider)
 	defer s.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ua1, err := CreateUserAccess(uname, password)
+	ua1, err := NewUserAccess(uname, password)
 	if err != nil {
 		t.Fatal("Error creating user:", err)
 	}
@@ -250,7 +250,7 @@ func TestStore_AuthLogout(t *testing.T) {
 
 func TestStore_Finding(t *testing.T) {
 	t.Parallel()
-	s, err := CreateStore(MemStoreProvider)
+	s, err := NewStore(MemStoreProvider)
 	defer s.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -323,7 +323,7 @@ func TestStore_Finding(t *testing.T) {
 
 func TestStore_IsFirst(t *testing.T) {
 	t.Parallel()
-	s, err := CreateStore(MemStoreProvider)
+	s, err := NewStore(MemStoreProvider)
 	defer s.Close()
 	if err != nil {
 		t.Error("Unexpected error:", err)
@@ -350,7 +350,7 @@ func TestStore_IsFirst(t *testing.T) {
 
 func TestStore_GlobalUsers(t *testing.T) {
 	t.Parallel()
-	s, err := CreateStore(MemStoreProvider)
+	s, err := NewStore(MemStoreProvider)
 	defer s.Close()
 	if err != nil {
 		t.Error("Unexpected error:", err)
@@ -387,7 +387,7 @@ func TestStore_GlobalUsers(t *testing.T) {
 
 func TestStore_ServerUsers(t *testing.T) {
 	t.Parallel()
-	s, err := CreateStore(MemStoreProvider)
+	s, err := NewStore(MemStoreProvider)
 	defer s.Close()
 	if err != nil {
 		t.Error("Unexpected error:", err)
@@ -424,7 +424,7 @@ func TestStore_ServerUsers(t *testing.T) {
 
 func TestStore_ChanUsers(t *testing.T) {
 	t.Parallel()
-	s, err := CreateStore(MemStoreProvider)
+	s, err := NewStore(MemStoreProvider)
 	defer s.Close()
 	if err != nil {
 		t.Error("Unexpected error:", err)

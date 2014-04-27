@@ -6,9 +6,9 @@ type UserModes struct {
 	*UserModeKinds
 }
 
-// CreateUserModes creates a new usermodes using the metadata instance for
+// NewUserModes creates a new usermodes using the metadata instance for
 // reference information.
-func CreateUserModes(u *UserModeKinds) *UserModes {
+func NewUserModes(u *UserModeKinds) *UserModes {
 	return &UserModes{
 		UserModeKinds: u,
 	}

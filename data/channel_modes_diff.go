@@ -13,15 +13,15 @@ type ModeDiff struct {
 	neg           *ChannelModes
 }
 
-// CreateModeDiff creates an empty ModeDiff.
-func CreateModeDiff(
+// NewModeDiff creates an empty ModeDiff.
+func NewModeDiff(
 	kinds *ChannelModeKinds, userKinds *UserModeKinds) *ModeDiff {
 
 	return &ModeDiff{
 		ChannelModeKinds: kinds,
 		userModeKinds:    userKinds,
-		pos:              CreateChannelModes(kinds, userKinds),
-		neg:              CreateChannelModes(kinds, userKinds),
+		pos:              NewChannelModes(kinds, userKinds),
+		neg:              NewChannelModes(kinds, userKinds),
 	}
 }
 

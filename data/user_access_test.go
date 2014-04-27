@@ -15,7 +15,7 @@ func TestUserAccess(t *testing.T) {
 	var masks = []string{`*!*@host`, `*!user@*`}
 
 	a = &UserAccess{}
-	a, err = CreateUserAccess(uname, password, masks...)
+	a, err = NewUserAccess(uname, password, masks...)
 	if err != nil {
 		t.Fatal("Unexpected error:", err)
 	}
@@ -29,15 +29,15 @@ func TestUserAccess(t *testing.T) {
 		t.Errorf("Masks are %#v not %#v", a.Masks, masks)
 	}
 
-	a, err = CreateUserAccess("", password, masks...)
+	a, err = NewUserAccess("", password, masks...)
 	if a != nil || err != errMissingUnameOrPwd {
 		t.Error("Empty username should fail creation.")
 	}
-	a, err = CreateUserAccess(uname, "", masks...)
+	a, err = NewUserAccess(uname, "", masks...)
 	if a != nil || err != errMissingUnameOrPwd {
 		t.Error("Empty password should fail creation.")
 	}
-	a, err = CreateUserAccess(uname, password, "a", "a")
+	a, err = NewUserAccess(uname, password, "a", "a")
 	if a != nil || err != errDuplicateMask {
 		t.Error("Duplicate masks should generate an error.")
 	}
@@ -45,7 +45,7 @@ func TestUserAccess(t *testing.T) {
 
 func TestUserAccess_VerifyPassword(t *testing.T) {
 	t.Parallel()
-	a, err := CreateUserAccess(uname, password)
+	a, err := NewUserAccess(uname, password)
 	if err != nil {
 		t.Fatal("Unexpected Error:", err)
 	}
@@ -59,7 +59,7 @@ func TestUserAccess_VerifyPassword(t *testing.T) {
 
 func TestUserAccess_SerializeDeserialize(t *testing.T) {
 	var masks = []string{`*!*@host`, `*!user@*`}
-	a, err := CreateUserAccess(uname, password, masks...)
+	a, err := NewUserAccess(uname, password, masks...)
 	if err != nil {
 		t.Fatal("Unexpected error:", err)
 	}
@@ -553,7 +553,7 @@ func TestUserAccess_String(t *testing.T) {
 
 func TestUserAccess_ResetPassword(t *testing.T) {
 	t.Parallel()
-	a, err := CreateUserAccess(uname, password)
+	a, err := NewUserAccess(uname, password)
 	if err != nil {
 		t.Error(err)
 	}

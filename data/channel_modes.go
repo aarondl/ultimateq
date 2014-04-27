@@ -20,8 +20,8 @@ type ChannelModes struct {
 	addresses int
 }
 
-// CreateChannelModes creates an empty ChannelModes.
-func CreateChannelModes(
+// NewChannelModes creates an empty ChannelModes.
+func NewChannelModes(
 	kinds *ChannelModeKinds, userKinds *UserModeKinds) *ChannelModes {
 
 	return &ChannelModes{

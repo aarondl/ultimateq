@@ -125,8 +125,8 @@ type Config struct {
 	Errors    []error "-"
 }
 
-// CreateConfig initializes a Config object.
-func CreateConfig() *Config {
+// NewConfig initializes a Config object.
+func NewConfig() *Config {
 	return &Config{
 		Global:  &Server{},
 		Servers: make(map[string]*Server, nAssumedServers),

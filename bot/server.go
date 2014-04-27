@@ -116,7 +116,7 @@ func (s *Server) Write(buf []byte) (int, error) {
 // createEndpoint creates a ServerEndpoint with an embedded DataEndpoint.
 func (s *Server) createEndpoint(store *data.Store, mutex *sync.RWMutex) {
 	s.endpoint = &ServerEndpoint{
-		DataEndpoint: data.CreateDataEndpoint(
+		DataEndpoint: data.NewDataEndpoint(
 			s.name,
 			s,
 			s.state,
@@ -132,7 +132,7 @@ func (s *Server) createEndpoint(store *data.Store, mutex *sync.RWMutex) {
 func (s *Server) createDispatching(prefix rune, channels []string) {
 	s.dispatchCore = dispatch.NewDispatchCore(channels...)
 	s.dispatcher = dispatch.NewDispatcher(s.dispatchCore)
-	s.cmds = cmd.CreateCmds(prefix, s.dispatchCore)
+	s.cmds = cmd.NewCmds(prefix, s.dispatchCore)
 }
 
 // createState uses the server's current ProtoCaps to create a state.
@@ -166,7 +166,7 @@ func (s *Server) createIrcClient() error {
 	}
 
 	s.protect.Lock()
-	s.client = inet.CreateIrcClient(result.conn, s.name,
+	s.client = inet.NewIrcClient(result.conn, s.name,
 		int(s.conf.GetFloodLenPenalty()),
 		time.Duration(s.conf.GetFloodTimeout()*1000.0)*time.Millisecond,
 		time.Duration(s.conf.GetFloodStep()*1000.0)*time.Millisecond,

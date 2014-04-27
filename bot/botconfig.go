@@ -105,7 +105,7 @@ func (b *Bot) Rehash() error {
 	name := b.conf.GetFilename()
 	b.protectConfig.RUnlock()
 
-	conf := config.CreateConfigFromFile(name)
+	conf := config.NewConfigFromFile(name)
 	if !CheckConfig(conf) {
 		return errInvalidConfig
 	}

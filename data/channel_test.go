@@ -5,11 +5,11 @@ import (
 )
 
 func (s *s) TestChannel_Create(c *C) {
-	ch := CreateChannel("", testChannelKinds, testUserKinds)
+	ch := NewChannel("", testChannelKinds, testUserKinds)
 	c.Check(ch, IsNil)
 
 	name := "#CHAN"
-	ch = CreateChannel(name, testChannelKinds, testUserKinds)
+	ch = NewChannel(name, testChannelKinds, testUserKinds)
 	c.Check(ch, NotNil)
 	c.Check(ch.Name(), Equals, name)
 	c.Check(ch.Topic(), Equals, "")
@@ -20,7 +20,7 @@ func (s *s) TestChannel_GettersSetters(c *C) {
 	name := "#chan"
 	topic := "topic"
 
-	ch := CreateChannel(name, testChannelKinds, testUserKinds)
+	ch := NewChannel(name, testChannelKinds, testUserKinds)
 	c.Check(ch.Name(), Equals, name)
 	ch.SetTopic(topic)
 	c.Check(ch.Topic(), Equals, topic)
@@ -28,7 +28,7 @@ func (s *s) TestChannel_GettersSetters(c *C) {
 
 func (s *s) TestChannel_Bans(c *C) {
 	bans := []string{"ban1", "ban2"}
-	ch := CreateChannel("name", testChannelKinds, testUserKinds)
+	ch := NewChannel("name", testChannelKinds, testUserKinds)
 
 	ch.SetBans(bans)
 	got := ch.Bans()
@@ -49,7 +49,7 @@ func (s *s) TestChannel_Bans(c *C) {
 
 func (s *s) TestChannel_IsBanned(c *C) {
 	bans := []string{"*!*@host.com", "nick!*@*"}
-	ch := CreateChannel("name", testChannelKinds, testUserKinds)
+	ch := NewChannel("name", testChannelKinds, testUserKinds)
 	ch.SetBans(bans)
 	c.Check(ch.IsBanned("nick"), Equals, true)
 	c.Check(ch.IsBanned("notnick"), Equals, false)
@@ -60,7 +60,7 @@ func (s *s) TestChannel_IsBanned(c *C) {
 
 func (s *s) TestChannel_DeleteBanWild(c *C) {
 	bans := []string{"*!*@host.com", "nick!*@*", "nick2!*@*"}
-	ch := CreateChannel("name", testChannelKinds, testUserKinds)
+	ch := NewChannel("name", testChannelKinds, testUserKinds)
 	ch.SetBans(bans)
 	c.Check(ch.IsBanned("nick"), Equals, true)
 	c.Check(ch.IsBanned("notnick"), Equals, false)
@@ -94,6 +94,6 @@ func (s *s) TestChannel_DeleteBanWild(c *C) {
 }
 
 func (s *s) TestChannel_String(c *C) {
-	ch := CreateChannel("name", testChannelKinds, testUserKinds)
+	ch := NewChannel("name", testChannelKinds, testUserKinds)
 	c.Check(ch.String(), Equals, "name")
 }

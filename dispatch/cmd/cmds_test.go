@@ -176,11 +176,11 @@ func setupForAuth() (state *data.State, store *data.Store,
 
 	var err error
 	state, _ = setup()
-	store, err = data.CreateStore(data.MemStoreProvider)
+	store, err = data.NewStore(data.MemStoreProvider)
 	if err != nil {
 		panic(err)
 	}
-	user, err = data.CreateUserAccess("user", "pass", "*!*@host")
+	user, err = data.NewUserAccess("user", "pass", "*!*@host")
 	if err != nil {
 		panic(err)
 	}
@@ -200,7 +200,7 @@ var core = dispatch.NewDispatchCore()
 var prefix = '.'
 
 func TestCmds(t *testing.T) {
-	c := CreateCmds(prefix, core)
+	c := NewCmds(prefix, core)
 	if c == nil {
 		t.Fatal("Cmds should not be nil.")
 	}
@@ -232,7 +232,7 @@ func chkStr(msg, pattern string) error {
 }
 
 func TestCmds_Register(t *testing.T) {
-	c := CreateCmds(prefix, core)
+	c := NewCmds(prefix, core)
 
 	var handler = &commandHandler{}
 
@@ -366,7 +366,7 @@ func TestCmds_Register(t *testing.T) {
 }
 
 func TestCmds_RegisterProtected(t *testing.T) {
-	c := CreateCmds(prefix, core)
+	c := NewCmds(prefix, core)
 
 	handler := &commandHandler{}
 	var success bool
@@ -384,7 +384,7 @@ func TestCmds_RegisterProtected(t *testing.T) {
 
 func TestCmds_Dispatch(t *testing.T) {
 	dcore := dispatch.NewDispatchCore()
-	c := CreateCmds(prefix, dcore)
+	c := NewCmds(prefix, dcore)
 	c.AddChannels(channel)
 	if c == nil {
 		t.Error("Cmds should not be nil.")
@@ -393,7 +393,7 @@ func TestCmds_Dispatch(t *testing.T) {
 	var buffer = &bytes.Buffer{}
 	var stateMutex, storeMutex sync.RWMutex
 	state, store := setup()
-	var dataEndpoint = data.CreateDataEndpoint(server, buffer, state, store,
+	var dataEndpoint = data.NewDataEndpoint(server, buffer, state, store,
 		&stateMutex, &storeMutex)
 
 	ccmd := string(c.prefix) + cmd
@@ -594,7 +594,7 @@ func TestCmds_Dispatch(t *testing.T) {
 }
 
 func TestCmds_DispatchAuthed(t *testing.T) {
-	c := CreateCmds(prefix, core)
+	c := NewCmds(prefix, core)
 
 	var table = []struct {
 		Sender   string
@@ -616,7 +616,7 @@ func TestCmds_DispatchAuthed(t *testing.T) {
 	state, store, user := setupForAuth()
 	user.GrantGlobal(100, "a")
 
-	var dataEndpoint = data.CreateDataEndpoint(server, buffer, state, store,
+	var dataEndpoint = data.NewDataEndpoint(server, buffer, state, store,
 		&stateMutex, &storeMutex)
 
 	for _, test := range table {
@@ -701,11 +701,11 @@ func TestCmds_DispatchAuthed(t *testing.T) {
 }
 
 func TestCmds_DispatchNils(t *testing.T) {
-	c := CreateCmds(prefix, core)
+	c := NewCmds(prefix, core)
 	var buffer = &bytes.Buffer{}
 	var stateMutex, storeMutex sync.RWMutex
 
-	var dataEndpoint = data.CreateDataEndpoint(server, buffer, nil, nil,
+	var dataEndpoint = data.NewDataEndpoint(server, buffer, nil, nil,
 		&stateMutex, &storeMutex)
 
 	ev := &irc.Event{
@@ -753,11 +753,11 @@ func TestCmds_DispatchNils(t *testing.T) {
 }
 
 func TestCmds_DispatchReturns(t *testing.T) {
-	c := CreateCmds(prefix, core)
+	c := NewCmds(prefix, core)
 	var buffer = &bytes.Buffer{}
 	var stateMutex, storeMutex sync.RWMutex
 
-	var dataEndpoint = data.CreateDataEndpoint(server, buffer, nil, nil,
+	var dataEndpoint = data.NewDataEndpoint(server, buffer, nil, nil,
 		&stateMutex, &storeMutex)
 
 	ev := &irc.Event{
@@ -810,13 +810,13 @@ func TestCmds_DispatchReturns(t *testing.T) {
 }
 
 func TestCmds_DispatchChannel(t *testing.T) {
-	c := CreateCmds(prefix, core)
+	c := NewCmds(prefix, core)
 	var buffer = &bytes.Buffer{}
 	var stateMutex, storeMutex sync.RWMutex
 
 	state, store := setup()
 
-	var dataEndpoint = data.CreateDataEndpoint(server, buffer, state, store,
+	var dataEndpoint = data.NewDataEndpoint(server, buffer, state, store,
 		&stateMutex, &storeMutex)
 
 	ev := &irc.Event{
@@ -871,7 +871,7 @@ func TestCmds_DispatchChannel(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, cmd + " " + channel}
-	noState := data.CreateDataEndpoint(server, buffer, nil, store,
+	noState := data.NewDataEndpoint(server, buffer, nil, store,
 		&stateMutex, &storeMutex)
 	err = c.Dispatch(server, 0, ev, noState)
 	c.WaitForHandlers()
@@ -918,12 +918,12 @@ func TestCmds_DispatchChannel(t *testing.T) {
 }
 
 func TestCmds_DispatchUsers(t *testing.T) {
-	c := CreateCmds(prefix, core)
+	c := NewCmds(prefix, core)
 	var buffer = &bytes.Buffer{}
 	var stateMutex, storeMutex sync.RWMutex
 
 	state, store, _ := setupForAuth()
-	var dataEndpoint = data.CreateDataEndpoint(server, buffer, state, store,
+	var dataEndpoint = data.NewDataEndpoint(server, buffer, state, store,
 		&stateMutex, &storeMutex)
 
 	ev := &irc.Event{
@@ -1017,12 +1017,12 @@ func TestCmds_DispatchUsers(t *testing.T) {
 }
 
 func TestCmds_DispatchErrors(t *testing.T) {
-	c := CreateCmds(prefix, core)
+	c := NewCmds(prefix, core)
 	var buffer = &bytes.Buffer{}
 	var stateMutex, storeMutex sync.RWMutex
 
 	state, store, _ := setupForAuth()
-	var dataEndpoint = data.CreateDataEndpoint(server, buffer, state, store,
+	var dataEndpoint = data.NewDataEndpoint(server, buffer, state, store,
 		&stateMutex, &storeMutex)
 
 	ev := &irc.Event{
@@ -1078,7 +1078,7 @@ func TestCmds_DispatchErrors(t *testing.T) {
 		t.Error(err)
 	}
 
-	disableStoreEp := data.CreateDataEndpoint(server, buffer, state, nil,
+	disableStoreEp := data.NewDataEndpoint(server, buffer, state, nil,
 		&stateMutex, &storeMutex)
 	ev.Args = []string{nick, cmd + " *user nick"}
 	err = c.Dispatch(server, 0, ev, disableStoreEp)
@@ -1088,7 +1088,7 @@ func TestCmds_DispatchErrors(t *testing.T) {
 		t.Error(err)
 	}
 
-	disableStateEp := data.CreateDataEndpoint(server, buffer, nil, store,
+	disableStateEp := data.NewDataEndpoint(server, buffer, nil, store,
 		&stateMutex, &storeMutex)
 	ev.Args = []string{nick, cmd + " nick nick"}
 	err = c.Dispatch(server, 0, ev, disableStateEp)
@@ -1123,12 +1123,12 @@ func TestCmds_DispatchErrors(t *testing.T) {
 }
 
 func TestCmds_DispatchVariadicUsers(t *testing.T) {
-	c := CreateCmds(prefix, core)
+	c := NewCmds(prefix, core)
 	var buffer = &bytes.Buffer{}
 	var stateMutex, storeMutex sync.RWMutex
 
 	state, store, _ := setupForAuth()
-	var dataEndpoint = data.CreateDataEndpoint(server, buffer, state, store,
+	var dataEndpoint = data.NewDataEndpoint(server, buffer, state, store,
 		&stateMutex, &storeMutex)
 
 	ev := &irc.Event{
@@ -1209,12 +1209,12 @@ func TestCmds_DispatchVariadicUsers(t *testing.T) {
 }
 
 func TestCmds_DispatchMixUserAndChan(t *testing.T) {
-	c := CreateCmds(prefix, core)
+	c := NewCmds(prefix, core)
 	var buffer = &bytes.Buffer{}
 	var stateMutex, storeMutex sync.RWMutex
 
 	state, store, _ := setupForAuth()
-	var dataEndpoint = data.CreateDataEndpoint(server, buffer, state, store,
+	var dataEndpoint = data.NewDataEndpoint(server, buffer, state, store,
 		&stateMutex, &storeMutex)
 
 	ev := &irc.Event{
@@ -1249,13 +1249,13 @@ func TestCmds_DispatchMixUserAndChan(t *testing.T) {
 }
 
 func TestCmds_DispatchReflection(t *testing.T) {
-	c := CreateCmds(prefix, core)
+	c := NewCmds(prefix, core)
 	var buffer = &bytes.Buffer{}
 	var err error
 	var stateMutex, storeMutex sync.RWMutex
 
 	state, _ := setup()
-	var dataEndpoint = data.CreateDataEndpoint(server, buffer, state, nil,
+	var dataEndpoint = data.NewDataEndpoint(server, buffer, state, nil,
 		&stateMutex, &storeMutex)
 
 	errMsg := "error"
@@ -1332,13 +1332,13 @@ func TestCmds_DispatchReflection(t *testing.T) {
 }
 
 func TestCmds_DispatchOverridePrefix(t *testing.T) {
-	c := CreateCmds(prefix, core)
+	c := NewCmds(prefix, core)
 	var buffer = &bytes.Buffer{}
 	var err error
 	var stateMutex, storeMutex sync.RWMutex
 
 	state, _ := setup()
-	var dataEndpoint = data.CreateDataEndpoint(server, buffer, state, nil,
+	var dataEndpoint = data.NewDataEndpoint(server, buffer, state, nil,
 		&stateMutex, &storeMutex)
 
 	handler := &commandHandler{}
@@ -1395,7 +1395,7 @@ func TestCmds_DispatchOverridePrefix(t *testing.T) {
 }
 
 func TestCmds_EachCmd(t *testing.T) {
-	c := CreateCmds(prefix, core)
+	c := NewCmds(prefix, core)
 	var err error
 
 	handler := &errorHandler{}
@@ -1450,13 +1450,13 @@ func TestCmds_Panic(t *testing.T) {
 	lk := &lockWriter{&bytes.Buffer{}, ch}
 	log.SetOutput(lk)
 
-	c := CreateCmds(prefix, core)
+	c := NewCmds(prefix, core)
 	panicMsg := "dispatch panic"
 
 	var buffer = &bytes.Buffer{}
 	var stateMutex, storeMutex sync.RWMutex
 	state, store := setup()
-	var dataEndpoint = data.CreateDataEndpoint(server, buffer, state, store,
+	var dataEndpoint = data.NewDataEndpoint(server, buffer, state, store,
 		&stateMutex, &storeMutex)
 
 	handler := panicHandler{

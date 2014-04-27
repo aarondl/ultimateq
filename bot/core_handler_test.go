@@ -118,7 +118,7 @@ func (s *s) TestCoreHandler_Join(c *C) {
 	srv := b.servers[netID]
 	c.Check(err, IsNil)
 
-	srv.state.Self.User = data.CreateUser("nick!user@host")
+	srv.state.Self.User = data.NewUser("nick!user@host")
 	ev := irc.NewEvent(netID, netInfo, irc.JOIN,
 		srv.state.Self.Host(), "#chan")
 
