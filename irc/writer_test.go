@@ -17,7 +17,7 @@ func TestHelper_ImplementsWriter(t *testing.T) {
 
 func TestHelper_Send(t *testing.T) {
 	buf := bytes.Buffer{}
-	h := &Helper{&buf}
+	h := Helper{&buf}
 	format := "PRIVMSG %v :%v"
 	target := "#chan"
 	msg := "msg"
@@ -31,7 +31,7 @@ func TestHelper_Send(t *testing.T) {
 
 func TestHelper_Sendln(t *testing.T) {
 	buf := bytes.Buffer{}
-	h := &Helper{&buf}
+	h := Helper{&buf}
 	header := "PRIVMSG"
 	target := "#chan"
 	msg := "msg"
@@ -46,7 +46,7 @@ func TestHelper_Sendln(t *testing.T) {
 
 func TestHelper_Sendf(t *testing.T) {
 	buf := bytes.Buffer{}
-	h := &Helper{&buf}
+	h := Helper{&buf}
 	format := "PRIVMSG %v :%v"
 	target := "#chan"
 	msg := "msg"
@@ -60,7 +60,7 @@ func TestHelper_Sendf(t *testing.T) {
 
 func TestHelper_Privmsg(t *testing.T) {
 	buf := bytes.Buffer{}
-	h := &Helper{&buf}
+	h := Helper{&buf}
 	ch := "#chan"
 	s1, s2 := "string1", "string2"
 	h.Privmsg(ch, s1, s2)
@@ -73,7 +73,7 @@ func TestHelper_Privmsg(t *testing.T) {
 
 func TestHelper_Privmsgln(t *testing.T) {
 	buf := bytes.Buffer{}
-	h := &Helper{&buf}
+	h := Helper{&buf}
 	ch := "#chan"
 	s1, s2 := "string1", "string2"
 	expect := fmt.Sprintln(s1, s2)
@@ -87,7 +87,7 @@ func TestHelper_Privmsgln(t *testing.T) {
 
 func TestHelper_Privmsgf(t *testing.T) {
 	buf := bytes.Buffer{}
-	h := &Helper{&buf}
+	h := Helper{&buf}
 	ch := "#chan"
 	format := "%v - %v"
 	s1, s2 := "string1", "string2"
@@ -100,7 +100,7 @@ func TestHelper_Privmsgf(t *testing.T) {
 
 func TestHelper_Notice(t *testing.T) {
 	buf := bytes.Buffer{}
-	h := &Helper{&buf}
+	h := Helper{&buf}
 	ch := "#chan"
 	s1, s2 := "string1", "string2"
 	h.Notice(ch, s1, s2)
@@ -113,7 +113,7 @@ func TestHelper_Notice(t *testing.T) {
 
 func TestHelper_Noticeln(t *testing.T) {
 	buf := bytes.Buffer{}
-	h := &Helper{&buf}
+	h := Helper{&buf}
 	ch := "#chan"
 	s1, s2 := "string1", "string2"
 	expect := fmt.Sprintln(s1, s2)
@@ -127,7 +127,7 @@ func TestHelper_Noticeln(t *testing.T) {
 
 func TestHelper_Noticef(t *testing.T) {
 	buf := bytes.Buffer{}
-	h := &Helper{&buf}
+	h := Helper{&buf}
 	ch := "#chan"
 	format := "%v - %v"
 	s1, s2 := "string1", "string2"
@@ -141,7 +141,7 @@ func TestHelper_Noticef(t *testing.T) {
 
 func TestHelper_CTCP(t *testing.T) {
 	buf := bytes.Buffer{}
-	h := &Helper{&buf}
+	h := Helper{&buf}
 	ch := "#chan"
 	s1, s2 := "string1", "string2"
 	tag := "tag"
@@ -156,7 +156,7 @@ func TestHelper_CTCP(t *testing.T) {
 
 func TestHelper_CTCPln(t *testing.T) {
 	buf := bytes.Buffer{}
-	h := &Helper{&buf}
+	h := Helper{&buf}
 	ch := "#chan"
 	s1, s2 := "string1", "string2"
 	tag := "tag"
@@ -172,7 +172,7 @@ func TestHelper_CTCPln(t *testing.T) {
 
 func TestHelper_CTCPf(t *testing.T) {
 	buf := bytes.Buffer{}
-	h := &Helper{&buf}
+	h := Helper{&buf}
 	ch := "#chan"
 	format := "%v - %v"
 	s1, s2 := "string1", "string2"
@@ -188,7 +188,7 @@ func TestHelper_CTCPf(t *testing.T) {
 
 func TestHelper_CTCPReply(t *testing.T) {
 	buf := bytes.Buffer{}
-	h := &Helper{&buf}
+	h := Helper{&buf}
 	ch := "#chan"
 	s1, s2 := "string1", "string2"
 	tag := "tag"
@@ -203,7 +203,7 @@ func TestHelper_CTCPReply(t *testing.T) {
 
 func TestHelper_CTCPReplyln(t *testing.T) {
 	buf := bytes.Buffer{}
-	h := &Helper{&buf}
+	h := Helper{&buf}
 	ch := "#chan"
 	s1, s2 := "string1", "string2"
 	tag := "tag"
@@ -219,7 +219,7 @@ func TestHelper_CTCPReplyln(t *testing.T) {
 
 func TestHelper_CTCPReplyf(t *testing.T) {
 	buf := bytes.Buffer{}
-	h := &Helper{&buf}
+	h := Helper{&buf}
 	ch := "#chan"
 	format := "%v - %v"
 	s1, s2 := "string1", "string2"
@@ -235,7 +235,7 @@ func TestHelper_CTCPReplyf(t *testing.T) {
 
 func TestHelper_Notify(t *testing.T) {
 	buf := bytes.Buffer{}
-	h := &Helper{&buf}
+	h := Helper{&buf}
 	ch := "#chan"
 	s1, s2 := "string1", "string2"
 
@@ -257,7 +257,7 @@ func TestHelper_Notify(t *testing.T) {
 
 func TestHelper_Notifyln(t *testing.T) {
 	buf := bytes.Buffer{}
-	h := &Helper{&buf}
+	h := Helper{&buf}
 	ch := "#chan"
 	s1, s2 := "string1", "string2"
 
@@ -283,7 +283,7 @@ func TestHelper_Notifyln(t *testing.T) {
 
 func TestHelper_Notifyf(t *testing.T) {
 	buf := bytes.Buffer{}
-	h := &Helper{&buf}
+	h := Helper{&buf}
 	ch := "#chan"
 	format := "%v - %v"
 	s1, s2 := "string1", "string2"
@@ -307,7 +307,7 @@ func TestHelper_Notifyf(t *testing.T) {
 
 func TestHelper_Join(t *testing.T) {
 	buf := bytes.Buffer{}
-	h := &Helper{&buf}
+	h := Helper{&buf}
 	ch := "#chan"
 	h.Join()
 	if buf.Len() != 0 {
@@ -332,7 +332,7 @@ func TestHelper_Join(t *testing.T) {
 
 func TestHelper_Part(t *testing.T) {
 	buf := bytes.Buffer{}
-	h := &Helper{&buf}
+	h := Helper{&buf}
 	ch := "#chan"
 	h.Part()
 	if buf.Len() != 0 {
@@ -357,7 +357,7 @@ func TestHelper_Part(t *testing.T) {
 
 func TestHelper_Quit(t *testing.T) {
 	buf := bytes.Buffer{}
-	h := &Helper{&buf}
+	h := Helper{&buf}
 	msg := "quitting"
 	h.Quit(msg)
 
@@ -369,7 +369,7 @@ func TestHelper_Quit(t *testing.T) {
 
 func TestHelper_splitSend(t *testing.T) {
 	buf := bytes.Buffer{}
-	h := &Helper{&buf}
+	h := Helper{&buf}
 	header := "PRIVMSG #chan :"
 	s0 := "message"
 	h.splitSend([]byte(header), []byte(s0))

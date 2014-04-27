@@ -14,14 +14,14 @@ import (
 // Fixtures for basic responses as well as full bot required messages
 //===================================================================
 type testPoint struct {
-	*irc.Helper
+	irc.Helper
 	buf *bytes.Buffer
 	srv *Server
 }
 
 func makeTestPoint(srv *Server) *testPoint {
 	buf := &bytes.Buffer{}
-	t := &testPoint{&irc.Helper{buf}, buf, srv}
+	t := &testPoint{irc.Helper{buf}, buf, srv}
 	return t
 }
 

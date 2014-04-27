@@ -14,7 +14,7 @@ var core = NewDispatchCore()
 // Set up a type that can be used to mock irc.Writer
 //===========================================================
 type testPoint struct {
-	*irc.Helper
+	irc.Helper
 }
 
 //===========================================================
@@ -81,7 +81,7 @@ func TestDispatcher_Dispatching(t *testing.T) {
 	}}
 
 	d := NewDispatcher(core)
-	send := testPoint{&irc.Helper{}}
+	send := testPoint{irc.Helper{}}
 
 	d.Register(irc.PRIVMSG, h1)
 	d.Register(irc.PRIVMSG, h2)
@@ -129,7 +129,7 @@ func TestDispatcher_RawDispatch(t *testing.T) {
 	}}
 
 	d := NewDispatcher(core)
-	send := testPoint{&irc.Helper{}}
+	send := testPoint{irc.Helper{}}
 	d.Register(irc.PRIVMSG, h1)
 	d.Register(irc.RAW, h2)
 
@@ -720,7 +720,7 @@ func TestDispatch_Panic(t *testing.T) {
 
 	d.Register(irc.RAW, handler)
 	ev := irc.NewEvent("", netInfo, "dispatcher", irc.PRIVMSG, "panic test")
-	d.Dispatch(ev, testPoint{&irc.Helper{}})
+	d.Dispatch(ev, testPoint{irc.Helper{}})
 	d.WaitForHandlers()
 
 	<-ch

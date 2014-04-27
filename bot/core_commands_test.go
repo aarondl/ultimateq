@@ -59,7 +59,7 @@ func commandsSetup(t *testing.T) *tSetup {
 	}
 	srv := b.servers[netID]
 	buf := &bytes.Buffer{}
-	srv.writer = &irc.Helper{buf}
+	srv.writer = irc.Helper{buf}
 
 	srv.state.Update(
 		irc.NewEvent(netID, netInfo, irc.RPL_WELCOME, "", "Hi", bothost),

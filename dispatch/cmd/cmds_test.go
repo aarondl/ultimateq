@@ -24,7 +24,7 @@ func init() {
 
 func newWriter() (*bytes.Buffer, irc.Writer) {
 	b := &bytes.Buffer{}
-	return b, &irc.Helper{b}
+	return b, irc.Helper{b}
 }
 
 type badLocker struct {

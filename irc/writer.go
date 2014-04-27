@@ -105,26 +105,26 @@ type Helper struct {
 }
 
 // Send sends a string with spaces between non-strings.
-func (h *Helper) Send(args ...interface{}) error {
+func (h Helper) Send(args ...interface{}) error {
 	_, err := fmt.Fprint(h, args...)
 	return err
 }
 
 // Sendln sends a string with spaces between everything. Does not send newline.
-func (h *Helper) Sendln(args ...interface{}) error {
+func (h Helper) Sendln(args ...interface{}) error {
 	str := fmt.Sprintln(args...)
 	_, err := h.Write([]byte(str[:len(str)-1]))
 	return err
 }
 
 // Sendf sends a formatted string.
-func (h *Helper) Sendf(format string, args ...interface{}) error {
+func (h Helper) Sendf(format string, args ...interface{}) error {
 	_, err := fmt.Fprintf(h, format, args...)
 	return err
 }
 
 // Privmsg sends a string with spaces between non-strings.
-func (h *Helper) Privmsg(target string, args ...interface{}) error {
+func (h Helper) Privmsg(target string, args ...interface{}) error {
 	header := []byte(fmt.Sprintf(fmtPrivmsgHeader, target))
 	msg := []byte(fmt.Sprint(args...))
 	return h.splitSend(header, msg)
@@ -132,7 +132,7 @@ func (h *Helper) Privmsg(target string, args ...interface{}) error {
 
 // Privmsgln sends a privmsg with spaces between everything.
 // Does not send newline.
-func (h *Helper) Privmsgln(target string, args ...interface{}) error {
+func (h Helper) Privmsgln(target string, args ...interface{}) error {
 	header := []byte(fmt.Sprintf(fmtPrivmsgHeader, target))
 	str := fmt.Sprintln(args...)
 	str = str[:len(str)-1]
@@ -140,14 +140,14 @@ func (h *Helper) Privmsgln(target string, args ...interface{}) error {
 }
 
 // Privmsgf sends a formatted privmsg.
-func (h *Helper) Privmsgf(target, format string, args ...interface{}) error {
+func (h Helper) Privmsgf(target, format string, args ...interface{}) error {
 	header := []byte(fmt.Sprintf(fmtPrivmsgHeader, target))
 	msg := []byte(fmt.Sprintf(format, args...))
 	return h.splitSend(header, msg)
 }
 
 // Notice sends a string with spaces between non-strings.
-func (h *Helper) Notice(target string, args ...interface{}) error {
+func (h Helper) Notice(target string, args ...interface{}) error {
 	header := []byte(fmt.Sprintf(fmtNoticeHeader, target))
 	msg := []byte(fmt.Sprint(args...))
 	return h.splitSend(header, msg)
@@ -155,7 +155,7 @@ func (h *Helper) Notice(target string, args ...interface{}) error {
 
 // Noticeln sends a notice with spaces between everything.
 // Does not send newline.
-func (h *Helper) Noticeln(target string, args ...interface{}) error {
+func (h Helper) Noticeln(target string, args ...interface{}) error {
 	header := []byte(fmt.Sprintf(fmtNoticeHeader, target))
 	str := fmt.Sprintln(args...)
 	str = str[:len(str)-1]
@@ -163,14 +163,14 @@ func (h *Helper) Noticeln(target string, args ...interface{}) error {
 }
 
 // Noticef sends a formatted notice.
-func (h *Helper) Noticef(target, format string, args ...interface{}) error {
+func (h Helper) Noticef(target, format string, args ...interface{}) error {
 	header := []byte(fmt.Sprintf(fmtNoticeHeader, target))
 	msg := []byte(fmt.Sprintf(format, args...))
 	return h.splitSend(header, msg)
 }
 
 // CTCP sends a string with spaces between non-strings.
-func (h *Helper) CTCP(target, tag string, data ...interface{}) error {
+func (h Helper) CTCP(target, tag string, data ...interface{}) error {
 	msg := CTCPpack([]byte(tag), []byte(fmt.Sprint(data...)))
 	_, err := fmt.Fprintf(h, fmtCTCP, target, msg)
 	return err
@@ -178,7 +178,7 @@ func (h *Helper) CTCP(target, tag string, data ...interface{}) error {
 
 // CTCPln sends a CTCP with spaces between everything.
 // Does not send newline.
-func (h *Helper) CTCPln(target, tag string, data ...interface{}) error {
+func (h Helper) CTCPln(target, tag string, data ...interface{}) error {
 	str := fmt.Sprintln(data...)
 	str = str[:len(str)-1]
 	msg := CTCPpack([]byte(tag), []byte(str))
@@ -187,14 +187,14 @@ func (h *Helper) CTCPln(target, tag string, data ...interface{}) error {
 }
 
 // CTCPf sends a formatted CTCP.
-func (h *Helper) CTCPf(target, tag, format string, data ...interface{}) error {
+func (h Helper) CTCPf(target, tag, format string, data ...interface{}) error {
 	msg := CTCPpack([]byte(tag), []byte(fmt.Sprintf(format, data...)))
 	_, err := fmt.Fprintf(h, fmtCTCP, target, msg)
 	return err
 }
 
 // CTCPReply sends a string with spaces between non-strings.
-func (h *Helper) CTCPReply(target, tag string, data ...interface{}) error {
+func (h Helper) CTCPReply(target, tag string, data ...interface{}) error {
 	msg := CTCPpack([]byte(tag), []byte(fmt.Sprint(data...)))
 	_, err := fmt.Fprintf(h, fmtCTCPReply, target, msg)
 	return err
@@ -202,7 +202,7 @@ func (h *Helper) CTCPReply(target, tag string, data ...interface{}) error {
 
 // CTCPReplyln sends a CTCPReply with spaces between everything.
 // Does not send newline.
-func (h *Helper) CTCPReplyln(target, tag string, data ...interface{}) error {
+func (h Helper) CTCPReplyln(target, tag string, data ...interface{}) error {
 	str := fmt.Sprintln(data...)
 	str = str[:len(str)-1]
 	msg := CTCPpack([]byte(tag), []byte(str))
@@ -211,7 +211,7 @@ func (h *Helper) CTCPReplyln(target, tag string, data ...interface{}) error {
 }
 
 // CTCPReplyf sends a formatted CTCPReply.
-func (h *Helper) CTCPReplyf(target, tag, format string,
+func (h Helper) CTCPReplyf(target, tag, format string,
 	data ...interface{}) error {
 
 	msg := CTCPpack([]byte(tag), []byte(fmt.Sprintf(format, data...)))
@@ -221,7 +221,7 @@ func (h *Helper) CTCPReplyf(target, tag, format string,
 
 // Notify sends a string with spaces between non-strings.
 // See irc.Writer.Notify for details of use.
-func (h *Helper) Notify(ev *Event, target string, args ...interface{}) error {
+func (h Helper) Notify(ev *Event, target string, args ...interface{}) error {
 	msgType := NOTICE
 	if ev.IsTargetChan() {
 		msgType = PRIVMSG
@@ -234,7 +234,7 @@ func (h *Helper) Notify(ev *Event, target string, args ...interface{}) error {
 
 // Notifyln sends a notify with spaces between everything.
 // Does not send newline. See irc.Writer.Notify for details of use.
-func (h *Helper) Notifyln(ev *Event, target string, args ...interface{}) error {
+func (h Helper) Notifyln(ev *Event, target string, args ...interface{}) error {
 	msgType := NOTICE
 	if ev.IsTargetChan() {
 		msgType = PRIVMSG
@@ -248,7 +248,7 @@ func (h *Helper) Notifyln(ev *Event, target string, args ...interface{}) error {
 
 // Notifyf sends a formatted notification.
 // See irc.Writer.Notify for details of use.
-func (h *Helper) Notifyf(ev *Event, target, format string,
+func (h Helper) Notifyf(ev *Event, target, format string,
 	args ...interface{}) error {
 
 	msgType := NOTICE
@@ -262,7 +262,7 @@ func (h *Helper) Notifyf(ev *Event, target, format string,
 }
 
 // Join sends a join message to the writer.
-func (h *Helper) Join(targets ...string) error {
+func (h Helper) Join(targets ...string) error {
 	if len(targets) == 0 {
 		return nil
 	}
@@ -271,7 +271,7 @@ func (h *Helper) Join(targets ...string) error {
 }
 
 // Part sends a part message to the writer.
-func (h *Helper) Part(targets ...string) error {
+func (h Helper) Part(targets ...string) error {
 	if len(targets) == 0 {
 		return nil
 	}
@@ -280,7 +280,7 @@ func (h *Helper) Part(targets ...string) error {
 }
 
 // Quit sends a quit message to the writer.
-func (h *Helper) Quit(msg string) error {
+func (h Helper) Quit(msg string) error {
 	_, err := fmt.Fprintf(h, fmtQuit, msg)
 	return err
 }
@@ -290,7 +290,7 @@ func (h *Helper) Quit(msg string) error {
 // SPLIT_BACKWARD character look-back to see if it can split on a space instead
 // of in the middle of a word. If it can, it will eliminate the space from
 // the following message.
-func (h *Helper) splitSend(header, msg []byte) error {
+func (h Helper) splitSend(header, msg []byte) error {
 	var err error
 	ln, lnh := len(msg), len(header)
 	msgMax := IRC_MAX_LENGTH - lnh
