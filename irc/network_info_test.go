@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	serverID = "irc.gamesurge.net"
+	netID = "irc.gamesurge.net"
 
 	_s0 = `NICK irc.test.net testircd-1.2 acCior abcde`
 
@@ -19,17 +19,17 @@ var (
 	capsTest0 = &Event{
 		Name:   RPL_MYINFO,
 		Args:   strings.Split(_s0, " "),
-		Sender: serverID,
+		Sender: netID,
 	}
 	capsTest1 = &Event{
 		Name:   RPL_ISUPPORT,
 		Args:   append(strings.Split(_s1, " "), "are supported by this server"),
-		Sender: serverID,
+		Sender: netID,
 	}
 	capsTest2 = &Event{
 		Name:   RPL_ISUPPORT,
 		Args:   append(strings.Split(_s2, " "), "are supported by this server"),
-		Sender: serverID,
+		Sender: netID,
 	}
 )
 

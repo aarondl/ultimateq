@@ -18,8 +18,8 @@ func TestBotConfig_ReadConfig(t *T) {
 	b, _ := createBot(fakeConfig, nil, nil, false, false)
 
 	b.ReadConfig(func(conf *config.Config) {
-		if conf.Servers[serverID].GetNick() !=
-			fakeConfig.Servers[serverID].GetNick() {
+		if conf.Servers[netID].GetNick() !=
+			fakeConfig.Servers[netID].GetNick() {
 
 			t.Error("The names should have been the same.")
 		}
@@ -30,8 +30,8 @@ func TestBotConfig_WriteConfig(t *T) {
 	b, _ := createBot(fakeConfig, nil, nil, false, false)
 
 	b.WriteConfig(func(conf *config.Config) {
-		if conf.Servers[serverID].GetNick() !=
-			fakeConfig.Servers[serverID].GetNick() {
+		if conf.Servers[netID].GetNick() !=
+			fakeConfig.Servers[netID].GetNick() {
 
 			t.Error("The names should have been the same.")
 		}
@@ -77,7 +77,7 @@ func TestBotConfig_ReplaceConfig(t *T) {
 	nick := []byte(irc.NICK + " :newnick\r\n")
 
 	conns := map[string]*mocks.Conn{
-		serverID + ":6667":      mocks.CreateConn(),
+		netID + ":6667":         mocks.CreateConn(),
 		"newserver:6667":        mocks.CreateConn(),
 		"anothernewserver:6667": mocks.CreateConn(),
 	}
@@ -101,7 +101,7 @@ func TestBotConfig_ReplaceConfig(t *T) {
 	c2 := fakeConfig.Clone().
 		GlobalContext().
 		Channels(chans2...).
-		ServerContext(serverID).
+		ServerContext(netID).
 		Nick("newnick").
 		Channels(chans3...).
 		Server("anothernewserver")
@@ -114,7 +114,7 @@ func TestBotConfig_ReplaceConfig(t *T) {
 			len(b.servers), len(c1.Servers))
 	}
 
-	oldsrv1, oldsrv2 := b.servers[serverID], b.servers["newserver"]
+	oldsrv1, oldsrv2 := b.servers[netID], b.servers["newserver"]
 	old1listen, old2listen := make(chan Status), make(chan Status)
 
 	oldsrv1.addStatusListener(old1listen, STATUS_STARTED)
@@ -134,13 +134,13 @@ func TestBotConfig_ReplaceConfig(t *T) {
 	if e := oldsrv2.conf.GetChannels(); !contains(e, chans1) {
 		t.Errorf("Expected elements: %v", e)
 	}
-	if e := b.dispatchCore.GetChannels(); !contains(e, chans1) {
+	if e := b.dispatchCore.Channels(); !contains(e, chans1) {
 		t.Errorf("Expected elements: %v", e)
 	}
-	if e := oldsrv1.dispatchCore.GetChannels(); !contains(e, chans1) {
+	if e := oldsrv1.dispatchCore.Channels(); !contains(e, chans1) {
 		t.Errorf("Expected elements: %v", e)
 	}
-	if e := oldsrv2.dispatchCore.GetChannels(); !contains(e, chans1) {
+	if e := oldsrv2.dispatchCore.Channels(); !contains(e, chans1) {
 		t.Errorf("Expected elements: %v", e)
 	}
 
@@ -173,17 +173,17 @@ func TestBotConfig_ReplaceConfig(t *T) {
 	if e := newsrv1.conf.GetChannels(); !contains(e, chans2) {
 		t.Errorf("Expected elements: %v", e)
 	}
-	if e := b.dispatchCore.GetChannels(); !contains(e, chans2) {
+	if e := b.dispatchCore.Channels(); !contains(e, chans2) {
 		t.Errorf("Expected elements: %v", e)
 	}
-	if e := oldsrv1.dispatchCore.GetChannels(); !contains(e, chans3) {
+	if e := oldsrv1.dispatchCore.Channels(); !contains(e, chans3) {
 		t.Errorf("Expected elements: %v", e)
 	}
-	if e := newsrv1.dispatchCore.GetChannels(); !contains(e, chans2) {
+	if e := newsrv1.dispatchCore.Channels(); !contains(e, chans2) {
 		t.Errorf("Expected elements: %v", e)
 	}
 
-	recv := conns[serverID+":6667"].Receive(len(nick), nil)
+	recv := conns[netID+":6667"].Receive(len(nick), nil)
 	if bytes.Compare(recv, nick) != 0 {
 		t.Errorf("Was expecting a change in nick but got: %s", recv)
 	}

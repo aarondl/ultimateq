@@ -66,8 +66,8 @@ type Server struct {
 	statusListeners [][]chan Status
 
 	// Configuration
-	conf *config.Server
-	caps *irc.ProtoCaps
+	conf    *config.Server
+	netInfo *irc.NetworkInfo
 
 	// Dispatching
 	dispatchCore *dispatch.DispatchCore
@@ -130,14 +130,14 @@ func (s *Server) createEndpoint(store *data.Store, mutex *sync.RWMutex) {
 
 // createDispatcher uses the server's current ProtoCaps to create a dispatcher.
 func (s *Server) createDispatching(prefix rune, channels []string) {
-	s.dispatchCore = dispatch.CreateDispatchCore(s.caps, channels...)
-	s.dispatcher = dispatch.CreateDispatcher(s.dispatchCore)
+	s.dispatchCore = dispatch.NewDispatchCore(channels...)
+	s.dispatcher = dispatch.NewDispatcher(s.dispatchCore)
 	s.cmds = cmd.CreateCmds(prefix, s.dispatchCore)
 }
 
 // createState uses the server's current ProtoCaps to create a state.
 func (s *Server) createState() (err error) {
-	s.state, err = data.CreateState(s.caps)
+	s.state, err = data.NewState(s.netInfo)
 	return err
 }
 
@@ -235,20 +235,18 @@ func (s *Server) Close() (err error) {
 	return
 }
 
-// rehashProtocaps delivers updated protocaps to the server's components who
+// rehashNetworkInfo delivers updated information to the server's components who
 // may need it.
-func (s *Server) rehashProtocaps() error {
+func (s *Server) rehashNetworkInfo() error {
 	var err error
-	s.bot.mergeProtocaps(s.caps)
-	s.dispatcher.Protocaps(s.caps)
 	s.protectState.Lock()
+	defer s.protectState.Unlock()
 	if s.state != nil {
-		err = s.state.Protocaps(s.caps)
+		err = s.state.SetNetworkInfo(s.netInfo)
 		if err != nil {
 			return err
 		}
 	}
-	s.protectState.Unlock()
 	return nil
 }
 

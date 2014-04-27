@@ -11,6 +11,7 @@ import (
 
 	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/dispatch/cmd"
+	"github.com/aarondl/ultimateq/irc"
 )
 
 var rgxFlags = regexp.MustCompile(`[A-Za-z]+`)
@@ -234,8 +235,8 @@ func (c *coreCmds) unregisterCoreCmds() {
 }
 
 // Cmd is responsible for parsing all of the commands.
-func (c *coreCmds) Cmd(cmd string, d *data.DataEndpoint,
-	cd *cmd.Event) (internal error) {
+func (c *coreCmds) Cmd(cmd string, w irc.Writer,
+	ev *cmd.Event) (internal error) {
 
 	var external error
 
@@ -249,47 +250,47 @@ func (c *coreCmds) Cmd(cmd string, d *data.DataEndpoint,
 
 	switch cmd {
 	case register:
-		internal, external = c.register(d, cd)
+		internal, external = c.register(w, ev)
 	case auth:
-		internal, external = c.auth(d, cd)
+		internal, external = c.auth(w, ev)
 	case logout:
-		internal, external = c.logout(d, cd)
+		internal, external = c.logout(w, ev)
 	case access:
-		internal, external = c.access(d, cd)
+		internal, external = c.access(w, ev)
 	case gusers:
-		internal, external = c.gusers(d, cd)
+		internal, external = c.gusers(w, ev)
 	case susers:
-		internal, external = c.susers(d, cd)
+		internal, external = c.susers(w, ev)
 	case users:
-		internal, external = c.users(d, cd)
+		internal, external = c.users(w, ev)
 	case deluser:
-		internal, external = c.deluser(d, cd)
+		internal, external = c.deluser(w, ev)
 	case delme:
-		internal, external = c.delme(d, cd)
+		internal, external = c.delme(w, ev)
 	case passwd:
-		internal, external = c.passwd(d, cd)
+		internal, external = c.passwd(w, ev)
 	case masks:
-		internal, external = c.masks(d, cd)
+		internal, external = c.masks(w, ev)
 	case addmask:
-		internal, external = c.addmask(d, cd)
+		internal, external = c.addmask(w, ev)
 	case delmask:
-		internal, external = c.delmask(d, cd)
+		internal, external = c.delmask(w, ev)
 	case resetpasswd:
-		internal, external = c.resetpasswd(d, cd)
+		internal, external = c.resetpasswd(w, ev)
 	case ggive:
-		internal, external = c.ggive(d, cd)
+		internal, external = c.ggive(w, ev)
 	case sgive:
-		internal, external = c.sgive(d, cd)
+		internal, external = c.sgive(w, ev)
 	case give:
-		internal, external = c.give(d, cd)
+		internal, external = c.give(w, ev)
 	case gtake:
-		internal, external = c.gtake(d, cd)
+		internal, external = c.gtake(w, ev)
 	case stake:
-		internal, external = c.stake(d, cd)
+		internal, external = c.stake(w, ev)
 	case take:
-		internal, external = c.take(d, cd)
+		internal, external = c.take(w, ev)
 	case help:
-		internal, external = c.help(d, cd)
+		internal, external = c.help(w, ev)
 	}
 
 	if internal != nil {
@@ -300,26 +301,26 @@ func (c *coreCmds) Cmd(cmd string, d *data.DataEndpoint,
 }
 
 // register register's a user to the bot with an optional user name.
-func (c *coreCmds) register(d *data.DataEndpoint,
-	cd *cmd.Event) (internal, external error) {
+func (c *coreCmds) register(w irc.Writer,
+	ev *cmd.Event) (internal, external error) {
 
 	var access *data.UserAccess
 
-	pwd := cd.GetArg("password")
-	uname := cd.GetArg("username")
+	pwd := ev.GetArg("password")
+	uname := ev.GetArg("username")
 	if len(uname) == 0 {
-		uname = strings.TrimLeft(cd.User.Username(), "~")
+		uname = strings.TrimLeft(ev.User.Username(), "~")
 	}
 
-	access = cd.UserAccess
+	access = ev.UserAccess
 	if access == nil {
-		access = cd.GetAuthedUser(d.GetKey(), cd.User.Host())
+		access = ev.GetAuthedUser(ev.NetworkID, ev.User.Host())
 	}
 	if access != nil {
 		return nil, fmt.Errorf(errMsgAuthed)
 	}
 
-	access, internal = cd.FindUser(uname)
+	access, internal = ev.FindUser(uname)
 	if internal != nil {
 		return
 	}
@@ -332,9 +333,9 @@ func (c *coreCmds) register(d *data.DataEndpoint,
 		return
 	}
 
-	host, nick := cd.User.Host(), cd.User.Nick()
+	host, nick := ev.User.Host(), ev.User.Nick()
 
-	cd.Close()
+	ev.Close()
 	c.b.protectStore.Lock()
 	defer c.b.protectStore.Unlock()
 	store := c.b.store
@@ -352,48 +353,48 @@ func (c *coreCmds) register(d *data.DataEndpoint,
 		return
 	}
 
-	_, internal = store.AuthUser(d.GetKey(), host, uname, pwd)
+	_, internal = store.AuthUser(ev.NetworkID, host, uname, pwd)
 	if internal != nil {
 		return
 	}
 
 	if isFirst {
-		d.Noticef(nick, registerSuccessFirst, uname)
+		w.Noticef(nick, registerSuccessFirst, uname)
 	} else {
-		d.Noticef(nick, registerSuccess, uname)
+		w.Noticef(nick, registerSuccess, uname)
 	}
 
 	return
 }
 
 // auth authenticates a user.
-func (c *coreCmds) auth(d *data.DataEndpoint, cd *cmd.Event) (
+func (c *coreCmds) auth(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
 	var access *data.UserAccess
-	pwd := cd.GetArg("password")
-	uname := cd.GetArg("username")
+	pwd := ev.GetArg("password")
+	uname := ev.GetArg("username")
 	if len(uname) == 0 {
-		uname = strings.TrimLeft(cd.User.Username(), "~")
+		uname = strings.TrimLeft(ev.User.Username(), "~")
 	}
 
-	host, nick := cd.User.Host(), cd.User.Nick()
+	host, nick := ev.User.Host(), ev.User.Nick()
 
-	access = cd.UserAccess
+	access = ev.UserAccess
 	if access == nil {
-		access = cd.GetAuthedUser(d.GetKey(), host)
+		access = ev.GetAuthedUser(ev.NetworkID, host)
 	}
 	if access != nil {
 		external = errors.New(errMsgAuthed)
 		return
 	}
 
-	cd.Close()
+	ev.Close()
 	c.b.protectStore.Lock()
 	defer c.b.protectStore.Unlock()
 	store := c.b.store
 
-	_, err := store.AuthUser(d.GetKey(), host, uname, pwd)
+	_, err := store.AuthUser(ev.NetworkID, host, uname, pwd)
 	if err != nil {
 		if authErr, ok := err.(data.AuthError); ok {
 			external = authErr
@@ -403,26 +404,26 @@ func (c *coreCmds) auth(d *data.DataEndpoint, cd *cmd.Event) (
 		return
 	}
 
-	d.Noticef(nick, authSuccess, uname)
+	w.Noticef(nick, authSuccess, uname)
 	return
 }
 
 // logout logs out a user.
-func (c *coreCmds) logout(d *data.DataEndpoint, cd *cmd.Event) (
+func (c *coreCmds) logout(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	user := cd.TargetUserAccess["user"]
+	user := ev.TargetUserAccess["user"]
 	uname := ""
-	host, nick := cd.User.Host(), cd.User.Nick()
+	host, nick := ev.User.Host(), ev.User.Nick()
 	if user != nil {
-		if !cd.UserAccess.HasGlobalFlag('G') {
+		if !ev.UserAccess.HasGlobalFlag('G') {
 			external = cmd.MakeGlobalFlagsError("G")
 			return
 		}
 		uname = user.Username
 	}
 
-	cd.Close()
+	ev.Close()
 	c.b.protectStore.Lock()
 	defer c.b.protectStore.Unlock()
 	store := c.b.store
@@ -430,40 +431,40 @@ func (c *coreCmds) logout(d *data.DataEndpoint, cd *cmd.Event) (
 	if len(uname) != 0 {
 		store.LogoutByUsername(uname)
 	} else {
-		store.Logout(d.GetKey(), host)
+		store.Logout(ev.NetworkID, host)
 	}
-	d.Notice(nick, logoutSuccess)
+	w.Notice(nick, logoutSuccess)
 
 	return
 }
 
 // access outputs the access for the user.
-func (c *coreCmds) access(d *data.DataEndpoint, cd *cmd.Event) (
+func (c *coreCmds) access(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	access := cd.TargetUserAccess["user"]
+	access := ev.TargetUserAccess["user"]
 	if access == nil {
-		access = cd.UserAccess
+		access = ev.UserAccess
 	}
 
 	ch := ""
-	if cd.Channel != nil {
-		ch = cd.Channel.Name()
+	if ev.Channel != nil {
+		ch = ev.Channel.Name()
 	}
-	d.Noticef(cd.User.Nick(), accessSuccess,
-		access.Username, access.String(d.GetKey(), ch))
+	w.Noticef(ev.User.Nick(), accessSuccess,
+		access.Username, access.String(ev.NetworkID, ch))
 
 	return
 }
 
 //gusers provides a list of users with global access
-func (c *coreCmds) gusers(d *data.DataEndpoint, cd *cmd.Event) (
+func (c *coreCmds) gusers(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
 	var list []data.UserAccess
 	var ua data.UserAccess
 
-	nick := cd.User.Nick()
+	nick := ev.User.Nick()
 
 	list, internal = c.b.store.GlobalUsers()
 	if internal != nil {
@@ -471,111 +472,111 @@ func (c *coreCmds) gusers(d *data.DataEndpoint, cd *cmd.Event) (
 	}
 
 	if len(list) == 0 {
-		d.Noticef(nick, gusersNoUsers)
+		w.Noticef(nick, gusersNoUsers)
 		return
 	}
 
 	usersWidth := userListWidth(list) + 1
-	d.Noticef(nick, gusersHead, len(list))
-	d.Noticef(nick, usersList, usersWidth,
+	w.Noticef(nick, gusersHead, len(list))
+	w.Noticef(nick, usersList, usersWidth,
 		usersListHeadUser, usersListHeadAccess)
 
 	for _, ua = range list {
 		ga := ua.GetGlobal()
-		d.Noticef(nick, usersList, usersWidth, ua.Username, ga)
+		w.Noticef(nick, usersList, usersWidth, ua.Username, ga)
 	}
 
 	return
 }
 
 //susers provides a list of users with server access
-func (c *coreCmds) susers(d *data.DataEndpoint, cd *cmd.Event) (
+func (c *coreCmds) susers(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
 	var list []data.UserAccess
 	var ua data.UserAccess
 
-	nick := cd.User.Nick()
+	nick := ev.User.Nick()
 
-	list, internal = c.b.store.ServerUsers(d.GetKey())
+	list, internal = c.b.store.ServerUsers(ev.NetworkID)
 	if internal != nil {
 		return
 	}
 
 	if len(list) == 0 {
-		d.Noticef(nick, susersNoUsers, d.GetKey())
+		w.Noticef(nick, susersNoUsers, ev.NetworkID)
 		return
 	}
 
 	usersWidth := userListWidth(list) + 1
-	d.Noticef(nick, susersHead, len(list), d.GetKey())
-	d.Noticef(nick, usersList, usersWidth,
+	w.Noticef(nick, susersHead, len(list), ev.NetworkID)
+	w.Noticef(nick, usersList, usersWidth,
 		usersListHeadUser, usersListHeadAccess)
 
 	for _, ua = range list {
-		sa := ua.GetServer(d.GetKey())
-		d.Noticef(nick, usersList, usersWidth, ua.Username, sa)
+		sa := ua.GetServer(ev.NetworkID)
+		w.Noticef(nick, usersList, usersWidth, ua.Username, sa)
 	}
 
 	return
 }
 
 // users provides a list of users added to a channel
-func (c *coreCmds) users(d *data.DataEndpoint, cd *cmd.Event) (
+func (c *coreCmds) users(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
 	var list []data.UserAccess
 	var ua data.UserAccess
 	var ch string
 
-	if cd.GetArg("chan") != `` {
-		ch = cd.GetArg("chan")
+	if ev.GetArg("chan") != `` {
+		ch = ev.GetArg("chan")
 	} else {
-		if cd.Channel.Name() != `` {
-			ch = cd.Channel.Name()
+		if ev.Channel.Name() != `` {
+			ch = ev.Channel.Name()
 		} else {
 			return
 		}
 	}
 
-	nick := cd.User.Nick()
+	nick := ev.User.Nick()
 
-	list, internal = c.b.store.ChanUsers(d.GetKey(), ch)
+	list, internal = c.b.store.ChanUsers(ev.NetworkID, ch)
 	if internal != nil {
 		return
 	}
 
 	if len(list) == 0 {
-		d.Noticef(nick, usersNoUsers, ch)
+		w.Noticef(nick, usersNoUsers, ch)
 		return
 	}
 
 	usersWidth := userListWidth(list) + 1
-	d.Noticef(nick, usersHead, len(list), ch)
-	d.Noticef(nick, usersList, usersWidth,
+	w.Noticef(nick, usersHead, len(list), ch)
+	w.Noticef(nick, usersList, usersWidth,
 		usersListHeadUser, usersListHeadAccess)
 
 	for _, ua = range list {
-		ca := ua.GetChannel(d.GetKey(), ch)
-		d.Noticef(nick, usersList, usersWidth, ua.Username, ca)
+		ca := ua.GetChannel(ev.NetworkID, ch)
+		w.Noticef(nick, usersList, usersWidth, ua.Username, ca)
 	}
 
 	return
 }
 
 // deluser deletes a user
-func (c *coreCmds) deluser(d *data.DataEndpoint, cd *cmd.Event) (
+func (c *coreCmds) deluser(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	param := cd.GetArg("user")
-	if !cd.UserAccess.HasGlobalFlag('G') {
+	param := ev.GetArg("user")
+	if !ev.UserAccess.HasGlobalFlag('G') {
 		external = cmd.MakeGlobalFlagsError("G")
 		return
 	}
-	uname := cd.TargetUserAccess["user"].Username
+	uname := ev.TargetUserAccess["user"].Username
 
-	nick := cd.User.Nick()
-	cd.Close()
+	nick := ev.User.Nick()
+	ev.Close()
 	c.b.protectStore.Lock()
 	defer c.b.protectStore.Unlock()
 	store := c.b.store
@@ -589,27 +590,27 @@ func (c *coreCmds) deluser(d *data.DataEndpoint, cd *cmd.Event) (
 	}
 
 	if removed {
-		d.Noticef(nick, deluserSuccess, param)
+		w.Noticef(nick, deluserSuccess, param)
 	} else {
-		d.Noticef(nick, deluserFailure, param)
+		w.Noticef(nick, deluserFailure, param)
 	}
 
 	return
 }
 
 // delme deletes self
-func (c *coreCmds) delme(d *data.DataEndpoint, cd *cmd.Event) (
+func (c *coreCmds) delme(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	host, nick := cd.User.Host(), cd.User.Nick()
-	uname := cd.UserAccess.Username
-	cd.Close()
+	host, nick := ev.User.Host(), ev.User.Nick()
+	uname := ev.UserAccess.Username
+	ev.Close()
 	c.b.protectStore.Lock()
 	defer c.b.protectStore.Unlock()
 	store := c.b.store
 
 	removed := false
-	store.Logout(d.GetKey(), host)
+	store.Logout(ev.NetworkID, host)
 	removed, internal = store.RemoveUser(uname)
 	if internal != nil {
 		return
@@ -618,24 +619,24 @@ func (c *coreCmds) delme(d *data.DataEndpoint, cd *cmd.Event) (
 		internal = errors.New(delmeFailure)
 		return
 	}
-	d.Noticef(nick, delmeSuccess, uname)
+	w.Noticef(nick, delmeSuccess, uname)
 	return
 }
 
 // passwd changes a user's password
-func (c *coreCmds) passwd(d *data.DataEndpoint, cd *cmd.Event) (
+func (c *coreCmds) passwd(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	oldpasswd := cd.GetArg("oldpassword")
-	newpasswd := cd.GetArg("newpassword")
-	nick := cd.User.Nick()
-	uname := cd.UserAccess.Username
-	if !cd.UserAccess.VerifyPassword(oldpasswd) {
-		d.Notice(nick, passwdFailure)
+	oldpasswd := ev.GetArg("oldpassword")
+	newpasswd := ev.GetArg("newpassword")
+	nick := ev.User.Nick()
+	uname := ev.UserAccess.Username
+	if !ev.UserAccess.VerifyPassword(oldpasswd) {
+		w.Notice(nick, passwdFailure)
 		return
 	}
 
-	cd.Close()
+	ev.Close()
 	c.b.protectStore.Lock()
 	defer c.b.protectStore.Unlock()
 	store := c.b.store
@@ -657,19 +658,19 @@ func (c *coreCmds) passwd(d *data.DataEndpoint, cd *cmd.Event) (
 	if internal != nil {
 		return
 	}
-	d.Notice(nick, passwdSuccess)
+	w.Notice(nick, passwdSuccess)
 
 	return
 }
 
 // masks outputs the masks of the user.
-func (c *coreCmds) masks(d *data.DataEndpoint, cd *cmd.Event) (
+func (c *coreCmds) masks(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	access := cd.UserAccess
-	user := cd.TargetUserAccess["user"]
+	access := ev.UserAccess
+	user := ev.TargetUserAccess["user"]
 	if user != nil {
-		if !cd.UserAccess.HasGlobalFlag('G') {
+		if !ev.UserAccess.HasGlobalFlag('G') {
 			external = cmd.MakeGlobalFlagsError("G")
 			return
 		}
@@ -677,33 +678,33 @@ func (c *coreCmds) masks(d *data.DataEndpoint, cd *cmd.Event) (
 	}
 
 	if len(access.Masks) > 0 {
-		d.Noticef(cd.User.Nick(), masksSuccess,
+		w.Noticef(ev.User.Nick(), masksSuccess,
 			strings.Join(access.Masks, " "))
 	} else {
-		d.Notice(cd.User.Nick(), masksFailure)
+		w.Notice(ev.User.Nick(), masksFailure)
 	}
 
 	return
 }
 
 // addmask adds a mask to a user.
-func (c *coreCmds) addmask(d *data.DataEndpoint, cd *cmd.Event) (
+func (c *coreCmds) addmask(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	mask := cd.GetArg("mask")
-	nick := cd.User.Nick()
-	uname := cd.UserAccess.Username
+	mask := ev.GetArg("mask")
+	nick := ev.User.Nick()
+	uname := ev.UserAccess.Username
 
-	user := cd.TargetUserAccess["user"]
+	user := ev.TargetUserAccess["user"]
 	if user != nil {
-		if !cd.UserAccess.HasGlobalFlag('G') {
+		if !ev.UserAccess.HasGlobalFlag('G') {
 			external = cmd.MakeGlobalFlagsError("G")
 			return
 		}
 		uname = user.Username
 	}
 
-	cd.Close()
+	ev.Close()
 	c.b.protectStore.Lock()
 	defer c.b.protectStore.Unlock()
 	store := c.b.store
@@ -723,32 +724,32 @@ func (c *coreCmds) addmask(d *data.DataEndpoint, cd *cmd.Event) (
 		if internal != nil {
 			return
 		}
-		d.Noticef(nick, addmaskSuccess, mask)
+		w.Noticef(nick, addmaskSuccess, mask)
 	} else {
-		d.Noticef(nick, addmaskFailure, mask)
+		w.Noticef(nick, addmaskFailure, mask)
 	}
 
 	return
 }
 
 // delmask deletes a mask from a user.
-func (c *coreCmds) delmask(d *data.DataEndpoint, cd *cmd.Event) (
+func (c *coreCmds) delmask(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	mask := cd.GetArg("mask")
-	nick := cd.User.Nick()
-	uname := cd.UserAccess.Username
+	mask := ev.GetArg("mask")
+	nick := ev.User.Nick()
+	uname := ev.UserAccess.Username
 
-	user := cd.TargetUserAccess["user"]
+	user := ev.TargetUserAccess["user"]
 	if user != nil {
-		if !cd.UserAccess.HasGlobalFlag('G') {
+		if !ev.UserAccess.HasGlobalFlag('G') {
 			external = cmd.MakeGlobalFlagsError("G")
 			return
 		}
 		uname = user.Username
 	}
 
-	cd.Close()
+	ev.Close()
 	c.b.protectStore.Lock()
 	defer c.b.protectStore.Unlock()
 	store := c.b.store
@@ -768,24 +769,24 @@ func (c *coreCmds) delmask(d *data.DataEndpoint, cd *cmd.Event) (
 		if internal != nil {
 			return
 		}
-		d.Noticef(nick, delmaskSuccess, mask)
+		w.Noticef(nick, delmaskSuccess, mask)
 	} else {
-		d.Noticef(nick, delmaskFailure, mask)
+		w.Noticef(nick, delmaskFailure, mask)
 	}
 
 	return
 }
 
 // resetpasswd resets a user's password
-func (c *coreCmds) resetpasswd(d *data.DataEndpoint, cd *cmd.Event) (
+func (c *coreCmds) resetpasswd(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	uname := cd.TargetUserAccess["user"].Username
-	resetnick := cd.TargetUsers["nick"].Nick()
-	nick := cd.User.Nick()
+	uname := ev.TargetUserAccess["user"].Username
+	resetnick := ev.TargetUsers["nick"].Nick()
+	nick := ev.User.Nick()
 	newpasswd := ""
 
-	cd.Close()
+	ev.Close()
 	c.b.protectStore.Lock()
 	defer c.b.protectStore.Unlock()
 	store := c.b.store
@@ -807,16 +808,16 @@ func (c *coreCmds) resetpasswd(d *data.DataEndpoint, cd *cmd.Event) (
 	if internal != nil {
 		return
 	}
-	d.Notice(nick, resetpasswdSuccess)
-	d.Noticef(resetnick, resetpasswdSuccessTarget, nick, newpasswd)
+	w.Notice(nick, resetpasswdSuccess)
+	w.Noticef(resetnick, resetpasswdSuccessTarget, nick, newpasswd)
 
 	return
 }
 
 // ggive gives global access to a user.
-func (c *coreCmds) ggive(d *data.DataEndpoint, cd *cmd.Event) (
+func (c *coreCmds) ggive(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
-	return c.giveHelper(d, cd,
+	return c.giveHelper(w, ev,
 		func(a *data.UserAccess, level uint8, flags string) string {
 			if level > 0 {
 				a.GrantGlobalLevel(level)
@@ -830,10 +831,10 @@ func (c *coreCmds) ggive(d *data.DataEndpoint, cd *cmd.Event) (
 }
 
 // sgive gives server access to a user.
-func (c *coreCmds) sgive(d *data.DataEndpoint, cd *cmd.Event) (
+func (c *coreCmds) sgive(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
-	server := d.GetKey()
-	return c.giveHelper(d, cd,
+	server := ev.NetworkID
+	return c.giveHelper(w, ev,
 		func(a *data.UserAccess, level uint8, flags string) string {
 			if level > 0 {
 				a.GrantServerLevel(server, level)
@@ -847,11 +848,11 @@ func (c *coreCmds) sgive(d *data.DataEndpoint, cd *cmd.Event) (
 }
 
 // give gives channel access to a user.
-func (c *coreCmds) give(d *data.DataEndpoint, cd *cmd.Event) (
+func (c *coreCmds) give(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
-	server := d.GetKey()
-	channel := cd.GetArg("chan")
-	return c.giveHelper(d, cd,
+	server := ev.NetworkID
+	channel := ev.GetArg("chan")
+	return c.giveHelper(w, ev,
 		func(a *data.UserAccess, level uint8, flags string) string {
 			if level > 0 {
 				a.GrantChannelLevel(server, channel, level)
@@ -866,9 +867,9 @@ func (c *coreCmds) give(d *data.DataEndpoint, cd *cmd.Event) (
 }
 
 // gtake takes global access from a user.
-func (c *coreCmds) gtake(d *data.DataEndpoint, cd *cmd.Event) (
+func (c *coreCmds) gtake(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
-	return c.takeHelper(d, cd,
+	return c.takeHelper(w, ev,
 		func(a *data.UserAccess, all, level bool, flags string) (string, bool) {
 			var save bool
 			if all {
@@ -898,10 +899,10 @@ func (c *coreCmds) gtake(d *data.DataEndpoint, cd *cmd.Event) (
 }
 
 // stake takes server access from a user.
-func (c *coreCmds) stake(d *data.DataEndpoint, cd *cmd.Event) (
+func (c *coreCmds) stake(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
-	server := d.GetKey()
-	return c.takeHelper(d, cd,
+	server := ev.NetworkID
+	return c.takeHelper(w, ev,
 		func(a *data.UserAccess, all, level bool, flags string) (string, bool) {
 			var save bool
 			if all {
@@ -933,11 +934,11 @@ func (c *coreCmds) stake(d *data.DataEndpoint, cd *cmd.Event) (
 }
 
 // take takes global access from a user.
-func (c *coreCmds) take(d *data.DataEndpoint, cd *cmd.Event) (
+func (c *coreCmds) take(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
-	server := d.GetKey()
-	channel := cd.GetArg("chan")
-	return c.takeHelper(d, cd,
+	server := ev.NetworkID
+	channel := ev.GetArg("chan")
+	return c.takeHelper(w, ev,
 		func(a *data.UserAccess, all, level bool, flags string) (string, bool) {
 			var save bool
 			if all {
@@ -969,14 +970,14 @@ func (c *coreCmds) take(d *data.DataEndpoint, cd *cmd.Event) (
 }
 
 // giveHelper parses the args to a give function and executes them in context
-func (c *coreCmds) giveHelper(d *data.DataEndpoint, cd *cmd.Event,
+func (c *coreCmds) giveHelper(w irc.Writer, ev *cmd.Event,
 	g giveHelperFunc) (internal, external error) {
 
-	uname := cd.TargetUserAccess["user"].Username
-	args := cd.SplitArg("levelOrFlags")
-	nick := cd.User.Nick()
+	uname := ev.TargetUserAccess["user"].Username
+	args := ev.SplitArg("levelOrFlags")
+	nick := ev.User.Nick()
 
-	cd.Close()
+	ev.Close()
 	c.b.protectStore.Lock()
 	defer c.b.protectStore.Unlock()
 	store := c.b.store
@@ -1008,23 +1009,23 @@ func (c *coreCmds) giveHelper(d *data.DataEndpoint, cd *cmd.Event,
 		if internal = store.AddUser(access); internal != nil {
 			return
 		}
-		d.Noticef(nick, str)
+		w.Noticef(nick, str)
 	} else {
-		d.Noticef(nick, giveFailure)
+		w.Noticef(nick, giveFailure)
 	}
 
 	return
 }
 
 // takeHelper parses the args to a take function and executes them in context
-func (c *coreCmds) takeHelper(d *data.DataEndpoint, cd *cmd.Event,
+func (c *coreCmds) takeHelper(w irc.Writer, ev *cmd.Event,
 	t takeHelperFunc) (internal, external error) {
 
-	uname := cd.TargetUserAccess["user"].Username
-	arg := cd.GetArg("allOrFlags")
-	nick := cd.User.Nick()
+	uname := ev.TargetUserAccess["user"].Username
+	arg := ev.GetArg("allOrFlags")
+	nick := ev.User.Nick()
 
-	cd.Close()
+	ev.Close()
 	c.b.protectStore.Lock()
 	defer c.b.protectStore.Unlock()
 	store := c.b.store
@@ -1060,17 +1061,17 @@ func (c *coreCmds) takeHelper(d *data.DataEndpoint, cd *cmd.Event,
 			return
 		}
 	}
-	d.Noticef(nick, str)
+	w.Noticef(nick, str)
 
 	return
 }
 
 // help searches for commands, and also provides details for specific commands
-func (c *coreCmds) help(d *data.DataEndpoint, cd *cmd.Event) (
+func (c *coreCmds) help(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	search := strings.ToLower(cd.GetArg("command"))
-	nick := cd.User.Nick()
+	search := strings.ToLower(ev.GetArg("command"))
+	nick := ev.User.Nick()
 
 	var output = make(map[string][]string)
 	var exactMatches []*cmd.Cmd
@@ -1118,20 +1119,20 @@ func (c *coreCmds) help(d *data.DataEndpoint, cd *cmd.Event) (
 
 	if exactMatches != nil {
 		exactMatch := exactMatches[0]
-		d.Notice(nick, helpSuccess,
+		w.Notice(nick, helpSuccess,
 			" ", exactMatch.Extension, ".", exactMatch.Cmd)
-		d.Notice(nick, exactMatch.Description)
+		w.Notice(nick, exactMatch.Description)
 		if len(exactMatch.Args) > 0 {
-			d.Notice(nick, helpSuccessUsage, strings.Join(exactMatch.Args, " "))
+			w.Notice(nick, helpSuccessUsage, strings.Join(exactMatch.Args, " "))
 		}
 	} else if len(output) > 0 {
 		for extension, commands := range output {
 			sort.Strings(commands)
-			d.Notice(nick, extension, ":")
-			d.Notice(nick, " ", strings.Join(commands, " "))
+			w.Notice(nick, extension, ":")
+			w.Notice(nick, " ", strings.Join(commands, " "))
 		}
 	} else {
-		d.Noticef(nick, helpFailure, search)
+		w.Noticef(nick, helpFailure, search)
 	}
 
 	return

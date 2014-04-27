@@ -32,6 +32,7 @@ var (
 		`(`, `\(`, `)`, `\)`, `]`, `\]`, `[`,
 		`\[`, `\`, `\\`, `/`, `\/`, `%v`, `.*`,
 	)
+	netInfo = irc.NewNetworkInfo()
 )
 
 type tSetup struct {
@@ -46,7 +47,7 @@ type tSetup struct {
 func commandsSetup(t *T) *tSetup {
 	conf := Configure().Nick("nobody").Altnick("nobody1").Username("nobody").
 		Userhost("host.com").Realname("ultimateq").NoReconnect(true).
-		Ssl(true).Prefix(prefix).Server(serverID)
+		Ssl(true).Prefix(prefix).Server(netID)
 
 	b, err := createBot(conf, nil, func(_ string) (*data.Store, error) {
 		return data.CreateStore(data.MemStoreProvider)
@@ -55,26 +56,22 @@ func commandsSetup(t *T) *tSetup {
 	if err != nil {
 		t.Fatal("Unexpected error:", err)
 	}
-	srv := b.servers[serverID]
+	srv := b.servers[netID]
 	buf := &bytes.Buffer{}
 	srv.endpoint.Writer = buf
 
-	srv.state.Update(&irc.Message{
-		Sender: serverID, Name: irc.RPL_WELCOME,
-		Args: []string{"Welcome", bothost},
-	})
-	srv.state.Update(&irc.Message{
-		Sender: bothost, Name: irc.JOIN,
-		Args: []string{channel},
-	})
-	srv.state.Update(&irc.Message{
-		Sender: u1host, Name: irc.JOIN,
-		Args: []string{channel},
-	})
-	srv.state.Update(&irc.Message{
-		Sender: u2host, Name: irc.PRIVMSG,
-		Args: []string{botnick, "hithere"},
-	})
+	srv.state.Update(
+		irc.NewEvent(netID, netInfo, irc.RPL_WELCOME, "", "Hi", bothost),
+	)
+	srv.state.Update(
+		irc.NewEvent(netID, netInfo, irc.JOIN, bothost, channel),
+	)
+	srv.state.Update(
+		irc.NewEvent(netID, netInfo, irc.JOIN, u1host, channel),
+	)
+	srv.state.Update(
+		irc.NewEvent(netID, netInfo, irc.PRIVMSG, u2host, botnick, "hi"),
+	)
 
 	return &tSetup{b, srv.endpoint.DataEndpoint, srv.state, b.store, buf, t}
 }
@@ -96,10 +93,10 @@ func rspChk(ts *tSetup, expected, sender string, args ...string) error {
 
 func prvRspChk(ts *tSetup, expected, to, sender string, args ...string) error {
 	ts.buffer.Reset()
-	err := ts.b.cmds.Dispatch(serverID, 0, &irc.Message{
-		Name: irc.PRIVMSG, Sender: sender,
-		Args: []string{to, strings.Join(args, " ")},
-	}, ts.ep)
+	err := ts.b.cmds.Dispatch(netID, 0, irc.NewEvent(
+		netID, netInfo, irc.PRIVMSG, sender, to, strings.Join(args, " ")),
+		ts.ep,
+	)
 	ts.b.cmds.WaitForHandlers()
 
 	s := ts.buffer.String()
@@ -124,7 +121,7 @@ func prvRspChk(ts *tSetup, expected, to, sender string, args ...string) error {
 func TestCoreCommands(t *T) {
 	conf := Configure().Nick("nobody").Altnick("nobody1").Username("nobody").
 		Userhost("bitforge.ca").Realname("ultimateq").NoReconnect(true).
-		Ssl(true).Server(serverID)
+		Ssl(true).Server(netID)
 
 	b, err := createBot(conf, nil, func(_ string) (*data.Store, error) {
 		return data.CreateStore(data.MemStoreProvider)
@@ -146,7 +143,7 @@ func TestCoreCommands_Register(t *T) {
 
 	var err error
 
-	if ts.store.GetAuthedUser(serverID, u1user) != nil {
+	if ts.store.GetAuthedUser(netID, u1user) != nil {
 		t.Error("Somehow user was authed already.")
 	}
 
@@ -155,7 +152,7 @@ func TestCoreCommands_Register(t *T) {
 		t.Error(err)
 	}
 
-	access := ts.store.GetAuthedUser(serverID, u1host)
+	access := ts.store.GetAuthedUser(netID, u1host)
 	if access == nil {
 		t.Error("User was not authenticated.")
 	} else {
@@ -172,7 +169,7 @@ func TestCoreCommands_Register(t *T) {
 		t.Error(err)
 	}
 
-	access = ts.store.GetAuthedUser(serverID, u2host)
+	access = ts.store.GetAuthedUser(netID, u2host)
 	if access == nil {
 		t.Error("User was not authenticated.")
 	} else if access.Global != nil {
@@ -184,7 +181,7 @@ func TestCoreCommands_Register(t *T) {
 		}
 	}
 
-	ts.store.Logout(serverID, u2host)
+	ts.store.Logout(netID, u2host)
 	err = rspChk(ts, errMsgAuthed, u1host, register, passwd, u1user)
 	if err != nil {
 		t.Error(err)
@@ -201,7 +198,7 @@ func TestCoreCommands_Auth(t *T) {
 	if err != nil {
 		t.Error(err)
 	}
-	access := ts.store.GetAuthedUser(serverID, u1host)
+	access := ts.store.GetAuthedUser(netID, u1host)
 	if access == nil {
 		t.Error("User was not authenticated.")
 	}
@@ -209,7 +206,7 @@ func TestCoreCommands_Auth(t *T) {
 	if err != nil {
 		t.Error(err)
 	}
-	access = ts.store.GetAuthedUser(serverID, u1host)
+	access = ts.store.GetAuthedUser(netID, u1host)
 	if access != nil {
 		t.Error("User was not logged out.")
 	}
@@ -222,7 +219,7 @@ func TestCoreCommands_Auth(t *T) {
 		t.Error(err)
 	}
 
-	access = ts.store.GetAuthedUser(serverID, u1host)
+	access = ts.store.GetAuthedUser(netID, u1host)
 	if access == nil {
 		t.Error("User was not authenticated.")
 	}
@@ -251,7 +248,7 @@ func TestCoreCommands_Logout(t *T) {
 		t.Error(err)
 	}
 
-	access := ts.store.GetAuthedUser(serverID, u1host)
+	access := ts.store.GetAuthedUser(netID, u1host)
 	if access != nil {
 		t.Error("User was not logged out.")
 	}
@@ -342,10 +339,10 @@ func TestCoreCommands_Deluser(t *T) {
 		t.Error(err)
 	}
 
-	access1 := ts.store.GetAuthedUser(serverID, u1host)
-	access2 := ts.store.GetAuthedUser(serverID, u1host)
+	access1 := ts.store.GetAuthedUser(netID, u1host)
+	access2 := ts.store.GetAuthedUser(netID, u1host)
 	if access1 == nil || access2 == nil {
-		t.Error("User's were not authenticated.")
+		t.Error("Users were not authenticated.")
 	}
 
 	err = rspChk(ts, ".*(G) global flag(s) required.*", u2host,
@@ -358,7 +355,7 @@ func TestCoreCommands_Deluser(t *T) {
 		t.Error(err)
 	}
 
-	access2 = ts.store.GetAuthedUser(serverID, u2host)
+	access2 = ts.store.GetAuthedUser(netID, u2host)
 	if access2 != nil {
 		t.Error("User was not logged out.")
 	}
@@ -380,7 +377,7 @@ func TestCoreCommands_Deluser(t *T) {
 		t.Error(err)
 	}
 
-	access2 = ts.store.GetAuthedUser(serverID, u2host)
+	access2 = ts.store.GetAuthedUser(netID, u2host)
 	if access2 != nil {
 		t.Error("User was not logged out.")
 	}
@@ -417,7 +414,7 @@ func TestCoreCommands_Delme(t *T) {
 		t.Error(err)
 	}
 
-	access := ts.store.GetAuthedUser(serverID, u1host)
+	access := ts.store.GetAuthedUser(netID, u1host)
 	if access == nil {
 		t.Error("User was not authenticated.")
 	}
@@ -427,7 +424,7 @@ func TestCoreCommands_Delme(t *T) {
 		t.Error(err)
 	}
 
-	access = ts.store.GetAuthedUser(serverID, u1host)
+	access = ts.store.GetAuthedUser(netID, u1host)
 	if access != nil {
 		t.Error("User was not logged out.")
 	}
@@ -465,7 +462,7 @@ func TestCoreCommands_Passwd(t *T) {
 		t.Error(err)
 	}
 
-	access = ts.store.GetAuthedUser(serverID, u1host)
+	access = ts.store.GetAuthedUser(netID, u1host)
 	if access == nil {
 		t.Error("User was not authenticatd.")
 	}
@@ -477,7 +474,7 @@ func TestCoreCommands_Passwd(t *T) {
 		t.Error(err)
 	}
 
-	access = ts.store.GetAuthedUser(serverID, u1host)
+	access = ts.store.GetAuthedUser(netID, u1host)
 	if access == nil {
 		t.Error("User was not authenticatd.")
 	}
@@ -496,9 +493,8 @@ func TestCoreCommands_Masks(t *T) {
 	defer commandsTeardown(ts, t)
 
 	other := "other!other@other"
-	ts.state.Update(&irc.Message{
-		Name: irc.PRIVMSG, Sender: other,
-		Args: []string{botnick}},
+	ts.state.Update(
+		irc.NewEvent(netID, netInfo, irc.PRIVMSG, other, botnick),
 	)
 
 	var err error
@@ -535,7 +531,7 @@ func TestCoreCommands_Masks(t *T) {
 		t.Error(err)
 	}
 
-	access = ts.store.GetAuthedUser(serverID, u1host)
+	access = ts.store.GetAuthedUser(netID, u1host)
 	if access == nil {
 		t.Fatal("User was not authed.")
 	}
@@ -590,7 +586,7 @@ func TestCoreCommands_Masks(t *T) {
 		t.Error(err)
 	}
 
-	access = ts.store.GetAuthedUser(serverID, u1host)
+	access = ts.store.GetAuthedUser(netID, u1host)
 	if access == nil {
 		t.Fatal("User was not authed.")
 	}
@@ -620,7 +616,7 @@ func TestCoreCommands_Resetpasswd(t *T) {
 		t.Error(err)
 	}
 
-	access = ts.store.GetAuthedUser(serverID, u2host)
+	access = ts.store.GetAuthedUser(netID, u2host)
 	if access == nil {
 		t.Fatal("User was not authenticatd.")
 	}
@@ -633,7 +629,7 @@ func TestCoreCommands_Resetpasswd(t *T) {
 		t.Error(err)
 	}
 
-	access = ts.store.GetAuthedUser(serverID, u2host)
+	access = ts.store.GetAuthedUser(netID, u2host)
 	if access == nil {
 		t.Fatal("User was not authenticatd.")
 	}
@@ -732,7 +728,7 @@ func TestCoreCommands_GiveTakeServer(t *T) {
 		t.Error(err)
 	}
 
-	if !a.HasServerFlag(serverID, 'h') || !a.HasServerLevel(serverID, 100) {
+	if !a.HasServerFlag(netID, 'h') || !a.HasServerLevel(netID, 100) {
 		t.Error("Server access not granted correctly.")
 	}
 
@@ -741,7 +737,7 @@ func TestCoreCommands_GiveTakeServer(t *T) {
 		t.Error(err)
 	}
 
-	if a.HasServerLevel(serverID, 100) {
+	if a.HasServerLevel(netID, 100) {
 		t.Error("Server access not taken correctly.")
 	}
 
@@ -750,17 +746,17 @@ func TestCoreCommands_GiveTakeServer(t *T) {
 		t.Error(err)
 	}
 
-	if a.HasServerFlag(serverID, 'h') {
+	if a.HasServerFlag(netID, 'h') {
 		t.Error("Server access not taken correctly.")
 	}
 
-	a.GrantServer(serverID, 100, "h")
+	a.GrantServer(netID, 100, "h")
 	err = rspChk(ts, sgiveSuccess, u1host, stake, u2nick, "all")
 	if err != nil {
 		t.Error(err)
 	}
 
-	if a.HasServerLevel(serverID, 100) || a.HasServerFlag(serverID, 'h') {
+	if a.HasServerLevel(netID, 100) || a.HasServerFlag(netID, 'h') {
 		t.Error("Server access not taken correctly.")
 	}
 
@@ -796,8 +792,8 @@ func TestCoreCommands_GiveTakeChannel(t *T) {
 		t.Error(err)
 	}
 
-	if !a.HasChannelFlag(serverID, channel, 'h') ||
-		!a.HasChannelLevel(serverID, channel, 100) {
+	if !a.HasChannelFlag(netID, channel, 'h') ||
+		!a.HasChannelLevel(netID, channel, 100) {
 		t.Error("Channel access not granted correctly.")
 	}
 
@@ -806,7 +802,7 @@ func TestCoreCommands_GiveTakeChannel(t *T) {
 		t.Error(err)
 	}
 
-	if a.HasChannelLevel(serverID, channel, 100) {
+	if a.HasChannelLevel(netID, channel, 100) {
 		t.Error("Channel access not taken correctly.")
 	}
 
@@ -815,18 +811,18 @@ func TestCoreCommands_GiveTakeChannel(t *T) {
 		t.Error(err)
 	}
 
-	if a.HasChannelFlag(serverID, channel, 'h') {
+	if a.HasChannelFlag(netID, channel, 'h') {
 		t.Error("Channel access not taken correctly.")
 	}
 
-	a.GrantChannel(serverID, channel, 100, "h")
+	a.GrantChannel(netID, channel, 100, "h")
 	err = rspChk(ts, giveSuccess, u1host, take, channel, u2nick, "all")
 	if err != nil {
 		t.Error(err)
 	}
 
-	if a.HasChannelFlag(serverID, channel, 'h') ||
-		a.HasChannelLevel(serverID, channel, 100) {
+	if a.HasChannelFlag(netID, channel, 'h') ||
+		a.HasChannelLevel(netID, channel, 100) {
 		t.Error("Channel access not taken correctly.")
 	}
 
@@ -953,12 +949,12 @@ func TestCoreCommands_Susers(t *T) {
 	if err != nil {
 		t.Fatal("Could not find user1.")
 	}
-	a1.GrantServer(serverID, 2, "b")
+	a1.GrantServer(netID, 2, "b")
 	a2, err = ts.store.FindUser(u2user)
 	if err != nil {
 		t.Fatal("Could not find user1.")
 	}
-	a2.GrantServer(serverID, 100, "abc")
+	a2.GrantServer(netID, 100, "abc")
 
 	if err = ts.store.AddUser(a1); err != nil {
 		t.Fatal("Could not save user.")
@@ -969,8 +965,8 @@ func TestCoreCommands_Susers(t *T) {
 
 	check := susersHead +
 		`NOTICE .* :` + usersListHeadUser + `.*` + usersListHeadAccess +
-		`NOTICE .* :` + u1user + `.*` + a1.GetServer(serverID).String() +
-		`NOTICE .* :` + u2user + `.*` + a2.GetServer(serverID).String()
+		`NOTICE .* :` + u1user + `.*` + a1.GetServer(netID).String() +
+		`NOTICE .* :` + u2user + `.*` + a2.GetServer(netID).String()
 	err = rspChk(ts, check, u1host, susers)
 	if err != nil {
 		t.Error(err)
@@ -1002,12 +998,12 @@ func TestCoreCommands_Users(t *T) {
 	if err != nil {
 		t.Fatal("Could not find user1.")
 	}
-	a1.GrantChannel(serverID, channel, 3, "c")
+	a1.GrantChannel(netID, channel, 3, "c")
 	a2, err = ts.store.FindUser(u2user)
 	if err != nil {
 		t.Fatal("Could not find user1.")
 	}
-	a2.GrantChannel(serverID, channel, 100, "abc")
+	a2.GrantChannel(netID, channel, 100, "abc")
 
 	if err = ts.store.AddUser(a1); err != nil {
 		t.Fatal("Could not save user.")
@@ -1018,8 +1014,8 @@ func TestCoreCommands_Users(t *T) {
 
 	check := usersHead +
 		`NOTICE .* :` + usersListHeadUser + `.*` + usersListHeadAccess +
-		`NOTICE .* :` + u1user + `.*` + a1.GetChannel(serverID, channel).String() +
-		`NOTICE .* :` + u2user + `.*` + a2.GetChannel(serverID, channel).String()
+		`NOTICE .* :` + u1user + `.*` + a1.GetChannel(netID, channel).String() +
+		`NOTICE .* :` + u2user + `.*` + a2.GetChannel(netID, channel).String()
 	err = rspChk(ts, check, u1host, users, channel)
 	if err != nil {
 		t.Error(err)

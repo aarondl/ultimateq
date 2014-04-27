@@ -59,7 +59,7 @@ func (b *Bot) ReplaceConfig(newConfig *config.Config) bool {
 	}
 
 	if !contains(b.conf.Global.GetChannels(), newConfig.Global.GetChannels()) {
-		b.dispatchCore.Channels(newConfig.Global.GetChannels())
+		b.dispatchCore.SetChannels(newConfig.Global.GetChannels())
 	}
 
 	b.conf = newConfig
@@ -93,7 +93,7 @@ func (s *Server) rehashConfig(srvConfig *config.Server) {
 		s.Write([]byte(irc.NICK + " :" + s.conf.GetNick()))
 	}
 	if setChannels {
-		s.dispatchCore.Channels(s.conf.GetChannels())
+		s.dispatchCore.SetChannels(s.conf.GetChannels())
 	}
 }
 

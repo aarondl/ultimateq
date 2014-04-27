@@ -22,24 +22,24 @@ type s struct{}
 var _ = check.Suite(&s{})
 
 type testHandler struct {
-	callback func(*irc.Message, irc.Endpoint)
+	callback func(*irc.Event, irc.Writer)
 }
 
-func (h testHandler) HandleRaw(m *irc.Message, send irc.Endpoint) {
+func (h testHandler) HandleRaw(m *irc.Event, send irc.Writer) {
 	if h.callback != nil {
 		h.callback(m, send)
 	}
 }
 
 type testCommand struct {
-	callback func(string, *data.DataEndpoint, *cmd.Event) error
+	callback func(string, irc.Writer, *cmd.Event) error
 }
 
 func (h testCommand) Cmd(cmd string,
-	ep *data.DataEndpoint, cdata *cmd.Event) error {
+	w irc.Writer, cdata *cmd.Event) error {
 
 	if h.callback != nil {
-		return h.callback(cmd, ep, cdata)
+		return h.callback(cmd, w, cdata)
 	}
 	return nil
 }
@@ -55,7 +55,7 @@ func init() {
 	data.UserAccessPwdCost = 4 // See bcrypt.MinCost
 }
 
-var serverID = "irc.test.net"
+var netID = "irc.test.net"
 
 var fakeConfig = Configure().
 	Nick("nobody").
@@ -68,7 +68,7 @@ var fakeConfig = Configure().
 	NoVerifyCert(true).
 	SslCert("fakecert").
 	Ssl(true).
-	Server(serverID)
+	Server(netID)
 
 //==================================
 // Tests begin
@@ -132,7 +132,7 @@ func TestBot_StartStopServer(t *T) {
 	conf := fakeConfig.Clone()
 	conf.Server("othersrv").Host("other")
 	b, _ := createBot(conf, connProvider, nil, false, false)
-	srv := b.servers[serverID]
+	srv := b.servers[netID]
 	//othersrv := b.servers["othersrv"]
 
 	done := make(chan int)
@@ -146,12 +146,12 @@ func TestBot_StartStopServer(t *T) {
 		//<-start
 		for i := 0; i < 2; i++ {
 			<-start
-			if !b.StopServer(serverID) {
+			if !b.StopServer(netID) {
 				t.Error("There was a problem stopping the server.")
 			}
 
 			<-stop
-			if !b.StartServer(serverID) {
+			if !b.StartServer(netID) {
 				t.Fatal("There was an error starting the server.")
 			}
 		}
@@ -175,15 +175,15 @@ func TestBot_Dispatching(t *T) {
 	}
 	b, _ := createBot(fakeConfig, connProvider, nil, false, false)
 
-	result := make(chan *irc.Message)
+	result := make(chan *irc.Event)
 	thandler := &testHandler{
-		func(m *irc.Message, ep irc.Endpoint) {
+		func(m *irc.Event, w irc.Writer) {
 			result <- m
 		},
 	}
 	cresult := make(chan string)
 	tcommand := &testCommand{
-		func(command string, _ *data.DataEndpoint, _ *cmd.Event) error {
+		func(command string, _ irc.Writer, _ *cmd.Event) error {
 			cresult <- command
 			return nil
 		},
@@ -227,9 +227,9 @@ func TestBot_Dispatch_ConnectDisconnect(t *T) {
 	}
 	b, _ := createBot(fakeConfig, connProvider, nil, false, false)
 
-	result := make(chan *irc.Message)
+	result := make(chan *irc.Event)
 	thandler := &testHandler{
-		func(m *irc.Message, ep irc.Endpoint) {
+		func(m *irc.Event, w irc.Writer) {
 			result <- m
 		},
 	}
@@ -266,7 +266,7 @@ func TestBot_Reconnect(t *T) {
 	conf := fakeConfig.Clone().GlobalContext().NoReconnect(false).
 		ReconnectTimeout(1)
 	b, _ := createBot(conf, connProvider, nil, false, false)
-	srv := b.servers[serverID]
+	srv := b.servers[netID]
 	srv.reconnScale = time.Millisecond
 
 	go func() {
@@ -299,7 +299,7 @@ func TestBot_ReconnectConnection(t *T) {
 	conf := fakeConfig.Clone().GlobalContext().NoReconnect(false).
 		ReconnectTimeout(1)
 	b, _ := createBot(conf, connProvider, nil, false, false)
-	srv := b.servers[serverID]
+	srv := b.servers[netID]
 	srv.reconnScale = time.Millisecond
 
 	listen := make(chan Status)
@@ -331,7 +331,7 @@ func TestBot_ReconnectKill(t *T) {
 	conf := fakeConfig.Clone().GlobalContext().NoReconnect(false).
 		ReconnectTimeout(3)
 	b, _ := createBot(conf, connProvider, nil, false, false)
-	srv := b.servers[serverID]
+	srv := b.servers[netID]
 
 	listen := make(chan Status)
 	srv.addStatusListener(listen, STATUS_RECONNECTING)
@@ -351,7 +351,7 @@ func TestBot_Register(t *T) {
 	t.Parallel()
 	b, _ := createBot(fakeConfig, nil, nil, false, false)
 	gid := b.Register(irc.PRIVMSG, &coreHandler{})
-	id, err := b.RegisterServer(serverID, irc.PRIVMSG, &coreHandler{})
+	id, err := b.RegisterServer(netID, irc.PRIVMSG, &coreHandler{})
 
 	if b.Unregister(irc.PRIVMSG, id) {
 		t.Error("Unregister should not know about server events.")
@@ -360,10 +360,10 @@ func TestBot_Register(t *T) {
 		t.Error("Should unregister the global registration.")
 	}
 
-	if ok, _ := b.UnregisterServer(serverID, irc.PRIVMSG, gid); ok {
+	if ok, _ := b.UnregisterServer(netID, irc.PRIVMSG, gid); ok {
 		t.Error("Unregister server should not know about global events.")
 	}
-	if ok, _ := b.UnregisterServer(serverID, irc.PRIVMSG, id); !ok {
+	if ok, _ := b.UnregisterServer(netID, irc.PRIVMSG, id); !ok {
 		t.Error("Unregister should unregister events.")
 	}
 
@@ -398,12 +398,12 @@ func TestBot_RegisterCmd(t *T) {
 		t.Error("It should unregister correctly.")
 	}
 
-	err = b.RegisterServerCmd(serverID, cmd.MkCmd("e", "d", command,
+	err = b.RegisterServerCmd(netID, cmd.MkCmd("e", "d", command,
 		&testCommand{}, cmd.ALL, cmd.ALL))
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
-	if success = b.UnregisterServerCmd(serverID, command); !success {
+	if success = b.UnregisterServerCmd(netID, command); !success {
 		t.Error("It should unregister correctly.")
 	}
 
@@ -421,8 +421,8 @@ func TestBot_RegisterCmd(t *T) {
 func TestBot_Providers(t *T) {
 	t.Parallel()
 	storeConf1 := fakeConfig.Clone().GlobalContext().NoStore(false)
-	storeConf2 := storeConf1.Clone().ServerContext(serverID).NoStore(false)
-	storeConf3 := storeConf1.Clone().ServerContext(serverID).NoStore(true)
+	storeConf2 := storeConf1.Clone().ServerContext(netID).NoStore(false)
+	storeConf3 := storeConf1.Clone().ServerContext(netID).NoStore(true)
 
 	badConnProv := func(s string) (net.Conn, error) {
 		return nil, net.ErrWriteToConnected
@@ -478,7 +478,7 @@ func TestBot_Stop(t *T) {
 		return conn, nil
 	}
 	b, _ := createBot(fakeConfig, connProvider, nil, false, false)
-	srv := b.servers[serverID]
+	srv := b.servers[netID]
 
 	listen := make(chan Status)
 	srv.addStatusListener(listen, STATUS_STARTED)
@@ -499,14 +499,14 @@ func TestBot_GetEndpoint(t *T) {
 		return conn, nil
 	}
 	b, _ := createBot(fakeConfig, connProvider, nil, false, false)
-	srv := b.servers[serverID]
+	srv := b.servers[netID]
 
 	listen := make(chan Status)
 	srv.addStatusListener(listen, STATUS_STARTED)
 
 	end := b.Start()
 
-	ep := b.GetEndpoint(serverID)
+	ep := b.GetEndpoint(netID)
 
 	test := "test\r\n"
 	result := make(chan string)

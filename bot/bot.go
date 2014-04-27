@@ -83,7 +83,6 @@ type Bot struct {
 	serverEnd     chan serverOp
 
 	// Dispatching
-	caps         *irc.ProtoCaps
 	dispatchCore *dispatch.DispatchCore
 	dispatcher   *dispatch.Dispatcher
 	cmds         *cmd.Cmds
@@ -255,23 +254,28 @@ func (b *Bot) startServer(srv *Server, writing, reading bool) {
 
 // dispatch starts dispatch loops on the server.
 func (b *Bot) dispatch(srv *Server) (disconnect bool, err error) {
-	var ircMsg *irc.Message
+	var ircMsg *irc.Event
 	var parseErr error
 	readCh := srv.client.ReadChannel()
 
-	b.dispatchMessage(srv, irc.NewMessage(irc.CONNECT, srv.name))
+	b.dispatchMessage(srv,
+		irc.NewEvent(srv.name, srv.netInfo, irc.CONNECT, srv.name))
 	for err == nil && !disconnect {
 		select {
-		case msg, ok := <-readCh:
+		case ev, ok := <-readCh:
 			if !ok {
 				disconnect = true
 				break
 			}
-			ircMsg, parseErr = parse.Parse(msg)
+
+			ircMsg, parseErr = parse.Parse(ev)
 			if parseErr != nil {
-				log.Printf(errFmtParsingIrcMessage, parseErr, msg)
+				log.Printf(errFmtParsingIrcMessage, parseErr, ev)
 				break
 			}
+			ircMsg.NetworkID = srv.name
+			ircMsg.NetworkInfo = srv.netInfo
+
 			srv.protectState.Lock()
 			if srv.state != nil {
 				srv.state.Update(ircMsg)
@@ -284,17 +288,18 @@ func (b *Bot) dispatch(srv *Server) (disconnect bool, err error) {
 		}
 	}
 
-	b.dispatchMessage(srv, irc.NewMessage(irc.DISCONNECT, srv.name))
+	b.dispatchMessage(srv,
+		irc.NewEvent(srv.name, srv.netInfo, irc.DISCONNECT, srv.name))
 	return
 }
 
 // dispatch sends a message to both the bot's dispatcher and the given servers
-func (b *Bot) dispatchMessage(s *Server, msg *irc.Message) {
-	b.dispatcher.Dispatch(msg, s.endpoint)
-	s.dispatcher.Dispatch(msg, s.endpoint)
-	b.cmds.Dispatch(s.name, s.cmds.GetPrefix(), msg,
+func (b *Bot) dispatchMessage(s *Server, ev *irc.Event) {
+	b.dispatcher.Dispatch(ev, s.endpoint)
+	s.dispatcher.Dispatch(ev, s.endpoint)
+	b.cmds.Dispatch(s.name, s.cmds.GetPrefix(), ev,
 		s.endpoint.DataEndpoint)
-	s.cmds.Dispatch(s.name, 0, msg, s.endpoint.DataEndpoint)
+	s.cmds.Dispatch(s.name, 0, ev, s.endpoint.DataEndpoint)
 }
 
 // Stop shuts down all connections and exits.
@@ -420,7 +425,7 @@ func (b *Bot) GetEndpoint(server string) (endpoint *data.DataEndpoint) {
 }
 
 // createBot creates a bot from the given configuration, using the providers
-// given to create connections and protocol caps.
+// given to create connections and protocol.
 func createBot(conf *config.Config, connProv ConnProvider,
 	storeProv StoreProvider,
 	attachHandlers, attachCommands bool) (*Bot, error) {
@@ -438,7 +443,6 @@ func createBot(conf *config.Config, connProv ConnProvider,
 		serverEnd:      make(chan serverOp),
 	}
 
-	b.caps = irc.CreateProtoCaps()
 	b.createDispatching(conf.Global.GetPrefix(), conf.Global.GetChannels())
 
 	makeStore := false
@@ -477,7 +481,7 @@ func (b *Bot) createServer(conf *config.Server) (*Server, error) {
 	s := &Server{
 		bot:         b,
 		name:        conf.GetName(),
-		caps:        b.caps.Clone(),
+		netInfo:     irc.NewNetworkInfo(),
 		conf:        conf,
 		killable:    make(chan int),
 		reconnScale: defaultReconnScale,
@@ -503,8 +507,8 @@ func (b *Bot) createServer(conf *config.Server) (*Server, error) {
 
 // createDispatcher uses the bot's current ProtoCaps to create a dispatcher.
 func (b *Bot) createDispatching(prefix rune, channels []string) {
-	b.dispatchCore = dispatch.CreateDispatchCore(b.caps, channels...)
-	b.dispatcher = dispatch.CreateDispatcher(b.dispatchCore)
+	b.dispatchCore = dispatch.NewDispatchCore(channels...)
+	b.dispatcher = dispatch.NewDispatcher(b.dispatchCore)
 	b.cmds = cmd.CreateCmds(prefix, b.dispatchCore)
 }
 
@@ -516,12 +520,4 @@ func (b *Bot) createStore(filename string) (err error) {
 		b.store, err = b.storeProvider(filename)
 	}
 	return
-}
-
-// mergeProtocaps merges a protocaps with the bot's current protocaps to ensure
-// the bot's main dispatcher still recognizes all channel types that the servers
-// currently recognize.
-func (b *Bot) mergeProtocaps(toMerge *irc.ProtoCaps) {
-	b.caps.Merge(toMerge)
-	b.dispatchCore.Protocaps(b.caps)
 }
