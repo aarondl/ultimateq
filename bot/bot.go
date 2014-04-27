@@ -23,8 +23,6 @@ import (
 )
 
 const (
-	// nAssumedServers is how many servers a bot typically connects to.
-	nAssumedServers = 1
 	// defaultReconnScale is how the config's ReconnTimeout is scaled.
 	defaultReconnScale = time.Second
 
@@ -48,13 +46,13 @@ var (
 	// errInvalidConfig is when NewBot was given an invalid configuration.
 	errInvalidConfig = errors.New("bot: Invalid Configuration")
 	// errInvalidServerId occurs when the user passes in an unknown
-	// server id to a method requiring a server id.
-	errUnknownServerID = errors.New("bot: Unknown Server id.")
+	// network id to a method requiring a network id.
+	errUnknownServerID = errors.New("bot: Unknown Network id")
 	// errServerKilled occurs when the server is killed during the running state
-	errServerKilled = errors.New("bot: Server killed.")
+	errServerKilled = errors.New("bot: Server killed")
 	// errServerKilledReconn occurs when the server is killed during a
 	// reconnection pause.
-	errServerKilledReconn = errors.New("bot: Server reconnection aborted.")
+	errServerKilledReconn = errors.New("bot: Server reconnection aborted")
 )
 
 type (
@@ -191,14 +189,14 @@ func (b *Bot) monitorServers() {
 	}
 }
 
-// StartServer starts a server by name. Start() should have been called prior
+// StartNetwork starts a network by name. Start() should have been called prior
 // to this.
-func (b *Bot) StartServer(server string) (started bool) {
+func (b *Bot) StartNetwork(networkID string) (started bool) {
 	b.protectServers.RLock()
 	defer b.protectServers.RUnlock()
 
 	var srv *Server
-	if srv, started = b.servers[server]; started {
+	if srv, started = b.servers[networkID]; started {
 		go b.startServer(srv, true, true)
 	}
 	return
@@ -314,8 +312,8 @@ func (b *Bot) Stop() {
 	}
 }
 
-// StopServer stops a server by name.
-func (b *Bot) StopServer(networkID string) (stopped bool) {
+// StopNetwork stops a network by name.
+func (b *Bot) StopNetwork(networkID string) (stopped bool) {
 	if srv := b.getServer(networkID); srv != nil {
 		stopped = b.stopServer(srv)
 	}
@@ -345,11 +343,11 @@ func (b *Bot) Register(event string, handler interface{}) int {
 	return b.dispatcher.Register(event, handler)
 }
 
-// RegisterServer adds an event handler to a server specific dispatcher.
-func (b *Bot) RegisterServer(
-	server string, event string, handler interface{}) (int, error) {
+// RegisterNetwork adds an event handler to a network specific dispatcher.
+func (b *Bot) RegisterNetwork(
+	networkID string, event string, handler interface{}) (int, error) {
 
-	if s := b.getServer(server); s != nil {
+	if s := b.getServer(networkID); s != nil {
 		return s.dispatcher.Register(event, handler), nil
 	}
 	return 0, errUnknownServerID
@@ -360,11 +358,12 @@ func (b *Bot) Unregister(event string, id int) bool {
 	return b.dispatcher.Unregister(event, id)
 }
 
-// UnregisterServer removes an event handler from a server specific dispatcher.
-func (b *Bot) UnregisterServer(
-	server string, event string, id int) (bool, error) {
+// UnregisterNetwork removes an event handler from a network specific
+// dispatcher.
+func (b *Bot) UnregisterNetwork(
+	networkID string, event string, id int) (bool, error) {
 
-	if s := b.getServer(server); s != nil {
+	if s := b.getServer(networkID); s != nil {
 		return s.dispatcher.Unregister(event, id), nil
 	}
 	return false, errUnknownServerID
@@ -376,11 +375,11 @@ func (b *Bot) RegisterCmd(command *cmd.Cmd) error {
 	return b.cmds.Register(cmd.GLOBAL, command)
 }
 
-// RegisterServerCmd registers a command with the server.
+// RegisterNetworkCmd registers a command with the network.
 // See Cmder.Register for in-depth documentation.
-func (b *Bot) RegisterServerCmd(srv string, command *cmd.Cmd) error {
-	if s := b.getServer(srv); s != nil {
-		return s.cmds.Register(srv, command)
+func (b *Bot) RegisterNetworkCmd(networkID string, command *cmd.Cmd) error {
+	if s := b.getServer(networkID); s != nil {
+		return s.cmds.Register(networkID, command)
 	}
 	return errUnknownServerID
 }
@@ -390,15 +389,15 @@ func (b *Bot) UnregisterCmd(command string) bool {
 	return b.cmds.Unregister(cmd.GLOBAL, command)
 }
 
-// UnregisterServerCmd unregister's a command from the server.
-func (b *Bot) UnregisterServerCmd(server, command string) bool {
-	if s := b.getServer(server); s != nil {
-		return s.cmds.Unregister(server, command)
+// UnregisterNetworkCmd unregister's a command from the network.
+func (b *Bot) UnregisterNetworkCmd(networkID, command string) bool {
+	if s := b.getServer(networkID); s != nil {
+		return s.cmds.Unregister(networkID, command)
 	}
 	return false
 }
 
-// UsingState calls a callback if the requested server can present a state db.
+// UsingState calls a callback if the requested network can present a state db.
 // The returned boolean is whether or not the function was called.
 func (b *Bot) UsingState(networkID string, fn func(*data.State)) (called bool) {
 	s := b.getServer(networkID)
@@ -436,7 +435,7 @@ func (b *Bot) CloseState(networkID string) {
 	}
 }
 
-// UsingStore calls a callback if the requested server can present a data store.
+// UsingStore calls a callback if the bot can present a store db.
 // The returned boolean is whether or not the function was called.
 func (b *Bot) UsingStore(fn func(*data.Store)) (called bool) {
 	b.protectStore.RLock()
@@ -461,7 +460,7 @@ func (b *Bot) CloseStore() {
 	b.protectStore.RUnlock()
 }
 
-// GetEndpoint retrieves a servers endpoint. Will be nil if the server does
+// NetworkWriter retrieves a network's writer. Will be nil if the network does
 // not exist.
 func (b *Bot) NetworkWriter(networkID string) (w irc.Writer) {
 	if s := b.getServer(networkID); s != nil {
@@ -478,7 +477,7 @@ func createBot(conf *config.Config, connProv ConnProvider,
 
 	b := &Bot{
 		conf:           conf,
-		servers:        make(map[string]*Server, nAssumedServers),
+		servers:        make(map[string]*Server, 0),
 		connProvider:   connProv,
 		storeProvider:  storeProv,
 		attachHandlers: attachHandlers,
