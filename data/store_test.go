@@ -452,7 +452,7 @@ func TestStore_ChanUsers(t *testing.T) {
 
 	list, err = s.ChanUsers(server, channel)
 	if len(list) != 1 {
-		t.Error("There should be exactly 1 global user now.")
+		t.Fatal("There should be exactly 1 global user now.")
 	}
 	if list[0].Username != ua1.Username {
 		t.Error("The wrong user was found!")

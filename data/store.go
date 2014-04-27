@@ -88,96 +88,49 @@ func (s *Store) Close() error {
 }
 
 // GlobalUsers gets users with global access
-func (s *Store) GlobalUsers() (list []UserAccess, err error) {
-	var val []byte
-	var e *kv.Enumerator
-	var ua *UserAccess
-	var a *Access
-	var stop error
-
-	e, err = s.db.SeekFirst()
-	if err == io.EOF {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	for ; stop == nil; _, val, stop = e.Next() {
-		ua, err = deserialize(val)
-		if err != nil {
-			err = nil
-			continue
-		}
-
-		if a = ua.GetGlobal(); a != nil && !a.IsZero() {
-			list = append(list, *ua)
-		}
-	}
-
-	return
+func (s *Store) GlobalUsers() ([]*UserAccess, error) {
+	return iterate(s.db, func(ua *UserAccess) bool {
+		a := ua.GetGlobal()
+		return a != nil && !a.IsZero()
+	})
 }
 
 // ServerUsers gets users with Server access
-func (s *Store) ServerUsers(server string) (list []UserAccess, err error) {
-	var val []byte
-	var e *kv.Enumerator
-	var ua *UserAccess
-	var a *Access
-	var stop error
-
-	e, err = s.db.SeekFirst()
-	if err == io.EOF {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	for ; stop == nil; _, val, stop = e.Next() {
-		ua, err = deserialize(val)
-		if err != nil {
-			err = nil
-			continue
-		}
-
-		if a = ua.GetServer(server); a != nil && !a.IsZero() {
-			list = append(list, *ua)
-		}
-	}
-
-	return
+func (s *Store) ServerUsers(server string) ([]*UserAccess, error) {
+	return iterate(s.db, func(ua *UserAccess) bool {
+		a := ua.GetServer(server)
+		return a != nil && !a.IsZero()
+	})
 }
 
 // ChanUsers gets users with access to a channel
-func (s *Store) ChanUsers(server, channel string) (list []UserAccess, err error) {
-	var val []byte
-	var e *kv.Enumerator
-	var ua *UserAccess
-	var a *Access
-	var stop error
+func (s *Store) ChanUsers(server, channel string) ([]*UserAccess, error) {
+	return iterate(s.db, func(ua *UserAccess) bool {
+		a := ua.GetChannel(server, channel)
+		return a != nil && !a.IsZero()
+	})
+}
 
-	e, err = s.db.SeekFirst()
-	if err == io.EOF {
+func iterate(db *kv.DB, filter func(*UserAccess) bool) ([]*UserAccess, error) {
+	list := make([]*UserAccess, 0)
+
+	e, err := db.SeekFirst()
+	switch {
+	case err == io.EOF:
 		return nil, nil
-	}
-	if err != nil {
+	case err != nil:
 		return nil, err
 	}
 
+	var stop error
+	var val []byte
 	for ; stop == nil; _, val, stop = e.Next() {
-		ua, err = deserialize(val)
-		if err != nil {
-			err = nil
-			continue
-		}
-
-		if a = ua.GetChannel(server, channel); a != nil && !a.IsZero() {
-			list = append(list, *ua)
+		if ua, err := deserialize(val); err == nil && filter(ua) {
+			list = append(list, ua)
 		}
 	}
 
-	return
+	return list, nil
 }
 
 // AddUser adds a user to the database.

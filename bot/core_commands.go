@@ -461,8 +461,8 @@ func (c *coreCmds) access(w irc.Writer, ev *cmd.Event) (
 func (c *coreCmds) gusers(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	var list []data.UserAccess
-	var ua data.UserAccess
+	var list []*data.UserAccess
+	var ua *data.UserAccess
 
 	nick := ev.User.Nick()
 
@@ -493,8 +493,8 @@ func (c *coreCmds) gusers(w irc.Writer, ev *cmd.Event) (
 func (c *coreCmds) susers(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	var list []data.UserAccess
-	var ua data.UserAccess
+	var list []*data.UserAccess
+	var ua *data.UserAccess
 
 	nick := ev.User.Nick()
 
@@ -525,8 +525,8 @@ func (c *coreCmds) susers(w irc.Writer, ev *cmd.Event) (
 func (c *coreCmds) users(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	var list []data.UserAccess
-	var ua data.UserAccess
+	var list []*data.UserAccess
+	var ua *data.UserAccess
 	var ch string
 
 	if ev.GetArg("chan") != `` {
@@ -1139,7 +1139,7 @@ func (c *coreCmds) help(w irc.Writer, ev *cmd.Event) (
 }
 
 // userListWidth calculates the width of the userList's "User" column.
-func userListWidth(users []data.UserAccess) int {
+func userListWidth(users []*data.UserAccess) int {
 	minl := len(usersListHeadUser)
 	for _, u := range users {
 		l := len(u.Username)
