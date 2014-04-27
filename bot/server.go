@@ -73,7 +73,7 @@ type Server struct {
 	dispatchCore *dispatch.DispatchCore
 	dispatcher   *dispatch.Dispatcher
 	cmds         *cmd.Cmds
-	endpoint     *ServerEndpoint
+	writer       irc.Writer
 
 	handlerID int
 	handler   *coreHandler
@@ -92,12 +92,6 @@ type Server struct {
 	protectState sync.RWMutex
 }
 
-// ServerEndpoint implements the Endpoint interface.
-type ServerEndpoint struct {
-	*data.DataEndpoint
-	server *Server
-}
-
 // Write writes to the server's IrcClient.
 func (s *Server) Write(buf []byte) (int, error) {
 	if len(buf) == 0 {
@@ -111,21 +105,6 @@ func (s *Server) Write(buf []byte) (int, error) {
 	}
 
 	return 0, errNotConnected
-}
-
-// createEndpoint creates a ServerEndpoint with an embedded DataEndpoint.
-func (s *Server) createEndpoint(store *data.Store, mutex *sync.RWMutex) {
-	s.endpoint = &ServerEndpoint{
-		DataEndpoint: data.NewDataEndpoint(
-			s.name,
-			s,
-			s.state,
-			store,
-			&s.protectState,
-			mutex,
-		),
-		server: s,
-	}
 }
 
 // createDispatcher uses the server's current ProtoCaps to create a dispatcher.

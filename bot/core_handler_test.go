@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"net"
+	"testing"
 
 	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/irc"
-	. "gopkg.in/check.v1"
 )
 
 //===================================================================
@@ -40,17 +40,19 @@ func (t *testPoint) GetKey() string {
 //==============
 // Tests
 //==============
-func (s *s) TestCoreHandler_Ping(c *C) {
+func TestCoreHandler_Ping(t *testing.T) {
 	handler := coreHandler{}
 	ev := irc.NewEvent(netID, netInfo, irc.PING, "", "123123123123")
 	endpoint := makeTestPoint(nil)
 	handler.HandleRaw(ev, endpoint)
-	c.Check(endpoint.gets(), Equals, irc.PONG+" :"+ev.Args[0])
+	expect := irc.PONG + " :" + ev.Args[0]
+	if got := endpoint.gets(); got != expect {
+		t.Errorf("Expected: %s, got: %s", expect, got)
+	}
 }
 
-func (s *s) TestCoreHandler_Connect(c *C) {
-	b, err := createBot(fakeConfig, nil, nil, false, false)
-	c.Check(err, IsNil)
+func TestCoreHandler_Connect(t *testing.T) {
+	b, _ := createBot(fakeConfig, nil, nil, false, false)
 	cnf := fakeConfig.GetServer(netID)
 	handler := coreHandler{bot: b}
 	msg1 := fmt.Sprintf("NICK :%v", cnf.GetNick())
@@ -60,12 +62,15 @@ func (s *s) TestCoreHandler_Connect(c *C) {
 	ev := irc.NewEvent(netID, netInfo, irc.CONNECT, "")
 	endpoint := makeTestPoint(b.servers[netID])
 	handler.HandleRaw(ev, endpoint)
-	c.Check(endpoint.gets(), Equals, msg1+msg2)
+
+	expect := msg1 + msg2
+	if got := endpoint.gets(); got != expect {
+		t.Errorf("Expected: %s, got: %s", expect, got)
+	}
 }
 
-func (s *s) TestCoreHandler_Nick(c *C) {
-	b, err := createBot(fakeConfig, nil, nil, false, false)
-	c.Check(err, IsNil)
+func TestCoreHandler_Nick(t *testing.T) {
+	b, _ := createBot(fakeConfig, nil, nil, false, false)
 	cnf := fakeConfig.GetServer(netID)
 	handler := coreHandler{bot: b}
 	ev := irc.NewEvent(netID, netInfo, irc.ERR_NICKNAMEINUSE, "")
@@ -78,22 +83,27 @@ func (s *s) TestCoreHandler_Nick(c *C) {
 	nick3 := nickstr + cnf.GetNick() + "__"
 
 	handler.HandleRaw(ev, endpoint)
-	c.Check(endpoint.gets(), Equals, nick1)
+	if got := endpoint.gets(); got != nick1 {
+		t.Errorf("Expected: %s, got: %s", nick1, got)
+	}
 	endpoint.resetTestWritten()
 	handler.HandleRaw(ev, endpoint)
-	c.Check(endpoint.gets(), Equals, nick2)
+	if got := endpoint.gets(); got != nick2 {
+		t.Errorf("Expected: %s, got: %s", nick2, got)
+	}
 	endpoint.resetTestWritten()
 	handler.HandleRaw(ev, endpoint)
-	c.Check(endpoint.gets(), Equals, nick3)
+	if got := endpoint.gets(); got != nick3 {
+		t.Errorf("Expected: %s, got: %s", nick3, got)
+	}
 }
 
-func (s *s) TestCoreHandler_NetInfo(c *C) {
+func TestCoreHandler_NetInfo(t *testing.T) {
 	connProvider := func(srv string) (net.Conn, error) {
 		return nil, nil
 	}
 
-	b, err := createBot(fakeConfig, connProvider, nil, true, false)
-	c.Check(err, IsNil)
+	b, _ := createBot(fakeConfig, connProvider, nil, true, false)
 
 	msg1 := irc.NewEvent(netID, netInfo, irc.RPL_MYINFO, "",
 		"NICK", "irc.test.net", "testircd-1.2", "acCior", "beiIklmno")
@@ -102,21 +112,30 @@ func (s *s) TestCoreHandler_NetInfo(c *C) {
 	srv := b.servers[netID]
 	srv.handler.HandleRaw(msg1, &testPoint{})
 	srv.handler.HandleRaw(msg2, &testPoint{})
-	c.Check(srv.netInfo.ServerName(), Equals, "irc.test.net")
-	c.Check(srv.netInfo.IrcdVersion(), Equals, "testircd-1.2")
-	c.Check(srv.netInfo.Usermodes(), Equals, "acCior")
-	c.Check(srv.netInfo.LegacyChanmodes(), Equals, "beiIklmno")
-	c.Check(srv.netInfo.Chantypes(), Equals, "&$")
+	if got, exp := srv.netInfo.ServerName(), "irc.test.net"; got != exp {
+		t.Errorf("Expected: %s, got: %s", exp, got)
+	}
+	if got, exp := srv.netInfo.IrcdVersion(), "testircd-1.2"; got != exp {
+		t.Errorf("Expected: %s, got: %s", exp, got)
+	}
+	if got, exp := srv.netInfo.Usermodes(), "acCior"; got != exp {
+		t.Errorf("Expected: %s, got: %s", exp, got)
+	}
+	if got, exp := srv.netInfo.LegacyChanmodes(), "beiIklmno"; got != exp {
+		t.Errorf("Expected: %s, got: %s", exp, got)
+	}
+	if got, exp := srv.netInfo.Chantypes(), "&$"; got != exp {
+		t.Errorf("Expected: %s, got: %s", exp, got)
+	}
 }
 
-func (s *s) TestCoreHandler_Join(c *C) {
+func TestCoreHandler_Join(t *testing.T) {
 	connProvider := func(srv string) (net.Conn, error) {
 		return nil, nil
 	}
 
-	b, err := createBot(fakeConfig, connProvider, nil, true, false)
+	b, _ := createBot(fakeConfig, connProvider, nil, true, false)
 	srv := b.servers[netID]
-	c.Check(err, IsNil)
 
 	srv.state.Self.User = data.NewUser("nick!user@host")
 	ev := irc.NewEvent(netID, netInfo, irc.JOIN,
@@ -124,5 +143,7 @@ func (s *s) TestCoreHandler_Join(c *C) {
 
 	endpoint := makeTestPoint(nil)
 	srv.handler.HandleRaw(ev, endpoint)
-	c.Check(endpoint.gets(), Equals, "WHO :#chanMODE :#chan")
+	if got, exp := endpoint.gets(), "WHO :#chanMODE :#chan"; got != exp {
+		t.Errorf("Expected: %s, got: %s", exp, got)
+	}
 }

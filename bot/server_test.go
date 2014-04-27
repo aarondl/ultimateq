@@ -91,18 +91,6 @@ func TestServer_createTlsConfig(t *testing.T) {
 	}
 }
 
-func TestServerSender(t *testing.T) {
-	t.Parallel()
-	b, _ := createBot(fakeConfig, nil, nil, false, false)
-	ep := b.GetEndpoint(netID)
-	if ep.GetKey() != netID {
-		t.Error("Expected the key to represent the server.")
-	}
-	if b.servers[netID].endpoint.server != b.servers[netID] {
-		t.Error("Endpoints are being constructed with wrong servers.")
-	}
-}
-
 func TestServer_Close(t *testing.T) {
 	t.Parallel()
 	errch := make(chan error)

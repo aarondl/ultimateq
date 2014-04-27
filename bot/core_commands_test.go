@@ -37,7 +37,8 @@ var (
 
 type tSetup struct {
 	b      *Bot
-	ep     *data.DataEndpoint
+	locker data.Locker
+	writer irc.Writer
 	state  *data.State
 	store  *data.Store
 	buffer *bytes.Buffer
@@ -58,7 +59,7 @@ func commandsSetup(t *testing.T) *tSetup {
 	}
 	srv := b.servers[netID]
 	buf := &bytes.Buffer{}
-	srv.endpoint.Writer = buf
+	srv.writer = &irc.Helper{buf}
 
 	srv.state.Update(
 		irc.NewEvent(netID, netInfo, irc.RPL_WELCOME, "", "Hi", bothost),
@@ -73,7 +74,7 @@ func commandsSetup(t *testing.T) *tSetup {
 		irc.NewEvent(netID, netInfo, irc.PRIVMSG, u2host, botnick, "hi"),
 	)
 
-	return &tSetup{b, srv.endpoint.DataEndpoint, srv.state, b.store, buf, t}
+	return &tSetup{b, b, srv.writer, srv.state, b.store, buf, t}
 }
 
 func commandsTeardown(s *tSetup, t *testing.T) {
@@ -95,7 +96,7 @@ func prvRspChk(ts *tSetup, expected, to, sender string, args ...string) error {
 	ts.buffer.Reset()
 	err := ts.b.cmds.Dispatch(netID, 0, irc.NewEvent(
 		netID, netInfo, irc.PRIVMSG, sender, to, strings.Join(args, " ")),
-		ts.ep,
+		ts.writer, ts.locker,
 	)
 	ts.b.cmds.WaitForHandlers()
 

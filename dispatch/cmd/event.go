@@ -30,8 +30,8 @@ import (
 // within must be checked for nil, see each element's documentation
 // for further information.
 type Event struct {
-	ep *data.DataEndpoint
 	*irc.Event
+	locker data.Locker
 	*data.State
 	*data.Store
 	// User can be nil if the bot's State is disabled.
@@ -67,14 +67,14 @@ type Event struct {
 
 // GetArg gets an argument that was passed in to the command by the user. The
 // name of the argument passed into Register() is required to get the argument.
-func (cd *Event) GetArg(arg string) string {
-	return cd.args[arg]
+func (ev *Event) GetArg(arg string) string {
+	return ev.args[arg]
 }
 
 // SplitArg behaves exactly like GetArg but calls strings.Fields on the
 // argument. Useful for varargs...
-func (cd *Event) SplitArg(arg string) (args []string) {
-	if str, ok := cd.args[arg]; ok && len(str) > 0 {
+func (ev *Event) SplitArg(arg string) (args []string) {
+	if str, ok := ev.args[arg]; ok && len(str) > 0 {
 		args = strings.Fields(str)
 	}
 	return
@@ -82,12 +82,12 @@ func (cd *Event) SplitArg(arg string) (args []string) {
 
 // FindUserByNick finds a user by their nickname. An error is returned if
 // they were not found.
-func (cd *Event) FindUserByNick(nick string) (*data.User, error) {
-	if cd.State == nil {
+func (ev *Event) FindUserByNick(nick string) (*data.User, error) {
+	if ev.State == nil {
 		return nil, errors.New(errMsgStateDisabled)
 	}
 
-	user := cd.State.GetUser(nick)
+	user := ev.State.GetUser(nick)
 	if user == nil {
 		return nil, fmt.Errorf(errFmtUserNotFound, nick)
 	}
@@ -100,9 +100,9 @@ func (cd *Event) FindUserByNick(nick string) (*data.User, error) {
 // username in the string. The user parameter is returned when a nickname lookup
 // is done. An error occurs if the user is not found, the user is not authed,
 // the username is not registered, etc.
-func (cd *Event) FindAccessByUser(server, nickOrUser string) (
+func (ev *Event) FindAccessByUser(server, nickOrUser string) (
 	access *data.UserAccess, user *data.User, err error) {
-	if cd.Store == nil {
+	if ev.Store == nil {
 		err = errors.New(errMsgStoreDisabled)
 		return
 	}
@@ -114,23 +114,23 @@ func (cd *Event) FindAccessByUser(server, nickOrUser string) (
 			return
 		}
 		uname := nickOrUser[1:]
-		access, err = cd.Store.FindUser(uname)
+		access, err = ev.Store.FindUser(uname)
 		if access == nil {
 			err = fmt.Errorf(errFmtUserNotRegistered, uname)
 			return
 		}
 	default:
-		if cd.State == nil {
+		if ev.State == nil {
 			err = errors.New(errMsgStateDisabled)
 			return
 		}
 
-		user = cd.State.GetUser(nickOrUser)
+		user = ev.State.GetUser(nickOrUser)
 		if user == nil {
 			err = fmt.Errorf(errFmtUserNotFound, nickOrUser)
 			return
 		}
-		access = cd.Store.GetAuthedUser(server, user.Host())
+		access = ev.Store.GetAuthedUser(server, user.Host())
 		if access == nil {
 			err = fmt.Errorf(errFmtUserNotAuthed, nickOrUser)
 			return
@@ -147,16 +147,16 @@ func (cd *Event) FindAccessByUser(server, nickOrUser string) (
 // required. See Event's documentation for when to call this method.
 // All Event's methods and fields become invalid after a call to Close.
 // Close will never return an error so it can be safely ignored.
-func (cd *Event) Close() error {
-	cd.once.Do(func() {
-		cd.User = nil
-		cd.UserAccess = nil
-		cd.UserChannelModes = nil
-		cd.Channel = nil
-		cd.State = nil
-		cd.Store = nil
-		cd.ep.CloseState()
-		cd.ep.CloseStore()
+func (ev *Event) Close() error {
+	ev.once.Do(func() {
+		ev.User = nil
+		ev.UserAccess = nil
+		ev.UserChannelModes = nil
+		ev.Channel = nil
+		ev.State = nil
+		ev.Store = nil
+		ev.locker.CloseState(ev.NetworkID)
+		ev.locker.CloseStore()
 	})
 	return nil
 }

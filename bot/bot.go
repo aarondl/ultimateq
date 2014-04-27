@@ -295,11 +295,10 @@ func (b *Bot) dispatch(srv *Server) (disconnect bool, err error) {
 
 // dispatch sends a message to both the bot's dispatcher and the given servers
 func (b *Bot) dispatchMessage(s *Server, ev *irc.Event) {
-	b.dispatcher.Dispatch(ev, s.endpoint)
-	s.dispatcher.Dispatch(ev, s.endpoint)
-	b.cmds.Dispatch(s.name, s.cmds.GetPrefix(), ev,
-		s.endpoint.DataEndpoint)
-	s.cmds.Dispatch(s.name, 0, ev, s.endpoint.DataEndpoint)
+	b.dispatcher.Dispatch(ev, s.writer)
+	s.dispatcher.Dispatch(ev, s.writer)
+	b.cmds.Dispatch(s.name, s.cmds.GetPrefix(), ev, s.writer, b)
+	s.cmds.Dispatch(s.name, 0, ev, s.writer, b)
 }
 
 // Stop shuts down all connections and exits.
@@ -313,11 +312,8 @@ func (b *Bot) Stop() {
 }
 
 // StopServer stops a server by name.
-func (b *Bot) StopServer(server string) (stopped bool) {
-	b.protectServers.RLock()
-	defer b.protectServers.RUnlock()
-
-	if srv, ok := b.servers[server]; ok {
+func (b *Bot) StopServer(networkID string) (stopped bool) {
+	if srv := b.getServer(networkID); srv != nil {
 		stopped = b.stopServer(srv)
 	}
 	return
@@ -350,10 +346,7 @@ func (b *Bot) Register(event string, handler interface{}) int {
 func (b *Bot) RegisterServer(
 	server string, event string, handler interface{}) (int, error) {
 
-	b.protectServers.RLock()
-	defer b.protectServers.RUnlock()
-
-	if s, ok := b.servers[server]; ok {
+	if s := b.getServer(server); s != nil {
 		return s.dispatcher.Register(event, handler), nil
 	}
 	return 0, errUnknownServerID
@@ -368,10 +361,7 @@ func (b *Bot) Unregister(event string, id int) bool {
 func (b *Bot) UnregisterServer(
 	server string, event string, id int) (bool, error) {
 
-	b.protectServers.RLock()
-	defer b.protectServers.RUnlock()
-
-	if s, ok := b.servers[server]; ok {
+	if s := b.getServer(server); s != nil {
 		return s.dispatcher.Unregister(event, id), nil
 	}
 	return false, errUnknownServerID
@@ -386,11 +376,7 @@ func (b *Bot) RegisterCmd(command *cmd.Cmd) error {
 // RegisterServerCmd registers a command with the server.
 // See Cmder.Register for in-depth documentation.
 func (b *Bot) RegisterServerCmd(srv string, command *cmd.Cmd) error {
-
-	b.protectServers.RLock()
-	defer b.protectServers.RUnlock()
-
-	if s, ok := b.servers[srv]; ok {
+	if s := b.getServer(srv); s != nil {
 		return s.cmds.Register(srv, command)
 	}
 	return errUnknownServerID
@@ -403,25 +389,82 @@ func (b *Bot) UnregisterCmd(command string) bool {
 
 // UnregisterServerCmd unregister's a command from the server.
 func (b *Bot) UnregisterServerCmd(server, command string) bool {
-	b.protectServers.RLock()
-	defer b.protectServers.RUnlock()
-
-	if s, ok := b.servers[server]; ok {
+	if s := b.getServer(server); s != nil {
 		return s.cmds.Unregister(server, command)
 	}
 	return false
 }
 
-// GetEndpoint retrieves a servers endpoint. Will be nil if the server does
-// not exist.
-func (b *Bot) GetEndpoint(server string) (endpoint *data.DataEndpoint) {
-	b.protectServers.RLock()
-	defer b.protectServers.RUnlock()
+// UsingState calls a callback if the requested server can present a state db.
+// The returned boolean is whether or not the function was called.
+func (b *Bot) UsingState(networkID string, fn func(*data.State)) (called bool) {
+	s := b.getServer(networkID)
+	if s == nil {
+		return false
+	}
 
-	if srv, ok := b.servers[server]; ok {
-		endpoint = srv.endpoint.DataEndpoint
+	s.protectState.RLock()
+	defer s.protectState.RUnlock()
+	if s.state != nil {
+		fn(s.state)
+		called = true
 	}
 	return
+}
+
+// OpenState locks the state db, and returns it. CloseState must be called or
+// the lock will never be released and the bot will sieze up. The state must
+// be checked for nil in case the state is disabled.
+func (b *Bot) OpenState(networkID string) *data.State {
+	s := b.getServer(networkID)
+	if s == nil {
+		return nil
+	}
+
+	s.protectState.RLock()
+	return s.state
+}
+
+// CloseState unlocks the data state after use by OpenState.
+func (b *Bot) CloseState(networkID string) {
+	s := b.getServer(networkID)
+	if s != nil {
+		s.protectState.RUnlock()
+	}
+}
+
+// UsingStore calls a callback if the requested server can present a data store.
+// The returned boolean is whether or not the function was called.
+func (b *Bot) UsingStore(fn func(*data.Store)) (called bool) {
+	b.protectStore.RLock()
+	defer b.protectStore.RUnlock()
+	if b.store != nil {
+		fn(b.store)
+		called = true
+	}
+	return
+}
+
+// OpenStore locks the store db, and returns it. CloseStore must be called or
+// the lock will never be released and the bot will sieze up. The store must
+// be checked for nil.
+func (b *Bot) OpenStore() *data.Store {
+	b.protectStore.RLock()
+	return b.store
+}
+
+// CloseStore unlocks the data store after use by OpenState.
+func (b *Bot) CloseStore() {
+	b.protectStore.RUnlock()
+}
+
+// GetEndpoint retrieves a servers endpoint. Will be nil if the server does
+// not exist.
+func (b *Bot) NetworkWriter(networkID string) (w irc.Writer) {
+	if s := b.getServer(networkID); s != nil {
+		w = s.writer
+	}
+	return w
 }
 
 // createBot creates a bot from the given configuration, using the providers
@@ -495,12 +538,12 @@ func (b *Bot) createServer(conf *config.Server) (*Server, error) {
 		}
 	}
 
-	s.createEndpoint(b.store, &b.protectStore)
-
 	if b.attachHandlers {
 		s.handler = &coreHandler{bot: b}
 		s.handlerID = s.dispatcher.Register(irc.RAW, s.handler)
 	}
+
+	s.writer = &irc.Helper{s}
 
 	return s, nil
 }
@@ -520,4 +563,15 @@ func (b *Bot) createStore(filename string) (err error) {
 		b.store, err = b.storeProvider(filename)
 	}
 	return
+}
+
+// getServer safely retrieves a server.
+func (b *Bot) getServer(networkID string) *Server {
+	b.protectServers.RLock()
+	defer b.protectServers.RUnlock()
+
+	if srv, ok := b.servers[networkID]; ok {
+		return srv
+	}
+	return nil
 }

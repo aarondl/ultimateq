@@ -13,13 +13,7 @@ import (
 	"github.com/aarondl/ultimateq/dispatch/cmd"
 	"github.com/aarondl/ultimateq/irc"
 	"github.com/aarondl/ultimateq/mocks"
-	"gopkg.in/check.v1"
 )
-
-func Test(t *testing.T) { check.TestingT(t) } //Hook into testing package
-type s struct{}
-
-var _ = check.Suite(&s{})
 
 type testHandler struct {
 	callback func(*irc.Event, irc.Writer)
@@ -492,6 +486,47 @@ func TestBot_Stop(t *testing.T) {
 	}
 }
 
+func TestBot_Locker(t *testing.T) {
+	t.Parallel()
+
+	goodStoreProv := func(s string) (*data.Store, error) {
+		return data.NewStore(data.MemStoreProvider)
+	}
+	b, err := createBot(fakeConfig.Clone().NoStore(false), nil,
+		goodStoreProv, false, false)
+
+	if err != nil {
+		t.Error("Unexpected err:", err)
+	}
+	var _ data.Locker = b // Check conformity
+
+	var called, reallyCalled bool
+	called = b.UsingState(netID, func(_ *data.State) {
+		reallyCalled = true
+	})
+	if !called || !reallyCalled {
+		t.Error("The state callback was not called:", called, reallyCalled)
+	}
+	called = b.UsingStore(func(_ *data.Store) {
+		reallyCalled = true
+	})
+	if !called || !reallyCalled {
+		t.Error("The store callback was not called:", called, reallyCalled)
+	}
+
+	ostate := b.OpenState(netID)
+	if ostate != b.servers[netID].state {
+		t.Error("Wrong object came back:", ostate)
+	}
+	b.CloseState(netID)
+
+	ostore := b.OpenStore()
+	if ostore != b.store {
+		t.Error("Wrong object came back:", ostore)
+	}
+	b.CloseStore()
+}
+
 func TestBot_GetEndpoint(t *testing.T) {
 	t.Parallel()
 	conn := mocks.NewConn()
@@ -506,7 +541,7 @@ func TestBot_GetEndpoint(t *testing.T) {
 
 	end := b.Start()
 
-	ep := b.GetEndpoint(netID)
+	ep := b.NetworkWriter(netID)
 
 	test := "test\r\n"
 	result := make(chan string)

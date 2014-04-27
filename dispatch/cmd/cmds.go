@@ -224,8 +224,8 @@ func (c *Cmds) Unregister(server, cmd string) (found bool) {
 }
 
 // Dispatch dispatches an IrcEvent into the cmds event handlers.
-func (c *Cmds) Dispatch(server string, overridePrefix rune,
-	ev *irc.Event, ep *data.DataEndpoint) (err error) {
+func (c *Cmds) Dispatch(networkID string, overridePrefix rune,
+	ev *irc.Event, writer irc.Writer, locker data.Locker) (err error) {
 
 	// Filter non privmsg/notice
 	msgtype := 0
@@ -280,8 +280,8 @@ func (c *Cmds) Dispatch(server string, overridePrefix rune,
 	}
 
 	var cmdEv = &Event{
-		ep:    ep,
-		Event: ev,
+		locker: locker,
+		Event:  ev,
 	}
 
 	var args []string
@@ -289,26 +289,26 @@ func (c *Cmds) Dispatch(server string, overridePrefix rune,
 		args = fields[1:]
 	}
 
-	state := ep.OpenState()
-	store := ep.OpenStore()
+	state := locker.OpenState(networkID)
+	store := locker.OpenStore()
 	cmdEv.State = state
 	cmdEv.Store = store
 
 	if command.RequireAuth {
-		if cmdEv.UserAccess, err = filterAccess(store, command,
-			server, ch, ep, ev); err != nil {
+		if cmdEv.UserAccess, err = filterAccess(store, command, networkID,
+			ch, ev); err != nil {
 
 			cmdEv.Close()
-			ep.Notice(nick, err.Error())
+			writer.Notice(nick, err.Error())
 			return
 		}
 	}
 
-	if err = c.filterArgs(server, command, ch, isChan, args, cmdEv, ev, state,
-		store); err != nil {
+	if err = c.filterArgs(networkID, command, ch, isChan, args, cmdEv, ev,
+		state, store); err != nil {
 
 		cmdEv.Close()
-		ep.Notice(nick, err.Error())
+		writer.Notice(nick, err.Error())
 		return
 	}
 
@@ -327,12 +327,12 @@ func (c *Cmds) Dispatch(server string, overridePrefix rune,
 		defer dispatch.PanicHandler()
 		defer c.HandlerFinished()
 		defer cmdEv.Close()
-		ok, err := cmdNameDispatch(command.Handler, cmd, ep, cmdEv)
+		ok, err := cmdNameDispatch(command.Handler, cmd, writer, cmdEv)
 		if !ok {
-			err = command.Handler.Cmd(cmd, ep, cmdEv)
+			err = command.Handler.Cmd(cmd, writer, cmdEv)
 		}
 		if err != nil {
-			ep.Notice(nick, err.Error())
+			writer.Notice(nick, err.Error())
 		}
 	}()
 
@@ -343,7 +343,7 @@ func (c *Cmds) Dispatch(server string, overridePrefix rune,
 // as the command with an uppercase letter (no camel case). The arguments
 // must be the exact same as the CmdHandler.Cmd with the cmd string
 // argument removed for this to work.
-func cmdNameDispatch(handler CmdHandler, cmd string, ep *data.DataEndpoint,
+func cmdNameDispatch(handler CmdHandler, cmd string, writer irc.Writer,
 	ev *Event) (dispatched bool, err error) {
 
 	methodName := strings.ToUpper(cmd[:1]) + cmd[1:]
@@ -361,7 +361,7 @@ func cmdNameDispatch(handler CmdHandler, cmd string, ep *data.DataEndpoint,
 		return
 	}
 
-	dispatched = reflect.TypeOf(ep).AssignableTo(fnType.In(1)) &&
+	dispatched = reflect.TypeOf(writer).AssignableTo(fnType.In(1)) &&
 		reflect.TypeOf(ev).AssignableTo(fnType.In(2)) &&
 		reflect.TypeOf(errors.New("")).AssignableTo(fnType.Out(0))
 	if !dispatched {
@@ -369,7 +369,7 @@ func cmdNameDispatch(handler CmdHandler, cmd string, ep *data.DataEndpoint,
 	}
 
 	returnVals := fn.Func.Call([]reflect.Value{
-		reflect.ValueOf(handler), reflect.ValueOf(ep), reflect.ValueOf(ev),
+		reflect.ValueOf(handler), reflect.ValueOf(writer), reflect.ValueOf(ev),
 	})
 
 	// We have already verified it's type. So this should never fail.
@@ -380,7 +380,7 @@ func cmdNameDispatch(handler CmdHandler, cmd string, ep *data.DataEndpoint,
 // filterAccess ensures that a user has the correct access to perform the given
 // command.
 func filterAccess(store *data.Store, command *Cmd, server, channel string,
-	ep *data.DataEndpoint, ev *irc.Event) (*data.UserAccess, error) {
+	ev *irc.Event) (*data.UserAccess, error) {
 
 	hasLevel := command.ReqLevel != 0
 	hasFlags := len(command.ReqFlags) != 0
@@ -389,7 +389,7 @@ func filterAccess(store *data.Store, command *Cmd, server, channel string,
 		return nil, errors.New(errMsgStoreDisabled)
 	}
 
-	var access = store.GetAuthedUser(ep.GetKey(), ev.Sender)
+	var access = store.GetAuthedUser(server, ev.Sender)
 	if access == nil {
 		return nil, errors.New(errMsgNotAuthed)
 	}
