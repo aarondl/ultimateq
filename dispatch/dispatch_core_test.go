@@ -9,12 +9,12 @@ import (
 
 func checkArrays(expected []string, actual []string) error {
 	if len(expected) != len(actual) {
-		return fmt.Errorf("Length Expected: %v got: %v",
+		return fmt.Errorf("length expected: %v got: %v",
 			len(expected), len(actual))
 	}
 	for i, v := range expected {
 		if v != actual[i] {
-			return fmt.Errorf("Expected: %v got: %v", v, actual[i])
+			return fmt.Errorf("expected: %v got: %v", v, actual[i])
 		}
 	}
 	return nil

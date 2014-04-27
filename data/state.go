@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	errProtoCapsMissing = errors.New("data: Protocaps missing.")
+	errProtoCapsMissing = errors.New("data: Protocaps missing")
 )
 
 // Self is the bot's user, he's a special case since he has to hold a Modeset.
@@ -51,7 +51,7 @@ func NewState(netInfo *irc.NetworkInfo) (*State, error) {
 	return state, nil
 }
 
-// Protocaps updates the protocaps of the state.
+// SetNetworkInfo updates the network information of the state.
 func (s *State) SetNetworkInfo(ni *irc.NetworkInfo) error {
 	if ni == nil {
 		return errProtoCapsMissing

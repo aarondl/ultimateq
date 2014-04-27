@@ -31,7 +31,7 @@ func (u *User) Username() string {
 	return u.host.Username()
 }
 
-// Host returns the host of this user.
+// Hostname returns the hostname of this user.
 func (u *User) Hostname() string {
 	return u.host.Hostname()
 }

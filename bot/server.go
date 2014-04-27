@@ -20,6 +20,7 @@ import (
 	"github.com/aarondl/ultimateq/irc"
 )
 
+// Status is the status of a network connection.
 type Status byte
 
 // Server Statuses
@@ -42,7 +43,7 @@ var (
 	// errFailedToLoadCertificate happens when we fail to parse the certificate
 	errFailedToLoadCertificate = errors.New("bot: Failed to load certificate")
 	// errServerKilledConn happens when the server is killed mid-connect.
-	errServerKilledConn = errors.New("bot: Killed trying to connect.")
+	errServerKilledConn = errors.New("bot: Killed trying to connect")
 )
 
 // connResult is used to return results from the channel patterns in

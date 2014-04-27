@@ -51,12 +51,12 @@ func (c *coreHandler) HandleRaw(w irc.Writer, ev *irc.Event) {
 		defer c.protect.Unlock()
 		if c.nickvalue == 0 && 0 < len(altnick) {
 			nick = altnick
-			c.nickvalue += 1
+			c.nickvalue++
 		} else {
 			for i := 0; i < c.nickvalue; i++ {
 				nick += "_"
 			}
-			c.nickvalue += 1
+			c.nickvalue++
 		}
 		w.Send("NICK :" + nick)
 

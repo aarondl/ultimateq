@@ -44,7 +44,7 @@ func (m *ChannelModes) Apply(modestring string) ([]UserMode, []UserMode) {
 
 // ApplyDiff applies a ModeDiff to the current modeset instance.
 func (m *ChannelModes) ApplyDiff(d *ModeDiff) {
-	for mode, _ := range d.pos.modes {
+	for mode := range d.pos.modes {
 		m.setMode(mode)
 	}
 	for mode, arg := range d.pos.argModes {
@@ -56,7 +56,7 @@ func (m *ChannelModes) ApplyDiff(d *ModeDiff) {
 		}
 	}
 
-	for mode, _ := range d.neg.modes {
+	for mode := range d.neg.modes {
 		m.unsetMode(mode)
 	}
 	for mode, arg := range d.neg.argModes {
@@ -79,7 +79,7 @@ func (m *ChannelModes) String() string {
 	index := 0
 	argIndex := 0
 
-	for mode, _ := range m.modes {
+	for mode := range m.modes {
 		modes[index] = mode
 		index++
 	}

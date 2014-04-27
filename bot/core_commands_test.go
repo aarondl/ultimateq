@@ -103,18 +103,18 @@ func prvRspChk(ts *tSetup, expected, to, sender string, args ...string) error {
 	s := ts.buffer.String()
 	if len(s) == 0 {
 		if err != nil {
-			return fmt.Errorf("Buffer not full and error returned: %v", err)
+			return fmt.Errorf("buffer not full and error returned: %v", err)
 		}
-		return fmt.Errorf("Everything should generate a response.")
+		return fmt.Errorf("everything should generate a response")
 	}
 
 	rgx := `^NOTICE [A-Za-z0-9]+ :` + rgxCreator.Replace(expected) + `$`
 	match, err := regexp.MatchString(rgx, s)
 	if err != nil {
-		return fmt.Errorf("Error making pattern: \n\t%s\n\t%s", expected, rgx)
+		return fmt.Errorf("error making pattern: \n\t%s\n\t%s", expected, rgx)
 	}
 	if !match {
-		return fmt.Errorf("\nUnexpected Response: \n\t%s\n\t%s", s, rgx)
+		return fmt.Errorf("\nunexpected response: \n\t%s\n\t%s", s, rgx)
 	}
 	return nil
 }

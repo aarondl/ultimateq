@@ -3,18 +3,20 @@ package irc
 import "bytes"
 
 const (
-	CTCPDelim     = '\x01'
-	CTCPLowQuote  = '\x10'
-	CTCPHighQuote = '\x5C'
-	CTCPSep       = '\x20'
+	ctcpDelim     = '\x01'
+	ctcpLowQuote  = '\x10'
+	ctcpHighQuote = '\x5C'
+	ctcpSep       = '\x20'
 )
 
+// IsCTCP checks if the current byte string is a CTCP message.
 func IsCTCP(msg []byte) bool {
-	return CTCPDelim == msg[0] && CTCPDelim == msg[len(msg)-1]
+	return ctcpDelim == msg[0] && ctcpDelim == msg[len(msg)-1]
 }
 
+// IsCTCPString checks if the current string is a CTCP message.
 func IsCTCPString(msg string) bool {
-	return CTCPDelim == msg[0] && CTCPDelim == msg[len(msg)-1]
+	return ctcpDelim == msg[0] && ctcpDelim == msg[len(msg)-1]
 }
 
 // CTCPunpack unpacks a CTCP message.
@@ -41,13 +43,13 @@ func CTCPpack(tag, data []byte) []byte {
 	ret = ctcpLowLevelEscape(ret)
 
 	retDelimited := make([]byte, len(ret)+2)
-	retDelimited[0] = CTCPDelim
-	retDelimited[len(retDelimited)-1] = CTCPDelim
+	retDelimited[0] = ctcpDelim
+	retDelimited[len(retDelimited)-1] = ctcpDelim
 	copy(retDelimited[1:], ret)
 	return retDelimited
 }
 
-// CTCPunpack unpacks a CTCP message to strings.
+// CTCPunpackString unpacks a CTCP message to strings.
 func CTCPunpackString(msg string) (tag, data string) {
 	t, d := CTCPunpack([]byte(msg))
 	return string(t), string(d)
@@ -65,7 +67,7 @@ func CTCPpackString(tag, data string) string {
 // SPC    ::= '\040'
 // X-MSG  ::= | X-N-AS+ | X-N-AS+ SPC X-CHR*
 func ctcpUnpack(in []byte) ([]byte, []byte) {
-	splits := bytes.SplitN(in, []byte{CTCPSep}, 2)
+	splits := bytes.SplitN(in, []byte{ctcpSep}, 2)
 
 	if len(splits) == 2 {
 		return splits[0], splits[1]
@@ -81,7 +83,7 @@ func ctcpPack(tag []byte, data []byte) []byte {
 
 	ret := make([]byte, len(tag)+len(data)+1)
 	copy(ret, tag)
-	ret[len(tag)] = CTCPSep
+	ret[len(tag)] = ctcpSep
 	copy(ret[len(tag)+1:], data)
 	return ret
 }
@@ -92,17 +94,17 @@ func ctcpPack(tag []byte, data []byte) []byte {
 // X-DELIM --> X-QUOTE 'a' (0x61)
 // X-QUOTE --> X-QUOTE X-QUOTE
 func ctcpHighLevelEscape(in []byte) []byte {
-	out := bytes.Replace(in, []byte{CTCPHighQuote},
-		[]byte{CTCPHighQuote, CTCPHighQuote}, -1)
-	out = bytes.Replace(out, []byte{0x01}, []byte{CTCPHighQuote, 0x61}, -1)
+	out := bytes.Replace(in, []byte{ctcpHighQuote},
+		[]byte{ctcpHighQuote, ctcpHighQuote}, -1)
+	out = bytes.Replace(out, []byte{0x01}, []byte{ctcpHighQuote, 0x61}, -1)
 	return out
 }
 
 // ctcpHighLevelUnescape unescapes the ctcp message to get ready for the wire
 func ctcpHighLevelUnescape(in []byte) []byte {
-	out := bytes.Replace(in, []byte{CTCPHighQuote, 0x61}, []byte{0x01}, -1)
-	out = bytes.Replace(out, []byte{CTCPHighQuote, CTCPHighQuote},
-		[]byte{CTCPHighQuote}, -1)
+	out := bytes.Replace(in, []byte{ctcpHighQuote, 0x61}, []byte{0x01}, -1)
+	out = bytes.Replace(out, []byte{ctcpHighQuote, ctcpHighQuote},
+		[]byte{ctcpHighQuote}, -1)
 	return out
 }
 
@@ -113,20 +115,20 @@ func ctcpHighLevelUnescape(in []byte) []byte {
 // CR      --> M-QUOTE 'r'
 // M-QUOTE --> M-QUOTE M-QUOTE
 func ctcpLowLevelEscape(in []byte) []byte {
-	out := bytes.Replace(in, []byte{CTCPLowQuote},
-		[]byte{CTCPLowQuote, CTCPLowQuote}, -1)
-	out = bytes.Replace(out, []byte{'\r'}, []byte{CTCPLowQuote, '\r'}, -1)
-	out = bytes.Replace(out, []byte{'\n'}, []byte{CTCPLowQuote, '\n'}, -1)
-	out = bytes.Replace(out, []byte{0x00}, []byte{CTCPLowQuote, 0x00}, -1)
+	out := bytes.Replace(in, []byte{ctcpLowQuote},
+		[]byte{ctcpLowQuote, ctcpLowQuote}, -1)
+	out = bytes.Replace(out, []byte{'\r'}, []byte{ctcpLowQuote, '\r'}, -1)
+	out = bytes.Replace(out, []byte{'\n'}, []byte{ctcpLowQuote, '\n'}, -1)
+	out = bytes.Replace(out, []byte{0x00}, []byte{ctcpLowQuote, 0x00}, -1)
 	return out
 }
 
 // ctcpLowLevelUnescape unescapes the ctcp message to get ready for the wire
 func ctcpLowLevelUnescape(in []byte) []byte {
-	out := bytes.Replace(in, []byte{CTCPLowQuote, 0x00}, []byte{0x00}, -1)
-	out = bytes.Replace(out, []byte{CTCPLowQuote, '\n'}, []byte{'\n'}, -1)
-	out = bytes.Replace(out, []byte{CTCPLowQuote, '\r'}, []byte{'\r'}, -1)
-	out = bytes.Replace(out, []byte{CTCPLowQuote, CTCPLowQuote},
-		[]byte{CTCPLowQuote}, -1)
+	out := bytes.Replace(in, []byte{ctcpLowQuote, 0x00}, []byte{0x00}, -1)
+	out = bytes.Replace(out, []byte{ctcpLowQuote, '\n'}, []byte{'\n'}, -1)
+	out = bytes.Replace(out, []byte{ctcpLowQuote, '\r'}, []byte{'\r'}, -1)
+	out = bytes.Replace(out, []byte{ctcpLowQuote, ctcpLowQuote},
+		[]byte{ctcpLowQuote}, -1)
 	return out
 }

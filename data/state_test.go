@@ -331,7 +331,7 @@ func (s *s) TestState_UpdateNick(c *C) {
 	c.Check(st.GetUser(users[1]), IsNil)
 	c.Check(st.IsOn(users[0], channels[0]), Equals, true)
 	c.Check(st.IsOn(users[1], channels[0]), Equals, false)
-	for nick, _ := range st.channelUsers[strings.ToLower(channels[0])] {
+	for nick := range st.channelUsers[strings.ToLower(channels[0])] {
 		c.Check(nick, Equals, nicks[0])
 	}
 
@@ -341,7 +341,7 @@ func (s *s) TestState_UpdateNick(c *C) {
 	c.Check(st.GetUser(users[1]), NotNil)
 	c.Check(st.IsOn(users[0], channels[0]), Equals, false)
 	c.Check(st.IsOn(users[1], channels[0]), Equals, true)
-	for nick, _ := range st.channelUsers[strings.ToLower(channels[0])] {
+	for nick := range st.channelUsers[strings.ToLower(channels[0])] {
 		c.Check(nick, Equals, nicks[1])
 	}
 

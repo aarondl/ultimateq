@@ -19,10 +19,10 @@ func init() {
 var (
 	// errMissingUnameOrPwd is given when the username or the password of
 	// a user is empty string.
-	errMissingUnameOrPwd = errors.New("data: Missing username or password.")
+	errMissingUnameOrPwd = errors.New("data: Missing username or password")
 	// errDuplicateMask is given when a duplicate mask is passed into the
 	// NewUserAccess method.
-	errDuplicateMask = errors.New("data: Duplicate mask in user creation.")
+	errDuplicateMask = errors.New("data: Duplicate mask in user creation")
 )
 
 const (

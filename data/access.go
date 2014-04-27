@@ -88,6 +88,7 @@ func (a *Access) ClearAllFlags() {
 	a.Flags = 0
 }
 
+// IsZero checks if this instance of access has no flags and no level.
 func (a *Access) IsZero() bool {
 	return a.Flags == 0 && a.Level == 0
 }
