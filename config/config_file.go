@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"io"
 	"io/ioutil"
 	"os"
@@ -23,38 +24,56 @@ type (
 	roFileCallback func(string) (io.ReadCloser, error)
 )
 
-// NewConfigFromFile initializes a Config object from a file.
-func NewConfigFromFile(filename string) *Config {
+// FromFile overwrites the current config with the contents of the file.
+// It will use defaultConfigFileName if filename is the empty string.
+func (c *Config) FromFile(filename string) *Config {
 	provider := func(name string) (io.ReadCloser, error) {
 		return os.Open(name)
 	}
-	return createConfigFromFile(filename, provider)
+
+	c.fromFile(filename, provider)
+	return c
 }
 
-// createConfigFromFile reads the file provided by the callback and turns it
-// into a config. The file provided is closed by this function.
-func createConfigFromFile(filename string, fn roFileCallback) (conf *Config) {
+// fromFile reads the file provided by the callback and turns it
+// into a config. The file provided is closed by this function. It overrides
+// filename with defaultConfigFileName if it's the empty string.
+func (c *Config) fromFile(filename string, fn roFileCallback) *Config {
+	if filename == "" {
+		filename = defaultConfigFileName
+	}
+
 	file, err := fn(filename)
 	if err != nil {
-		conf = NewConfig()
-		conf.addError(errMsgInvalidConfigFile, err)
+		c.addError(errMsgFileError, err)
 	} else {
-		conf = NewConfigFromReader(file)
-		conf.filename = filename
-		file.Close()
+		defer file.Close()
+		c.FromReader(file)
+
+		c.protect.Lock()
+		defer c.protect.Unlock()
+		c.filename = filename
 	}
-	return
+
+	return c
 }
 
-// NewConfigFromReader initializes a Config object from a reader.
-func NewConfigFromReader(reader io.Reader) *Config {
-	c := &Config{
-		Errors: make([]error, 0),
-	}
+// FromString overwrites the current config with the contents of the string.
+func (c *Config) FromString(config string) *Config {
+	buf := bytes.NewBufferString(config)
+	c.FromReader(buf)
+	return c
+}
+
+// FromReader overwrites the current config with the contents of the reader.
+func (c *Config) FromReader(reader io.Reader) *Config {
+	c.protect.Lock()
+	defer c.protect.Unlock()
+	c.clear()
+
 	buf, err := ioutil.ReadAll(reader)
 	if err != nil {
 		c.addError(errMsgInvalidConfigFile, err)
-		return c
 	}
 	err = yaml.Unmarshal(buf, c)
 	if err != nil {
@@ -62,7 +81,6 @@ func NewConfigFromReader(reader io.Reader) *Config {
 	}
 
 	c.fixReferencesAndNames()
-
 	return c
 }
 
@@ -70,69 +88,68 @@ func NewConfigFromReader(reader io.Reader) *Config {
 // is returned to patch up backreferences to the main config as well as check
 // that the name/host are set properly.
 func (c *Config) fixReferencesAndNames() {
-	if c.Global == nil {
-		c.Global = &Server{}
+	if c.Network == nil {
+		c.Network = &Network{InName: "global", protect: &c.protect}
 	}
-	for s, v := range c.Servers {
-		if v == nil {
-			v = &Server{}
-			c.Servers[s] = v
+
+	for name, network := range c.Networks {
+		if network == nil {
+			network = &Network{}
+			c.Networks[name] = network
 		}
-		v.parent = c
-		v.Name = s
-		if len(v.Host) == 0 {
-			v.Host = s
-		}
+
+		network.parent = c
+		network.protect = &c.protect
+		network.InName = name
 	}
 }
 
-// FlushConfigToFile writes a config out to a writer. If the filename is empty
+// ToFile writes a config out to a writer. If the filename is empty
 // it will write to the file that this config was loaded from, or it will
 // write to the defaultConfigFileName.
-func FlushConfigToFile(conf *Config, filename string) (err error) {
+func (c *Config) ToFile(filename string) error {
 	provider := func(f string) (io.WriteCloser, error) {
 		return os.Create(filename)
 	}
 
-	err = flushConfigToFile(conf, filename, provider)
-	return
+	return c.toFile(filename, provider)
 }
 
-// flushConfigToFile uses a callback to get a ReadWriter to write to. It also
+// toFile uses a callback to get a ReadWriter to write to. It also
 // manages resolving the filename properly and writing the config to the Writer.
 // The file provided by the callback is closed in this function.
-func flushConfigToFile(conf *Config, filename string,
-	getFile wrFileCallback) (err error) {
-
+func (c *Config) toFile(filename string, getFile wrFileCallback) error {
 	if filename == "" {
-		if conf.filename != "" {
-			filename = conf.filename
-		} else {
-			filename = defaultConfigFileName
-		}
+		filename = c.Filename()
 	}
 
-	var writer io.WriteCloser
-	writer, err = getFile(filename)
+	writer, err := getFile(filename)
 	if err != nil {
-		return
+		return err
 	}
 	defer writer.Close()
 
-	err = FlushConfigToWriter(conf, writer)
-	return
+	return c.ToWriter(writer)
 }
 
-// FlushConfigToWriter writes a config out to a writer
-func FlushConfigToWriter(conf *Config, writer io.Writer) (err error) {
-	marshalled, err := yaml.Marshal(conf)
+// ToWriter writes a config out to a writer.
+func (c *Config) ToWriter(writer io.Writer) error {
+	c.protect.RLock()
+	defer c.protect.RUnlock()
+
+	marshalled, err := yaml.Marshal(c)
 	if err != nil {
-		return
+		return err
 	}
 	var n, written = 0, 0
 	for err == nil && written < len(marshalled) {
 		n, err = writer.Write(marshalled[written:])
 		written += n
 	}
-	return
+
+	if err != io.EOF {
+		return err
+	}
+
+	return nil
 }

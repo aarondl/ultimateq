@@ -1,0 +1,260 @@
+package config
+
+import (
+	"bytes"
+	"io"
+	"strings"
+	"testing"
+)
+
+type testBuffer struct {
+	io.ReadWriter
+	closed bool
+}
+
+func (t *testBuffer) Close() error {
+	t.closed = true
+	return nil
+}
+
+type dyingReader struct {
+}
+
+func (d *dyingReader) Read(b []byte) (int, error) {
+	return 0, io.ErrUnexpectedEOF
+}
+
+type dyingWriter struct {
+}
+
+func (d *dyingWriter) Write(b []byte) (int, error) {
+	return 0, io.ErrUnexpectedEOF
+}
+
+var configuration = `global:
+    port: 5555
+    nick: nick
+    username: username
+    realname: realname
+networks:
+    myserver:
+        servers:
+        - irc.gamesurge.net
+        nick: nickoverride
+    irc.gamesurge.net:
+        port: 3333
+`
+
+func verifyFakeConfig(t *testing.T, conf *Config) {
+	net1 := conf.Networks["myserver"]
+
+	if exp, got := "nickoverride", net1.Nick(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := uint16(5555), net1.Port(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := "username", net1.Username(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := "realname", net1.Realname(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+
+	if exp, got := "myserver", net1.Name(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := "irc.gamesurge.net", net1.Servers()[0]; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+
+	net2 := conf.Networks["irc.gamesurge.net"]
+
+	if exp, got := "nick", net2.Nick(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := "irc.gamesurge.net", net2.Servers()[0]; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := net2.Servers()[0], net2.Name(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+}
+
+func TestConfig_FromReader(t *testing.T) {
+	t.Parallel()
+	c := NewConfig().FromString(configuration)
+
+	if exp, got := true, c.IsValid(); exp != got {
+		t.Fatalf("Expected: %v, got: %v", exp, got)
+	}
+
+	verifyFakeConfig(t, c)
+}
+
+func TestConfig_FromReaderErrors(t *testing.T) {
+	t.Parallel()
+	c := NewConfig().FromReader(&dyingReader{})
+
+	ers := c.Errors()
+	if exp, got := 1, len(ers); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+
+	err := ers[0].Error()
+	errMsg := errMsgInvalidConfigFile[:len(errMsgInvalidConfigFile)-4]
+	if !strings.Contains(err, errMsg) {
+		t.Errorf(`"Expected: "%v" to contain: "%v"`, err, errMsg)
+	}
+
+	buf := bytes.NewBufferString("defaults:\n\tport: 5555")
+	c = NewConfig().FromReader(buf)
+
+	ers = c.Errors()
+	if exp, got := 1, len(ers); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+
+	err = ers[0].Error()
+	if !strings.Contains(err, errMsg) {
+		t.Errorf(`"Expected: "%v" to contain: "%v"`, err, errMsg)
+	}
+}
+
+func TestConfig_fromFile(t *testing.T) {
+	t.Parallel()
+	buf := &testBuffer{bytes.NewBufferString(configuration), false}
+
+	name := "check.yaml"
+	c := NewConfig().fromFile(name, func(f string) (io.ReadCloser, error) {
+		return buf, nil
+	})
+
+	if exp, got := name, c.filename; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if !buf.closed {
+		t.Error("It should close the file.")
+	}
+
+	verifyFakeConfig(t, c)
+
+	name = ""
+	buf = &testBuffer{bytes.NewBufferString(configuration), false}
+	c = NewConfig().fromFile(name, func(f string) (io.ReadCloser, error) {
+		return buf, nil
+	})
+
+	if c.filename != defaultConfigFileName {
+		t.Error("Expected it to use the default file name, got:", c.filename)
+	}
+}
+
+func TestConfig_fromFileErrors(t *testing.T) {
+	t.Parallel()
+	errMsg := errMsgFileError[:len(errMsgFileError)-4]
+
+	c := NewConfig().fromFile("", func(_ string) (io.ReadCloser, error) {
+		return nil, io.EOF
+	})
+	ers := c.Errors()
+	if exp, got := 1, len(ers); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+
+	err := ers[0].Error()
+	if !strings.Contains(err, errMsg) {
+		t.Errorf(`"Expected: "%v" to contain: "%v"`, err, errMsg)
+	}
+}
+
+func TestConfig_ToWriter(t *testing.T) {
+	t.Parallel()
+	c := NewConfig().FromString(configuration)
+
+	buf := &bytes.Buffer{}
+	c.ToWriter(buf)
+
+	c = NewConfig().FromReader(buf)
+
+	verifyFakeConfig(t, c)
+}
+
+func TestConfig_ToWriterErrors(t *testing.T) {
+	t.Parallel()
+
+	err := NewConfig().ToWriter(&dyingWriter{})
+	if err == nil || err == io.EOF {
+		t.Error("Expected to see an unconventional error.")
+	}
+}
+
+func TestConfig_toFile(t *testing.T) {
+	t.Parallel()
+
+	c := NewConfig()
+	buf := &testBuffer{&bytes.Buffer{}, false}
+
+	filename := ""
+	c.toFile("a.txt", func(fn string) (io.WriteCloser, error) {
+		filename = fn
+		return buf, nil
+	})
+	if filename != "a.txt" {
+		t.Error("Expected it to set the filename to what we asked for.")
+	}
+
+	filename = ""
+	c.toFile("", func(fn string) (io.WriteCloser, error) {
+		filename = fn
+		return buf, nil
+	})
+	if filename != defaultConfigFileName {
+		t.Error("Expected it to set the filename to the default.")
+	}
+
+	filename = ""
+	c.filename = "b.txt"
+	c.toFile("", func(fn string) (io.WriteCloser, error) {
+		filename = fn
+		return buf, nil
+	})
+	if filename != "b.txt" {
+		t.Error("Expected it to set the filename to the config's filename.")
+	}
+}
+
+func TestConfig_toFileErrors(t *testing.T) {
+	t.Parallel()
+	err := NewConfig().toFile("", func(_ string) (io.WriteCloser, error) {
+		return nil, io.EOF
+	})
+
+	if err == nil {
+		t.Error("Expected an error.")
+	}
+}
+
+func TestConfig_fixReferenceAndNames(t *testing.T) {
+	t.Parallel()
+
+	c := Config{Networks: make(map[string]*Network)}
+	c.Networks["test"] = nil
+	c.fixReferencesAndNames()
+
+	if c.Network == nil {
+		t.Error("It should set the network to empty not nil.")
+	}
+
+	if c.Network.protect == nil {
+		t.Error("It should hook up the mutex.")
+	}
+
+	if c.Networks["test"] == nil {
+		t.Error("It should instantiate empty networks.")
+	}
+
+	if c.Networks["test"].protect == nil {
+		t.Error("It should hook up the mutex.")
+	}
+}

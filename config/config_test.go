@@ -3,28 +3,8 @@ package config
 import (
 	"bytes"
 	"log"
-	"os"
 	"testing"
-	. "gopkg.in/check.v1"
 )
-
-func Test(t *testing.T) { TestingT(t) } //Hook into testing package
-type s struct{}
-
-var _ = Suite(&s{})
-
-func init() {
-	setLogger() // This had to be done for DisplayErrors' test
-}
-
-func setLogger() {
-	f, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
-	if err != nil {
-		log.Println("Could not set logger:", err)
-	} else {
-		log.SetOutput(f)
-	}
-}
 
 func reqErr(name string) string {
 	return `.*Requires.*` + name + `.*`
@@ -34,7 +14,7 @@ func invErr(name string) string {
 	return `.*Invalid.*` + name + `.*`
 }
 
-var srv1 = &Server{
+var net1 = &Network{
 	Name:             "irc1",
 	Host:             "irc.gamesurge.net",
 	Port:             5555,
@@ -58,7 +38,7 @@ var srv1 = &Server{
 	Channels:         []string{"#chan1", "#chan2"},
 }
 
-var srv2 = &Server{
+var net2 = &Network{
 	Name:             "irc2",
 	Host:             "irc.gamesurge.com",
 	Port:             6666,
@@ -82,220 +62,116 @@ var srv2 = &Server{
 	Channels:         []string{"#chan2"},
 }
 
-func (s *s) TestConfig(c *C) {
+func TestConfig(t *testing.T) {
 	config := NewConfig()
-	c.Check(config.Servers, NotNil)
+	c.Check(config.Networks, NotNil)
 	c.Check(config.Global, NotNil)
 }
 
-func (s *s) TestConfig_Fallbacks(c *C) {
+func TestConfig_Fallbacks(t *testing.T) {
 	config := NewConfig()
 
 	host, name := "irc.gamesurge.net", "gamesurge"
 
-	srv := *srv1
-	config.Global = &srv
+	net := *net1
+	config.Global = &net
 
-	server := &Server{parent: config, Name: name, Host: host}
-	config.Servers[name] = server
+	network := &Network{parent: config, Name: name, Host: host}
+	config.Networks[name] = network
 
-	c.Check(server.GetHost(), Equals, host)
-	c.Check(server.GetName(), Equals, name)
-	c.Check(server.GetPort(), Equals, config.Global.GetPort())
-	c.Check(server.GetSsl(), Equals, config.Global.GetSsl())
-	c.Check(server.GetSslCert(), Equals, config.Global.GetSslCert())
-	c.Check(server.GetNoVerifyCert(), Equals, config.Global.GetNoVerifyCert())
-	c.Check(server.GetNoState(), Equals, config.Global.GetNoState())
-	c.Check(server.GetNoStore(), Equals, config.Global.GetNoStore())
-	c.Check(server.GetFloodLenPenalty(), Equals,
-		config.Global.GetFloodLenPenalty())
-	c.Check(server.GetFloodTimeout(), Equals, config.Global.GetFloodTimeout())
-	c.Check(server.GetFloodStep(), Equals, config.Global.GetFloodStep())
-	c.Check(server.GetKeepAlive(), Equals, config.Global.GetKeepAlive())
-	c.Check(server.GetNoReconnect(), Equals, config.Global.GetNoReconnect())
-	c.Check(server.GetReconnectTimeout(), Equals,
-		config.Global.GetReconnectTimeout())
-	c.Check(server.GetNick(), Equals, config.Global.GetNick())
-	c.Check(server.GetAltnick(), Equals, config.Global.GetAltnick())
-	c.Check(server.GetUsername(), Equals, config.Global.GetUsername())
-	c.Check(server.GetUserhost(), Equals, config.Global.GetUserhost())
-	c.Check(server.GetRealname(), Equals, config.Global.GetRealname())
-	c.Check(server.GetPrefix(), Equals, config.Global.GetPrefix())
-	c.Check(len(server.GetChannels()), Equals, len(config.Global.Channels))
-	for i, v := range server.GetChannels() {
-		c.Check(v, Equals, config.Global.Channels[i])
+	c.Check(network.GetHost(), Equals, host)
+	c.Check(network.GetName(), Equals, name)
+	c.Check(network.GetPort(), Equals, config.Network.GetPort())
+	c.Check(network.GetSsl(), Equals, config.Network.GetSsl())
+	c.Check(network.GetSslCert(), Equals, config.Network.GetSslCert())
+	c.Check(network.GetNoVerifyCert(), Equals, config.Network.GetNoVerifyCert())
+	c.Check(network.GetNoState(), Equals, config.Network.GetNoState())
+	c.Check(network.GetNoStore(), Equals, config.Network.GetNoStore())
+	c.Check(network.GetFloodLenPenalty(), Equals,
+		config.Network.GetFloodLenPenalty())
+	c.Check(network.GetFloodTimeout(), Equals, config.Network.GetFloodTimeout())
+	c.Check(network.GetFloodStep(), Equals, config.Network.GetFloodStep())
+	c.Check(network.GetKeepAlive(), Equals, config.Network.GetKeepAlive())
+	c.Check(network.GetNoReconnect(), Equals, config.Network.GetNoReconnect())
+	c.Check(network.GetReconnectTimeout(), Equals,
+		config.Network.GetReconnectTimeout())
+	c.Check(network.GetNick(), Equals, config.Network.GetNick())
+	c.Check(network.GetAltnick(), Equals, config.Network.GetAltnick())
+	c.Check(network.GetUsername(), Equals, config.Network.GetUsername())
+	c.Check(network.GetUserhost(), Equals, config.Network.GetUserhost())
+	c.Check(network.GetRealname(), Equals, config.Network.GetRealname())
+	c.Check(network.GetPrefix(), Equals, config.Network.GetPrefix())
+	c.Check(len(network.GetChannels()), Equals, len(config.Network.Channels))
+	for i, v := range network.GetChannels() {
+		c.Check(v, Equals, config.Network.Channels[i])
 	}
 }
 
-func (s *s) TestConfig_Fluent(c *C) {
-	srv2host := "znc.gamesurge.net"
-
-	conf := NewConfig().
-		// Setting Globals
-		Host(""). // Should not break anything
-		Port(srv2.GetPort()).
-		Ssl(srv2.GetSsl()).
-		SslCert(srv2.GetSslCert()).
-		NoVerifyCert(srv2.GetNoVerifyCert()).
-		NoState(srv2.GetNoState()).
-		NoStore(srv2.GetNoStore()).
-		FloodLenPenalty(srv2.GetFloodLenPenalty()).
-		FloodTimeout(srv2.GetFloodTimeout()).
-		FloodStep(srv2.GetFloodStep()).
-		KeepAlive(srv2.GetKeepAlive()).
-		NoReconnect(srv2.GetNoReconnect()).
-		ReconnectTimeout(srv2.GetReconnectTimeout()).
-		Nick(srv2.GetNick()).
-		Altnick(srv2.GetAltnick()).
-		Username(srv2.GetUsername()).
-		Userhost(srv2.GetUserhost()).
-		Realname(srv2.GetRealname()).
-		Prefix(string(srv2.GetPrefix())).
-		Channels(srv2.GetChannels()...).
-		// Server 1
-		Server(srv1.GetName()).
-		Host(srv1.GetHost()).
-		Port(srv1.GetPort()).
-		Ssl(srv1.GetSsl()).
-		SslCert(srv1.GetSslCert()).
-		NoVerifyCert(srv1.GetNoVerifyCert()).
-		NoState(srv1.GetNoState()).
-		NoStore(srv1.GetNoStore()).
-		FloodLenPenalty(srv1.GetFloodLenPenalty()).
-		FloodTimeout(srv1.GetFloodTimeout()).
-		FloodStep(srv1.GetFloodStep()).
-		KeepAlive(srv1.GetKeepAlive()).
-		NoReconnect(srv1.GetNoReconnect()).
-		ReconnectTimeout(srv1.GetReconnectTimeout()).
-		Nick(srv1.GetNick()).
-		Altnick(srv1.GetAltnick()).
-		Username(srv1.GetUsername()).
-		Userhost(srv1.GetUserhost()).
-		Realname(srv1.GetRealname()).
-		Prefix(string(srv1.GetPrefix())).
-		Channels(srv1.GetChannels()...).
-		// Server 2 using defaults
-		Server(srv2host)
-
-	server := conf.GetServer(srv1.Name)
-	server2 := conf.GetServer(srv2host)
-	c.Check(server.GetHost(), Equals, srv1.GetHost())
-	c.Check(server.GetName(), Equals, srv1.GetName())
-	c.Check(server.GetPort(), Equals, srv1.GetPort())
-	c.Check(server.GetSsl(), Equals, srv1.GetSsl())
-	c.Check(server.GetSslCert(), Equals, srv1.GetSslCert())
-	c.Check(server.GetNoVerifyCert(), Equals, srv1.GetNoVerifyCert())
-	c.Check(server.GetNoState(), Equals, srv1.GetNoState())
-	c.Check(server.GetNoStore(), Equals, srv1.GetNoStore())
-	c.Check(server.GetFloodLenPenalty(), Equals, srv1.GetFloodLenPenalty())
-	c.Check(server.GetFloodTimeout(), Equals, srv1.GetFloodTimeout())
-	c.Check(server.GetFloodStep(), Equals, srv1.GetFloodStep())
-	c.Check(server.GetKeepAlive(), Equals, srv1.GetKeepAlive())
-	c.Check(server.GetNoReconnect(), Equals, srv1.GetNoReconnect())
-	c.Check(server.GetReconnectTimeout(), Equals, srv1.GetReconnectTimeout())
-	c.Check(server.GetNick(), Equals, srv1.GetNick())
-	c.Check(server.GetAltnick(), Equals, srv1.GetAltnick())
-	c.Check(server.GetUsername(), Equals, srv1.GetUsername())
-	c.Check(server.GetUserhost(), Equals, srv1.GetUserhost())
-	c.Check(server.GetRealname(), Equals, srv1.GetRealname())
-	c.Check(server.GetPrefix(), Equals, srv1.GetPrefix())
-	c.Check(len(server.GetChannels()), Equals, len(srv1.Channels))
-	for i, v := range server.GetChannels() {
-		c.Check(v, Equals, srv1.Channels[i])
-	}
-
-	c.Check(server2.GetHost(), Equals, srv2host)
-	c.Check(server2.GetPort(), Equals, srv2.GetPort())
-	c.Check(server2.GetSsl(), Equals, srv2.GetSsl())
-	c.Check(server2.GetSslCert(), Equals, srv2.GetSslCert())
-	c.Check(server2.GetNoVerifyCert(), Equals, srv2.GetNoVerifyCert())
-	c.Check(server2.GetNoState(), Equals, srv2.GetNoState())
-	c.Check(server2.GetNoStore(), Equals, srv2.GetNoStore())
-	c.Check(server2.GetFloodLenPenalty(), Equals, srv2.GetFloodLenPenalty())
-	c.Check(server2.GetFloodTimeout(), Equals, srv2.GetFloodTimeout())
-	c.Check(server2.GetFloodStep(), Equals, srv2.GetFloodStep())
-	c.Check(server2.GetKeepAlive(), Equals, srv2.GetKeepAlive())
-	c.Check(server2.GetNoReconnect(), Equals, srv2.GetNoReconnect())
-	c.Check(server2.GetReconnectTimeout(), Equals, srv2.GetReconnectTimeout())
-	c.Check(server2.GetNick(), Equals, srv2.GetNick())
-	c.Check(server2.GetAltnick(), Equals, srv2.GetAltnick())
-	c.Check(server2.GetUsername(), Equals, srv2.GetUsername())
-	c.Check(server2.GetUserhost(), Equals, srv2.GetUserhost())
-	c.Check(server2.GetRealname(), Equals, srv2.GetRealname())
-	c.Check(server2.GetPrefix(), Equals, srv2.GetPrefix())
-	c.Check(len(server2.GetChannels()), Equals, len(srv2.Channels))
-	for i, v := range server2.GetChannels() {
-		c.Check(v, Equals, srv2.Channels[i])
-	}
-}
-
-func (s *s) TestConfig_Globals(c *C) {
+func TestConfig_Globals(t *testing.T) {
+	t.Parallel()
 	conf := NewConfig().
 		StoreFile("store").
-		Nick(srv1.Nick).
-		Realname(srv1.Realname).
-		Username(srv1.Username).
-		Userhost(srv1.Userhost).
-		Server(srv1.GetName())
+		Nick(net1.Nick).
+		Realname(net1.Realname).
+		Username(net1.Username).
+		Userhost(net1.Userhost).
+		Network(net1.GetName())
 
 	c.Check(conf.GetStoreFile(), Equals, "store")
 	c.Check(conf.IsValid(), Equals, true)
 }
 
-func (s *s) TestConfig_Defaults(c *C) {
-	conf := NewConfig().
-		Nick(srv1.Nick).
-		Realname(srv1.Realname).
-		Username(srv1.Username).
-		Userhost(srv1.Userhost).
-		Server(srv1.GetName())
-	srv := conf.GetServer(srv1.GetName())
+func TestConfig_Defaults(t *testing.T) {
+	t.Parallel()
+	conf := NewConfig().FromString(tnaheaoeth)
+	net := conf.GetNetwork(net1.GetName())
 
 	c.Check(conf.GetStoreFile(), Equals, defaultStoreFile)
-	c.Check(srv.GetPort(), Equals, defaultIrcPort)
-	c.Check(srv.GetSsl(), Equals, false)
-	c.Check(srv.GetNoVerifyCert(), Equals, false)
-	c.Check(srv.GetNoState(), Equals, false)
-	c.Check(srv.GetNoStore(), Equals, false)
-	c.Check(srv.GetFloodLenPenalty(), Equals, defaultFloodLenPenalty)
-	c.Check(srv.GetFloodTimeout(), Equals, defaultFloodTimeout)
-	c.Check(srv.GetFloodStep(), Equals, defaultFloodStep)
-	c.Check(srv.GetKeepAlive(), Equals, defaultKeepAlive)
-	c.Check(srv.GetNoReconnect(), Equals, false)
-	c.Check(srv.GetReconnectTimeout(), Equals, defaultReconnectTimeout)
-	c.Check(srv.GetPrefix(), Equals, defaultPrefix)
+	c.Check(net.GetPort(), Equals, defaultIrcPort)
+	c.Check(net.GetSsl(), Equals, false)
+	c.Check(net.GetNoVerifyCert(), Equals, false)
+	c.Check(net.GetNoState(), Equals, false)
+	c.Check(net.GetNoStore(), Equals, false)
+	c.Check(net.GetFloodLenPenalty(), Equals, defaultFloodLenPenalty)
+	c.Check(net.GetFloodTimeout(), Equals, defaultFloodTimeout)
+	c.Check(net.GetFloodStep(), Equals, defaultFloodStep)
+	c.Check(net.GetKeepAlive(), Equals, defaultKeepAlive)
+	c.Check(net.GetNoReconnect(), Equals, false)
+	c.Check(net.GetReconnectTimeout(), Equals, defaultReconnectTimeout)
+	c.Check(net.GetPrefix(), Equals, defaultPrefix)
 }
 
-func (s *s) TestConfig_InvalidValues(c *C) {
+func TestConfig_InvalidValues(t *testing.T) {
+	t.Parallel()
 	conf := NewConfig().
-		Nick(srv1.Nick).
-		Realname(srv1.Realname).
-		Username(srv1.Username).
-		Userhost(srv1.Userhost).
-		Server(srv1.GetName())
-	srv := conf.GetServer(srv1.GetName())
-	srv.Ssl = "x"
-	srv.FloodLenPenalty = "x"
-	srv.FloodTimeout = "x"
-	srv.FloodStep = "x"
-	srv.KeepAlive = "x"
-	srv.NoVerifyCert = "x"
-	srv.NoState = "x"
-	srv.NoStore = "x"
-	srv.NoReconnect = "x"
-	srv.ReconnectTimeout = "x"
-	srv.Prefix = "xx"
+		Nick(net1.Nick).
+		Realname(net1.Realname).
+		Username(net1.Username).
+		Userhost(net1.Userhost).
+		Network(net1.GetName())
+	net := conf.GetNetwork(net1.GetName())
+	net.Ssl = "x"
+	net.FloodLenPenalty = "x"
+	net.FloodTimeout = "x"
+	net.FloodStep = "x"
+	net.KeepAlive = "x"
+	net.NoVerifyCert = "x"
+	net.NoState = "x"
+	net.NoStore = "x"
+	net.NoReconnect = "x"
+	net.ReconnectTimeout = "x"
+	net.Prefix = "xx"
 
-	c.Check(srv.GetSsl(), Equals, false)
-	c.Check(srv.GetNoVerifyCert(), Equals, false)
-	c.Check(srv.GetNoState(), Equals, false)
-	c.Check(srv.GetNoStore(), Equals, false)
-	c.Check(srv.GetFloodLenPenalty(), Equals, defaultFloodLenPenalty)
-	c.Check(srv.GetFloodTimeout(), Equals, defaultFloodTimeout)
-	c.Check(srv.GetFloodStep(), Equals, defaultFloodStep)
-	c.Check(srv.GetKeepAlive(), Equals, defaultKeepAlive)
-	c.Check(srv.GetNoReconnect(), Equals, false)
-	c.Check(srv.GetReconnectTimeout(), Equals, defaultReconnectTimeout)
+	c.Check(net.GetSsl(), Equals, false)
+	c.Check(net.GetNoVerifyCert(), Equals, false)
+	c.Check(net.GetNoState(), Equals, false)
+	c.Check(net.GetNoStore(), Equals, false)
+	c.Check(net.GetFloodLenPenalty(), Equals, defaultFloodLenPenalty)
+	c.Check(net.GetFloodTimeout(), Equals, defaultFloodTimeout)
+	c.Check(net.GetFloodStep(), Equals, defaultFloodStep)
+	c.Check(net.GetKeepAlive(), Equals, defaultKeepAlive)
+	c.Check(net.GetNoReconnect(), Equals, false)
+	c.Check(net.GetReconnectTimeout(), Equals, defaultReconnectTimeout)
 
 	c.Check(conf.IsValid(), Equals, false)
 	c.Check(len(conf.Errors), Equals, 10)
@@ -311,68 +187,74 @@ func (s *s) TestConfig_InvalidValues(c *C) {
 	c.Check(conf.Errors[9].Error(), Matches, invErr(errReconnectTimeout))
 }
 
-func (s *s) TestConfig_ValidationEmpty(c *C) {
+func TestConfig_ValidationEmpty(t *testing.T) {
+	t.Parallel()
 	conf := NewConfig()
 	c.Check(conf.IsValid(), Equals, false)
 	c.Check(len(conf.Errors), Equals, 1)
-	c.Check(conf.Errors[0].Error(), Equals, errMsgServersRequired)
+	c.Check(conf.Errors[0].Error(), Equals, errMsgNetworksRequired)
 }
 
-func (s *s) TestConfig_ValidationNoHost(c *C) {
+func TestConfig_ValidationNoHost(t *testing.T) {
+	t.Parallel()
 	conf := NewConfig().
-		Server("").
-		Port(srv1.Port)
-	c.Check(len(conf.Servers), Equals, 0)
-	c.Check(conf.Global.Port, Equals, uint16(srv1.Port))
+		Network("").
+		Port(net1.Port)
+	c.Check(len(conf.Networks), Equals, 0)
+	c.Check(conf.Global.Port, Equals, uint16(net1.Port))
 	c.Check(conf.IsValid(), Equals, false)
 	c.Check(len(conf.Errors), Equals, 2)
 	c.Check(conf.Errors[0].Error(), Matches, reqErr(errHost))
-	c.Check(conf.Errors[1].Error(), Equals, errMsgServersRequired)
+	c.Check(conf.Errors[1].Error(), Equals, errMsgNetworksRequired)
 }
 
-func (s *s) TestConfig_ValidationInvalidHost(c *C) {
+func TestConfig_ValidationInvalidHost(t *testing.T) {
+	t.Parallel()
 	conf := NewConfig().
-		Nick(srv1.Nick).
-		Realname(srv1.Realname).
-		Username(srv1.Username).
-		Userhost(srv1.Userhost).
-		Server("%")
+		Nick(net1.Nick).
+		Realname(net1.Realname).
+		Username(net1.Username).
+		Userhost(net1.Userhost).
+		Network("%")
 	c.Check(conf.IsValid(), Equals, false)
 	c.Check(len(conf.Errors), Equals, 1)
 	c.Check(conf.Errors[0].Error(), Matches, invErr(errHost))
 }
 
-func (s *s) TestConfig_ValidationNoHostInternal(c *C) {
+func TestConfig_ValidationNoHostInternal(t *testing.T) {
+	t.Parallel()
 	conf := NewConfig().
-		Server(srv1.Host).
-		Nick(srv1.Nick).
-		Channels(srv1.Channels...).
-		Username(srv1.Username).
-		Userhost(srv1.Userhost).
-		Realname(srv1.Realname)
-	conf.Servers[srv1.Host].Host = ""
+		Network(net1.Host).
+		Nick(net1.Nick).
+		Channels(net1.Channels...).
+		Username(net1.Username).
+		Userhost(net1.Userhost).
+		Realname(net1.Realname)
+	conf.Networks[net1.Host].Host = ""
 	c.Check(conf.IsValid(), Equals, false)
 	c.Check(len(conf.Errors), Equals, 1) // Internal No host
 	c.Check(conf.Errors[0].Error(), Matches, reqErr(errHost))
 }
 
-func (s *s) TestConfig_ValidationDuplicateName(c *C) {
+func TestConfig_ValidationDuplicateName(t *testing.T) {
+	t.Parallel()
 	conf := NewConfig().
-		Nick(srv1.Nick).
-		Realname(srv1.Realname).
-		Username(srv1.Username).
-		Userhost(srv1.Userhost).
-		Server("a.com").
-		Server("a.com")
-	c.Check(len(conf.Servers), Equals, 1)
+		Nick(net1.Nick).
+		Realname(net1.Realname).
+		Username(net1.Username).
+		Userhost(net1.Userhost).
+		Network("a.com").
+		Network("a.com")
+	c.Check(len(conf.Networks), Equals, 1)
 	c.Check(conf.IsValid(), Equals, false)
 	c.Check(len(conf.Errors), Equals, 1)
-	c.Check(conf.Errors[0].Error(), Equals, errMsgDuplicateServer)
+	c.Check(conf.Errors[0].Error(), Equals, errMsgDuplicateNetwork)
 }
 
-func (s *s) TestConfig_ValidationMissing(c *C) {
+func TestConfig_ValidationMissing(t *testing.T) {
+	t.Parallel()
 	conf := NewConfig().
-		Server(srv1.Host)
+		Network(net1.Host)
 	c.Check(conf.IsValid(), Equals, false)
 	// Missing: Nick, Username, Userhost, Realname
 	c.Check(len(conf.Errors), Equals, 4)
@@ -382,9 +264,10 @@ func (s *s) TestConfig_ValidationMissing(c *C) {
 	c.Check(conf.Errors[3].Error(), Matches, reqErr(errRealname))
 }
 
-func (s *s) TestConfig_ValidationRegex(c *C) {
+func TestConfig_ValidationRegex(t *testing.T) {
+	t.Parallel()
 	conf := NewConfig().
-		Server(srv1.Host).
+		Network(net1.Host).
 		Nick(`@Nick`).              // no special chars
 		Channels(`chan`).           // must start with valid prefix
 		Username(`spaces in here`). // no spaces
@@ -399,12 +282,13 @@ func (s *s) TestConfig_ValidationRegex(c *C) {
 	c.Check(conf.Errors[4].Error(), Matches, invErr(errChannel))
 }
 
-func (s *s) TestConfig_DisplayErrors(c *C) {
+func TestConfig_DisplayErrors(t *testing.T) {
+	t.Parallel()
 	buf := &bytes.Buffer{}
 	log.SetOutput(buf)
 	c.Check(buf.Len(), Equals, 0)
 	conf := NewConfig().
-		Server("localhost")
+		Network("localhost")
 	c.Check(conf.IsValid(), Equals, false)
 	c.Check(len(conf.Errors), Equals, 4)
 	conf.DisplayErrors()
@@ -412,59 +296,25 @@ func (s *s) TestConfig_DisplayErrors(c *C) {
 	setLogger() // Reset the logger
 }
 
-func (s *s) TestConfig_GetServer(c *C) {
+func TestConfig_GetNetwork(t *testing.T) {
+	t.Parallel()
 	conf := NewConfig()
-	conf.Servers[srv1.GetName()] = srv1
-	conf.Servers[srv2.GetName()] = srv2
-	c.Check(conf.GetServer(srv1.GetName()), Equals, srv1)
-	c.Check(conf.GetServer(srv2.GetName()), Equals, srv2)
+	conf.Networks[net1.GetName()] = net1
+	conf.Networks[net2.GetName()] = net2
+	c.Check(conf.GetNetwork(net1.GetName()), Equals, net1)
+	c.Check(conf.GetNetwork(net2.GetName()), Equals, net2)
 }
 
-func (s *s) TestConfig_RemoveServer(c *C) {
-	conf := NewConfig()
-	conf.Servers[srv1.GetName()] = srv1
-	conf.Servers[srv2.GetName()] = srv2
-	c.Check(conf.GetServer(srv1.GetName()), Equals, srv1)
-	c.Check(conf.GetServer(srv2.GetName()), Equals, srv2)
-
-	conf.ServerContext(srv1.GetName())
-	c.Check(conf.context, NotNil)
-
-	conf.RemoveServer(srv1.GetName())
-	c.Check(conf.IsValid(), Equals, true)
-
-	c.Check(conf.context, IsNil)
-
-	c.Check(conf.GetServer(srv1.GetName()), IsNil)
-	c.Check(conf.GetServer(srv2.GetName()), Equals, srv2)
+func TestConfig_SetContext(t *testing.T) {
+	t.Parallel()
 }
 
-func (s *s) TestConfig_SetContext(c *C) {
-	conf := NewConfig()
-	srv := *srv1
-	conf.Servers[srv1.GetName()] = &srv
-
-	var p1, p2, p3 uint16 = 1, 2, 3
-
-	conf.Port(p1) // Should set global context
-	c.Check(conf.Global.GetPort(), Equals, p1)
-
-	conf.ServerContext(srv1.GetName())
-	conf.Port(p2)
-	conf.GlobalContext()
-	conf.Port(p3)
-
-	c.Check(conf.GetServer(srv1.GetName()).GetPort(), Equals, p2)
-	c.Check(conf.Global.GetPort(), Equals, p3)
-
-	c.Check(len(conf.Errors), Equals, 0)
-	conf.ServerContext("")
-	c.Check(len(conf.Errors), Equals, 1)
-	c.Check(conf.IsValid(), Equals, false)
-	c.Check(conf.Errors[0].Error(), Matches, fmtErrServerNotFound[:33]+".*")
+func TestConfig_Clone(t *testing.T) {
+	t.Parallel()
 }
 
-func (s *s) TestValidNames(c *C) {
+func TestValidNames(t *testing.T) {
+	t.Parallel()
 	goodNicks := []string{`a1bc`, `a5bc`, `a9bc`, `MyNick`, `[MyNick`,
 		`My[Nick`, `]MyNick`, `My]Nick`, `\MyNick`, `My\Nick`, "MyNick",
 		"My`Nick", `_MyNick`, `My_Nick`, `^MyNick`, `My^Nick`, `{MyNick`,
@@ -480,59 +330,18 @@ func (s *s) TestValidNames(c *C) {
 
 	for i := 0; i < len(goodNicks); i++ {
 		if !rgxNickname.MatchString(goodNicks[i]) {
-			c.Errorf("Good nick failed regex: %v\n", goodNicks[i])
+			t.Errorf("Good nick failed regex: %v\n", goodNicks[i])
 		}
 	}
 	for i := 0; i < len(badNicks); i++ {
 		if rgxNickname.MatchString(badNicks[i]) {
-			c.Errorf("Bad nick passed regex: %v\n", badNicks[i])
+			t.Errorf("Bad nick passed regex: %v\n", badNicks[i])
 		}
 	}
 }
 
-func (s *s) TestConfig_Clone(c *C) {
-	conf := NewConfig()
-
-	srv := *srv1
-	srv.parent = conf
-	name := srv1.Name
-	filename := "file.yaml"
-	conf.filename = filename
-	conf.Servers[name] = &srv
-
-	var globalPort, serverPort uint16 = 1, 2
-
-	newconf := conf.Clone().
-		GlobalContext().
-		Port(globalPort).
-		ServerContext(name).
-		Port(0)
-
-	c.Check(newconf.GetFilename(), Equals, conf.GetFilename())
-
-	newconf.GlobalContext()
-	c.Check(conf.Global.Port, Not(Equals), globalPort)
-	c.Check(srv1.Port, Not(Equals), globalPort)
-	c.Check(newconf.GetServer(name).GetPort(), Equals, globalPort)
-
-	newconf.
-		ServerContext(srv1.Name).
-		Port(serverPort)
-
-	c.Check(conf.Global.Port, Not(Equals), serverPort)
-	c.Check(srv1.Port, Not(Equals), serverPort)
-	c.Check(newconf.GetServer(name).GetPort(), Equals, serverPort)
-}
-
-func (s *s) TestConfig_Filename(c *C) {
-	conf := NewConfig()
-	filename := "file.yaml"
-	c.Check(conf.GetFilename(), Equals, defaultConfigFileName)
-	conf.filename = filename
-	c.Check(conf.GetFilename(), Equals, filename)
-}
-
-func (s *s) TestValidChannels(c *C) {
+func TestValidChannels(t *testing.T) {
+	t.Parallel()
 	// Check that the first letter must be {#+!&}
 	goodChannels := []string{"#ValidChannel", "+ValidChannel", "&ValidChannel",
 		"!12345", "#c++"}
@@ -542,12 +351,12 @@ func (s *s) TestValidChannels(c *C) {
 
 	for i := 0; i < len(goodChannels); i++ {
 		if !rgxChannel.MatchString(goodChannels[i]) {
-			c.Errorf("Good chan failed regex: %v\n", goodChannels[i])
+			t.Errorf("Good chan failed regex: %v\n", goodChannels[i])
 		}
 	}
 	for i := 0; i < len(badChannels); i++ {
 		if rgxChannel.MatchString(badChannels[i]) {
-			c.Errorf("Bad chan passed regex: %v\n", badChannels[i])
+			t.Errorf("Bad chan passed regex: %v\n", badChannels[i])
 		}
 	}
 }

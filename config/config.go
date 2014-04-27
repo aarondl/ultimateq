@@ -1,7 +1,6 @@
 /*
-Package config provides several ways to configure an irc bot. Some methods are
-inline fluent configuration, yaml reading from any io.Reader. It also provides
-config validation.
+Package config creates a configuration using yaml. It also does configuration
+validation.
 */
 package config
 
@@ -10,14 +9,13 @@ import (
 	"log"
 	"regexp"
 	"strconv"
+	"sync"
 )
 
 const (
-	// nAssumedServers is the typcial number of configured servers for a bot
-	nAssumedServers = 1
-	// defaultIrcPort is IRC Server's default tcp port.
+	// defaultIrcPort is IRC Network'n default tcp port.
 	defaultIrcPort = uint16(6667)
-	// defaultStoreFile is where the bot will store it's Store database if not
+	// defaultStoreFile is where the bot will store it'n Store database if not
 	// overridden.
 	defaultStoreFile = "./store.db"
 	// defaultFloodLenPenalty is how many characters in a message by default
@@ -42,16 +40,16 @@ const (
 
 // The following format strings are for formatting various config errors.
 const (
-	fmtErrInvalid         = "config(%v): Invalid %v, given: %v"
-	fmtErrMissing         = "config(%v): Requires %v, but nothing was given."
-	fmtErrServerNotFound  = "config: Server not found, given: %v"
-	errMsgServersRequired = "config: At least one server is required."
-	errMsgDuplicateServer = "config: Server names must be unique, use .Host()"
+	fmtErrInvalid          = "config(%v): Invalid %v, given: %v"
+	fmtErrMissing          = "config(%v): Requires %v, but nothing was given."
+	fmtErrNetworkNotFound  = "config: Network not found, given: %v"
+	errMsgNetworksRequired = "config: At least one network is required."
+	errMsgDuplicateNetwork = "config: Network names must be unique, use .Host()"
 )
 
 // The following is for mapping config setting names to strings
 const (
-	errHost             = "host"
+	errServers          = "servers"
 	errPort             = "port"
 	errSsl              = "ssl"
 	errNoVerifyCert     = "noverifycert"
@@ -79,7 +77,7 @@ var (
 	// letter     =  %x41-5A / %x61-7A  ; A-Z / a-z
 	// digit      =  %x30-39            ; 0-9
 	// special    =  %x5B-60 / %x7B-7D  ; [ ] \ ` _ ^ { | }
-	// We make an excemption to the 9 char limit since few servers today
+	// We make an excemption to the 9 char limit since few networks today
 	// enforce it, and the RFC also states that clients should handle longer
 	// names.
 	// Test that the name is a valid IRC nickname
@@ -101,7 +99,7 @@ var (
 	channel    =  ( "#" / "+" / ( "!" channelid ) / "&" ) chanstring
 					[ ":" chanstring ] */
 	rgxChannel = regexp.MustCompile(
-		`^(?i)[#&+!][^\s\000\007,]{1,49}$`)
+		`^(?i)[#&+!][^\n\000\007,]{1,49}$`)
 
 	// rgxHost matches hostnames
 	rgxHost = regexp.MustCompile(
@@ -115,179 +113,223 @@ var (
 )
 
 // Config holds all the information related to the bot including global settings
-// default settings, and server specific settings.
+// default settings, and network specific settings.
 type Config struct {
-	Servers   map[string]*Server
-	Global    *Server
-	context   *Server
-	filename  string
-	Storefile string
-	Errors    []error "-"
+	*Network  `yaml:"global" json:"global"`
+	Networks  map[string]*Network `yaml:"networks" json:"networks"`
+	Storefile string              `yaml:"storefile" json:"storefile"`
+
+	errors   errList      `yaml:"-" json:"-"`
+	filename string       `yaml:"-" json:"-"`
+	protect  sync.RWMutex `yaml:"-" json:"-"`
 }
 
 // NewConfig initializes a Config object.
 func NewConfig() *Config {
-	return &Config{
-		Global:  &Server{},
-		Servers: make(map[string]*Server, nAssumedServers),
-		Errors:  make([]error, 0),
-	}
+	c := &Config{}
+	c.clear()
+
+	return c
+}
+
+// Clear re-initializes all memory in the configuration.
+func (c *Config) Clear() {
+	c.protect.Lock()
+	defer c.protect.Unlock()
+
+	c.clear()
+}
+
+// clear re-initializes all memory in the configuration without locking first.
+func (c *Config) clear() {
+	c.Network = &Network{InName: "global", protect: &c.protect}
+	c.Networks = make(map[string]*Network)
+	c.Storefile = ""
+
+	c.errors = make(errList, 0)
+	c.filename = ""
 }
 
 // Clone deep copies a configuration object.
 func (c *Config) Clone() *Config {
-	global := *c.Global
+	c.protect.RLock()
+	defer c.protect.RUnlock()
+
 	newconf := &Config{
-		Global:   &global,
-		Servers:  make(map[string]*Server, len(c.Servers)),
-		Errors:   make([]error, 0),
+		Network:  c.Network.Clone(),
+		Networks: make(map[string]*Network, len(c.Networks)),
+		errors:   make([]error, 0),
 		filename: c.filename,
 	}
-	for name, srv := range c.Servers {
-		newsrv := *srv
-		newsrv.parent = newconf
-		newconf.Servers[name] = &newsrv
+	for name, net := range c.Networks {
+		newnet := net.Clone()
+		newnet.parent = newconf
+		newconf.Networks[name] = newnet
 	}
 	return newconf
 }
 
-// addError builds an error object and returns it using Sprintf.
+// errList is an array of errors.
+type errList []error
+
+// addError builds an error object and appends it to this instances errors.
 func (c *Config) addError(format string, args ...interface{}) {
-	c.Errors = append(c.Errors, fmt.Errorf(format, args...))
+	c.errors.addError(format, args...)
+}
+
+// addError builds an error object and appends it to this instances errors.
+func (l *errList) addError(format string, args ...interface{}) {
+	*l = append(*l, fmt.Errorf(format, args...))
+}
+
+// Errors returns the errors encountered during validation.
+func (c *Config) Errors() []error {
+	c.protect.RLock()
+	c.protect.RUnlock()
+
+	ers := make([]error, len(c.errors))
+	copy(ers, c.errors)
+	return ers
 }
 
 // IsValid checks to see if the configuration is valid. If errors are found in
-// the config the Config.Errors property is filled with the validation errors.
+// the config the Config.Errors() will return the validation errors.
 // These can be used to display to the user. See DisplayErrors for a display
 // helper.
 func (c *Config) IsValid() bool {
-	if len(c.Servers) == 0 {
-		c.addError(errMsgServersRequired)
+	list := make(errList, 0)
+	c.protect.RLock()
+
+	if len(c.Networks) == 0 {
+		c.addError(errMsgNetworksRequired)
+		c.protect.RUnlock()
 		return false
 	}
 
-	c.validateServer(c.Global, false)
-	for _, s := range c.Servers {
-		c.validateServer(s, true)
+	c.validateNetwork(c.Network, &list, false)
+	for _, n := range c.Networks {
+		c.validateNetwork(n, &list, true)
 	}
 
-	return len(c.Errors) == 0
+	c.protect.RUnlock()
+	c.protect.Lock()
+	defer c.protect.Unlock()
+	c.errors = list
+
+	return len(c.errors) == 0
 }
 
-// validateServer checks a server for errors and adds to the error collection
+// validateNetwork checks a network for errors and adds to the error collection
 // if any are found.
-func (c *Config) validateServer(s *Server, missingIsError bool) {
-	name := s.GetName()
-	if len(s.Ssl) != 0 {
-		if _, err := strconv.ParseBool(s.Ssl); err != nil {
-			c.addError(fmtErrInvalid, name, errSsl, s.Ssl)
+func (c *Config) validateNetwork(n *Network, ers *errList, missingIsErr bool) {
+	name := n.InName
+	if len(n.InSsl) != 0 {
+		if _, err := strconv.ParseBool(n.InSsl); err != nil {
+			ers.addError(fmtErrInvalid, name, errSsl, n.InSsl)
 		}
 	}
 
-	if len(s.NoVerifyCert) != 0 {
-		if _, err := strconv.ParseBool(s.NoVerifyCert); err != nil {
-			c.addError(fmtErrInvalid, name, errNoVerifyCert, s.NoVerifyCert)
+	if len(n.InNoVerifyCert) != 0 {
+		if _, err := strconv.ParseBool(n.InNoVerifyCert); err != nil {
+			ers.addError(fmtErrInvalid, name, errNoVerifyCert, n.InNoVerifyCert)
 		}
 	}
 
-	if len(s.NoState) != 0 {
-		if _, err := strconv.ParseBool(s.NoState); err != nil {
-			c.addError(fmtErrInvalid, name, errNoState, s.NoState)
+	if len(n.InNoState) != 0 {
+		if _, err := strconv.ParseBool(n.InNoState); err != nil {
+			ers.addError(fmtErrInvalid, name, errNoState, n.InNoState)
 		}
 	}
 
-	if len(s.NoStore) != 0 {
-		if _, err := strconv.ParseBool(s.NoStore); err != nil {
-			c.addError(fmtErrInvalid, name, errNoStore, s.NoStore)
+	if len(n.InNoStore) != 0 {
+		if _, err := strconv.ParseBool(n.InNoStore); err != nil {
+			ers.addError(fmtErrInvalid, name, errNoStore, n.InNoStore)
 		}
 	}
 
-	if len(s.FloodLenPenalty) != 0 {
+	if len(n.InFloodLenPenalty) != 0 {
 		if _, err :=
-			strconv.ParseUint(s.FloodLenPenalty, 10, 32); err != nil {
-			c.addError(fmtErrInvalid, name, errFloodLenPenalty,
-				s.FloodLenPenalty)
+			strconv.ParseUint(n.InFloodLenPenalty, 10, 32); err != nil {
+			ers.addError(fmtErrInvalid, name, errFloodLenPenalty,
+				n.InFloodLenPenalty)
 		}
 	}
 
-	if len(s.FloodTimeout) != 0 {
-		if _, err := strconv.ParseFloat(s.FloodTimeout, 32); err != nil {
-			c.addError(fmtErrInvalid, name, errFloodTimeout,
-				s.FloodTimeout)
+	if len(n.InFloodTimeout) != 0 {
+		if _, err := strconv.ParseFloat(n.InFloodTimeout, 32); err != nil {
+			ers.addError(fmtErrInvalid, name, errFloodTimeout,
+				n.InFloodTimeout)
 		}
 	}
 
-	if len(s.FloodStep) != 0 {
-		if _, err := strconv.ParseFloat(s.FloodStep, 32); err != nil {
-			c.addError(fmtErrInvalid, name, errFloodStep,
-				s.FloodStep)
+	if len(n.InFloodStep) != 0 {
+		if _, err := strconv.ParseFloat(n.InFloodStep, 32); err != nil {
+			ers.addError(fmtErrInvalid, name, errFloodStep,
+				n.InFloodStep)
 		}
 	}
 
-	if len(s.KeepAlive) != 0 {
-		if _, err := strconv.ParseFloat(s.KeepAlive, 32); err != nil {
-			c.addError(fmtErrInvalid, name, errKeepAlive,
-				s.KeepAlive)
+	if len(n.InKeepAlive) != 0 {
+		if _, err := strconv.ParseFloat(n.InKeepAlive, 32); err != nil {
+			ers.addError(fmtErrInvalid, name, errKeepAlive,
+				n.InKeepAlive)
 		}
 	}
 
-	if len(s.NoReconnect) != 0 {
-		if _, err := strconv.ParseBool(s.NoReconnect); err != nil {
-			c.addError(fmtErrInvalid, name, errNoReconnect,
-				s.NoReconnect)
+	if len(n.InNoReconnect) != 0 {
+		if _, err := strconv.ParseBool(n.InNoReconnect); err != nil {
+			ers.addError(fmtErrInvalid, name, errNoReconnect,
+				n.InNoReconnect)
 		}
 	}
 
-	if len(s.ReconnectTimeout) != 0 {
-		if _, err := strconv.ParseUint(s.ReconnectTimeout, 10, 32); err != nil {
-			c.addError(fmtErrInvalid, name, errReconnectTimeout,
-				s.ReconnectTimeout)
+	if len(n.InReconnectTimeout) != 0 {
+		_, err := strconv.ParseUint(n.InReconnectTimeout, 10, 32)
+		if err != nil {
+			ers.addError(fmtErrInvalid, name, errReconnectTimeout,
+				n.InReconnectTimeout)
 		}
 	}
 
-	if host := s.GetHost(); len(host) == 0 {
-		if missingIsError {
-			c.addError(fmtErrMissing, name, errHost)
+	if s := n.Servers(); len(s) == 0 {
+		if missingIsErr {
+			ers.addError(fmtErrMissing, name, errServers)
 		}
-	} else if !rgxHost.MatchString(host) || len(host) > maxHostSize {
-		c.addError(fmtErrInvalid, name, errHost, host)
+	} else {
+		for _, srv := range s {
+			if !rgxHost.MatchString(srv) || len(srv) > maxHostSize {
+				ers.addError(fmtErrInvalid, name, errServers, srv)
+			}
+		}
 	}
 
-	if nick := s.GetNick(); len(nick) == 0 {
-		if missingIsError {
-			c.addError(fmtErrMissing, name, errNick)
+	if nick := n.Nick(); len(nick) == 0 {
+		if missingIsErr {
+			ers.addError(fmtErrMissing, name, errNick)
 		}
 	} else if !rgxNickname.MatchString(nick) {
-		c.addError(fmtErrInvalid, name, errNick, nick)
+		ers.addError(fmtErrInvalid, name, errNick, nick)
 	}
 
-	if username := s.GetUsername(); len(username) == 0 {
-		if missingIsError {
-			c.addError(fmtErrMissing, name, errUsername)
+	if username := n.Username(); len(username) == 0 {
+		if missingIsErr {
+			ers.addError(fmtErrMissing, name, errUsername)
 		}
 	} else if !rgxUsername.MatchString(username) {
-		c.addError(fmtErrInvalid, name, errUsername, username)
+		ers.addError(fmtErrInvalid, name, errUsername, username)
 	}
 
-	if userhost := s.GetUserhost(); len(userhost) == 0 {
-		if missingIsError {
-			c.addError(fmtErrMissing, name, errUserhost)
-		}
-	} else if !rgxHost.MatchString(userhost) {
-		c.addError(fmtErrInvalid, name, errUserhost, userhost)
-	}
-
-	if realname := s.GetRealname(); len(realname) == 0 {
-		if missingIsError {
-			c.addError(fmtErrMissing, name, errRealname)
+	if realname := n.Realname(); len(realname) == 0 {
+		if missingIsErr {
+			ers.addError(fmtErrMissing, name, errRealname)
 		}
 	} else if !rgxRealname.MatchString(realname) {
-		c.addError(fmtErrInvalid, name, errRealname, realname)
+		ers.addError(fmtErrInvalid, name, errRealname, realname)
 	}
 
-	for _, channel := range s.GetChannels() {
+	for _, channel := range n.Channels() {
 		if !rgxChannel.MatchString(channel) {
-			c.addError(fmtErrInvalid, name, errChannel, channel)
+			ers.addError(fmtErrInvalid, name, errChannel, channel)
 		}
 	}
 }
@@ -295,259 +337,90 @@ func (c *Config) validateServer(s *Server, missingIsError bool) {
 // DisplayErrors is a helper function to log the output of all config to the
 // standard logger.
 func (c *Config) DisplayErrors() {
-	for _, e := range c.Errors {
+	c.protect.RLock()
+	defer c.protect.RUnlock()
+
+	for _, e := range c.errors {
 		log.Println(e.Error())
 	}
 }
 
-// GlobalContext clears the configs server context
-func (c *Config) GlobalContext() *Config {
-	c.context = nil
-	return c
+// GetNetwork retrieves the network by name if it exists, nil if not.
+func (c *Config) GetNetwork(name string) *Network {
+	c.protect.RLock()
+	defer c.protect.RUnlock()
+
+	return c.Networks[name]
 }
 
-// ServerContext the configs server context, adds an error if the if server
-// key is not found.
-func (c *Config) ServerContext(name string) *Config {
-	if srv, ok := c.Servers[name]; ok {
-		c.context = srv
-	} else {
-		c.addError(fmtErrServerNotFound, name)
-	}
-	return c
-}
-
-// GetContext retrieves the current configuration context, if no context has
-// been set, returns the global setting object.
-func (c *Config) GetContext() *Server {
-	if c.context != nil {
-		return c.context
-	}
-	return c.Global
-}
-
-// GetServer retrieves the server by name if it exists, nil if not.
-func (c *Config) GetServer(name string) *Server {
-	return c.Servers[name]
-}
-
-// Server fluently creates a server object and sets the context on the Config to
-// the current instance. This automatically sets the Host() parameter to the
-// same thing. If you have multiple servers connecting to the same host, you
-// will have to use this to name the server, and Host() to set the host.
-func (c *Config) Server(name string) *Config {
-	if len(name) != 0 {
-		if _, ok := c.Servers[name]; !ok {
-			c.context = &Server{parent: c, Name: name, Host: name}
-			c.Servers[name] = c.context
-		} else {
-			c.addError(errMsgDuplicateServer)
-		}
-	} else {
-		c.addError(fmtErrMissing, "<NONE>", errHost)
-	}
-	return c
-}
-
-// RemoveServer removes a server by name. Note that this does not work on
-// host if a name has been set on the server.
-func (c *Config) RemoveServer(name string) (deleted bool) {
-	if _, deleted := c.Servers[name]; deleted {
-		delete(c.Servers, name)
-		c.context = nil
-	}
-	return
-}
-
-// Host fluently sets the host for the current config context
-func (c *Config) Host(host string) *Config {
-	if c.context != nil {
-		c.context.Host = host
-	}
-	return c
-}
-
-// Port fluently sets the port for the current config context
-func (c *Config) Port(port uint16) *Config {
-	c.GetContext().Port = port
-	return c
-}
-
-// Ssl fluently sets the ssl for the current config context
-func (c *Config) Ssl(ssl bool) *Config {
-	c.GetContext().Ssl = strconv.FormatBool(ssl)
-	return c
-}
-
-// SslCert sets a filename that will be read in (pem format)
-// to verify the server's certificate.
-func (c *Config) SslCert(cert string) *Config {
-	c.GetContext().SslCert = cert
-	return c
-}
-
-// NoVerifyCert fluently sets the noverifyCert for the current config context
-func (c *Config) NoVerifyCert(noverifycert bool) *Config {
-	c.GetContext().NoVerifyCert = strconv.FormatBool(noverifycert)
-	return c
-}
-
-// NoState fluently sets reconnection for the current config context,
-// this turns off the irc state database (data package).
-func (c *Config) NoState(nostate bool) *Config {
-	c.GetContext().NoState = strconv.FormatBool(nostate)
-	return c
-}
-
-// NoStore fluently sets reconnection for the current config context,
-// this turns off the irc store database (data package).
-func (c *Config) NoStore(nostore bool) *Config {
-	c.GetContext().NoStore = strconv.FormatBool(nostore)
-	return c
-}
-
-// FloodLenPenalty fluently sets flood lenPenalty for the current config
-// context. This is how many characters in a message will generate an extra
-// second of flood protection penalty.
-func (c *Config) FloodLenPenalty(floodlenPenalty uint) *Config {
-	c.GetContext().FloodLenPenalty =
-		strconv.FormatUint(uint64(floodlenPenalty), 10)
-	return c
-}
-
-// FloodTimeout fluently sets flood timeout for the current config
-// context, this is how many seconds of penalty must accumulate before flood
-// protection is triggered, and also how long after flood protection activation
-// it will continue to flood protect for.
-func (c *Config) FloodTimeout(floodtimeout float64) *Config {
-	c.GetContext().FloodTimeout = strconv.FormatFloat(floodtimeout, 'e', -1, 64)
-	return c
-}
-
-// FloodStep fluently sets flood protect step for the current config
-// context, this is how many seconds as a base are used to protect against
-// flooding, but may be added on to by FloodLenPenalty for sufficiently long
-// messages.
-func (c *Config) FloodStep(floodstep float64) *Config {
-	c.GetContext().FloodStep = strconv.FormatFloat(floodstep, 'e', -1, 64)
-	return c
-}
-
-// KeepAlive fluently sets keep alive timeout for the current config
-// context, this is how many seconds to wait on an idle connection before
-// sending a ping to see if the server is dead.
-func (c *Config) KeepAlive(floodstep float64) *Config {
-	c.GetContext().KeepAlive = strconv.FormatFloat(floodstep, 'e', -1, 64)
-	return c
-}
-
-// NoReconnect fluently sets reconnection for the current config context
-func (c *Config) NoReconnect(noreconnect bool) *Config {
-	c.GetContext().NoReconnect = strconv.FormatBool(noreconnect)
-	return c
-}
-
-// ReconnectTimeout fluently sets the port for the current config context
-func (c *Config) ReconnectTimeout(seconds uint) *Config {
-	c.GetContext().ReconnectTimeout = strconv.FormatUint(uint64(seconds), 10)
-	return c
-}
-
-// Nick fluently sets the nick for the current config context
-func (c *Config) Nick(nick string) *Config {
-	c.GetContext().Nick = nick
-	return c
-}
-
-// Altnick fluently sets the altnick for the current config context
-func (c *Config) Altnick(altnick string) *Config {
-	c.GetContext().Altnick = altnick
-	return c
-}
-
-// Username fluently sets the username for the current config context
-func (c *Config) Username(username string) *Config {
-	c.GetContext().Username = username
-	return c
-}
-
-// Userhost fluently sets the userhost for the current config context
-func (c *Config) Userhost(userhost string) *Config {
-	c.GetContext().Userhost = userhost
-	return c
-}
-
-// Realname fluently sets the realname for the current config context
-func (c *Config) Realname(realname string) *Config {
-	c.GetContext().Realname = realname
-	return c
-}
-
-// Prefix fluently sets the prefix for the current config context
-func (c *Config) Prefix(prefix string) *Config {
-	c.GetContext().Prefix = prefix
-	return c
-}
-
-// Channels fluently sets the channels for the current config context
-func (c *Config) Channels(channels ...string) *Config {
-	if len(channels) > 0 {
-		context := c.GetContext()
-		context.Channels = make([]string, len(channels))
-		copy(context.Channels, channels)
-	}
-	return c
-}
-
-// Server states the all the details necessary to connect to an irc server
+// Network states the all the details necessary to connect to an irc network
 // Although all of these are exported so they can be deserialized into a yaml
-// file, they are not for direct reading and the helper methods should ALWAYS
-// be used to preserve correct global-value resolution.
-type Server struct {
-	parent *Config
+// file. The fields are all marked with "In" as in "Internal" and should not
+// be accessed directly, but through their appropriately named helper methods.
+type Network struct {
+	parent  *Config       `yaml:"-" json:"-"`
+	protect *sync.RWMutex `yaml:"-" json:"-"`
 
-	// Name of this connection
-	Name string
+	// Name of this network
+	InName string `yaml:"-" json:"-"`
 
-	// Irc Server connection info
-	Host string
-	Port uint16
+	// Irc Network connection info
+	InServers []string `yaml:"servers" json:"servers"`
+	InPort    uint16   `yaml:"port" json:"port"`
 
 	// Ssl configuration
-	Ssl          string
-	SslCert      string
-	NoVerifyCert string
+	InSsl          string `yaml:"ssl" json:"ssl"`
+	InSslCert      string `yaml:"sslcert" json:"sslcert"`
+	InNoVerifyCert string `yaml:"noverifycert" json:"noverifycert"`
 
 	// State tracking
-	NoState string
-	NoStore string
+	InNoState string `yaml:"nostate" json:"nostate"`
+	InNoStore string `yaml:"nostore" json:"nostore"`
 
 	// Flood Protection
-	FloodLenPenalty string
-	FloodTimeout    string
-	FloodStep       string
+	InFloodLenPenalty string `yaml:"floodlenpenalty" json:"floodlenpenalty"`
+	InFloodTimeout    string `yaml:"floodtimeout" json:"floodtimeout"`
+	InFloodStep       string `yaml:"floodstep" json:"floodstep"`
 
 	// Keep alive
-	KeepAlive string
+	InKeepAlive string `yaml:"keepalive" json:"keepalive"`
 
-	// Auto reconnection
-	NoReconnect      string
-	ReconnectTimeout string
+	// Auto reconnectiong
+	InNoReconnect      string `yaml:"noreconnect" json:"noreconnect"`
+	InReconnectTimeout string `yaml:"reconnecttimeout" json:"reconnecttimeout"`
 
 	// Irc User data
-	Nick     string
-	Altnick  string
-	Username string
-	Userhost string
-	Realname string
+	InNick     string `yaml:"nick" json:"nick"`
+	InAltnick  string `yaml:"altnick" json:"altnick"`
+	InUsername string `yaml:"username" json:"username"`
+	InUserhost string `yaml:"userhost" json:"userhost"`
+	InRealname string `yaml:"realname" json:"realname"`
+	InPassword string `yaml:"password" json:"password"`
 
 	// Dispatching options
-	Prefix   string
-	Channels []string
+	InPrefix   string   `yaml:"prefix" json:"prefix"`
+	InChannels []string `yaml:"channels" json:"channels"`
 }
 
-// GetFilename returns fileName of the configuration, or the default.
-func (c *Config) GetFilename() (filename string) {
+// Clone clones a network.
+func (n *Network) Clone() *Network {
+	n.protect.RLock()
+	defer n.protect.RUnlock()
+
+	newNet := *n
+	newNet.InChannels = make([]string, len(n.InChannels))
+	newNet.InServers = make([]string, len(n.InServers))
+	copy(newNet.InChannels, n.InChannels)
+	copy(newNet.InServers, n.InServers)
+
+	return &newNet
+}
+
+// Filename returns fileName of the configuration, or the default.
+func (c *Config) Filename() (filename string) {
+	c.protect.RLock()
+	defer c.protect.RUnlock()
+
 	filename = defaultConfigFileName
 	if len(c.filename) > 0 {
 		filename = c.filename
@@ -555,14 +428,11 @@ func (c *Config) GetFilename() (filename string) {
 	return
 }
 
-// StoreFile fluently sets the storefile for the global context.
-func (c *Config) StoreFile(storefile string) *Config {
-	c.Storefile = storefile
-	return c
-}
+// StoreFile gets the global storefile or defaultStoreFile.
+func (c *Config) StoreFile() (storefile string) {
+	c.protect.RLock()
+	defer c.protect.RUnlock()
 
-// GetStoreFile gets the global storefile or defaultStoreFile.
-func (c *Config) GetStoreFile() (storefile string) {
 	storefile = defaultStoreFile
 	if len(c.Storefile) > 0 {
 		storefile = c.Storefile
@@ -570,35 +440,53 @@ func (c *Config) GetStoreFile() (storefile string) {
 	return
 }
 
-// GetHost gets s.host
-func (s *Server) GetHost() string {
-	return s.Host
+// Name gets the network's name.
+func (n *Network) Name() string {
+	n.protect.RLock()
+	defer n.protect.RUnlock()
+
+	return n.InName
 }
 
-// GetName gets s.name
-func (s *Server) GetName() string {
-	return s.Name
+// Servers gets the network's server list.
+func (n *Network) Servers() []string {
+	n.protect.RLock()
+	defer n.protect.RUnlock()
+
+	if len(n.InServers) == 0 {
+		return []string{n.InName}
+	}
+
+	servers := make([]string, len(n.InServers))
+	copy(servers, n.InServers)
+	return servers
 }
 
-// GetPort returns gets Port of the server, or the global port, or
+// Port returns gets Port of the network, or the global port, or
 // ircDefaultPort
-func (s *Server) GetPort() (port uint16) {
+func (n *Network) Port() (port uint16) {
+	n.protect.RLock()
+	defer n.protect.RUnlock()
+
 	port = defaultIrcPort
-	if s.Port != 0 {
-		port = s.Port
-	} else if s.parent != nil && s.parent.Global.Port != 0 {
-		port = s.parent.Global.Port
+	if n.InPort != 0 {
+		port = n.InPort
+	} else if n.parent != nil && n.parent.InPort != 0 {
+		port = n.parent.InPort
 	}
 	return
 }
 
-// GetSsl returns Ssl of the server, or the global ssl, or false
-func (s *Server) GetSsl() (ssl bool) {
+// Ssl returns Ssl of the network, or the global ssl, or false
+func (n *Network) Ssl() (ssl bool) {
+	n.protect.RLock()
+	defer n.protect.RUnlock()
+
 	var err error
-	if len(s.Ssl) != 0 {
-		ssl, err = strconv.ParseBool(s.Ssl)
-	} else if s.parent != nil && len(s.parent.Global.Ssl) != 0 {
-		ssl, err = strconv.ParseBool(s.parent.Global.Ssl)
+	if len(n.InSsl) != 0 {
+		ssl, err = strconv.ParseBool(n.InSsl)
+	} else if n.parent != nil && len(n.parent.InSsl) != 0 {
+		ssl, err = strconv.ParseBool(n.parent.InSsl)
 	}
 
 	if err != nil {
@@ -607,24 +495,30 @@ func (s *Server) GetSsl() (ssl bool) {
 	return
 }
 
-// GetSslCert returns the path to the certificate used when connecting.
-func (s *Server) GetSslCert() (cert string) {
-	if len(s.SslCert) > 0 {
-		cert = s.SslCert
-	} else if s.parent != nil && len(s.parent.Global.SslCert) > 0 {
-		cert = s.parent.Global.SslCert
+// SslCert returns the path to the certificate used when connecting.
+func (n *Network) SslCert() (cert string) {
+	n.protect.RLock()
+	defer n.protect.RUnlock()
+
+	if len(n.InSslCert) > 0 {
+		cert = n.InSslCert
+	} else if n.parent != nil && len(n.parent.InSslCert) > 0 {
+		cert = n.parent.InSslCert
 	}
 	return
 }
 
-// GetNoVerifyCert gets NoVerifyCert of the server, or the global verifyCert, or
+// NoVerifyCert gets NoVerifyCert of the network, or the global verifyCert, or
 // false
-func (s *Server) GetNoVerifyCert() (noverifyCert bool) {
+func (n *Network) NoVerifyCert() (noverifyCert bool) {
+	n.protect.RLock()
+	defer n.protect.RUnlock()
+
 	var err error
-	if len(s.NoVerifyCert) != 0 {
-		noverifyCert, err = strconv.ParseBool(s.NoVerifyCert)
-	} else if s.parent != nil && len(s.parent.Global.NoVerifyCert) != 0 {
-		noverifyCert, err = strconv.ParseBool(s.parent.Global.NoVerifyCert)
+	if len(n.InNoVerifyCert) != 0 {
+		noverifyCert, err = strconv.ParseBool(n.InNoVerifyCert)
+	} else if n.parent != nil && len(n.parent.InNoVerifyCert) != 0 {
+		noverifyCert, err = strconv.ParseBool(n.parent.InNoVerifyCert)
 	}
 
 	if err != nil {
@@ -633,14 +527,17 @@ func (s *Server) GetNoVerifyCert() (noverifyCert bool) {
 	return
 }
 
-// GetNoState gets NoState of the server, or the global nostate, or
+// NoState gets NoState of the network, or the global nostate, or
 // false
-func (s *Server) GetNoState() (nostate bool) {
+func (n *Network) NoState() (nostate bool) {
+	n.protect.RLock()
+	defer n.protect.RUnlock()
+
 	var err error
-	if len(s.NoState) != 0 {
-		nostate, err = strconv.ParseBool(s.NoState)
-	} else if s.parent != nil && len(s.parent.Global.NoState) != 0 {
-		nostate, err = strconv.ParseBool(s.parent.Global.NoState)
+	if len(n.InNoState) != 0 {
+		nostate, err = strconv.ParseBool(n.InNoState)
+	} else if n.parent != nil && len(n.parent.InNoState) != 0 {
+		nostate, err = strconv.ParseBool(n.parent.InNoState)
 	}
 
 	if err != nil {
@@ -649,14 +546,17 @@ func (s *Server) GetNoState() (nostate bool) {
 	return
 }
 
-// GetNoStore gets NoStore of the server, or the global nostore, or
+// NoStore gets NoStore of the network, or the global nostore, or
 // false
-func (s *Server) GetNoStore() (nostore bool) {
+func (n *Network) NoStore() (nostore bool) {
+	n.protect.RLock()
+	defer n.protect.RUnlock()
+
 	var err error
-	if len(s.NoStore) != 0 {
-		nostore, err = strconv.ParseBool(s.NoStore)
-	} else if s.parent != nil && len(s.parent.Global.NoStore) != 0 {
-		nostore, err = strconv.ParseBool(s.parent.Global.NoStore)
+	if len(n.InNoStore) != 0 {
+		nostore, err = strconv.ParseBool(n.InNoStore)
+	} else if n.parent != nil && len(n.parent.InNoStore) != 0 {
+		nostore, err = strconv.ParseBool(n.parent.InNoStore)
 	}
 
 	if err != nil {
@@ -665,14 +565,17 @@ func (s *Server) GetNoStore() (nostore bool) {
 	return
 }
 
-// GetNoReconnect gets NoReconnect of the server, or the global noReconnect, or
+// NoReconnect gets NoReconnect of the network, or the global noReconnect, or
 // false
-func (s *Server) GetNoReconnect() (noReconnect bool) {
+func (n *Network) NoReconnect() (noReconnect bool) {
+	n.protect.RLock()
+	defer n.protect.RUnlock()
+
 	var err error
-	if len(s.NoReconnect) != 0 {
-		noReconnect, err = strconv.ParseBool(s.NoReconnect)
-	} else if s.parent != nil && len(s.parent.Global.NoReconnect) != 0 {
-		noReconnect, err = strconv.ParseBool(s.parent.Global.NoReconnect)
+	if len(n.InNoReconnect) != 0 {
+		noReconnect, err = strconv.ParseBool(n.InNoReconnect)
+	} else if n.parent != nil && len(n.parent.InNoReconnect) != 0 {
+		noReconnect, err = strconv.ParseBool(n.parent.InNoReconnect)
 	}
 
 	if err != nil {
@@ -681,17 +584,20 @@ func (s *Server) GetNoReconnect() (noReconnect bool) {
 	return
 }
 
-// GetFloodLenPenalty gets FloodLenPenalty of the server, or the global
+// FloodLenPenalty gets FloodLenPenalty of the network, or the global
 // floodLenPenalty, or defaultFloodLenPenalty
-func (s *Server) GetFloodLenPenalty() (floodLenPenalty uint) {
+func (n *Network) FloodLenPenalty() (floodLenPenalty uint) {
+	n.protect.RLock()
+	defer n.protect.RUnlock()
+
 	var err error
 	var u uint64
 	var notset bool
 	floodLenPenalty = defaultFloodLenPenalty
-	if len(s.FloodLenPenalty) != 0 {
-		u, err = strconv.ParseUint(s.FloodLenPenalty, 10, 32)
-	} else if s.parent != nil && len(s.parent.Global.FloodLenPenalty) != 0 {
-		u, err = strconv.ParseUint(s.parent.Global.FloodLenPenalty, 10, 32)
+	if len(n.InFloodLenPenalty) != 0 {
+		u, err = strconv.ParseUint(n.InFloodLenPenalty, 10, 32)
+	} else if n.parent != nil && len(n.parent.InFloodLenPenalty) != 0 {
+		u, err = strconv.ParseUint(n.parent.InFloodLenPenalty, 10, 32)
 	} else {
 		notset = true
 	}
@@ -704,15 +610,18 @@ func (s *Server) GetFloodLenPenalty() (floodLenPenalty uint) {
 	return
 }
 
-// GetFloodTimeout gets FloodTimeout of the server, or the global
+// FloodTimeout gets FloodTimeout of the network, or the global
 // floodTimeout, or defaultFloodTimeout
-func (s *Server) GetFloodTimeout() (floodTimeout float64) {
+func (n *Network) FloodTimeout() (floodTimeout float64) {
+	n.protect.RLock()
+	defer n.protect.RUnlock()
+
 	var err error
 	floodTimeout = defaultFloodTimeout
-	if len(s.FloodTimeout) != 0 {
-		floodTimeout, err = strconv.ParseFloat(s.FloodTimeout, 32)
-	} else if s.parent != nil && len(s.parent.Global.FloodTimeout) != 0 {
-		floodTimeout, err = strconv.ParseFloat(s.parent.Global.FloodTimeout, 32)
+	if len(n.InFloodTimeout) != 0 {
+		floodTimeout, err = strconv.ParseFloat(n.InFloodTimeout, 32)
+	} else if n.parent != nil && len(n.parent.InFloodTimeout) != 0 {
+		floodTimeout, err = strconv.ParseFloat(n.parent.InFloodTimeout, 32)
 	}
 
 	if err != nil {
@@ -721,15 +630,18 @@ func (s *Server) GetFloodTimeout() (floodTimeout float64) {
 	return
 }
 
-// GetFloodStep gets FloodStep of the server, or the global
+// FloodStep gets FloodStep of the network, or the global
 // floodStep, or defaultFloodStep
-func (s *Server) GetFloodStep() (floodStep float64) {
+func (n *Network) FloodStep() (floodStep float64) {
+	n.protect.RLock()
+	defer n.protect.RUnlock()
+
 	var err error
 	floodStep = defaultFloodStep
-	if len(s.FloodStep) != 0 {
-		floodStep, err = strconv.ParseFloat(s.FloodStep, 32)
-	} else if s.parent != nil && len(s.parent.Global.FloodStep) != 0 {
-		floodStep, err = strconv.ParseFloat(s.parent.Global.FloodStep, 32)
+	if len(n.InFloodStep) != 0 {
+		floodStep, err = strconv.ParseFloat(n.InFloodStep, 32)
+	} else if n.parent != nil && len(n.parent.InFloodStep) != 0 {
+		floodStep, err = strconv.ParseFloat(n.parent.InFloodStep, 32)
 	}
 
 	if err != nil {
@@ -738,15 +650,18 @@ func (s *Server) GetFloodStep() (floodStep float64) {
 	return
 }
 
-// GetKeepAlive gets KeepAlive of the server, or the global keepAlive,
+// KeepAlive gets KeepAlive of the network, or the global keepAlive,
 // or defaultKeepAlive.
-func (s *Server) GetKeepAlive() (keepAlive float64) {
+func (n *Network) KeepAlive() (keepAlive float64) {
+	n.protect.RLock()
+	defer n.protect.RUnlock()
+
 	var err error
 	keepAlive = defaultKeepAlive
-	if len(s.KeepAlive) != 0 {
-		keepAlive, err = strconv.ParseFloat(s.KeepAlive, 32)
-	} else if s.parent != nil && len(s.parent.Global.KeepAlive) != 0 {
-		keepAlive, err = strconv.ParseFloat(s.parent.Global.KeepAlive, 32)
+	if len(n.InKeepAlive) != 0 {
+		keepAlive, err = strconv.ParseFloat(n.InKeepAlive, 32)
+	} else if n.parent != nil && len(n.parent.InKeepAlive) != 0 {
+		keepAlive, err = strconv.ParseFloat(n.parent.InKeepAlive, 32)
 	}
 
 	if err != nil {
@@ -755,17 +670,20 @@ func (s *Server) GetKeepAlive() (keepAlive float64) {
 	return
 }
 
-// GetReconnectTimeout gets ReconnectTimeout of the server, or the global
+// ReconnectTimeout gets ReconnectTimeout of the network, or the global
 // reconnectTimeout, or defaultReconnectTimeout
-func (s *Server) GetReconnectTimeout() (reconnTimeout uint) {
+func (n *Network) ReconnectTimeout() (reconnTimeout uint) {
+	n.protect.RLock()
+	defer n.protect.RUnlock()
+
 	var notset bool
 	var err error
 	var u uint64
 	reconnTimeout = defaultReconnectTimeout
-	if len(s.ReconnectTimeout) != 0 {
-		u, err = strconv.ParseUint(s.ReconnectTimeout, 10, 32)
-	} else if s.parent != nil && len(s.parent.Global.ReconnectTimeout) != 0 {
-		u, err = strconv.ParseUint(s.parent.Global.ReconnectTimeout, 10, 32)
+	if len(n.InReconnectTimeout) != 0 {
+		u, err = strconv.ParseUint(n.InReconnectTimeout, 10, 32)
+	} else if n.parent != nil && len(n.parent.InReconnectTimeout) != 0 {
+		u, err = strconv.ParseUint(n.parent.InReconnectTimeout, 10, 32)
 	} else {
 		notset = true
 	}
@@ -778,78 +696,114 @@ func (s *Server) GetReconnectTimeout() (reconnTimeout uint) {
 	return
 }
 
-// GetNick gets Nick of the server, or the global nick, or empty string.
-func (s *Server) GetNick() (nick string) {
-	if len(s.Nick) > 0 {
-		nick = s.Nick
-	} else if s.parent != nil && len(s.parent.Global.Nick) > 0 {
-		nick = s.parent.Global.Nick
+// Nick gets Nick of the network, or the global nick, or empty string.
+func (n *Network) Nick() (nick string) {
+	n.protect.RLock()
+	defer n.protect.RUnlock()
+
+	if len(n.InNick) > 0 {
+		nick = n.InNick
+	} else if n.parent != nil && len(n.parent.InNick) > 0 {
+		nick = n.parent.InNick
 	}
 	return
 }
 
-// GetAltnick gets Altnick of the server, or the global altnick, or empty
+// Altnick gets Altnick of the network, or the global nick, or empty string.
+func (n *Network) Altnick() (altnick string) {
+	n.protect.RLock()
+	defer n.protect.RUnlock()
+
+	if len(n.InAltnick) > 0 {
+		altnick = n.InAltnick
+	} else if n.parent != nil && len(n.parent.InAltnick) > 0 {
+		altnick = n.parent.InAltnick
+	}
+	return
+}
+
+// Username gets Username of the network, or the global username, or empty
 // string.
-func (s *Server) GetAltnick() (altnick string) {
-	if len(s.Altnick) > 0 {
-		altnick = s.Altnick
-	} else if s.parent != nil && len(s.parent.Global.Altnick) > 0 {
-		altnick = s.parent.Global.Altnick
+func (n *Network) Username() (username string) {
+	n.protect.RLock()
+	defer n.protect.RUnlock()
+
+	if len(n.InUsername) > 0 {
+		username = n.InUsername
+	} else if n.parent != nil && len(n.parent.InUsername) > 0 {
+		username = n.parent.InUsername
 	}
 	return
 }
 
-// GetUsername gets Username of the server, or the global username, or empty
+// Userhost gets Userhost of the network, or the global userhost, or empty
 // string.
-func (s *Server) GetUsername() (username string) {
-	if len(s.Username) > 0 {
-		username = s.Username
-	} else if s.parent != nil && len(s.parent.Global.Username) > 0 {
-		username = s.parent.Global.Username
+func (n *Network) Userhost() (userhost string) {
+	n.protect.RLock()
+	defer n.protect.RUnlock()
+
+	if len(n.InUserhost) > 0 {
+		userhost = n.InUserhost
+	} else if n.parent != nil && len(n.parent.InUserhost) > 0 {
+		userhost = n.parent.InUserhost
 	}
 	return
 }
 
-// GetUserhost gets Userhost of the server, or the global userhost, or empty
+// Realname gets Realname of the network, or the global realname, or empty
 // string.
-func (s *Server) GetUserhost() (userhost string) {
-	if len(s.Userhost) > 0 {
-		userhost = s.Userhost
-	} else if s.parent != nil && len(s.parent.Global.Userhost) > 0 {
-		userhost = s.parent.Global.Userhost
+func (n *Network) Realname() (realname string) {
+	n.protect.RLock()
+	defer n.protect.RUnlock()
+
+	if len(n.InRealname) > 0 {
+		realname = n.InRealname
+	} else if n.parent != nil && len(n.parent.InRealname) > 0 {
+		realname = n.parent.InRealname
 	}
 	return
 }
 
-// GetRealname gets Realname of the server, or the global realname, or empty
-// string.
-func (s *Server) GetRealname() (realname string) {
-	if len(s.Realname) > 0 {
-		realname = s.Realname
-	} else if s.parent != nil && len(s.parent.Global.Realname) > 0 {
-		realname = s.parent.Global.Realname
+// Password gets password of the network, or the global password,
+// or empty string.
+func (n *Network) Password() (password string) {
+	n.protect.RLock()
+	defer n.protect.RUnlock()
+
+	if len(n.InPassword) > 0 {
+		password = n.InPassword
+	} else if n.parent != nil && len(n.parent.InPassword) > 0 {
+		password = n.parent.InPassword
 	}
 	return
 }
 
-// GetPrefix gets Prefix of the server, or the global prefix, or defaultPrefix.
-func (s *Server) GetPrefix() (prefix rune) {
+// Prefix gets Prefix of the network, or the global prefix, or defaultPrefix.
+func (n *Network) Prefix() (prefix rune) {
+	n.protect.RLock()
+	defer n.protect.RUnlock()
+
 	prefix = defaultPrefix
-	if len(s.Prefix) > 0 {
-		prefix = rune(s.Prefix[0])
-	} else if s.parent != nil && len(s.parent.Global.Prefix) > 0 {
-		prefix = rune(s.parent.Global.Prefix[0])
+	if len(n.InPrefix) > 0 {
+		prefix = rune(n.InPrefix[0])
+	} else if n.parent != nil && len(n.parent.InPrefix) > 0 {
+		prefix = rune(n.parent.InPrefix[0])
 	}
 	return
 }
 
-// GetChannels gets Channels of the server, or the global channels, or nil
+// Channels gets Channels of the network, or the global channels, or nil
 // slice of string (check the length!).
-func (s *Server) GetChannels() (channels []string) {
-	if len(s.Channels) > 0 {
-		channels = s.Channels
-	} else if s.parent != nil && len(s.parent.Global.Channels) > 0 {
-		channels = s.parent.Global.Channels
+func (n *Network) Channels() (channels []string) {
+	n.protect.RLock()
+	defer n.protect.RUnlock()
+
+	if len(n.InChannels) > 0 {
+		channels = make([]string, len(n.InChannels))
+		copy(channels, n.InChannels)
+	} else if n.parent != nil && len(n.parent.InChannels) > 0 {
+		channels = make([]string, len(n.parent.InChannels))
+		copy(channels, n.parent.InChannels)
 	}
 	return
 }
