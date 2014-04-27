@@ -66,6 +66,7 @@ const (
 	errFmtInsuffGlobalFlags  = "Access Denied: (%v) global flag(s) required."
 	errFmtInsuffServerFlags  = "Access Denied: (%v) server flag(s) required."
 	errFmtInsuffChannelFlags = "Access Denied: (%v) channel flag(s) required."
+	errFmtCmdNotFound        = "Error: Command not found (%v), try \"help\"."
 	errFmtUserNotRegistered  = "Error: User [%v] is not registered."
 	errFmtUserNotAuthed      = "Error: User [%v] is not authenticated."
 	errFmtUserNotFound       = "Error: User [%v] could not be found."
@@ -245,7 +246,7 @@ func (c *Cmds) Dispatch(networkID string, overridePrefix rune,
 	if len(fields) == 0 {
 		return nil
 	}
-	cmd := fields[0]
+	cmd := strings.ToLower(fields[0])
 
 	ch := ""
 	nick := irc.Nick(ev.Sender)
@@ -272,7 +273,9 @@ func (c *Cmds) Dispatch(networkID string, overridePrefix rune,
 	c.protectCmds.RLock()
 	defer c.protectCmds.RUnlock()
 	if command, ok = c.commands[cmd]; !ok {
-		return nil
+		err = fmt.Errorf(errFmtCmdNotFound, cmd)
+		writer.Noticef(nick, errFmtCmdNotFound, err)
+		return err
 	}
 
 	if 0 == (msgtype&command.Msgtype) || 0 == (msgscope&command.Msgscope) {
@@ -300,7 +303,7 @@ func (c *Cmds) Dispatch(networkID string, overridePrefix rune,
 
 			cmdEv.Close()
 			writer.Notice(nick, err.Error())
-			return
+			return err
 		}
 	}
 
@@ -309,7 +312,7 @@ func (c *Cmds) Dispatch(networkID string, overridePrefix rune,
 
 		cmdEv.Close()
 		writer.Notice(nick, err.Error())
-		return
+		return err
 	}
 
 	if state != nil {

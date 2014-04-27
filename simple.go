@@ -74,8 +74,9 @@ func (q *Quoter) Addquote(w irc.Writer, ev *cmd.Event) error {
 	err := q.db.AddQuote(nick, quote)
 	if err != nil {
 		w.Noticef(nick, "\x02Quote:\x02 %v", err)
+	} else {
+		w.Notice(nick, "\x02Quote:\x02 Added.")
 	}
-	w.Notice(nick, "\x02Quote:\x02 Added.")
 	return nil
 }
 
@@ -189,7 +190,7 @@ func (q *Quoter) Details(w irc.Writer, ev *cmd.Event) error {
  Queryer methods.
 ===================== */
 
-func (_ *Queryer) PrivmsgChannel(ev *irc.Event, w irc.Writer) {
+func (_ *Queryer) PrivmsgChannel(w irc.Writer, ev *irc.Event) {
 	if out, err := query.YouTube(ev.Message()); len(out) != 0 {
 		w.Privmsg(ev.Target(), out)
 	} else if err != nil {
