@@ -7,6 +7,10 @@ import (
 	"testing"
 )
 
+var (
+	netInfo = NewNetworkInfo()
+)
+
 func TestHelper_ImplementsWriter(t *testing.T) {
 	var _ Writer = &Helper{nil}
 }
@@ -224,6 +228,78 @@ func TestHelper_CTCPReplyf(t *testing.T) {
 
 	expect := fmt.Sprintf("%v %v :\x01%v %v\x01", NOTICE, ch, tag,
 		fmt.Sprintf(format, s1, s2))
+	if s := buf.String(); s != expect {
+		t.Errorf("Expected: %s, got: %s", expect, s)
+	}
+}
+
+func TestHelper_Notify(t *testing.T) {
+	buf := bytes.Buffer{}
+	h := &Helper{&buf}
+	ch := "#chan"
+	s1, s2 := "string1", "string2"
+
+	ev := &Event{NetworkInfo: netInfo, Args: []string{ch}}
+	h.Notify(ev, "user", s1, s2)
+	expect := fmt.Sprintf("%v %v :%v", PRIVMSG, ch, fmt.Sprint(s1, s2))
+	if s := buf.String(); s != expect {
+		t.Errorf("Expected: %s, got: %s", expect, s)
+	}
+
+	buf.Reset()
+	ev.Args = []string{"user"}
+	h.Notify(ev, "user", s1, s2)
+	expect = fmt.Sprintf("%v %v :%v", NOTICE, "user", fmt.Sprint(s1, s2))
+	if s := buf.String(); s != expect {
+		t.Errorf("Expected: %s, got: %s", expect, s)
+	}
+}
+
+func TestHelper_Notifyln(t *testing.T) {
+	buf := bytes.Buffer{}
+	h := &Helper{&buf}
+	ch := "#chan"
+	s1, s2 := "string1", "string2"
+
+	ev := &Event{NetworkInfo: netInfo, Args: []string{ch}}
+	h.Notifyln(ev, ch, s1, s2)
+	expect := fmt.Sprintf("%v %v :%v", PRIVMSG, ch,
+		strings.TrimSpace(fmt.Sprintln(s1, s2)))
+
+	if s := buf.String(); s != expect {
+		t.Errorf("Expected: %s, got: %s", expect, s)
+	}
+
+	buf.Reset()
+	ev.Args = []string{"user"}
+	h.Notifyln(ev, "user", s1, s2)
+	expect = fmt.Sprintf("%v %v :%v", NOTICE, "user",
+		strings.TrimSpace(fmt.Sprintln(s1, s2)))
+
+	if s := buf.String(); s != expect {
+		t.Errorf("Expected: %s, got: %s", expect, s)
+	}
+}
+
+func TestHelper_Notifyf(t *testing.T) {
+	buf := bytes.Buffer{}
+	h := &Helper{&buf}
+	ch := "#chan"
+	format := "%v - %v"
+	s1, s2 := "string1", "string2"
+
+	ev := &Event{NetworkInfo: netInfo, Args: []string{ch}}
+
+	h.Notifyf(ev, ch, format, s1, s2)
+	expect := fmt.Sprintf("%v %v :%v", PRIVMSG, ch, fmt.Sprintf(format, s1, s2))
+	if s := buf.String(); s != expect {
+		t.Errorf("Expected: %s, got: %s", expect, s)
+	}
+
+	buf.Reset()
+	ev.Args = []string{"user"}
+	h.Notifyf(ev, "u", format, s1, s2)
+	expect = fmt.Sprintf("%v %v :%v", NOTICE, "u", fmt.Sprintf(format, s1, s2))
 	if s := buf.String(); s != expect {
 		t.Errorf("Expected: %s, got: %s", expect, s)
 	}

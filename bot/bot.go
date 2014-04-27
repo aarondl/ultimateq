@@ -5,9 +5,12 @@ will use to start a bot instance.
 package bot
 
 import (
+	"bufio"
 	"errors"
 	"log"
 	"net"
+	"os"
+	"os/signal"
 	"sync"
 	"time"
 
@@ -573,5 +576,53 @@ func (b *Bot) getServer(networkID string) *Server {
 	if srv, ok := b.servers[networkID]; ok {
 		return srv
 	}
+	return nil
+}
+
+// Run makes a very typical bot. It will call the cb function passed in
+// before starting to allow registration of extensions etc. Returns error
+// if the bot could not be created. Does NOT return until dead.
+// The following are featured behaviors:
+// Watches for Keyboard Input OR SIGTERM OR SIGKILL and shuts down normally.
+// Creates a logger on stdout.
+func Run(cb func(b *Bot)) error {
+	log.SetOutput(os.Stdout)
+
+	b, err := NewBot(ConfigureFile("config.yaml"))
+	if err != nil {
+		return err
+	}
+	defer b.Close()
+
+	end := b.Start()
+
+	input, quit := make(chan int), make(chan os.Signal, 2)
+
+	go func() {
+		scanner := bufio.NewScanner(os.Stdin)
+		scanner.Scan()
+		input <- 0
+	}()
+
+	signal.Notify(quit, os.Interrupt, os.Kill)
+
+	stop := false
+	for !stop {
+		select {
+		case <-input:
+			b.Stop()
+			stop = true
+		case <-quit:
+			b.Stop()
+			stop = true
+		case err, ok := <-end:
+			log.Println("Server death:", err)
+			stop = !ok
+		}
+	}
+
+	log.Println("Shutting down...")
+	<-time.After(1 * time.Second)
+
 	return nil
 }

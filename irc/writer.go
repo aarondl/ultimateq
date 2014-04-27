@@ -24,6 +24,8 @@ const (
 	fmtCTCP = PRIVMSG + " %s :%s"
 	// fmtCTCPReply creates a CTCPReply message.
 	fmtCTCPReply = NOTICE + " %s :%s"
+	// fmtNotifyHeader creates a notice or privmsg message.
+	fmtNotifyHeader = "%s %s :"
 	// fmtJoin creates a join message.
 	fmtJoin = JOIN + " :%s"
 	// fmtPart creates a part message.
@@ -44,7 +46,7 @@ type Writer interface {
 	// Sendf sends a formatted string.
 	Sendf(string, ...interface{}) error
 
-	// Privmsg sends a string with spaces between non-strings.
+	// Privmsg sends a privmsg with spaces between non-strings.
 	Privmsg(string, ...interface{}) error
 	// Privmsgln sends a privmsg with spaces between everything.
 	// Does not send newline.
@@ -52,7 +54,7 @@ type Writer interface {
 	// Privmsgf sends a formatted privmsg.
 	Privmsgf(string, string, ...interface{}) error
 
-	// Notice sends a string with spaces between non-strings.
+	// Notice sends a notice with spaces between non-strings.
 	Notice(string, ...interface{}) error
 	// Noticeln sends a notice with spaces between everything.
 	// Does not send newline.
@@ -60,7 +62,7 @@ type Writer interface {
 	// Noticef sends a formatted notice.
 	Noticef(string, string, ...interface{}) error
 
-	// CTCP sends a string with spaces between non-strings.
+	// CTCP sends a CTCP with spaces between non-strings.
 	CTCP(string, string, ...interface{}) error
 	// CTCPln sends a CTCP with spaces between everything.
 	// Does not send newline.
@@ -69,12 +71,25 @@ type Writer interface {
 	CTCPf(string, string, string, ...interface{}) error
 	// CTCPReply sends a string with spaces between non-strings.
 
+	// CTCPReply sends a CTCPReply with spaces between non-strings.
 	CTCPReply(string, string, ...interface{}) error
 	// CTCPReplyln sends a CTCPReply with spaces between everything.
 	// Does not send newline.
 	CTCPReplyln(string, string, ...interface{}) error
 	// CTCPReplyf sends a formatted CTCPReply.
 	CTCPReplyf(string, string, string, ...interface{}) error
+
+	// Notify sends a notification with spaces between non-strings.
+	// If the Event is designated towards a #channel, then the notification
+	// will be sent to that channel. If the Event is designated towards a user
+	// (normally the bot itself) then the notification will be sent to the
+	// given target.
+	Notify(*Event, string, ...interface{}) error
+	// Notifyln sends a notification with spaces between everything.
+	// Does not send newline. See Notify for details of use.
+	Notifyln(*Event, string, ...interface{}) error
+	// Notifyf sends a formatted notification. See Notify for details of use.
+	Notifyf(*Event, string, string, ...interface{}) error
 
 	// Sends a join message to the writer.
 	Join(...string) error
@@ -202,6 +217,48 @@ func (h *Helper) CTCPReplyf(target, tag, format string,
 	msg := CTCPpack([]byte(tag), []byte(fmt.Sprintf(format, data...)))
 	_, err := fmt.Fprintf(h, fmtCTCPReply, target, msg)
 	return err
+}
+
+// Notify sends a string with spaces between non-strings.
+// See irc.Writer.Notify for details of use.
+func (h *Helper) Notify(ev *Event, target string, args ...interface{}) error {
+	msgType := NOTICE
+	if ev.IsTargetChan() {
+		msgType = PRIVMSG
+		target = ev.Target()
+	}
+	header := []byte(fmt.Sprintf(fmtNotifyHeader, msgType, target))
+	msg := []byte(fmt.Sprint(args...))
+	return h.splitSend(header, msg)
+}
+
+// Notifyln sends a notify with spaces between everything.
+// Does not send newline. See irc.Writer.Notify for details of use.
+func (h *Helper) Notifyln(ev *Event, target string, args ...interface{}) error {
+	msgType := NOTICE
+	if ev.IsTargetChan() {
+		msgType = PRIVMSG
+		target = ev.Target()
+	}
+	header := []byte(fmt.Sprintf(fmtNotifyHeader, msgType, target))
+	str := fmt.Sprintln(args...)
+	str = str[:len(str)-1]
+	return h.splitSend(header, []byte(str))
+}
+
+// Notifyf sends a formatted notification.
+// See irc.Writer.Notify for details of use.
+func (h *Helper) Notifyf(ev *Event, target, format string,
+	args ...interface{}) error {
+
+	msgType := NOTICE
+	if ev.IsTargetChan() {
+		msgType = PRIVMSG
+		target = ev.Target()
+	}
+	header := []byte(fmt.Sprintf(fmtNotifyHeader, msgType, target))
+	msg := []byte(fmt.Sprintf(format, args...))
+	return h.splitSend(header, msg)
 }
 
 // Join sends a join message to the writer.
