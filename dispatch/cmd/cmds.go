@@ -225,7 +225,7 @@ func (c *Cmds) Unregister(server, cmd string) (found bool) {
 
 // Dispatch dispatches an IrcEvent into the cmds event handlers.
 func (c *Cmds) Dispatch(networkID string, overridePrefix rune,
-	ev *irc.Event, writer irc.Writer, locker data.Locker) (err error) {
+	writer irc.Writer, ev *irc.Event, locker data.Locker) (err error) {
 
 	// Filter non privmsg/notice
 	msgtype := 0

@@ -16,12 +16,12 @@ import (
 )
 
 type testHandler struct {
-	callback func(*irc.Event, irc.Writer)
+	callback func(irc.Writer, *irc.Event)
 }
 
-func (h testHandler) HandleRaw(m *irc.Event, send irc.Writer) {
+func (h testHandler) HandleRaw(w irc.Writer, ev *irc.Event) {
 	if h.callback != nil {
-		h.callback(m, send)
+		h.callback(w, ev)
 	}
 }
 
@@ -171,8 +171,8 @@ func TestBot_Dispatching(t *testing.T) {
 
 	result := make(chan *irc.Event)
 	thandler := &testHandler{
-		func(m *irc.Event, w irc.Writer) {
-			result <- m
+		func(_ irc.Writer, ev *irc.Event) {
+			result <- ev
 		},
 	}
 	cresult := make(chan string)
@@ -223,8 +223,8 @@ func TestBot_Dispatch_ConnectDisconnect(t *testing.T) {
 
 	result := make(chan *irc.Event)
 	thandler := &testHandler{
-		func(m *irc.Event, w irc.Writer) {
-			result <- m
+		func(w irc.Writer, ev *irc.Event) {
+			result <- ev
 		},
 	}
 	b.Register(irc.CONNECT, thandler)

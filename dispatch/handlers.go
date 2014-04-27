@@ -4,48 +4,48 @@ import "github.com/aarondl/ultimateq/irc"
 
 // PrivmsgHandler is for handling privmsgs going to channel or user targets.
 type PrivmsgHandler interface {
-	Privmsg(*irc.Event, irc.Writer)
+	Privmsg(irc.Writer, *irc.Event)
 }
 
 // PrivmsgUserHandler is for handling privmsgs going to user targets.
 type PrivmsgUserHandler interface {
-	PrivmsgUser(*irc.Event, irc.Writer)
+	PrivmsgUser(irc.Writer, *irc.Event)
 }
 
 // PrivmsgChannelHandler is for handling privmsgs going to channel targets.
 type PrivmsgChannelHandler interface {
-	PrivmsgChannel(*irc.Event, irc.Writer)
+	PrivmsgChannel(irc.Writer, *irc.Event)
 }
 
 // NoticeHandler is for handling privmsgs going to channel or user targets.
 type NoticeHandler interface {
-	Notice(*irc.Event, irc.Writer)
+	Notice(irc.Writer, *irc.Event)
 }
 
 // NoticeUserHandler is for handling privmsgs going to user targets.
 type NoticeUserHandler interface {
-	NoticeUser(*irc.Event, irc.Writer)
+	NoticeUser(irc.Writer, *irc.Event)
 }
 
 // NoticeChannelHandler is for handling privmsgs going to channel targets.
 type NoticeChannelHandler interface {
-	NoticeChannel(*irc.Event, irc.Writer)
+	NoticeChannel(irc.Writer, *irc.Event)
 }
 
 // CTCPHandler is for handling ctcp messages that are directly to the bot.
 // Automatically parses the tag & data portions out.
 type CTCPHandler interface {
-	CTCP(*irc.Event, string, string, irc.Writer)
+	CTCP(irc.Writer, *irc.Event, string, string)
 }
 
 // CTCPChannelHandler is for handling ctcp messages that go to a channel.
 // Automatically parses the tag & data portions out.
 type CTCPChannelHandler interface {
-	CTCPChannel(*irc.Event, string, string, irc.Writer)
+	CTCPChannel(irc.Writer, *irc.Event, string, string)
 }
 
 // CTCPReplyHandler is for handling ctcp replies from clients.
 // Automatically parses the tag & data portions out.
 type CTCPReplyHandler interface {
-	CTCPReply(*irc.Event, string, string, irc.Writer)
+	CTCPReply(irc.Writer, *irc.Event, string, string)
 }

@@ -94,9 +94,9 @@ func rspChk(ts *tSetup, expected, sender string, args ...string) error {
 
 func prvRspChk(ts *tSetup, expected, to, sender string, args ...string) error {
 	ts.buffer.Reset()
-	err := ts.b.cmds.Dispatch(netID, 0, irc.NewEvent(
+	err := ts.b.cmds.Dispatch(netID, 0, ts.writer, irc.NewEvent(
 		netID, netInfo, irc.PRIVMSG, sender, to, strings.Join(args, " ")),
-		ts.writer, ts.locker,
+		ts.locker,
 	)
 	ts.b.cmds.WaitForHandlers()
 

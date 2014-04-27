@@ -20,15 +20,15 @@ type testPoint struct {
 //===========================================================
 // Set up a type that can be used to mock a callback for raw.
 //===========================================================
-type testCallback func(ev *irc.Event, w irc.Writer)
+type testCallback func(w irc.Writer, ev *irc.Event)
 
 type testHandler struct {
 	callback testCallback
 }
 
-func (handler testHandler) HandleRaw(ev *irc.Event, w irc.Writer) {
+func (handler testHandler) HandleRaw(w irc.Writer, ev *irc.Event) {
 	if handler.callback != nil {
-		handler.callback(ev, w)
+		handler.callback(w, ev)
 	}
 }
 
@@ -68,16 +68,16 @@ func TestDispatcher_Dispatching(t *testing.T) {
 	t.Parallel()
 	var msg1, msg2, msg3 *irc.Event
 	var s1, s2 irc.Writer
-	h1 := testHandler{func(m *irc.Event, s irc.Writer) {
-		msg1 = m
-		s1 = s
+	h1 := testHandler{func(w irc.Writer, ev *irc.Event) {
+		msg1 = ev
+		s1 = w
 	}}
-	h2 := testHandler{func(m *irc.Event, s irc.Writer) {
-		msg2 = m
-		s2 = s
+	h2 := testHandler{func(w irc.Writer, ev *irc.Event) {
+		msg2 = ev
+		s2 = w
 	}}
-	h3 := testHandler{func(m *irc.Event, s irc.Writer) {
-		msg3 = m
+	h3 := testHandler{func(w irc.Writer, ev *irc.Event) {
+		msg3 = ev
 	}}
 
 	d := NewDispatcher(core)
@@ -89,7 +89,7 @@ func TestDispatcher_Dispatching(t *testing.T) {
 
 	privmsg := &irc.Event{Name: irc.PRIVMSG}
 	quitmsg := &irc.Event{Name: irc.QUIT}
-	d.Dispatch(privmsg, send)
+	d.Dispatch(send, privmsg)
 	d.WaitForHandlers()
 
 	if msg1 == nil {
@@ -111,7 +111,7 @@ func TestDispatcher_Dispatching(t *testing.T) {
 		t.Error("Erroneously dispatched to h3.")
 	}
 
-	d.Dispatch(quitmsg, send)
+	d.Dispatch(send, quitmsg)
 	d.WaitForHandlers()
 	if msg3.Name != irc.QUIT {
 		t.Error("Failed to dispatch to h3.")
@@ -121,11 +121,11 @@ func TestDispatcher_Dispatching(t *testing.T) {
 func TestDispatcher_RawDispatch(t *testing.T) {
 	t.Parallel()
 	var msg1, msg2 *irc.Event
-	h1 := testHandler{func(m *irc.Event, send irc.Writer) {
-		msg1 = m
+	h1 := testHandler{func(w irc.Writer, ev *irc.Event) {
+		msg1 = ev
 	}}
-	h2 := testHandler{func(m *irc.Event, send irc.Writer) {
-		msg2 = m
+	h2 := testHandler{func(w irc.Writer, ev *irc.Event) {
+		msg2 = ev
 	}}
 
 	d := NewDispatcher(core)
@@ -134,7 +134,7 @@ func TestDispatcher_RawDispatch(t *testing.T) {
 	d.Register(irc.RAW, h2)
 
 	privmsg := &irc.Event{Name: irc.PRIVMSG}
-	d.Dispatch(privmsg, send)
+	d.Dispatch(send, privmsg)
 	d.WaitForHandlers()
 	if msg1 != privmsg {
 		t.Error("Failed to dispatch to privmsg handler.")
@@ -147,8 +147,8 @@ func TestDispatcher_RawDispatch(t *testing.T) {
 // ================================
 // Testing types
 // ================================
-type testCallbackMsg func(*irc.Event, irc.Writer)
-type testCTCPCallbackMsg func(*irc.Event, string, string, irc.Writer)
+type testCallbackMsg func(irc.Writer, *irc.Event)
+type testCTCPCallbackMsg func(irc.Writer, *irc.Event, string, string)
 
 type testPrivmsgHandler struct {
 	callback testCallbackMsg
@@ -190,84 +190,84 @@ type testCTCPReplyHandler struct {
 // ================================
 // Testing Callbacks
 // ================================
-func (t testPrivmsgHandler) Privmsg(ev *irc.Event, w irc.Writer) {
-	t.callback(ev, w)
+func (t testPrivmsgHandler) Privmsg(w irc.Writer, ev *irc.Event) {
+	t.callback(w, ev)
 }
 func (t testPrivmsgUserHandler) PrivmsgUser(
-	ev *irc.Event, w irc.Writer) {
+	w irc.Writer, ev *irc.Event) {
 
-	t.callback(ev, w)
+	t.callback(w, ev)
 }
 func (t testPrivmsgChannelHandler) PrivmsgChannel(
-	ev *irc.Event, w irc.Writer) {
+	w irc.Writer, ev *irc.Event) {
 
-	t.callback(ev, w)
+	t.callback(w, ev)
 }
 func (t testPrivmsgAllHandler) Privmsg(
-	ev *irc.Event, w irc.Writer) {
+	w irc.Writer, ev *irc.Event) {
 
-	t.testCallbackNormal(ev, w)
+	t.testCallbackNormal(w, ev)
 }
 func (t testPrivmsgAllHandler) PrivmsgUser(
-	ev *irc.Event, w irc.Writer) {
+	w irc.Writer, ev *irc.Event) {
 
-	t.testCallbackUser(ev, w)
+	t.testCallbackUser(w, ev)
 }
 func (t testPrivmsgAllHandler) PrivmsgChannel(
-	ev *irc.Event, w irc.Writer) {
+	w irc.Writer, ev *irc.Event) {
 
-	t.testCallbackChannel(ev, w)
+	t.testCallbackChannel(w, ev)
 }
-func (t testNoticeHandler) Notice(ev *irc.Event, w irc.Writer) {
-	t.callback(ev, w)
+func (t testNoticeHandler) Notice(w irc.Writer, ev *irc.Event) {
+	t.callback(w, ev)
 }
 func (t testNoticeUserHandler) NoticeUser(
-	ev *irc.Event, w irc.Writer) {
+	w irc.Writer, ev *irc.Event) {
 
-	t.callback(ev, w)
+	t.callback(w, ev)
 }
 func (t testNoticeChannelHandler) NoticeChannel(
-	ev *irc.Event, w irc.Writer) {
+	w irc.Writer, ev *irc.Event) {
 
-	t.callback(ev, w)
+	t.callback(w, ev)
 }
 func (t testNoticeAllHandler) Notice(
-	ev *irc.Event, w irc.Writer) {
+	w irc.Writer, ev *irc.Event) {
 
-	t.testCallbackNormal(ev, w)
+	t.testCallbackNormal(w, ev)
 }
 func (t testNoticeAllHandler) NoticeUser(
-	ev *irc.Event, w irc.Writer) {
+	w irc.Writer, ev *irc.Event) {
 
-	t.testCallbackUser(ev, w)
+	t.testCallbackUser(w, ev)
 }
 func (t testNoticeAllHandler) NoticeChannel(
-	ev *irc.Event, w irc.Writer) {
+	w irc.Writer, ev *irc.Event) {
 
-	t.testCallbackChannel(ev, w)
+	t.testCallbackChannel(w, ev)
 }
-func (t testCTCPHandler) CTCP(ev *irc.Event, a, b string, w irc.Writer) {
-	t.callback(ev, a, b, w)
+func (t testCTCPHandler) CTCP(w irc.Writer, ev *irc.Event, a, b string) {
+	t.callback(w, ev, a, b)
 }
 func (t testCTCPChannelHandler) CTCPChannel(
-	ev *irc.Event, a, b string, w irc.Writer) {
+	w irc.Writer, ev *irc.Event, a, b string) {
 
-	t.callback(ev, a, b, w)
+	t.callback(w, ev, a, b)
 }
 func (t testCTCPAllHandler) CTCP(
-	ev *irc.Event, a, b string, w irc.Writer) {
+	w irc.Writer, ev *irc.Event, a, b string) {
 
-	t.testCallbackNormal(ev, a, b, w)
+	t.testCallbackNormal(w, ev, a, b)
 }
 func (t testCTCPAllHandler) CTCPChannel(
-	ev *irc.Event, a, b string, w irc.Writer) {
+	w irc.Writer, ev *irc.Event, a, b string) {
 
-	t.testCallbackChannel(ev, a, b, w)
+	t.testCallbackChannel(w, ev, a, b)
 }
 func (t testCTCPReplyHandler) CTCPReply(
-	ev *irc.Event, a, b string, w irc.Writer) {
+	w irc.Writer, ev *irc.Event, a, b string) {
 
-	t.callback(ev, a, b, w)
+	t.callback(w, ev, a, b)
 }
 
 var privChanmsg = &irc.Event{
@@ -286,14 +286,14 @@ var privUsermsg = &irc.Event{
 func TestDispatcher_Privmsg(t *testing.T) {
 	t.Parallel()
 	var p, pu, pc *irc.Event
-	ph := testPrivmsgHandler{func(m *irc.Event, _ irc.Writer) {
-		p = m
+	ph := testPrivmsgHandler{func(w irc.Writer, ev *irc.Event) {
+		p = ev
 	}}
-	puh := testPrivmsgUserHandler{func(m *irc.Event, _ irc.Writer) {
-		pu = m
+	puh := testPrivmsgUserHandler{func(w irc.Writer, ev *irc.Event) {
+		pu = ev
 	}}
-	pch := testPrivmsgChannelHandler{func(m *irc.Event, _ irc.Writer) {
-		pc = m
+	pch := testPrivmsgChannelHandler{func(w irc.Writer, ev *irc.Event) {
+		pc = ev
 	}}
 
 	d := NewDispatcher(core)
@@ -301,7 +301,7 @@ func TestDispatcher_Privmsg(t *testing.T) {
 	d.Register(irc.PRIVMSG, puh)
 	d.Register(irc.PRIVMSG, pch)
 
-	d.Dispatch(privUsermsg, nil)
+	d.Dispatch(nil, privUsermsg)
 	d.WaitForHandlers()
 	if p == nil {
 		t.Error("Failed to dispatch to handler.")
@@ -314,7 +314,7 @@ func TestDispatcher_Privmsg(t *testing.T) {
 	}
 
 	p, pu, pc = nil, nil, nil
-	d.Dispatch(privChanmsg, nil)
+	d.Dispatch(nil, privChanmsg)
 	d.WaitForHandlers()
 	if p == nil {
 		t.Error("Failed to dispatch to handler.")
@@ -331,14 +331,14 @@ func TestDispatcher_PrivmsgMultiple(t *testing.T) {
 	t.Parallel()
 	var p, pu, pc *irc.Event
 	pall := testPrivmsgAllHandler{
-		func(m *irc.Event, _ irc.Writer) {
-			p = m
+		func(w irc.Writer, ev *irc.Event) {
+			p = ev
 		},
-		func(m *irc.Event, _ irc.Writer) {
-			pu = m
+		func(w irc.Writer, ev *irc.Event) {
+			pu = ev
 		},
-		func(m *irc.Event, _ irc.Writer) {
-			pc = m
+		func(w irc.Writer, ev *irc.Event) {
+			pc = ev
 		},
 	}
 
@@ -346,7 +346,7 @@ func TestDispatcher_PrivmsgMultiple(t *testing.T) {
 	d.Register(irc.PRIVMSG, pall)
 
 	p, pu, pc = nil, nil, nil
-	d.Dispatch(privChanmsg, nil)
+	d.Dispatch(nil, privChanmsg)
 	d.WaitForHandlers()
 	if p != nil {
 		t.Error("Erroneously dispatched to handler.")
@@ -359,7 +359,7 @@ func TestDispatcher_PrivmsgMultiple(t *testing.T) {
 	}
 
 	p, pu, pc = nil, nil, nil
-	d.Dispatch(privUsermsg, nil)
+	d.Dispatch(nil, privUsermsg)
 	d.WaitForHandlers()
 	if p != nil {
 		t.Error("Erroneously dispatched to handler.")
@@ -388,14 +388,14 @@ var noticeUsermsg = &irc.Event{
 func TestDispatcher_Notice(t *testing.T) {
 	t.Parallel()
 	var n, nu, nc *irc.Event
-	nh := testNoticeHandler{func(m *irc.Event, _ irc.Writer) {
-		n = m
+	nh := testNoticeHandler{func(w irc.Writer, ev *irc.Event) {
+		n = ev
 	}}
-	nuh := testNoticeUserHandler{func(m *irc.Event, _ irc.Writer) {
-		nu = m
+	nuh := testNoticeUserHandler{func(w irc.Writer, ev *irc.Event) {
+		nu = ev
 	}}
-	nch := testNoticeChannelHandler{func(m *irc.Event, _ irc.Writer) {
-		nc = m
+	nch := testNoticeChannelHandler{func(w irc.Writer, ev *irc.Event) {
+		nc = ev
 	}}
 
 	d := NewDispatcher(core)
@@ -403,7 +403,7 @@ func TestDispatcher_Notice(t *testing.T) {
 	d.Register(irc.NOTICE, nuh)
 	d.Register(irc.NOTICE, nch)
 
-	d.Dispatch(noticeUsermsg, nil)
+	d.Dispatch(nil, noticeUsermsg)
 	d.WaitForHandlers()
 	if n == nil {
 		t.Error("Failed to dispatch to handler.")
@@ -416,7 +416,7 @@ func TestDispatcher_Notice(t *testing.T) {
 	}
 
 	n, nu, nc = nil, nil, nil
-	d.Dispatch(noticeChanmsg, nil)
+	d.Dispatch(nil, noticeChanmsg)
 	d.WaitForHandlers()
 	if n == nil {
 		t.Error("Failed to dispatch to handler.")
@@ -433,14 +433,14 @@ func TestDispatcher_NoticeMultiple(t *testing.T) {
 	t.Parallel()
 	var n, nu, nc *irc.Event
 	nall := testNoticeAllHandler{
-		func(m *irc.Event, _ irc.Writer) {
-			n = m
+		func(w irc.Writer, ev *irc.Event) {
+			n = ev
 		},
-		func(m *irc.Event, _ irc.Writer) {
-			nu = m
+		func(w irc.Writer, ev *irc.Event) {
+			nu = ev
 		},
-		func(m *irc.Event, _ irc.Writer) {
-			nc = m
+		func(w irc.Writer, ev *irc.Event) {
+			nc = ev
 		},
 	}
 
@@ -448,7 +448,7 @@ func TestDispatcher_NoticeMultiple(t *testing.T) {
 	d.Register(irc.NOTICE, nall)
 
 	n, nu, nc = nil, nil, nil
-	d.Dispatch(noticeChanmsg, nil)
+	d.Dispatch(nil, noticeChanmsg)
 	d.WaitForHandlers()
 	if n != nil {
 		t.Error("Erroneously dispatched to handler.")
@@ -461,7 +461,7 @@ func TestDispatcher_NoticeMultiple(t *testing.T) {
 	}
 
 	n, nu, nc = nil, nil, nil
-	d.Dispatch(noticeUsermsg, nil)
+	d.Dispatch(nil, noticeUsermsg)
 	d.WaitForHandlers()
 	if n != nil {
 		t.Error("Erroneously dispatched to handler.")
@@ -490,22 +490,20 @@ var ctcpMsg = &irc.Event{
 func TestDispatcher_CTCP(t *testing.T) {
 	t.Parallel()
 	var c, cc *irc.Event
-	ch := testCTCPHandler{func(m *irc.Event, tag, data string,
-		_ irc.Writer) {
-
-		c = m
+	ch := testCTCPHandler{func(_ irc.Writer, ev *irc.Event, tag, data string) {
+		c = ev
 	}}
-	cch := testCTCPChannelHandler{func(m *irc.Event, tag, data string,
-		_ irc.Writer) {
+	cch := testCTCPChannelHandler{func(_ irc.Writer, ev *irc.Event, tag,
+		data string) {
 
-		cc = m
+		cc = ev
 	}}
 
 	d := NewDispatcher(core)
 	d.Register(irc.CTCP, ch)
 	d.Register(irc.CTCP, cch)
 
-	d.Dispatch(ctcpMsg, nil)
+	d.Dispatch(nil, ctcpMsg)
 	d.WaitForHandlers()
 	if c == nil {
 		t.Error("Failed to dispatch to handler.")
@@ -515,7 +513,7 @@ func TestDispatcher_CTCP(t *testing.T) {
 	}
 
 	c, cc = nil, nil
-	d.Dispatch(ctcpChanmsg, nil)
+	d.Dispatch(nil, ctcpChanmsg)
 	d.WaitForHandlers()
 	if c == nil {
 		t.Error("Failed to dispatch to handler.")
@@ -529,11 +527,11 @@ func TestDispatcher_CTCPMultiple(t *testing.T) {
 	t.Parallel()
 	var c, cc *irc.Event
 	call := testCTCPAllHandler{
-		func(m *irc.Event, a, b string, _ irc.Writer) {
-			c = m
+		func(_ irc.Writer, ev *irc.Event, a, b string) {
+			c = ev
 		},
-		func(m *irc.Event, a, b string, _ irc.Writer) {
-			cc = m
+		func(_ irc.Writer, ev *irc.Event, a, b string) {
+			cc = ev
 		},
 	}
 
@@ -541,7 +539,7 @@ func TestDispatcher_CTCPMultiple(t *testing.T) {
 	d.Register(irc.CTCP, call)
 
 	c, cc = nil, nil
-	d.Dispatch(ctcpChanmsg, nil)
+	d.Dispatch(nil, ctcpChanmsg)
 	d.WaitForHandlers()
 	if c != nil {
 		t.Error("Erroneously dispatched to handler.")
@@ -551,7 +549,7 @@ func TestDispatcher_CTCPMultiple(t *testing.T) {
 	}
 
 	c, cc = nil, nil
-	d.Dispatch(ctcpMsg, nil)
+	d.Dispatch(nil, ctcpMsg)
 	d.WaitForHandlers()
 	if c == nil {
 		t.Error("Failed to dispatch to handler.")
@@ -571,16 +569,16 @@ var ctcpReplyMsg = &irc.Event{
 func TestDispatcher_CTCPReply(t *testing.T) {
 	t.Parallel()
 	var c *irc.Event
-	ch := testCTCPReplyHandler{func(m *irc.Event, tag, data string,
-		_ irc.Writer) {
+	ch := testCTCPReplyHandler{func(_ irc.Writer, ev *irc.Event, tag,
+		data string) {
 
-		c = m
+		c = ev
 	}}
 
 	d := NewDispatcher(core)
 	d.Register(irc.CTCPReply, ch)
 
-	d.Dispatch(ctcpReplyMsg, nil)
+	d.Dispatch(nil, ctcpReplyMsg)
 	d.WaitForHandlers()
 	if c == nil {
 		t.Error("Failed to dispatch to handler.")
@@ -595,11 +593,11 @@ func TestDispatcher_FilterPrivmsgChannels(t *testing.T) {
 	}
 
 	var p, pc *irc.Event
-	ph := testPrivmsgHandler{func(m *irc.Event, _ irc.Writer) {
-		p = m
+	ph := testPrivmsgHandler{func(w irc.Writer, ev *irc.Event) {
+		p = ev
 	}}
-	pch := testPrivmsgChannelHandler{func(m *irc.Event, _ irc.Writer) {
-		pc = m
+	pch := testPrivmsgChannelHandler{func(w irc.Writer, ev *irc.Event) {
+		pc = ev
 	}}
 
 	dcore := NewDispatchCore("#CHAN")
@@ -607,7 +605,7 @@ func TestDispatcher_FilterPrivmsgChannels(t *testing.T) {
 	d.Register(irc.PRIVMSG, ph)
 	d.Register(irc.PRIVMSG, pch)
 
-	d.Dispatch(privChanmsg, nil)
+	d.Dispatch(nil, privChanmsg)
 	d.WaitForHandlers()
 	if p == nil {
 		t.Error("Failed to dispatch to handler.")
@@ -617,7 +615,7 @@ func TestDispatcher_FilterPrivmsgChannels(t *testing.T) {
 	}
 
 	p, pc = nil, nil
-	d.Dispatch(chanmsg2, nil)
+	d.Dispatch(nil, chanmsg2)
 	d.WaitForHandlers()
 	if p == nil {
 		t.Error("Failed to dispatch to handler.")
@@ -636,11 +634,11 @@ func TestDispatcher_FilterNoticeChannels(t *testing.T) {
 	}
 
 	var u, uc *irc.Event
-	uh := testNoticeHandler{func(m *irc.Event, _ irc.Writer) {
-		u = m
+	uh := testNoticeHandler{func(w irc.Writer, ev *irc.Event) {
+		u = ev
 	}}
-	uch := testNoticeChannelHandler{func(m *irc.Event, _ irc.Writer) {
-		uc = m
+	uch := testNoticeChannelHandler{func(w irc.Writer, ev *irc.Event) {
+		uc = ev
 	}}
 
 	dcore := NewDispatchCore("#CHAN")
@@ -648,7 +646,7 @@ func TestDispatcher_FilterNoticeChannels(t *testing.T) {
 	d.Register(irc.NOTICE, uh)
 	d.Register(irc.NOTICE, uch)
 
-	d.Dispatch(noticeChanmsg, nil)
+	d.Dispatch(nil, noticeChanmsg)
 	d.WaitForHandlers()
 	if u == nil {
 		t.Error("Failed to dispatch to handler.")
@@ -658,7 +656,7 @@ func TestDispatcher_FilterNoticeChannels(t *testing.T) {
 	}
 
 	u, uc = nil, nil
-	d.Dispatch(chanmsg2, nil)
+	d.Dispatch(nil, chanmsg2)
 	d.WaitForHandlers()
 	if u == nil {
 		t.Error("Failed to dispatch to handler.")
@@ -713,14 +711,14 @@ func TestDispatch_Panic(t *testing.T) {
 	panicMsg := "dispatch panic"
 
 	handler := testHandler{
-		func(ev *irc.Event, w irc.Writer) {
+		func(w irc.Writer, ev *irc.Event) {
 			panic(panicMsg)
 		},
 	}
 
 	d.Register(irc.RAW, handler)
 	ev := irc.NewEvent("", netInfo, "dispatcher", irc.PRIVMSG, "panic test")
-	d.Dispatch(ev, testPoint{irc.Helper{}})
+	d.Dispatch(testPoint{irc.Helper{}}, ev)
 	d.WaitForHandlers()
 
 	<-ch

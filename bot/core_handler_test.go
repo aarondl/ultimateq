@@ -44,7 +44,7 @@ func TestCoreHandler_Ping(t *testing.T) {
 	handler := coreHandler{}
 	ev := irc.NewEvent(netID, netInfo, irc.PING, "", "123123123123")
 	endpoint := makeTestPoint(nil)
-	handler.HandleRaw(ev, endpoint)
+	handler.HandleRaw(endpoint, ev)
 	expect := irc.PONG + " :" + ev.Args[0]
 	if got := endpoint.gets(); got != expect {
 		t.Errorf("Expected: %s, got: %s", expect, got)
@@ -61,7 +61,7 @@ func TestCoreHandler_Connect(t *testing.T) {
 
 	ev := irc.NewEvent(netID, netInfo, irc.CONNECT, "")
 	endpoint := makeTestPoint(b.servers[netID])
-	handler.HandleRaw(ev, endpoint)
+	handler.HandleRaw(endpoint, ev)
 
 	expect := msg1 + msg2
 	if got := endpoint.gets(); got != expect {
@@ -82,17 +82,17 @@ func TestCoreHandler_Nick(t *testing.T) {
 	nick2 := nickstr + cnf.GetNick() + "_"
 	nick3 := nickstr + cnf.GetNick() + "__"
 
-	handler.HandleRaw(ev, endpoint)
+	handler.HandleRaw(endpoint, ev)
 	if got := endpoint.gets(); got != nick1 {
 		t.Errorf("Expected: %s, got: %s", nick1, got)
 	}
 	endpoint.resetTestWritten()
-	handler.HandleRaw(ev, endpoint)
+	handler.HandleRaw(endpoint, ev)
 	if got := endpoint.gets(); got != nick2 {
 		t.Errorf("Expected: %s, got: %s", nick2, got)
 	}
 	endpoint.resetTestWritten()
-	handler.HandleRaw(ev, endpoint)
+	handler.HandleRaw(endpoint, ev)
 	if got := endpoint.gets(); got != nick3 {
 		t.Errorf("Expected: %s, got: %s", nick3, got)
 	}
@@ -110,8 +110,8 @@ func TestCoreHandler_NetInfo(t *testing.T) {
 	msg2 := irc.NewEvent(netID, netInfo, irc.RPL_ISUPPORT, "",
 		"RFC8213", "CHANTYPES=&$")
 	srv := b.servers[netID]
-	srv.handler.HandleRaw(msg1, &testPoint{})
-	srv.handler.HandleRaw(msg2, &testPoint{})
+	srv.handler.HandleRaw(&testPoint{}, msg1)
+	srv.handler.HandleRaw(&testPoint{}, msg2)
 	if got, exp := srv.netInfo.ServerName(), "irc.test.net"; got != exp {
 		t.Errorf("Expected: %s, got: %s", exp, got)
 	}
@@ -142,7 +142,7 @@ func TestCoreHandler_Join(t *testing.T) {
 		srv.state.Self.Host(), "#chan")
 
 	endpoint := makeTestPoint(nil)
-	srv.handler.HandleRaw(ev, endpoint)
+	srv.handler.HandleRaw(endpoint, ev)
 	if got, exp := endpoint.gets(), "WHO :#chanMODE :#chan"; got != exp {
 		t.Errorf("Expected: %s, got: %s", exp, got)
 	}
