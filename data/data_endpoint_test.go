@@ -3,12 +3,12 @@ package data
 import (
 	"bytes"
 	"sync"
-	. "testing"
+	"testing"
 
 	"github.com/aarondl/ultimateq/irc"
 )
 
-func TestDataEndpoint(t *T) {
+func TestDataEndpoint(t *testing.T) {
 	var stateMutex, storeMutex sync.RWMutex
 	state, err := NewState(irc.NewNetworkInfo())
 	if err != nil {

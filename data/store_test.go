@@ -1,10 +1,10 @@
 package data
 
 import (
-	. "testing"
+	"testing"
 )
 
-func TestStore(t *T) {
+func TestStore(t *testing.T) {
 	t.Parallel()
 	s, err := CreateStore(MemStoreProvider)
 	if err != nil {
@@ -21,7 +21,7 @@ func TestStore(t *T) {
 	}
 }
 
-func TestStore_AddUser(t *T) {
+func TestStore_AddUser(t *testing.T) {
 	t.Parallel()
 	s, err := CreateStore(MemStoreProvider)
 	defer s.Close()
@@ -71,7 +71,7 @@ func TestStore_AddUser(t *T) {
 	}
 }
 
-func TestStore_RemoveUser(t *T) {
+func TestStore_RemoveUser(t *testing.T) {
 	t.Parallel()
 	s, err := CreateStore(MemStoreProvider)
 	defer s.Close()
@@ -118,7 +118,7 @@ func TestStore_RemoveUser(t *T) {
 	}
 }
 
-func TestStore_AuthUser(t *T) {
+func TestStore_AuthUser(t *testing.T) {
 	t.Parallel()
 	s, err := CreateStore(MemStoreProvider)
 	defer s.Close()
@@ -193,7 +193,7 @@ func TestStore_AuthUser(t *T) {
 	}
 }
 
-func TestStore_AuthLogout(t *T) {
+func TestStore_AuthLogout(t *testing.T) {
 	t.Parallel()
 	s, err := CreateStore(MemStoreProvider)
 	defer s.Close()
@@ -248,7 +248,7 @@ func TestStore_AuthLogout(t *T) {
 	}
 }
 
-func TestStore_Finding(t *T) {
+func TestStore_Finding(t *testing.T) {
 	t.Parallel()
 	s, err := CreateStore(MemStoreProvider)
 	defer s.Close()
@@ -321,7 +321,7 @@ func TestStore_Finding(t *T) {
 	}
 }
 
-func TestStore_IsFirst(t *T) {
+func TestStore_IsFirst(t *testing.T) {
 	t.Parallel()
 	s, err := CreateStore(MemStoreProvider)
 	defer s.Close()
@@ -348,7 +348,7 @@ func TestStore_IsFirst(t *T) {
 	}
 }
 
-func TestStore_GlobalUsers(t *T) {
+func TestStore_GlobalUsers(t *testing.T) {
 	t.Parallel()
 	s, err := CreateStore(MemStoreProvider)
 	defer s.Close()
@@ -385,7 +385,7 @@ func TestStore_GlobalUsers(t *T) {
 	}
 }
 
-func TestStore_ServerUsers(t *T) {
+func TestStore_ServerUsers(t *testing.T) {
 	t.Parallel()
 	s, err := CreateStore(MemStoreProvider)
 	defer s.Close()
@@ -422,7 +422,7 @@ func TestStore_ServerUsers(t *T) {
 	}
 }
 
-func TestStore_ChanUsers(t *T) {
+func TestStore_ChanUsers(t *testing.T) {
 	t.Parallel()
 	s, err := CreateStore(MemStoreProvider)
 	defer s.Close()
@@ -459,7 +459,7 @@ func TestStore_ChanUsers(t *T) {
 	}
 }
 
-func TestStore_AuthError(t *T) {
+func TestStore_AuthError(t *testing.T) {
 	var err1 error = AuthError{
 		errFmtBadHost,
 		[]interface{}{"h", "u"},

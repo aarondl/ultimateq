@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	. "testing"
+	"testing"
 )
 
-func TestUserAccess(t *T) {
+func TestUserAccess(t *testing.T) {
 	t.Parallel()
 	var a *UserAccess
 	var err error
@@ -43,7 +43,7 @@ func TestUserAccess(t *T) {
 	}
 }
 
-func TestUserAccess_VerifyPassword(t *T) {
+func TestUserAccess_VerifyPassword(t *testing.T) {
 	t.Parallel()
 	a, err := CreateUserAccess(uname, password)
 	if err != nil {
@@ -57,7 +57,7 @@ func TestUserAccess_VerifyPassword(t *T) {
 	}
 }
 
-func TestUserAccess_SerializeDeserialize(t *T) {
+func TestUserAccess_SerializeDeserialize(t *testing.T) {
 	var masks = []string{`*!*@host`, `*!user@*`}
 	a, err := CreateUserAccess(uname, password, masks...)
 	if err != nil {
@@ -106,7 +106,7 @@ func TestUserAccess_SerializeDeserialize(t *T) {
 	}
 }
 
-func TestUserAccess_AddMasks(t *T) {
+func TestUserAccess_AddMasks(t *testing.T) {
 	t.Parallel()
 	masks := []string{`*!*@host`, `*!user@*`}
 	a := createUserAccess()
@@ -125,7 +125,7 @@ func TestUserAccess_AddMasks(t *T) {
 	}
 }
 
-func TestUserAccess_DelMasks(t *T) {
+func TestUserAccess_DelMasks(t *testing.T) {
 	t.Parallel()
 	masks := []string{`*!*@host`, `*!user@*`, `nick!*@*`}
 	a := createUserAccess(masks...)
@@ -143,7 +143,7 @@ func TestUserAccess_DelMasks(t *T) {
 	}
 }
 
-func TestUserAccess_ValidateMasks(t *T) {
+func TestUserAccess_ValidateMasks(t *testing.T) {
 	t.Parallel()
 	masks := []string{`*!*@host`, `*!user@*`}
 	a := createUserAccess(masks[1:]...)
@@ -161,7 +161,7 @@ func TestUserAccess_ValidateMasks(t *T) {
 	}
 }
 
-func TestUserAccess_Has(t *T) {
+func TestUserAccess_Has(t *testing.T) {
 	t.Parallel()
 	a := createUserAccess()
 
@@ -224,7 +224,7 @@ func TestUserAccess_Has(t *T) {
 	}
 }
 
-func TestUserAccess_GrantGlobal(t *T) {
+func TestUserAccess_GrantGlobal(t *testing.T) {
 	t.Parallel()
 	a := createUserAccess()
 	a.GrantGlobalLevel(100)
@@ -251,7 +251,7 @@ func TestUserAccess_GrantGlobal(t *T) {
 	}
 }
 
-func TestUserAccess_RevokeGlobal(t *T) {
+func TestUserAccess_RevokeGlobal(t *testing.T) {
 	t.Parallel()
 	a := createUserAccess()
 	a.GrantGlobal(100, "aB")
@@ -269,7 +269,7 @@ func TestUserAccess_RevokeGlobal(t *T) {
 	}
 }
 
-func TestUserAccess_HasGlobalLevel(t *T) {
+func TestUserAccess_HasGlobalLevel(t *testing.T) {
 	t.Parallel()
 	a := createUserAccess()
 	if a.HasGlobalLevel(50) {
@@ -284,7 +284,7 @@ func TestUserAccess_HasGlobalLevel(t *T) {
 	}
 }
 
-func TestUserAccess_HasGlobalFlags(t *T) {
+func TestUserAccess_HasGlobalFlags(t *testing.T) {
 	t.Parallel()
 	a := createUserAccess()
 	if a.HasGlobalFlags("ab") {
@@ -302,7 +302,7 @@ func TestUserAccess_HasGlobalFlags(t *T) {
 	}
 }
 
-func TestUserAccess_GrantServer(t *T) {
+func TestUserAccess_GrantServer(t *testing.T) {
 	t.Parallel()
 	a := createUserAccess()
 	s := a.GetServer(server)
@@ -342,7 +342,7 @@ func TestUserAccess_GrantServer(t *T) {
 	}
 }
 
-func TestUserAccess_RevokeServer(t *T) {
+func TestUserAccess_RevokeServer(t *testing.T) {
 	t.Parallel()
 	a := createUserAccess()
 	a.GrantServer(server, 100, "abc")
@@ -366,7 +366,7 @@ func TestUserAccess_RevokeServer(t *T) {
 	}
 }
 
-func TestUserAccess_HasServerLevel(t *T) {
+func TestUserAccess_HasServerLevel(t *testing.T) {
 	t.Parallel()
 	a := createUserAccess()
 	if a.HasServerLevel(server, 50) {
@@ -381,7 +381,7 @@ func TestUserAccess_HasServerLevel(t *T) {
 	}
 }
 
-func TestUserAccess_HasServerFlags(t *T) {
+func TestUserAccess_HasServerFlags(t *testing.T) {
 	t.Parallel()
 	a := createUserAccess()
 	if a.HasServerFlags(server, "ab") {
@@ -399,7 +399,7 @@ func TestUserAccess_HasServerFlags(t *T) {
 	}
 }
 
-func TestUserAccess_GrantChannel(t *T) {
+func TestUserAccess_GrantChannel(t *testing.T) {
 	t.Parallel()
 	a := createUserAccess()
 	s := a.GetChannel(server, channel)
@@ -439,7 +439,7 @@ func TestUserAccess_GrantChannel(t *T) {
 	}
 }
 
-func TestUserAccess_RevokeChannel(t *T) {
+func TestUserAccess_RevokeChannel(t *testing.T) {
 	t.Parallel()
 	a := createUserAccess()
 	a.GrantChannel(server, channel, 100, "abc")
@@ -463,7 +463,7 @@ func TestUserAccess_RevokeChannel(t *T) {
 	}
 }
 
-func TestUserAccess_HasChannelLevel(t *T) {
+func TestUserAccess_HasChannelLevel(t *testing.T) {
 	t.Parallel()
 	a := createUserAccess()
 	if a.HasChannelLevel(server, channel, 50) {
@@ -478,7 +478,7 @@ func TestUserAccess_HasChannelLevel(t *T) {
 	}
 }
 
-func TestUserAccess_HasChannelFlags(t *T) {
+func TestUserAccess_HasChannelFlags(t *testing.T) {
 	t.Parallel()
 	a := createUserAccess()
 	if a.HasChannelFlags(server, channel, "ab") {
@@ -497,7 +497,7 @@ func TestUserAccess_HasChannelFlags(t *T) {
 	}
 }
 
-func TestUserAccess_String(t *T) {
+func TestUserAccess_String(t *testing.T) {
 	var table = []struct {
 		HasGlobal       bool
 		GlobalLevel     uint8
@@ -551,7 +551,7 @@ func TestUserAccess_String(t *T) {
 	}
 }
 
-func TestUserAccess_ResetPassword(t *T) {
+func TestUserAccess_ResetPassword(t *testing.T) {
 	t.Parallel()
 	a, err := CreateUserAccess(uname, password)
 	if err != nil {

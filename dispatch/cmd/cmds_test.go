@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-	. "testing"
+	"testing"
 
 	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/dispatch"
@@ -199,7 +199,7 @@ func setupForAuth() (state *data.State, store *data.Store,
 var core = dispatch.NewDispatchCore()
 var prefix = '.'
 
-func TestCmds(t *T) {
+func TestCmds(t *testing.T) {
 	c := CreateCmds(prefix, core)
 	if c == nil {
 		t.Fatal("Cmds should not be nil.")
@@ -231,7 +231,7 @@ func chkStr(msg, pattern string) error {
 	return nil
 }
 
-func TestCmds_Register(t *T) {
+func TestCmds_Register(t *testing.T) {
 	c := CreateCmds(prefix, core)
 
 	var handler = &commandHandler{}
@@ -365,7 +365,7 @@ func TestCmds_Register(t *T) {
 	}
 }
 
-func TestCmds_RegisterProtected(t *T) {
+func TestCmds_RegisterProtected(t *testing.T) {
 	c := CreateCmds(prefix, core)
 
 	handler := &commandHandler{}
@@ -382,7 +382,7 @@ func TestCmds_RegisterProtected(t *T) {
 	}
 }
 
-func TestCmds_Dispatch(t *T) {
+func TestCmds_Dispatch(t *testing.T) {
 	dcore := dispatch.NewDispatchCore()
 	c := CreateCmds(prefix, dcore)
 	c.AddChannels(channel)
@@ -593,7 +593,7 @@ func TestCmds_Dispatch(t *T) {
 	}
 }
 
-func TestCmds_DispatchAuthed(t *T) {
+func TestCmds_DispatchAuthed(t *testing.T) {
 	c := CreateCmds(prefix, core)
 
 	var table = []struct {
@@ -700,7 +700,7 @@ func TestCmds_DispatchAuthed(t *T) {
 	}
 }
 
-func TestCmds_DispatchNils(t *T) {
+func TestCmds_DispatchNils(t *testing.T) {
 	c := CreateCmds(prefix, core)
 	var buffer = &bytes.Buffer{}
 	var stateMutex, storeMutex sync.RWMutex
@@ -752,7 +752,7 @@ func TestCmds_DispatchNils(t *T) {
 	}
 }
 
-func TestCmds_DispatchReturns(t *T) {
+func TestCmds_DispatchReturns(t *testing.T) {
 	c := CreateCmds(prefix, core)
 	var buffer = &bytes.Buffer{}
 	var stateMutex, storeMutex sync.RWMutex
@@ -809,7 +809,7 @@ func TestCmds_DispatchReturns(t *T) {
 	}
 }
 
-func TestCmds_DispatchChannel(t *T) {
+func TestCmds_DispatchChannel(t *testing.T) {
 	c := CreateCmds(prefix, core)
 	var buffer = &bytes.Buffer{}
 	var stateMutex, storeMutex sync.RWMutex
@@ -917,7 +917,7 @@ func TestCmds_DispatchChannel(t *T) {
 	}
 }
 
-func TestCmds_DispatchUsers(t *T) {
+func TestCmds_DispatchUsers(t *testing.T) {
 	c := CreateCmds(prefix, core)
 	var buffer = &bytes.Buffer{}
 	var stateMutex, storeMutex sync.RWMutex
@@ -1016,7 +1016,7 @@ func TestCmds_DispatchUsers(t *T) {
 	}
 }
 
-func TestCmds_DispatchErrors(t *T) {
+func TestCmds_DispatchErrors(t *testing.T) {
 	c := CreateCmds(prefix, core)
 	var buffer = &bytes.Buffer{}
 	var stateMutex, storeMutex sync.RWMutex
@@ -1122,7 +1122,7 @@ func TestCmds_DispatchErrors(t *T) {
 	}
 }
 
-func TestCmds_DispatchVariadicUsers(t *T) {
+func TestCmds_DispatchVariadicUsers(t *testing.T) {
 	c := CreateCmds(prefix, core)
 	var buffer = &bytes.Buffer{}
 	var stateMutex, storeMutex sync.RWMutex
@@ -1208,7 +1208,7 @@ func TestCmds_DispatchVariadicUsers(t *T) {
 	}
 }
 
-func TestCmds_DispatchMixUserAndChan(t *T) {
+func TestCmds_DispatchMixUserAndChan(t *testing.T) {
 	c := CreateCmds(prefix, core)
 	var buffer = &bytes.Buffer{}
 	var stateMutex, storeMutex sync.RWMutex
@@ -1248,7 +1248,7 @@ func TestCmds_DispatchMixUserAndChan(t *T) {
 	}
 }
 
-func TestCmds_DispatchReflection(t *T) {
+func TestCmds_DispatchReflection(t *testing.T) {
 	c := CreateCmds(prefix, core)
 	var buffer = &bytes.Buffer{}
 	var err error
@@ -1331,7 +1331,7 @@ func TestCmds_DispatchReflection(t *T) {
 	}
 }
 
-func TestCmds_DispatchOverridePrefix(t *T) {
+func TestCmds_DispatchOverridePrefix(t *testing.T) {
 	c := CreateCmds(prefix, core)
 	var buffer = &bytes.Buffer{}
 	var err error
@@ -1394,7 +1394,7 @@ func TestCmds_DispatchOverridePrefix(t *T) {
 	}
 }
 
-func TestCmds_EachCmd(t *T) {
+func TestCmds_EachCmd(t *testing.T) {
 	c := CreateCmds(prefix, core)
 	var err error
 
@@ -1445,7 +1445,7 @@ func (l *lockWriter) Write(b []byte) (int, error) {
 	return n, err
 }
 
-func TestCmds_Panic(t *T) {
+func TestCmds_Panic(t *testing.T) {
 	ch := make(chan struct{}, 1)
 	lk := &lockWriter{&bytes.Buffer{}, ch}
 	log.SetOutput(lk)

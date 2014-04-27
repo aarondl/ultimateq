@@ -1,10 +1,10 @@
 package data
 
 import (
-	. "testing"
+	"testing"
 )
 
-func TestAccess(t *T) {
+func TestAccess(t *testing.T) {
 	t.Parallel()
 	a := CreateAccess(0)
 	if a == nil {
@@ -25,7 +25,7 @@ func TestAccess(t *T) {
 	}
 }
 
-func TestAccess_HasLevel(t *T) {
+func TestAccess_HasLevel(t *testing.T) {
 	a := CreateAccess(50)
 
 	var table = map[uint8]bool{
@@ -41,7 +41,7 @@ func TestAccess_HasLevel(t *T) {
 	}
 }
 
-func TestAccess_HasFlag(t *T) {
+func TestAccess_HasFlag(t *testing.T) {
 	t.Parallel()
 	a := CreateAccess(0, "aBC", "d")
 	for _, v := range "aBCd" {
@@ -51,7 +51,7 @@ func TestAccess_HasFlag(t *T) {
 	}
 }
 
-func TestAccess_HasFlags(t *T) {
+func TestAccess_HasFlags(t *testing.T) {
 	t.Parallel()
 	a := CreateAccess(0, "aBC", "d")
 	if !a.HasFlags("aBCd") {
@@ -62,7 +62,7 @@ func TestAccess_HasFlags(t *T) {
 	}
 }
 
-func TestAccess_SetFlag(t *T) {
+func TestAccess_SetFlag(t *testing.T) {
 	t.Parallel()
 	a := CreateAccess(0)
 	if a.HasFlag('a') {
@@ -82,7 +82,7 @@ func TestAccess_SetFlag(t *T) {
 	}
 }
 
-func TestAccess_MultiEffects(t *T) {
+func TestAccess_MultiEffects(t *testing.T) {
 	t.Parallel()
 	a := CreateAccess(0)
 	a.SetFlags("ab", "A")
@@ -95,7 +95,7 @@ func TestAccess_MultiEffects(t *T) {
 	}
 }
 
-func TestAccess_ClearFlag(t *T) {
+func TestAccess_ClearFlag(t *testing.T) {
 	t.Parallel()
 	a := CreateAccess(0, "aBCd")
 	for _, v := range "aBCd" {
@@ -119,7 +119,7 @@ func TestAccess_ClearFlag(t *T) {
 	}
 }
 
-func TestAccess_ClearAllFlags(t *T) {
+func TestAccess_ClearAllFlags(t *testing.T) {
 	t.Parallel()
 	a := CreateAccess(0, "aBCd")
 	a.ClearAllFlags()
@@ -131,7 +131,7 @@ func TestAccess_ClearAllFlags(t *T) {
 	}
 }
 
-func TestAccess_IsZero(t *T) {
+func TestAccess_IsZero(t *testing.T) {
 	a := Access{}
 	if !a.IsZero() {
 		t.Error("Should be zero.")
@@ -142,7 +142,7 @@ func TestAccess_IsZero(t *T) {
 	}
 }
 
-func TestAccess_String(t *T) {
+func TestAccess_String(t *testing.T) {
 	t.Parallel()
 
 	var table = []struct {
@@ -170,7 +170,7 @@ func TestAccess_String(t *T) {
 	}
 }
 
-func Test_getFlagBits(t *T) {
+func Test_getFlagBits(t *testing.T) {
 	t.Parallel()
 	bits := getFlagBits("Aab")
 	aFlag, bFlag, AFlag := getFlagBit('a'), getFlagBit('b'), getFlagBit('A')
@@ -185,7 +185,7 @@ func Test_getFlagBits(t *T) {
 	}
 }
 
-func Test_getFlagBit(t *T) {
+func Test_getFlagBit(t *testing.T) {
 	t.Parallel()
 	var table = map[rune]uint64{
 		'A': 0x1,
@@ -203,7 +203,7 @@ func Test_getFlagBit(t *T) {
 	}
 }
 
-func Test_getFlagString(t *T) {
+func Test_getFlagString(t *testing.T) {
 	t.Parallel()
 	var table = map[uint64]string{
 		0x1: "A",

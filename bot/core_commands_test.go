@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	. "testing"
+	"testing"
 
 	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/irc"
@@ -41,10 +41,10 @@ type tSetup struct {
 	state  *data.State
 	store  *data.Store
 	buffer *bytes.Buffer
-	t      *T
+	t      *testing.T
 }
 
-func commandsSetup(t *T) *tSetup {
+func commandsSetup(t *testing.T) *tSetup {
 	conf := Configure().Nick("nobody").Altnick("nobody1").Username("nobody").
 		Userhost("host.com").Realname("ultimateq").NoReconnect(true).
 		Ssl(true).Prefix(prefix).Server(netID)
@@ -76,7 +76,7 @@ func commandsSetup(t *T) *tSetup {
 	return &tSetup{b, srv.endpoint.DataEndpoint, srv.state, b.store, buf, t}
 }
 
-func commandsTeardown(s *tSetup, t *T) {
+func commandsTeardown(s *tSetup, t *testing.T) {
 	if s.store != nil {
 		s.store.Close()
 	}
@@ -118,7 +118,7 @@ func prvRspChk(ts *tSetup, expected, to, sender string, args ...string) error {
 	return nil
 }
 
-func TestCoreCommands(t *T) {
+func TestCoreCommands(t *testing.T) {
 	conf := Configure().Nick("nobody").Altnick("nobody1").Username("nobody").
 		Userhost("bitforge.ca").Realname("ultimateq").NoReconnect(true).
 		Ssl(true).Server(netID)
@@ -137,7 +137,7 @@ func TestCoreCommands(t *T) {
 	commandsTeardown(&tSetup{b: b}, t)
 }
 
-func TestCoreCommands_Register(t *T) {
+func TestCoreCommands_Register(t *testing.T) {
 	ts := commandsSetup(t)
 	defer commandsTeardown(ts, t)
 
@@ -188,7 +188,7 @@ func TestCoreCommands_Register(t *T) {
 	}
 }
 
-func TestCoreCommands_Auth(t *T) {
+func TestCoreCommands_Auth(t *testing.T) {
 	ts := commandsSetup(t)
 	defer commandsTeardown(ts, t)
 
@@ -225,7 +225,7 @@ func TestCoreCommands_Auth(t *T) {
 	}
 }
 
-func TestCoreCommands_Logout(t *T) {
+func TestCoreCommands_Logout(t *testing.T) {
 	ts := commandsSetup(t)
 	defer commandsTeardown(ts, t)
 
@@ -268,7 +268,7 @@ func TestCoreCommands_Logout(t *T) {
 
 }
 
-func TestCoreCommands_Access(t *T) {
+func TestCoreCommands_Access(t *testing.T) {
 	ts := commandsSetup(t)
 	defer commandsTeardown(ts, t)
 	var err error
@@ -324,7 +324,7 @@ func TestCoreCommands_Access(t *T) {
 	}
 }
 
-func TestCoreCommands_Deluser(t *T) {
+func TestCoreCommands_Deluser(t *testing.T) {
 	ts := commandsSetup(t)
 	defer commandsTeardown(ts, t)
 
@@ -403,7 +403,7 @@ func TestCoreCommands_Deluser(t *T) {
 	}
 }
 
-func TestCoreCommands_Delme(t *T) {
+func TestCoreCommands_Delme(t *testing.T) {
 	ts := commandsSetup(t)
 	defer commandsTeardown(ts, t)
 
@@ -442,7 +442,7 @@ func TestCoreCommands_Delme(t *T) {
 	}
 }
 
-func TestCoreCommands_Passwd(t *T) {
+func TestCoreCommands_Passwd(t *testing.T) {
 	ts := commandsSetup(t)
 	defer commandsTeardown(ts, t)
 
@@ -488,7 +488,7 @@ func TestCoreCommands_Passwd(t *T) {
 	}
 }
 
-func TestCoreCommands_Masks(t *T) {
+func TestCoreCommands_Masks(t *testing.T) {
 	ts := commandsSetup(t)
 	defer commandsTeardown(ts, t)
 
@@ -600,7 +600,7 @@ func TestCoreCommands_Masks(t *T) {
 	}
 }
 
-func TestCoreCommands_Resetpasswd(t *T) {
+func TestCoreCommands_Resetpasswd(t *testing.T) {
 	ts := commandsSetup(t)
 	defer commandsTeardown(ts, t)
 	var err error
@@ -638,7 +638,7 @@ func TestCoreCommands_Resetpasswd(t *T) {
 	}
 }
 
-func TestCoreCommands_GiveTakeGlobal(t *T) {
+func TestCoreCommands_GiveTakeGlobal(t *testing.T) {
 	ts := commandsSetup(t)
 	defer commandsTeardown(ts, t)
 	var err error
@@ -702,7 +702,7 @@ func TestCoreCommands_GiveTakeGlobal(t *T) {
 	}
 }
 
-func TestCoreCommands_GiveTakeServer(t *T) {
+func TestCoreCommands_GiveTakeServer(t *testing.T) {
 	ts := commandsSetup(t)
 	defer commandsTeardown(ts, t)
 	var err error
@@ -766,7 +766,7 @@ func TestCoreCommands_GiveTakeServer(t *T) {
 	}
 }
 
-func TestCoreCommands_GiveTakeChannel(t *T) {
+func TestCoreCommands_GiveTakeChannel(t *testing.T) {
 	ts := commandsSetup(t)
 	defer commandsTeardown(ts, t)
 	var err error
@@ -832,7 +832,7 @@ func TestCoreCommands_GiveTakeChannel(t *T) {
 	}
 }
 
-func TestCoreCommands_Help(t *T) {
+func TestCoreCommands_Help(t *testing.T) {
 	ts := commandsSetup(t)
 	defer commandsTeardown(ts, t)
 	var err error
@@ -880,7 +880,7 @@ func TestCoreCommands_Help(t *T) {
 	}
 }
 
-func TestCoreCommands_Gusers(t *T) {
+func TestCoreCommands_Gusers(t *testing.T) {
 	ts := commandsSetup(t)
 	defer commandsTeardown(ts, t)
 	var a1, a2 *data.UserAccess
@@ -924,7 +924,7 @@ func TestCoreCommands_Gusers(t *T) {
 	}
 }
 
-func TestCoreCommands_Susers(t *T) {
+func TestCoreCommands_Susers(t *testing.T) {
 	ts := commandsSetup(t)
 	defer commandsTeardown(ts, t)
 	var a1, a2 *data.UserAccess
@@ -973,7 +973,7 @@ func TestCoreCommands_Susers(t *T) {
 	}
 }
 
-func TestCoreCommands_Users(t *T) {
+func TestCoreCommands_Users(t *testing.T) {
 	ts := commandsSetup(t)
 	defer commandsTeardown(ts, t)
 	var a1, a2 *data.UserAccess

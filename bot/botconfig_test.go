@@ -3,7 +3,7 @@ package bot
 import (
 	"bytes"
 	"net"
-	. "testing"
+	"testing"
 
 	"github.com/aarondl/ultimateq/config"
 	"github.com/aarondl/ultimateq/irc"
@@ -14,7 +14,7 @@ var zeroConnProvider = func(srv string) (net.Conn, error) {
 	return nil, nil
 }
 
-func TestBotConfig_ReadConfig(t *T) {
+func TestBotConfig_ReadConfig(t *testing.T) {
 	b, _ := createBot(fakeConfig, nil, nil, false, false)
 
 	b.ReadConfig(func(conf *config.Config) {
@@ -26,7 +26,7 @@ func TestBotConfig_ReadConfig(t *T) {
 	})
 }
 
-func TestBotConfig_WriteConfig(t *T) {
+func TestBotConfig_WriteConfig(t *testing.T) {
 	b, _ := createBot(fakeConfig, nil, nil, false, false)
 
 	b.WriteConfig(func(conf *config.Config) {
@@ -38,7 +38,7 @@ func TestBotConfig_WriteConfig(t *T) {
 	})
 }
 
-func TestBotConfig_testElementEquals(t *T) {
+func TestBotConfig_testElementEquals(t *testing.T) {
 	a := []string{"a", "b"}
 	b := []string{"b", "a"}
 	if !contains(a, b) {
@@ -73,7 +73,7 @@ func TestBotConfig_testElementEquals(t *T) {
 	}
 }
 
-func TestBotConfig_ReplaceConfig(t *T) {
+func TestBotConfig_ReplaceConfig(t *testing.T) {
 	nick := []byte(irc.NICK + " :newnick\r\n")
 
 	conns := map[string]*mocks.Conn{

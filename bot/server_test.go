@@ -5,14 +5,14 @@ import (
 	"crypto/x509"
 	"io"
 	"net"
-	. "testing"
+	"testing"
 	"time"
 
 	"github.com/aarondl/ultimateq/irc"
 	"github.com/aarondl/ultimateq/mocks"
 )
 
-func TestServer_createIrcClient(t *T) {
+func TestServer_createIrcClient(t *testing.T) {
 	t.Parallel()
 	errch := make(chan error)
 	connProvider := func(srv string) (net.Conn, error) {
@@ -33,7 +33,7 @@ func TestServer_createIrcClient(t *T) {
 	}
 }
 
-func TestServer_createIrcClient_failConn(t *T) {
+func TestServer_createIrcClient_failConn(t *testing.T) {
 	t.Parallel()
 	errch := make(chan error)
 	connProvider := func(srv string) (net.Conn, error) {
@@ -51,7 +51,7 @@ func TestServer_createIrcClient_failConn(t *T) {
 	}
 }
 
-func TestServer_createIrcClient_killConn(t *T) {
+func TestServer_createIrcClient_killConn(t *testing.T) {
 	t.Parallel()
 	errch := make(chan error)
 	connProvider := func(srv string) (net.Conn, error) {
@@ -73,7 +73,7 @@ func TestServer_createIrcClient_killConn(t *T) {
 	}
 }
 
-func TestServer_createTlsConfig(t *T) {
+func TestServer_createTlsConfig(t *testing.T) {
 	t.Parallel()
 	b, _ := createBot(fakeConfig, nil, nil, false, false)
 	srv := b.servers[netID]
@@ -91,7 +91,7 @@ func TestServer_createTlsConfig(t *T) {
 	}
 }
 
-func TestServerSender(t *T) {
+func TestServerSender(t *testing.T) {
 	t.Parallel()
 	b, _ := createBot(fakeConfig, nil, nil, false, false)
 	ep := b.GetEndpoint(netID)
@@ -103,7 +103,7 @@ func TestServerSender(t *T) {
 	}
 }
 
-func TestServer_Close(t *T) {
+func TestServer_Close(t *testing.T) {
 	t.Parallel()
 	errch := make(chan error)
 	conn := mocks.CreateConn()
@@ -130,7 +130,7 @@ func TestServer_Close(t *T) {
 	}
 }
 
-func TestServer_Status(t *T) {
+func TestServer_Status(t *testing.T) {
 	t.Parallel()
 	srv := &Server{}
 
@@ -185,7 +185,7 @@ func TestServer_Status(t *T) {
 	}
 }
 
-func TestServer_rehashNetworkInfo(t *T) {
+func TestServer_rehashNetworkInfo(t *testing.T) {
 	t.Parallel()
 	b, _ := createBot(fakeConfig, nil, nil, false, false)
 	srv := b.servers[netID]
@@ -203,7 +203,7 @@ func TestServer_rehashNetworkInfo(t *T) {
 	}
 }
 
-func TestServer_Write(t *T) {
+func TestServer_Write(t *testing.T) {
 	t.Parallel()
 	conn := mocks.CreateConn()
 	connProvider := func(srv string) (net.Conn, error) {

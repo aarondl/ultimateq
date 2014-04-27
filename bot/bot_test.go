@@ -5,7 +5,7 @@ import (
 	"log"
 	"net"
 	"os"
-	. "testing"
+	"testing"
 	"time"
 
 	"github.com/aarondl/ultimateq/config"
@@ -16,7 +16,7 @@ import (
 	"gopkg.in/check.v1"
 )
 
-func Test(t *T) { check.TestingT(t) } //Hook into testing package
+func Test(t *testing.T) { check.TestingT(t) } //Hook into testing package
 type s struct{}
 
 var _ = check.Suite(&s{})
@@ -73,7 +73,7 @@ var fakeConfig = Configure().
 //==================================
 // Tests begin
 //==================================
-func TestBot_Create(t *T) {
+func TestBot_Create(t *testing.T) {
 	t.Parallel()
 	bot, err := CreateBot(fakeConfig)
 	if bot == nil {
@@ -97,7 +97,7 @@ func TestBot_Create(t *T) {
 	}
 }
 
-func TestBot_Start(t *T) {
+func TestBot_Start(t *testing.T) {
 	t.Parallel()
 	connProvider := func(srv string) (net.Conn, error) {
 		return nil, io.EOF
@@ -118,7 +118,7 @@ func TestBot_Start(t *T) {
 	}
 }
 
-func TestBot_StartStopServer(t *T) {
+func TestBot_StartStopServer(t *testing.T) {
 	t.Parallel()
 	conn1 := mocks.CreateConn()
 	conn2 := mocks.CreateConn()
@@ -167,7 +167,7 @@ func TestBot_StartStopServer(t *T) {
 	<-done
 }
 
-func TestBot_Dispatching(t *T) {
+func TestBot_Dispatching(t *testing.T) {
 	t.Parallel()
 	conn := mocks.CreateConn()
 	connProvider := func(srv string) (net.Conn, error) {
@@ -219,7 +219,7 @@ func TestBot_Dispatching(t *T) {
 	}
 }
 
-func TestBot_Dispatch_ConnectDisconnect(t *T) {
+func TestBot_Dispatch_ConnectDisconnect(t *testing.T) {
 	t.Parallel()
 	conn := mocks.CreateConn()
 	connProvider := func(srv string) (net.Conn, error) {
@@ -253,7 +253,7 @@ func TestBot_Dispatch_ConnectDisconnect(t *T) {
 	}
 }
 
-func TestBot_Reconnect(t *T) {
+func TestBot_Reconnect(t *testing.T) {
 	t.Parallel()
 	conn := mocks.CreateConn()
 	wantedConn := make(chan int)
@@ -288,7 +288,7 @@ func TestBot_Reconnect(t *T) {
 	}
 }
 
-func TestBot_ReconnectConnection(t *T) {
+func TestBot_ReconnectConnection(t *testing.T) {
 	t.Parallel()
 	wantedConn := make(chan int)
 	connProvider := func(srv string) (net.Conn, error) {
@@ -322,7 +322,7 @@ func TestBot_ReconnectConnection(t *T) {
 	}
 }
 
-func TestBot_ReconnectKill(t *T) {
+func TestBot_ReconnectKill(t *testing.T) {
 	t.Parallel()
 	connProvider := func(srv string) (net.Conn, error) {
 		return nil, io.EOF
@@ -347,7 +347,7 @@ func TestBot_ReconnectKill(t *T) {
 	}
 }
 
-func TestBot_Register(t *T) {
+func TestBot_Register(t *testing.T) {
 	t.Parallel()
 	b, _ := createBot(fakeConfig, nil, nil, false, false)
 	gid := b.Register(irc.PRIVMSG, &coreHandler{})
@@ -377,7 +377,7 @@ func TestBot_Register(t *T) {
 	}
 }
 
-func TestBot_RegisterCmd(t *T) {
+func TestBot_RegisterCmd(t *testing.T) {
 	// t.Parallel() Cannot be parallel due to the nature of command registration
 	var err error
 	var success bool
@@ -418,7 +418,7 @@ func TestBot_RegisterCmd(t *T) {
 	}
 }
 
-func TestBot_Providers(t *T) {
+func TestBot_Providers(t *testing.T) {
 	t.Parallel()
 	storeConf1 := fakeConfig.Clone().GlobalContext().NoStore(false)
 	storeConf2 := storeConf1.Clone().ServerContext(netID).NoStore(false)
@@ -454,7 +454,7 @@ func TestBot_Providers(t *T) {
 	}
 }
 
-func TestBot_Store(t *T) {
+func TestBot_Store(t *testing.T) {
 	t.Parallel()
 	conf := fakeConfig.Clone().GlobalContext().NoStore(false)
 	goodStoreProv := func(s string) (*data.Store, error) {
@@ -471,7 +471,7 @@ func TestBot_Store(t *T) {
 	b.Close() // Nothing bad should happen
 }
 
-func TestBot_Stop(t *T) {
+func TestBot_Stop(t *testing.T) {
 	t.Parallel()
 	conn := mocks.CreateConn()
 	connProvider := func(srv string) (net.Conn, error) {
@@ -492,7 +492,7 @@ func TestBot_Stop(t *T) {
 	}
 }
 
-func TestBot_GetEndpoint(t *T) {
+func TestBot_GetEndpoint(t *testing.T) {
 	t.Parallel()
 	conn := mocks.CreateConn()
 	connProvider := func(srv string) (net.Conn, error) {
