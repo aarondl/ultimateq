@@ -9,21 +9,12 @@ import (
 )
 
 var core = NewDispatchCore()
-var logBuffer = &bytes.Buffer{}
-
-func init() {
-	log.SetOutput(logBuffer)
-}
 
 //===========================================================
 // Set up a type that can be used to mock irc.Writer
 //===========================================================
 type testPoint struct {
 	*irc.Helper
-}
-
-func (tsender testPoint) GetKey() string {
-	return ""
 }
 
 //===========================================================
@@ -702,8 +693,22 @@ func TestDispatchCore_ShouldDispatch(t *testing.T) {
 	}
 }
 
+type lockWriter struct {
+	*bytes.Buffer
+	write chan struct{}
+}
+
+func (l *lockWriter) Write(b []byte) (int, error) {
+	n, err := l.Buffer.Write(b)
+	l.write <- struct{}{}
+	return n, err
+}
+
 func TestDispatch_Panic(t *testing.T) {
-	logBuffer.Reset()
+	ch := make(chan struct{}, 1)
+	lk := &lockWriter{&bytes.Buffer{}, ch}
+	log.SetOutput(lk)
+
 	d := NewDispatcher(core)
 	panicMsg := "dispatch panic"
 
@@ -717,13 +722,15 @@ func TestDispatch_Panic(t *testing.T) {
 	ev := irc.NewEvent("", netInfo, "dispatcher", irc.PRIVMSG, "panic test")
 	d.Dispatch(ev, testPoint{&irc.Helper{}})
 	d.WaitForHandlers()
-	logStr := logBuffer.String()
+
+	<-ch
+	logStr := lk.String()
 
 	if logStr == "" {
 		t.Error("Expected not empty log.")
 	}
 
-	logBytes := logBuffer.Bytes()
+	logBytes := lk.Bytes()
 	if !bytes.Contains(logBytes, []byte(panicMsg)) {
 		t.Errorf("Log does not contain: %s\n%s", panicMsg, logBytes)
 	}

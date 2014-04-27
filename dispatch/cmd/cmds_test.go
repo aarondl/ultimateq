@@ -15,13 +15,11 @@ import (
 )
 
 var (
-	logBuffer = &bytes.Buffer{}
-	netInfo   = irc.NewNetworkInfo()
+	netInfo = irc.NewNetworkInfo()
 )
 
 func init() {
 	data.UserAccessPwdCost = 4 // See constant for bcrypt.MinCost
-	log.SetOutput(logBuffer)
 }
 
 type commandHandler struct {
@@ -1436,8 +1434,22 @@ func TestCmds_EachCmd(t *T) {
 	}
 }
 
+type lockWriter struct {
+	*bytes.Buffer
+	write chan struct{}
+}
+
+func (l *lockWriter) Write(b []byte) (int, error) {
+	n, err := l.Buffer.Write(b)
+	l.write <- struct{}{}
+	return n, err
+}
+
 func TestCmds_Panic(t *T) {
-	logBuffer.Reset()
+	ch := make(chan struct{}, 1)
+	lk := &lockWriter{&bytes.Buffer{}, ch}
+	log.SetOutput(lk)
+
 	c := CreateCmds(prefix, core)
 	panicMsg := "dispatch panic"
 
@@ -1461,13 +1473,14 @@ func TestCmds_Panic(t *T) {
 	}
 
 	c.WaitForHandlers()
-	logStr := logBuffer.String()
+	<-ch
+	logStr := lk.String()
 
 	if logStr == "" {
 		t.Error("Expected not empty log.")
 	}
 
-	logBytes := logBuffer.Bytes()
+	logBytes := lk.Bytes()
 	if !bytes.Contains(logBytes, []byte(panicMsg)) {
 		t.Errorf("Log does not contain: %s\n%s", panicMsg, logBytes)
 	}
