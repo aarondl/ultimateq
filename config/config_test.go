@@ -1,22 +1,59 @@
 package config
 
 import (
-	"bytes"
-	"log"
+	"strings"
 	"testing"
 )
 
-func reqErr(name string) string {
-	return `.*Requires.*` + name + `.*`
+func isReqErr(e error) bool {
+	return strings.Contains(e.Error(), "Required")
 }
 
-func invErr(name string) string {
-	return `.*Invalid.*` + name + `.*`
+func isInvErr(e error) bool {
+	return strings.Contains(e.Error(), "Invalid")
 }
 
-var net1 = &Network{
+func TestConfig(t *testing.T) {
+	c := NewConfig()
+	if c.Network == nil || c.Network.protect == nil {
+		t.Error("Expected global settings to be initialized.")
+	}
+
+	if c.Networks == nil {
+		t.Error("Expected network map to be initialized.")
+	}
+}
+
+func TestConfig_Clear(t *testing.T) {
+	name := "something"
+
+	c := NewConfig()
+	c.Network.InName = name
+	c.filename = name
+	c.Storefile = name
+	c.Networks[name] = &Network{}
+
+	c.Clear()
+	if c.Network.InName == name {
+		t.Error("It should wipe the network name.")
+	}
+
+	if c.filename == name {
+		t.Error("It should wipe the filename.")
+	}
+
+	if c.Storefile == name {
+		t.Error("It should wipe the store file.")
+	}
+
+	if _, ok := c.Networks[name]; ok {
+		t.Error("It should wipe the networks.")
+	}
+}
+
+/*var net1 = &Network{
 	Name:             "irc1",
-	Host:             "irc.gamesurge.net",
+	Servers:             "irc.gamesurge.net",
 	Port:             5555,
 	Ssl:              "true",
 	SslCert:          "file1",
@@ -63,9 +100,7 @@ var net2 = &Network{
 }
 
 func TestConfig(t *testing.T) {
-	config := NewConfig()
-	c.Check(config.Networks, NotNil)
-	c.Check(config.Global, NotNil)
+	_ := NewConfig()
 }
 
 func TestConfig_Fallbacks(t *testing.T) {
@@ -305,13 +340,10 @@ func TestConfig_GetNetwork(t *testing.T) {
 	c.Check(conf.GetNetwork(net2.GetName()), Equals, net2)
 }
 
-func TestConfig_SetContext(t *testing.T) {
-	t.Parallel()
-}
-
 func TestConfig_Clone(t *testing.T) {
 	t.Parallel()
-}
+
+}*/
 
 func TestValidNames(t *testing.T) {
 	t.Parallel()
