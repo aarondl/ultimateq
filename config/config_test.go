@@ -1,9 +1,24 @@
 package config
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 )
+
+var cloneable = `global:
+    nick: a
+    realname: a
+    username: a
+networks:
+    srv:
+        servers: i.com
+        channels: #dude
+        exts:
+            fun:
+                config:
+                    key: value
+`
 
 func isReqErr(e error) bool {
 	return strings.Contains(e.Error(), "Required")
@@ -14,6 +29,7 @@ func isInvErr(e error) bool {
 }
 
 func TestConfig(t *testing.T) {
+	t.Parallel()
 	c := NewConfig()
 	if c.Network == nil || c.Network.protect == nil {
 		t.Error("Expected global settings to be initialized.")
@@ -24,7 +40,29 @@ func TestConfig(t *testing.T) {
 	}
 }
 
+func TestConfig_Clone(t *testing.T) {
+	t.Parallel()
+	c := NewConfig().FromString(cloneable)
+	if !c.IsValid() {
+		t.Error(c.errors)
+		t.Error("Expected a valid configuration.")
+	}
+
+	b := c.Clone()
+	if b == c || b.Network == c.Network || &b.Networks == &c.Networks {
+		t.Error("It should allocate all it's own memory.")
+	}
+
+	sb, sc := b.Networks["srv"], c.Networks["srv"]
+	if sb == sc ||
+		&sb.InChannels == &sc.InChannels || &sb.InServers == &sc.InServers {
+
+		t.Error("Networks should also be deep-copied.")
+	}
+}
+
 func TestConfig_Clear(t *testing.T) {
+	t.Parallel()
 	name := "something"
 
 	c := NewConfig()
@@ -51,54 +89,328 @@ func TestConfig_Clear(t *testing.T) {
 	}
 }
 
-/*var net1 = &Network{
-	Name:             "irc1",
-	Servers:             "irc.gamesurge.net",
-	Port:             5555,
-	Ssl:              "true",
-	SslCert:          "file1",
-	NoVerifyCert:     "false",
-	NoState:          "false",
-	NoStore:          "true",
-	FloodLenPenalty:  "5",
-	FloodTimeout:     "3.5",
-	FloodStep:        "5.5",
-	KeepAlive:        "7.5",
-	NoReconnect:      "false",
-	ReconnectTimeout: "10",
-	Nick:             "n1",
-	Altnick:          "a1",
-	Username:         "u1",
-	Userhost:         "h1",
-	Realname:         "r1",
-	Prefix:           "1",
-	Channels:         []string{"#chan1", "#chan2"},
+var net1 = &Network{
+	InName:             "irc1",
+	InServers:          []string{"irc.gamesurge.net"},
+	InPort:             5555,
+	InSsl:              "true",
+	InSslCert:          "file1",
+	InNoVerifyCert:     "false",
+	InNoState:          "false",
+	InNoStore:          "true",
+	InFloodLenPenalty:  "5",
+	InFloodTimeout:     "3.5",
+	InFloodStep:        "5.5",
+	InKeepAlive:        "7.5",
+	InNoReconnect:      "false",
+	InReconnectTimeout: "10",
+	InNick:             "n1",
+	InAltnick:          "a1",
+	InUsername:         "u1",
+	InUserhost:         "h1",
+	InRealname:         "r1",
+	InPassword:         "p1",
+	InPrefix:           "1",
+	InChannels:         []string{"#chan1", "#chan2"},
+	InExts: map[string]*Ext{
+		"ext": {
+			InName:             "ext",
+			InConfig:           map[string]string{"k": "1"},
+			InLocal:            "true",
+			InExec:             "ee1",
+			InUseJSON:          "false",
+			InIsServer:         "false",
+			InAddress:          "ea1",
+			InSsl:              "true",
+			InSslClientCert:    "escc1",
+			InNoVerifyCert:     "false",
+			InSock:             "eso1",
+			InNoReconnect:      "true",
+			InReconnectTimeout: "10",
+		},
+	},
 }
 
 var net2 = &Network{
-	Name:             "irc2",
-	Host:             "irc.gamesurge.com",
-	Port:             6666,
-	Ssl:              "false",
-	SslCert:          "file2",
-	NoVerifyCert:     "true",
-	NoState:          "true",
-	NoStore:          "true",
-	FloodLenPenalty:  "6",
-	FloodTimeout:     "4.5",
-	FloodStep:        "6.5",
-	KeepAlive:        "8.5",
-	NoReconnect:      "true",
-	ReconnectTimeout: "100",
-	Nick:             "n2",
-	Altnick:          "a2",
-	Username:         "u2",
-	Userhost:         "h2",
-	Realname:         "r2",
-	Prefix:           "2",
-	Channels:         []string{"#chan2"},
+	InName:             "irc2",
+	InServers:          []string{"irc.gamesurge.com"},
+	InPort:             6666,
+	InSsl:              "false",
+	InSslCert:          "file2",
+	InNoVerifyCert:     "true",
+	InNoState:          "true",
+	InNoStore:          "true",
+	InFloodLenPenalty:  "6",
+	InFloodTimeout:     "4.5",
+	InFloodStep:        "6.5",
+	InKeepAlive:        "8.5",
+	InNoReconnect:      "true",
+	InReconnectTimeout: "100",
+	InNick:             "n2",
+	InAltnick:          "a2",
+	InUsername:         "u2",
+	InUserhost:         "h2",
+	InRealname:         "r2",
+	InPassword:         "p2",
+	InPrefix:           "2",
+	InChannels:         []string{"#chan2"},
+	InExts: map[string]*Ext{
+		"ext": {
+			InName:             "ext",
+			InConfig:           map[string]string{"k": "2"},
+			InLocal:            "false",
+			InExec:             "ee2",
+			InUseJSON:          "true",
+			InIsServer:         "true",
+			InAddress:          "ea2",
+			InSsl:              "false",
+			InSslClientCert:    "escc2",
+			InNoVerifyCert:     "true",
+			InSock:             "eso2",
+			InNoReconnect:      "false",
+			InReconnectTimeout: "20",
+		},
+	},
 }
 
+func TestConfig_Fallbacks(t *testing.T) {
+	t.Parallel()
+
+	c := NewConfig()
+	n1, n2 := *net1, *net2
+	e1, e2 := *net1.InExts["ext"], *net2.InExts["ext"]
+	n1.protect, n2.protect = &c.protect, &c.protect
+	e1.protect, e2.protect = &c.protect, &c.protect
+	c.Network = &n1
+	n2.parent = c
+	e2.parent = &e1
+
+	b := strconv.FormatBool
+	u := func(ui uint) string {
+		return strconv.Itoa(int(ui))
+	}
+	f := func(f float64) string {
+		return strconv.FormatFloat(f, 'f', -1, 64)
+	}
+
+	if exp, got := n2.InName, n2.Name(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n2.InPort, n2.Port(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n2.InSsl, b(n2.Ssl()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n2.InSslCert, n2.SslCert(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n2.InNoVerifyCert, b(n2.NoVerifyCert()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n2.InNoState, b(n2.NoState()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n2.InNoStore, b(n2.NoStore()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n2.InFloodLenPenalty, u(n2.FloodLenPenalty()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n2.InFloodTimeout, f(n2.FloodTimeout()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n2.InFloodStep, f(n2.FloodStep()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n2.InKeepAlive, f(n2.KeepAlive()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n2.InNoReconnect, b(n2.NoReconnect()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n2.InReconnectTimeout, u(n2.ReconnectTimeout()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n2.InNick, n2.Nick(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n2.InAltnick, n2.Altnick(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n2.InUsername, n2.Username(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n2.InUserhost, n2.Userhost(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n2.InRealname, n2.Realname(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n2.InPassword, n2.Password(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n2.InPrefix[0], byte(n2.Prefix()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+
+	for i, s := range n2.Servers() {
+		if n2.InServers[i] != s {
+			t.Error("Expected: %v, got: %v", n2.InServers[i], s)
+		}
+	}
+	for i, s := range n2.Channels() {
+		if n2.InChannels[i] != s {
+			t.Error("Expected: %v, got: %v", n2.InServers[i], s)
+		}
+	}
+
+	if exp, got := e2.InName, e2.Name(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := e2.InConfig["k"], e2.Config()["k"]; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := e2.InLocal, b(e2.Local()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := e2.InExec, e2.Exec(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := e2.InUseJSON, b(e2.UseJSON()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := e2.InIsServer, b(e2.IsServer()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := e2.InAddress, e2.Address(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := e2.InSsl, b(e2.Ssl()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := e2.InSslClientCert, e2.SslClientCert(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := e2.InNoVerifyCert, b(e2.NoVerifyCert()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := e2.InSock, e2.Sock(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := e2.InNoReconnect, b(e2.NoReconnect()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := e2.InReconnectTimeout, u(e2.ReconnectTimeout()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+
+	n2 = Network{protect: &c.protect, parent: c, InName: "servername"}
+	e2 = Ext{protect: &c.protect, parent: &e1}
+
+	if exp, got := n1.InPort, n2.Port(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n1.InSsl, b(n2.Ssl()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n1.InSslCert, n2.SslCert(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n1.InNoVerifyCert, b(n2.NoVerifyCert()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n1.InNoState, b(n2.NoState()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n1.InNoStore, b(n2.NoStore()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n1.InFloodLenPenalty, u(n2.FloodLenPenalty()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n1.InFloodTimeout, f(n2.FloodTimeout()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n1.InFloodStep, f(n2.FloodStep()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n1.InKeepAlive, f(n2.KeepAlive()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n1.InNoReconnect, b(n2.NoReconnect()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n1.InReconnectTimeout, u(n2.ReconnectTimeout()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n1.InNick, n2.Nick(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n1.InAltnick, n2.Altnick(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n1.InUsername, n2.Username(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n1.InUserhost, n2.Userhost(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n1.InRealname, n2.Realname(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n1.InPassword, n2.Password(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := n1.InPrefix[0], byte(n2.Prefix()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+
+	for i, s := range n2.Channels() {
+		if n1.InChannels[i] != s {
+			t.Errorf("Expected: %v, got: %v", n1.InServers[i], s)
+		}
+	}
+
+	if exp, got := e1.InConfig["k"], e2.Config()["k"]; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := e1.InLocal, b(e2.Local()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := e1.InExec, e2.Exec(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := e1.InUseJSON, b(e2.UseJSON()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := e1.InIsServer, b(e2.IsServer()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := e1.InAddress, e2.Address(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := e1.InSsl, b(e2.Ssl()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := e1.InSslClientCert, e2.SslClientCert(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := e1.InNoVerifyCert, b(e2.NoVerifyCert()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := e1.InSock, e2.Sock(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := e1.InNoReconnect, b(e2.NoReconnect()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := e1.InReconnectTimeout, u(e2.ReconnectTimeout()); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+}
+
+/*
 func TestConfig(t *testing.T) {
 	_ := NewConfig()
 }

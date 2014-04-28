@@ -40,6 +40,20 @@ type Ext struct {
 	InReconnectTimeout string `yaml:"reconnecttimeout" json:"reconnecttimeout"`
 }
 
+// Clone deep copies the Extension.
+func (e *Ext) Clone() *Ext {
+	e.protect.RLock()
+	defer e.protect.RUnlock()
+
+	newExt := *e
+	newExt.InConfig = make(map[string]string)
+	for k, v := range e.InConfig {
+		newExt.InConfig[k] = v
+	}
+
+	return &newExt
+}
+
 // Name returns the extensions name.
 func (e *Ext) Name() string {
 	e.protect.RLock()

@@ -92,6 +92,11 @@ func (c *Config) fixReferencesAndNames() {
 		c.Network = &Network{InName: "global", protect: &c.protect}
 	}
 
+	for ename, ext := range c.Network.InExts {
+		ext.protect = &c.protect
+		ext.InName = ename
+	}
+
 	for name, network := range c.Networks {
 		if network == nil {
 			network = &Network{}
@@ -101,6 +106,17 @@ func (c *Config) fixReferencesAndNames() {
 		network.parent = c
 		network.protect = &c.protect
 		network.InName = name
+
+		for ename, ext := range network.InExts {
+			if ext == nil {
+				ext = &Ext{}
+				network.InExts[ename] = ext
+			}
+
+			ext.parent = c.Network.InExts[ename]
+			ext.protect = &c.protect
+			ext.InName = ename
+		}
 	}
 }
 
@@ -147,9 +163,5 @@ func (c *Config) ToWriter(writer io.Writer) error {
 		written += n
 	}
 
-	if err != io.EOF {
-		return err
-	}
-
-	return nil
+	return err
 }

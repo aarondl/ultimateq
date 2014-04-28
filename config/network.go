@@ -52,6 +52,9 @@ type Network struct {
 	// Dispatching options
 	InPrefix   string   `yaml:"prefix" json:"prefix"`
 	InChannels []string `yaml:"channels" json:"channels"`
+
+	// Extensions
+	InExts map[string]*Ext `yaml:"exts" json:"exts"`
 }
 
 // Clone clones a network.
@@ -64,6 +67,12 @@ func (n *Network) Clone() *Network {
 	newNet.InServers = make([]string, len(n.InServers))
 	copy(newNet.InChannels, n.InChannels)
 	copy(newNet.InServers, n.InServers)
+
+	newNet.InExts = make(map[string]*Ext)
+	for name, ext := range n.InExts {
+		newExt := ext.Clone()
+		newNet.InExts[name] = newExt
+	}
 
 	return &newNet
 }

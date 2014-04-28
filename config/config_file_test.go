@@ -36,6 +36,12 @@ var configuration = `global:
     nick: nick
     username: username
     realname: realname
+    exts:
+        awesome:
+            config:
+                friend: bob
+            exec: /some/path/goes/here
+            isserver: true
 networks:
     myserver:
         servers:
@@ -79,14 +85,32 @@ func verifyFakeConfig(t *testing.T, conf *Config) {
 	if exp, got := net2.Servers()[0], net2.Name(); exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
+
+	ext := conf.InExts["awesome"]
+	if ext == nil {
+		t.Error("There should be an extension called awesome.")
+	}
+
+	if ext.InConfig["friend"] != "bob" {
+		t.Error("It should load the configuration.")
+	}
+
+	if ext.InExec != "/some/path/goes/here" {
+		t.Error("It should allow setting exec paths.")
+	}
+
+	if ext.InIsServer != "true" {
+		t.Error("It should allow setting boolean strings.")
+	}
 }
 
 func TestConfig_FromReader(t *testing.T) {
 	t.Parallel()
 	c := NewConfig().FromString(configuration)
 
-	if exp, got := true, c.IsValid(); exp != got {
-		t.Fatalf("Expected: %v, got: %v", exp, got)
+	if !c.IsValid() {
+		t.Error(c.errors)
+		t.Fatal("It should be a valid configuration.")
 	}
 
 	verifyFakeConfig(t, c)
@@ -173,7 +197,9 @@ func TestConfig_ToWriter(t *testing.T) {
 	c := NewConfig().FromString(configuration)
 
 	buf := &bytes.Buffer{}
-	c.ToWriter(buf)
+	if err := c.ToWriter(buf); err != nil {
+		t.Error("Unexpected error:", err)
+	}
 
 	c = NewConfig().FromReader(buf)
 
@@ -246,15 +272,68 @@ func TestConfig_fixReferenceAndNames(t *testing.T) {
 		t.Error("It should set the network to empty not nil.")
 	}
 
+	if c.Network.InName != "global" {
+		t.Error("It should set the name.")
+	}
+
 	if c.Network.protect == nil {
 		t.Error("It should hook up the mutex.")
 	}
 
-	if c.Networks["test"] == nil {
+	net := c.Networks["test"]
+	if net == nil {
 		t.Error("It should instantiate empty networks.")
 	}
 
-	if c.Networks["test"].protect == nil {
+	if net.protect == nil {
+		t.Error("It should hook up the mutex.")
+	}
+
+	if net.InName != "test" {
+		t.Error("It should set the name.")
+	}
+}
+
+func TestConfig_fixReferenceAndNamesExts(t *testing.T) {
+	t.Parallel()
+
+	c := NewConfig()
+	c.Network.InExts = map[string]*Ext{
+		"ext": {},
+	}
+	c.Networks["net"] = &Network{
+		InExts: map[string]*Ext{
+			"ext": nil,
+		},
+	}
+	c.fixReferencesAndNames()
+
+	ext := c.Network.InExts["ext"]
+
+	if ext == nil {
+		t.Error("Expected it to instantiate empty extensions.")
+	}
+
+	if ext.InName != "ext" {
+		t.Error("It should set the name.")
+	}
+
+	if ext.protect == nil {
+		t.Error("It should hook up the mutex.")
+	}
+
+	n := c.Networks["net"]
+	ext = n.InExts["ext"]
+
+	if ext == nil {
+		t.Error("Expected it to instantiate empty extensions.")
+	}
+
+	if ext.InName != "ext" {
+		t.Error("It should set the name.")
+	}
+
+	if ext.protect == nil {
 		t.Error("It should hook up the mutex.")
 	}
 }
