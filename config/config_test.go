@@ -187,6 +187,28 @@ var net2 = &Network{
 	},
 }
 
+func TestConfig_GetNetwork(t *testing.T) {
+	t.Parallel()
+	c := NewConfig().FromString("[networks.friend]")
+	n := c.GetNetwork("friend")
+	if n == nil {
+		t.Error("Expected the friend network to exist and be returned.")
+	}
+}
+
+func TestConfig_Storefile(t *testing.T) {
+	t.Parallel()
+	c := NewConfig().FromString(`storefile = "filename"`)
+	if c.StoreFile() != "filename" {
+		t.Error("Store file should return the filename for the config.")
+	}
+
+	c = NewConfig().FromString("")
+	if c.StoreFile() != defaultStoreFile {
+		t.Error("Store file when unset should be the default store file name.")
+	}
+}
+
 func TestConfig_Fallbacks(t *testing.T) {
 	t.Parallel()
 
@@ -421,6 +443,145 @@ func TestConfig_Fallbacks(t *testing.T) {
 	}
 	if exp, got := e1.InReconnectTimeout, u(e2.ReconnectTimeout()); exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+}
+
+func TestConfig_Defaults(t *testing.T) {
+	t.Parallel()
+	c := NewConfig()
+
+	if exp, got := defaultStoreFile, c.StoreFile(); exp != got {
+		t.Error("Expected: %v, got: %v")
+	}
+	if exp, got := defaultIrcPort, c.Port(); exp != got {
+		t.Error("Expected: %v, got: %v")
+	}
+	if exp, got := false, c.Ssl(); exp != got {
+		t.Error("Expected: %v, got: %v")
+	}
+	if exp, got := false, c.NoVerifyCert(); exp != got {
+		t.Error("Expected: %v, got: %v")
+	}
+	if exp, got := false, c.NoState(); exp != got {
+		t.Error("Expected: %v, got: %v")
+	}
+	if exp, got := false, c.NoStore(); exp != got {
+		t.Error("Expected: %v, got: %v")
+	}
+	if exp, got := defaultFloodLenPenalty, c.FloodLenPenalty(); exp != got {
+		t.Error("Expected: %v, got: %v")
+	}
+	if exp, got := defaultFloodTimeout, c.FloodTimeout(); exp != got {
+		t.Error("Expected: %v, got: %v")
+	}
+	if exp, got := defaultFloodStep, c.FloodStep(); exp != got {
+		t.Error("Expected: %v, got: %v")
+	}
+	if exp, got := defaultKeepAlive, c.KeepAlive(); exp != got {
+		t.Error("Expected: %v, got: %v")
+	}
+	if exp, got := false, c.NoReconnect(); exp != got {
+		t.Error("Expected: %v, got: %v")
+	}
+	if exp, got := defaultReconnectTimeout, c.ReconnectTimeout(); exp != got {
+		t.Error("Expected: %v, got: %v")
+	}
+	if exp, got := defaultPrefix, c.Prefix(); exp != got {
+		t.Error("Expected: %v, got: %v")
+	}
+}
+
+func TestConfig_InvalidValues(t *testing.T) {
+	t.Parallel()
+	c := NewConfig().FromString(`
+	nick = "a"
+	username = "username"
+	realname = "realname"
+	[networks.lol]`)
+	c.InSsl = "x"
+	c.InFloodLenPenalty = "x"
+	c.InFloodTimeout = "x"
+	c.InFloodStep = "x"
+	c.InKeepAlive = "x"
+	c.InNoVerifyCert = "x"
+	c.InNoState = "x"
+	c.InNoStore = "x"
+	c.InNoReconnect = "x"
+	c.InReconnectTimeout = "x"
+	c.InPrefix = "xx"
+
+	if exp, got := false, c.Ssl(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := false, c.NoVerifyCert(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := false, c.NoState(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := false, c.NoStore(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := defaultFloodLenPenalty, c.FloodLenPenalty(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := defaultFloodTimeout, c.FloodTimeout(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := defaultFloodStep, c.FloodStep(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := defaultKeepAlive, c.KeepAlive(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := false, c.NoReconnect(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := defaultReconnectTimeout, c.ReconnectTimeout(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+
+	if exp, got := false, c.IsValid(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+
+	if exp, got := 10, len(c.errors); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+
+	ers := make([]string, len(c.errors))
+	for i, e := range c.errors {
+		ers[i] = e.Error()
+	}
+	if exp, got := errSsl, ers[0]; !strings.Contains(got, exp) {
+		t.Errorf("Expected: \"%v\" to contain \"%v\"", got, exp)
+	}
+	if exp, got := errNoVerifyCert, ers[1]; !strings.Contains(got, exp) {
+		t.Errorf("Expected: \"%v\" to contain \"%v\"", got, exp)
+	}
+	if exp, got := errNoState, ers[2]; !strings.Contains(got, exp) {
+		t.Errorf("Expected: \"%v\" to contain \"%v\"", got, exp)
+	}
+	if exp, got := errNoStore, ers[3]; !strings.Contains(got, exp) {
+		t.Errorf("Expected: \"%v\" to contain \"%v\"", got, exp)
+	}
+	if exp, got := errFloodLenPenalty, ers[4]; !strings.Contains(got, exp) {
+		t.Errorf("Expected: \"%v\" to contain \"%v\"", got, exp)
+	}
+	if exp, got := errFloodTimeout, ers[5]; !strings.Contains(got, exp) {
+		t.Errorf("Expected: \"%v\" to contain \"%v\"", got, exp)
+	}
+	if exp, got := errFloodStep, ers[6]; !strings.Contains(got, exp) {
+		t.Errorf("Expected: \"%v\" to contain \"%v\"", got, exp)
+	}
+	if exp, got := errKeepAlive, ers[7]; !strings.Contains(got, exp) {
+		t.Errorf("Expected: \"%v\" to contain \"%v\"", got, exp)
+	}
+	if exp, got := errNoReconnect, ers[8]; !strings.Contains(got, exp) {
+		t.Errorf("Expected: \"%v\" to contain \"%v\"", got, exp)
+	}
+	if exp, got := errReconnectTimeout, ers[9]; !strings.Contains(got, exp) {
+		t.Errorf("Expected: \"%v\" to contain \"%v\"", got, exp)
 	}
 }
 
