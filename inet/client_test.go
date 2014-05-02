@@ -270,17 +270,11 @@ func (s *s) TestIrcClient_Write(c *C) {
 		c.Check(n, Equals, len(arg))
 	}()
 	client.pumpservice <- ch
-	c.Check(bytes.Compare(<-ch, test1), Equals, 0)
-	client.pumpservice <- ch
-	c.Check(bytes.Compare(<-ch, append(test2, []byte{13, 10}...)), Equals, 0)
+	expectedMsg := append(test1[:len(test1)-2], test2...)
+	expectedMsg = append(expectedMsg, []byte("\r\n")...)
+	c.Check(bytes.Compare(<-ch, expectedMsg), Equals, 0)
 
 	close(client.pumpservice)
-	n, err := client.Write(test1)
-	c.Check(n, Equals, 0)
-	c.Check(err, Equals, io.EOF)
-	n, err = client.Write(test2) // Test abortion of no \r\n
-	c.Check(n, Equals, 0)
-	c.Check(err, Equals, io.EOF)
 }
 
 func (s *s) TestIrcClient_Keepalive(c *C) {
