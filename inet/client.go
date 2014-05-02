@@ -406,36 +406,26 @@ func (c *IrcClient) Read(buf []byte) (int, error) {
 }
 
 // Write implements the io.Writer interface and is the preferred way to write
-// to the socket. Returns EOF if the client has been closed. The buffer
-// is split based on \r\n and each message is queued, then the Pump is signaled
-// through the channel with the number of messages queued. A read lock on a
-// mutex is required to write to the channel to ensure any other thread
-// cannot close the channel while someone is attempting to write to it.
+// to the socket. Returns EOF if the client has been closed. Removes from
+// the buffer all \r\n\0 characters and appends \r\n, then the Pump is signaled
+// through the channel.
 func (c *IrcClient) Write(buf []byte) (int, error) {
 	n := len(buf)
 	if n == 0 {
 		return 0, nil
 	}
 
-	write := func(msg []byte) bool {
-		copybuf := make([]byte, len(msg))
-		copy(copybuf, msg)
-		service, ok := <-c.pumpservice
-		if !ok {
-			return true
-		}
-		service <- copybuf
-		return false
-	}
+	// Replace makes a copy of the buffer
+	buf = bytes.Replace(buf, []byte("\r"), []byte(""), -1)
+	buf = bytes.Replace(buf, []byte("\n"), []byte(""), -1)
+	buf = bytes.Replace(buf, []byte{0}, []byte(""), -1)
+	buf = append(buf, []byte{'\r', '\n'}...)
 
-	start, remaining, abort := findChunks(buf, write)
-	if abort {
+	service, ok := <-c.pumpservice
+	if !ok {
 		return 0, io.EOF
-	} else if remaining {
-		if write(append(buf[start:], []byte{'\r', '\n'}...)) {
-			return start, io.EOF
-		}
 	}
+	service <- buf
 
 	return n, nil
 }
