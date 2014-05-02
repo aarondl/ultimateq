@@ -31,7 +31,7 @@ func (d *dyingWriter) Write(b []byte) (int, error) {
 	return 0, io.ErrUnexpectedEOF
 }
 
-var configuration = `global:
+/*var configuration = `global:
     port: 5555
     nick: nick
     username: username
@@ -49,6 +49,28 @@ networks:
         nick: nickoverride
     irc.gamesurge.net:
         port: 3333
+`*/
+
+var configuration = `
+nick = "nick"
+username = "username"
+realname = "realname"
+port = 5555
+
+[exts.awesome]
+exec = "/some/path/goes/here"
+isserver = "true"
+
+[exts.awesome.config]
+friend = "bob"
+
+[networks.myserver]
+servers = ["irc.gamesurge.net"]
+nick = "nickoverride"
+
+[networks.gamesurge]
+servers = ["irc.gamesurge.com"]
+port = 3333
 `
 
 func verifyFakeConfig(t *testing.T, conf *Config) {
@@ -74,15 +96,12 @@ func verifyFakeConfig(t *testing.T, conf *Config) {
 		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 
-	net2 := conf.Networks["irc.gamesurge.net"]
+	net2 := conf.Networks["gamesurge"]
 
 	if exp, got := "nick", net2.Nick(); exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
-	if exp, got := "irc.gamesurge.net", net2.Servers()[0]; exp != got {
-		t.Errorf("Expected: %v, got: %v", exp, got)
-	}
-	if exp, got := net2.Servers()[0], net2.Name(); exp != got {
+	if exp, got := "irc.gamesurge.com", net2.Servers()[0]; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 

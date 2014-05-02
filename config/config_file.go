@@ -3,17 +3,16 @@ package config
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"os"
 
-	"gopkg.in/yaml.v1"
+	"github.com/BurntSushi/toml"
 )
 
 const (
 	// defaultConfigFileName specifies a config file name in the event that
 	// none was given, but a write to the file is requested with no name given.
-	defaultConfigFileName = "config.yaml"
-	// errMsgInvalidConfigFile is when the yaml does not successfully parse
+	defaultConfigFileName = "config.toml"
+	// errMsgInvalidConfigFile is when the toml does not successfully parse
 	errMsgInvalidConfigFile = "config: Failed to load config file (%v)"
 	// errMsgFileError occurs if the file could not be opened.
 	errMsgFileError = "config: Failed to open config file (%v)"
@@ -71,11 +70,10 @@ func (c *Config) FromReader(reader io.Reader) *Config {
 	defer c.protect.Unlock()
 	c.clear()
 
-	buf, err := ioutil.ReadAll(reader)
-	if err != nil {
-		c.addError(errMsgInvalidConfigFile, err)
-	}
-	err = yaml.Unmarshal(buf, c)
+	//var blec interface{}
+	_, err := toml.DecodeReader(reader, c)
+	//spew.Dump(&blec)
+	//spew.Dump(c)
 	if err != nil {
 		c.addError(errMsgInvalidConfigFile, err)
 	}
@@ -153,14 +151,10 @@ func (c *Config) ToWriter(writer io.Writer) error {
 	c.protect.RLock()
 	defer c.protect.RUnlock()
 
-	marshalled, err := yaml.Marshal(c)
+	encoder := toml.NewEncoder(writer)
+	err := encoder.Encode(c)
 	if err != nil {
 		return err
-	}
-	var n, written = 0, 0
-	for err == nil && written < len(marshalled) {
-		n, err = writer.Write(marshalled[written:])
-		written += n
 	}
 
 	return err

@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-var cloneable = `global:
+/*var cloneable = `global:
     nick: a
     realname: a
     username: a
@@ -18,6 +18,20 @@ networks:
             fun:
                 config:
                     key: value
+`
+*/
+
+var cloneable = `
+nick = "a"
+realname = "a"
+username = "a"
+
+[networks.srv]
+servers = ["i.com"]
+channels = ["#dude"]
+
+[networks.srv.exts.fun.config]
+key = "value"
 `
 
 func isReqErr(e error) bool {

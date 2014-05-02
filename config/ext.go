@@ -7,37 +7,37 @@ import (
 
 // Ext represents an extension.
 type Ext struct {
-	parent  *Ext
-	protect *sync.RWMutex
+	parent  *Ext          `toml:"-" json:"-"`
+	protect *sync.RWMutex `toml:"-" json:"-"`
 
 	// All Extensions
-	InName   string            `yaml:"-" json:"-"`
-	InConfig map[string]string `yaml:"config" json:"config"`
+	InName   string            `toml:"-" json:"-"`
+	InConfig map[string]string `toml:"config" json:"config"`
 
 	// Local Only
-	InLocal string `yaml:"local" json:"local"`
+	InLocal string `toml:"local" json:"local"`
 
 	// Remote Only
-	InExec string `yaml:"exec" json:"exec"`
+	InExec string `toml:"exec" json:"exec"`
 	// If set it will use json not gob.
-	InUseJSON string `yaml:"usejson" json:"usejson"`
+	InUseJSON string `toml:"usejson" json:"usejson"`
 
 	// If the extension is the server
 	// not the bot. The bot will connect.
-	InIsServer string `yaml:"isserver" json:"isserver"`
+	InIsServer string `toml:"isserver" json:"isserver"`
 
 	// TCP/IP
-	InAddress       string `yaml:"address" json:"address"`
-	InSsl           string `yaml:"ssl" json:"ssl"`
-	InSslClientCert string `yaml:"sslclientcert" json:"sslclientcert"`
-	InNoVerifyCert  string `yaml:"noverifycert" json:"noverifycert"`
+	InAddress       string `toml:"address" json:"address"`
+	InSsl           string `toml:"ssl" json:"ssl"`
+	InSslClientCert string `toml:"sslclientcert" json:"sslclientcert"`
+	InNoVerifyCert  string `toml:"noverifycert" json:"noverifycert"`
 
 	// UNIX
-	InSock string `yaml:"sock" json:"sock"`
+	InSock string `toml:"sock" json:"sock"`
 
 	// Auto Connections
-	InNoReconnect      string `yaml:"noreconnect" json:"noreconnect"`
-	InReconnectTimeout string `yaml:"reconnecttimeout" json:"reconnecttimeout"`
+	InNoReconnect      string `toml:"noreconnect" json:"noreconnect"`
+	InReconnectTimeout string `toml:"reconnecttimeout" json:"reconnecttimeout"`
 }
 
 // Clone deep copies the Extension.

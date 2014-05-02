@@ -6,55 +6,55 @@ import (
 )
 
 // Network states the all the details necessary to connect to an irc network
-// Although all of these are exported so they can be deserialized into a yaml
+// Although all of these are exported so they can be deserialized into a toml
 // file. The fields are all marked with "In" as in "Internal" and should not
 // be accessed directly, but through their appropriately named helper methods.
 type Network struct {
-	parent  *Config       `yaml:"-" json:"-"`
-	protect *sync.RWMutex `yaml:"-" json:"-"`
+	parent  *Config       `toml:"-" json:"-"`
+	protect *sync.RWMutex `toml:"-" json:"-"`
 
 	// Name of this network
-	InName string `yaml:"-" json:"-"`
+	InName string `toml:"-" json:"-"`
 
 	// Irc Network connection info
-	InServers []string `yaml:"servers" json:"servers"`
-	InPort    uint16   `yaml:"port" json:"port"`
+	InServers []string `toml:"servers" json:"servers"`
+	InPort    uint16   `toml:"port" json:"port"`
 
 	// Ssl configuration
-	InSsl          string `yaml:"ssl" json:"ssl"`
-	InSslCert      string `yaml:"sslcert" json:"sslcert"`
-	InNoVerifyCert string `yaml:"noverifycert" json:"noverifycert"`
+	InSsl          string `toml:"ssl" json:"ssl"`
+	InSslCert      string `toml:"sslcert" json:"sslcert"`
+	InNoVerifyCert string `toml:"noverifycert" json:"noverifycert"`
 
 	// State tracking
-	InNoState string `yaml:"nostate" json:"nostate"`
-	InNoStore string `yaml:"nostore" json:"nostore"`
+	InNoState string `toml:"nostate" json:"nostate"`
+	InNoStore string `toml:"nostore" json:"nostore"`
 
 	// Flood Protection
-	InFloodLenPenalty string `yaml:"floodlenpenalty" json:"floodlenpenalty"`
-	InFloodTimeout    string `yaml:"floodtimeout" json:"floodtimeout"`
-	InFloodStep       string `yaml:"floodstep" json:"floodstep"`
+	InFloodLenPenalty string `toml:"floodlenpenalty" json:"floodlenpenalty"`
+	InFloodTimeout    string `toml:"floodtimeout" json:"floodtimeout"`
+	InFloodStep       string `toml:"floodstep" json:"floodstep"`
 
 	// Keep alive
-	InKeepAlive string `yaml:"keepalive" json:"keepalive"`
+	InKeepAlive string `toml:"keepalive" json:"keepalive"`
 
 	// Auto reconnectiong
-	InNoReconnect      string `yaml:"noreconnect" json:"noreconnect"`
-	InReconnectTimeout string `yaml:"reconnecttimeout" json:"reconnecttimeout"`
+	InNoReconnect      string `toml:"noreconnect" json:"noreconnect"`
+	InReconnectTimeout string `toml:"reconnecttimeout" json:"reconnecttimeout"`
 
 	// Irc User data
-	InNick     string `yaml:"nick" json:"nick"`
-	InAltnick  string `yaml:"altnick" json:"altnick"`
-	InUsername string `yaml:"username" json:"username"`
-	InUserhost string `yaml:"userhost" json:"userhost"`
-	InRealname string `yaml:"realname" json:"realname"`
-	InPassword string `yaml:"password" json:"password"`
+	InNick     string `toml:"nick" json:"nick"`
+	InAltnick  string `toml:"altnick" json:"altnick"`
+	InUsername string `toml:"username" json:"username"`
+	InUserhost string `toml:"userhost" json:"userhost"`
+	InRealname string `toml:"realname" json:"realname"`
+	InPassword string `toml:"password" json:"password"`
 
 	// Dispatching options
-	InPrefix   string   `yaml:"prefix" json:"prefix"`
-	InChannels []string `yaml:"channels" json:"channels"`
+	InPrefix   string   `toml:"prefix" json:"prefix"`
+	InChannels []string `toml:"channels" json:"channels"`
 
 	// Extensions
-	InExts map[string]*Ext `yaml:"exts" json:"exts"`
+	InExts map[string]*Ext `toml:"exts" json:"exts"`
 }
 
 // Clone clones a network.

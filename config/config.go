@@ -1,5 +1,5 @@
 /*
-Package config creates a configuration using yaml. It also does configuration
+Package config creates a configuration using toml. It also does configuration
 validation.
 */
 package config
@@ -115,13 +115,13 @@ var (
 // Config holds all the information related to the bot including global settings
 // default settings, and network specific settings.
 type Config struct {
-	*Network  `yaml:"global" json:"global"`
-	Networks  map[string]*Network `yaml:"networks" json:"networks"`
-	Storefile string              `yaml:"storefile" json:"storefile"`
+	*Network  `json:"global"`
+	Networks  map[string]*Network `toml:"networks" json:"networks"`
+	Storefile string              `toml:"storefile" json:"storefile"`
 
-	errors   errList      `yaml:"-" json:"-"`
-	filename string       `yaml:"-" json:"-"`
-	protect  sync.RWMutex `yaml:"-" json:"-"`
+	errors   errList      `toml:"-" json:"-"`
+	filename string       `toml:"-" json:"-"`
+	protect  sync.RWMutex `toml:"-" json:"-"`
 }
 
 // NewConfig initializes a Config object.
