@@ -592,6 +592,8 @@ func Run(cb func(b *Bot)) error {
 		return err
 	}
 	defer b.Close()
+	
+	cb(b)
 
 	end := b.Start()
 
