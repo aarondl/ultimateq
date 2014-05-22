@@ -884,8 +884,8 @@ func (c *coreCmds) give(w irc.Writer, ev *cmd.Event) (
 				}
 				a.GrantChannelFlags(server, channel, filtered)
 			}
-			return fmt.Sprintf(giveSuccess, a.Username, channel,
-				a.GetChannel(server, channel)), true
+			return fmt.Sprintf(giveSuccess, a.Username,
+				a.GetChannel(server, channel), channel), true
 		},
 	)
 }
@@ -984,7 +984,7 @@ func (c *coreCmds) take(w irc.Writer, ev *cmd.Event) (
 
 			var rstr = a.GetChannel(server, channel).String()
 			if save {
-				rstr = fmt.Sprintf(giveSuccess, a.Username, rstr)
+				rstr = fmt.Sprintf(giveSuccess, a.Username, rstr, channel)
 			} else {
 				rstr = fmt.Sprintf(takeFailureNo, a.Username, rstr)
 			}
