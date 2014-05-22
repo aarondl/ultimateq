@@ -74,5 +74,5 @@ func (s *s) TestModeDiff_String(c *C) {
 	diff.pos.Set("x", "y", "z")
 	diff.neg.Set("x", "y", "z")
 	str = diff.String()
-	c.Check(str, Matches, `^\+xyz-xyz$`)
+	c.Check(str, Matches, `^\+[xyz]{3}-[xyz]{3}$`)
 }

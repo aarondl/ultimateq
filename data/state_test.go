@@ -200,7 +200,14 @@ func (s *s) TestState_EachUser(c *C) {
 	st.addUser(users[1])
 	i := 0
 	st.EachUser(func(u *User) {
-		c.Check(users[i], Equals, u.Host())
+		has := false
+		for _, user := range users {
+			if user == u.Host() {
+				has = true
+				break
+			}
+		}
+		c.Check(has, Equals, true)
 		i++
 	})
 	c.Check(i, Equals, 2)
@@ -213,7 +220,14 @@ func (s *s) TestState_EachChannel(c *C) {
 	st.addChannel(channels[1])
 	i := 0
 	st.EachChannel(func(ch *Channel) {
-		c.Check(channels[i], Equals, ch.String())
+		has := false
+		for _, channel := range channels {
+			if channel == ch.String() {
+				has = true
+				break
+			}
+		}
+		c.Check(has, Equals, true)
 		i++
 	})
 	c.Check(i, Equals, 2)
@@ -229,7 +243,14 @@ func (s *s) TestState_EachUserChan(c *C) {
 	st.addToChannel(users[0], channels[1])
 	i := 0
 	st.EachUserChan(users[0], func(uc *UserChannel) {
-		c.Check(channels[i], Equals, uc.Channel.String())
+		has := false
+		for _, channel := range channels {
+			if channel == uc.Channel.String() {
+				has = true
+				break
+			}
+		}
+		c.Check(has, Equals, true)
 		i++
 	})
 	c.Check(i, Equals, 2)
@@ -245,7 +266,14 @@ func (s *s) TestState_EachChanUser(c *C) {
 	st.addToChannel(users[1], channels[0])
 	i := 0
 	st.EachChanUser(channels[0], func(cu *ChannelUser) {
-		c.Check(users[i], Equals, cu.User.Host())
+		has := false
+		for _, user := range users {
+			if user == cu.User.Host() {
+				has = true
+				break
+			}
+		}
+		c.Check(has, Equals, true)
 		i++
 	})
 	c.Check(i, Equals, 2)
@@ -257,8 +285,15 @@ func (s *s) TestState_GetUsers(c *C) {
 	st.addUser(users[0])
 	st.addUser(users[1])
 	c.Check(len(st.GetUsers()), Equals, 2)
-	for i, user := range st.GetUsers() {
-		c.Check(users[i], Equals, user)
+	for _, u := range st.GetUsers() {
+		has := false
+		for _, user := range users {
+			if user == u {
+				has = true
+				break
+			}
+		}
+		c.Check(has, Equals, true)
 	}
 }
 
@@ -268,8 +303,15 @@ func (s *s) TestState_GetChannels(c *C) {
 	st.addChannel(channels[0])
 	st.addChannel(channels[1])
 	c.Check(len(st.GetChannels()), Equals, 2)
-	for i, channel := range st.GetChannels() {
-		c.Check(channels[i], Equals, channel)
+	for _, ch := range st.GetChannels() {
+		has := false
+		for _, channel := range channels {
+			if channel == ch {
+				has = true
+				break
+			}
+		}
+		c.Check(has, Equals, true)
 	}
 }
 
@@ -283,8 +325,15 @@ func (s *s) TestState_GetUserChans(c *C) {
 	st.addToChannel(users[0], channels[0])
 	st.addToChannel(users[0], channels[1])
 	c.Check(len(st.GetUserChans(users[0])), Equals, 2)
-	for i, channel := range st.GetUserChans(users[0]) {
-		c.Check(channels[i], Equals, channel)
+	for _, uc := range st.GetUserChans(users[0]) {
+		has := false
+		for _, channel := range channels {
+			if channel == uc {
+				has = true
+				break
+			}
+		}
+		c.Check(has, Equals, true)
 	}
 }
 
@@ -298,8 +347,15 @@ func (s *s) TestState_GetChanUsers(c *C) {
 	st.addToChannel(users[0], channels[0])
 	st.addToChannel(users[1], channels[0])
 	c.Check(len(st.GetChanUsers(channels[0])), Equals, 2)
-	for i, user := range st.GetChanUsers(channels[0]) {
-		c.Check(users[i], Equals, user)
+	for _, cu := range st.GetChanUsers(channels[0]) {
+		has := false
+		for _, user := range users {
+			if user == cu {
+				has = true
+				break
+			}
+		}
+		c.Check(has, Equals, true)
 	}
 }
 

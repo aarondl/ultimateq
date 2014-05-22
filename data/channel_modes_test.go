@@ -289,5 +289,5 @@ func (s *s) TestChannelModes_String(c *C) {
 	modes = NewChannelModes(testChannelKinds, testUserKinds)
 	modes.Set("xyz")
 	str = modes.String()
-	c.Check(str, Matches, `^xyz$`)
+	c.Check(str, Matches, `^[xyz]{3}$`)
 }

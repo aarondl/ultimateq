@@ -512,14 +512,14 @@ func TestUserAccess_String(t *testing.T) {
 		ExpectNoChannel string
 	}{
 		{true, 100, "abc", true, 150, "abc", true, 200, "abc",
-			"G(100 abc) S(150 abc) #chan1(200 abc)",
-			"G(100 abc) S(150 abc) #chan1(200 abc) #chan2(200 abc)"},
+			"G(100 abc),S(150 abc),#chan1(200 abc)",
+			"G(100 abc),S(150 abc),#chan1(200 abc),#chan2(200 abc)"},
 		{false, 100, "abc", true, 150, "abc", true, 200, "abc",
-			"S(150 abc) #chan1(200 abc)",
-			"S(150 abc) #chan1(200 abc) #chan2(200 abc)"},
+			"S(150 abc),#chan1(200 abc)",
+			"S(150 abc),#chan1(200 abc),#chan2(200 abc)"},
 		{false, 0, "", false, 0, "", true, 200, "abc",
 			"#chan1(200 abc)",
-			"#chan1(200 abc) #chan2(200 abc)"},
+			"#chan1(200 abc),#chan2(200 abc)"},
 		{false, 0, "", false, 0, "", false, 0, "", "none", "none"},
 		{false, 0, "", false, 0, "", true, 0, "", "none", "none"},
 	}
@@ -540,13 +540,23 @@ func TestUserAccess_String(t *testing.T) {
 				test.ChannelLevel, test.ChannelFlags)
 		}
 
-		if was := a.String(server, "#chan1"); was != test.ExpectChannel {
-			t.Errorf("Wrong output:\n\twant:'%s'\n\twas: '%s'",
-				test.ExpectChannel, was)
+		var was string
+		var expList []string
+
+		was = a.String(server, "#chan1")
+		expList = strings.Split(test.ExpectChannel, ",")
+		for _, exp := range expList {
+			if !strings.Contains(was, exp) {
+				t.Errorf("Expected: '%s' to contain access: '%s'", was, exp)
+			}
 		}
-		if was := a.String(server, ""); was != test.ExpectNoChannel {
-			t.Errorf("Wrong output:\n\twant:'%s'\n\twas: '%s'",
-				test.ExpectNoChannel, was)
+
+		was = a.String(server, "")
+		expList = strings.Split(test.ExpectChannel, ",")
+		for _, exp := range expList {
+			if !strings.Contains(was, exp) {
+				t.Errorf("Expected: '%s' to contain access: '%s'", was, exp)
+			}
 		}
 	}
 }
