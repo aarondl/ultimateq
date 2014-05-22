@@ -827,8 +827,8 @@ func (c *coreCmds) ggive(w irc.Writer, ev *cmd.Event) (
 			if len(flags) != 0 {
 				filtered := filterFlags(flags, a.HasGlobalFlag)
 				if len(filtered) == 0 && level == 0 {
-					return fmt.Sprintf(giveFailureHas, a.Username, a.Global),
-						false
+					return fmt.Sprintf(giveFailureHas, a.Username,
+						a.Global, flags), false
 				}
 				a.GrantGlobalFlags(filtered)
 			}
@@ -853,7 +853,7 @@ func (c *coreCmds) sgive(w irc.Writer, ev *cmd.Event) (
 
 				if len(filtered) == 0 && level == 0 {
 					return fmt.Sprintf(giveFailureHas, a.Username,
-						a.GetServer(server)), false
+						a.GetServer(server), flags), false
 				}
 				a.GrantServerFlags(server, filtered)
 			}
@@ -880,7 +880,7 @@ func (c *coreCmds) give(w irc.Writer, ev *cmd.Event) (
 
 				if len(filtered) == 0 && level == 0 {
 					return fmt.Sprintf(giveFailureHas, a.Username,
-						a.GetChannel(server, channel)), false
+						a.GetChannel(server, channel), flags), false
 				}
 				a.GrantChannelFlags(server, channel, filtered)
 			}
