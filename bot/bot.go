@@ -314,6 +314,9 @@ func (b *Bot) Stop() {
 
 // StopNetwork stops a network by name.
 func (b *Bot) StopNetwork(networkID string) (stopped bool) {
+	b.protectServers.RLock()
+	defer b.protectServers.RUnlock()
+
 	if srv := b.getServer(networkID); srv != nil {
 		stopped = b.stopServer(srv)
 	}
@@ -592,7 +595,7 @@ func Run(cb func(b *Bot)) error {
 		return err
 	}
 	defer b.Close()
-	
+
 	cb(b)
 
 	end := b.Start()

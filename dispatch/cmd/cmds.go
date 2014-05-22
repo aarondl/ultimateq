@@ -273,9 +273,8 @@ func (c *Cmds) Dispatch(networkID string, overridePrefix rune,
 	c.protectCmds.RLock()
 	defer c.protectCmds.RUnlock()
 	if command, ok = c.commands[cmd]; !ok {
-		err = fmt.Errorf(errFmtCmdNotFound, cmd)
-		writer.Noticef(nick, errFmtCmdNotFound, err)
-		return err
+		//writer.Noticef(nick, errFmtCmdNotFound, cmd)
+		return nil
 	}
 
 	if 0 == (msgtype&command.Msgtype) || 0 == (msgscope&command.Msgscope) {

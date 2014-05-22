@@ -247,7 +247,7 @@ func (h *Handler) Up(w irc.Writer, ev *cmd.Event) error {
 	return nil
 }
 
-func (h *Handler) HandleRaw(ev *irc.Event, w irc.Writer) {
+func (h *Handler) HandleRaw(w irc.Writer, ev *irc.Event) {
 	if ev.Name == irc.JOIN {
 		h.b.UsingStore(func(s *data.Store) {
 			a := s.GetAuthedUser(ev.NetworkID, ev.Sender)
