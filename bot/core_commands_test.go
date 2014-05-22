@@ -669,6 +669,11 @@ func TestCoreCommands_GiveTakeGlobal(t *testing.T) {
 		t.Error("Global access not granted correctly.")
 	}
 
+	err = rspChk(ts, giveFailureHas, u1host, ggive, u2nick, "h")
+	if err != nil {
+		t.Error(err)
+	}
+
 	err = rspChk(ts, ggiveSuccess, u1host, gtake, u2nick)
 	if err != nil {
 		t.Error(err)
@@ -731,6 +736,11 @@ func TestCoreCommands_GiveTakeServer(t *testing.T) {
 
 	if !a.HasServerFlag(netID, 'h') || !a.HasServerLevel(netID, 100) {
 		t.Error("Server access not granted correctly.")
+	}
+
+	err = rspChk(ts, giveFailureHas, u1host, sgive, u2nick, "h")
+	if err != nil {
+		t.Error(err)
 	}
 
 	err = rspChk(ts, sgiveSuccess, u1host, stake, u2nick)
@@ -796,6 +806,11 @@ func TestCoreCommands_GiveTakeChannel(t *testing.T) {
 	if !a.HasChannelFlag(netID, channel, 'h') ||
 		!a.HasChannelLevel(netID, channel, 100) {
 		t.Error("Channel access not granted correctly.")
+	}
+
+	err = rspChk(ts, giveFailureHas, u1host, give, channel, u2nick, "h")
+	if err != nil {
+		t.Error(err)
 	}
 
 	err = rspChk(ts, giveSuccess, u1host, take, channel, u2nick)

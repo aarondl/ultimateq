@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"log"
@@ -118,11 +119,12 @@ const (
 
 	giveFailure = `Invalid arguments, must be numeric accesses from 1-255 or ` +
 		`flags in the range: A-Za-z.`
-	takeFailure = `Invalid arguments, leave empty to delete level access, ` +
+	giveFailureHas = `User [%v](%v) already has: %v`
+	takeFailure    = `Invalid arguments, leave empty to delete level access, ` +
 		`specific flags to delete those flags, or the keyword all to delete ` +
 		`everything. (given: %v)`
 	takeFailureNo = `No action taken. User [%v](%v) has none of the given ` +
-		`accesses to remove.`
+		`access to remove.`
 
 	gusersDesc    = `Lists all the users added to the global access list.`
 	gusersNoUsers = `No users for %v`
@@ -152,7 +154,7 @@ const (
 
 type (
 	argv           []string
-	giveHelperFunc func(*data.UserAccess, uint8, string) string
+	giveHelperFunc func(*data.UserAccess, uint8, string) (string, bool)
 	takeHelperFunc func(*data.UserAccess, bool, bool, string) (string, bool)
 )
 
@@ -818,14 +820,19 @@ func (c *coreCmds) resetpasswd(w irc.Writer, ev *cmd.Event) (
 func (c *coreCmds) ggive(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 	return c.giveHelper(w, ev,
-		func(a *data.UserAccess, level uint8, flags string) string {
+		func(a *data.UserAccess, level uint8, flags string) (string, bool) {
 			if level > 0 {
 				a.GrantGlobalLevel(level)
 			}
 			if len(flags) != 0 {
-				a.GrantGlobalFlags(flags)
+				filtered := filterFlags(flags, a.HasGlobalFlag)
+				if len(filtered) == 0 && level == 0 {
+					return fmt.Sprintf(giveFailureHas, a.Username, a.Global),
+						false
+				}
+				a.GrantGlobalFlags(filtered)
 			}
-			return fmt.Sprintf(ggiveSuccess, a.Username, a.Global.String())
+			return fmt.Sprintf(ggiveSuccess, a.Username, a.Global), true
 		},
 	)
 }
@@ -835,14 +842,23 @@ func (c *coreCmds) sgive(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 	server := ev.NetworkID
 	return c.giveHelper(w, ev,
-		func(a *data.UserAccess, level uint8, flags string) string {
+		func(a *data.UserAccess, level uint8, flags string) (string, bool) {
 			if level > 0 {
 				a.GrantServerLevel(server, level)
 			}
 			if len(flags) != 0 {
-				a.GrantServerFlags(server, flags)
+				filtered := filterFlags(flags, func(r rune) bool {
+					return a.HasServerFlag(server, r)
+				})
+
+				if len(filtered) == 0 && level == 0 {
+					return fmt.Sprintf(giveFailureHas, a.Username,
+						a.GetServer(server)), false
+				}
+				a.GrantServerFlags(server, filtered)
 			}
-			return fmt.Sprintf(sgiveSuccess, a.Username, a.GetServer(server))
+			return fmt.Sprintf(sgiveSuccess, a.Username, a.GetServer(server)),
+				true
 		},
 	)
 }
@@ -853,15 +869,23 @@ func (c *coreCmds) give(w irc.Writer, ev *cmd.Event) (
 	server := ev.NetworkID
 	channel := ev.GetArg("chan")
 	return c.giveHelper(w, ev,
-		func(a *data.UserAccess, level uint8, flags string) string {
+		func(a *data.UserAccess, level uint8, flags string) (string, bool) {
 			if level > 0 {
 				a.GrantChannelLevel(server, channel, level)
 			}
 			if len(flags) != 0 {
-				a.GrantChannelFlags(server, channel, flags)
+				filtered := filterFlags(flags, func(r rune) bool {
+					return a.HasChannelFlag(server, channel, r)
+				})
+
+				if len(filtered) == 0 && level == 0 {
+					return fmt.Sprintf(giveFailureHas, a.Username,
+						a.GetChannel(server, channel)), false
+				}
+				a.GrantChannelFlags(server, channel, filtered)
 			}
 			return fmt.Sprintf(giveSuccess, a.Username, channel,
-				a.GetChannel(server, channel))
+				a.GetChannel(server, channel)), true
 		},
 	)
 }
@@ -1005,9 +1029,11 @@ func (c *coreCmds) giveHelper(w irc.Writer, ev *cmd.Event,
 	}
 
 	if (level > 0 && level < 256) || len(flags) > 0 {
-		str := g(access, uint8(level), flags)
-		if internal = store.AddUser(access); internal != nil {
-			return
+		str, dosave := g(access, uint8(level), flags)
+		if dosave {
+			if internal = store.AddUser(access); internal != nil {
+				return
+			}
 		}
 		w.Noticef(nick, str)
 	} else {
@@ -1136,6 +1162,17 @@ func (c *coreCmds) help(w irc.Writer, ev *cmd.Event) (
 	}
 
 	return
+}
+
+// filterFlags removes flags that the user already has
+func filterFlags(flags string, check func(rune) bool) string {
+	buf := bytes.Buffer{}
+	for _, flag := range flags {
+		if !check(flag) {
+			buf.WriteRune(flag)
+		}
+	}
+	return buf.String()
 }
 
 // userListWidth calculates the width of the userList's "User" column.
