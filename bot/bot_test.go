@@ -127,17 +127,14 @@ func TestBot_StartStopNetwork(t *testing.T) {
 	conf.Server("othersrv").Host("other")
 	b, _ := createBot(conf, connProvider, nil, false, false)
 	srv := b.servers[netID]
-	//othersrv := b.servers["othersrv"]
 
 	done := make(chan int)
 	start := make(chan Status)
 	stop := make(chan Status)
 	srv.addStatusListener(start, STATUS_STARTED)
 	srv.addStatusListener(stop, STATUS_STOPPED)
-	//othersrv.addStatusListener(start, STATUS_STARTED)
 
 	go func() {
-		//<-start
 		for i := 0; i < 2; i++ {
 			<-start
 			if !b.StopNetwork(netID) {
@@ -150,6 +147,7 @@ func TestBot_StartStopNetwork(t *testing.T) {
 			}
 		}
 
+		<-start
 		go b.Stop()
 		<-stop
 		done <- 0
