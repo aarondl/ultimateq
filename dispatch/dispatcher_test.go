@@ -48,18 +48,18 @@ func TestDispatcher_Registration(t *testing.T) {
 	d := NewDispatcher(core)
 	handler := testHandler{}
 
-	id := d.Register(irc.PRIVMSG, handler)
+	id := d.Register("", "", irc.PRIVMSG, handler)
 	if id == 0 {
 		t.Error("It should have given back an id.")
 	}
-	id2 := d.Register(irc.PRIVMSG, handler)
+	id2 := d.Register("", "", irc.PRIVMSG, handler)
 	if id == id2 {
 		t.Error("It should not produce duplicate ids.")
 	}
-	if !d.Unregister("privmsg", id) {
+	if !d.Unregister(id) {
 		t.Error("It should unregister via it's id regardless of string case")
 	}
-	if d.Unregister("privmsg", id) {
+	if d.Unregister(id) {
 		t.Error("It should not unregister the same event multiple times.")
 	}
 }
@@ -83,9 +83,9 @@ func TestDispatcher_Dispatching(t *testing.T) {
 	d := NewDispatcher(core)
 	send := testPoint{irc.Helper{}}
 
-	d.Register(irc.PRIVMSG, h1)
-	d.Register(irc.PRIVMSG, h2)
-	d.Register(irc.QUIT, h3)
+	d.Register("", "", irc.PRIVMSG, h1)
+	d.Register("", "", irc.PRIVMSG, h2)
+	d.Register("", "", irc.QUIT, h3)
 
 	privmsg := &irc.Event{Name: irc.PRIVMSG}
 	quitmsg := &irc.Event{Name: irc.QUIT}
@@ -130,8 +130,8 @@ func TestDispatcher_RawDispatch(t *testing.T) {
 
 	d := NewDispatcher(core)
 	send := testPoint{irc.Helper{}}
-	d.Register(irc.PRIVMSG, h1)
-	d.Register(irc.RAW, h2)
+	d.Register("", "", irc.PRIVMSG, h1)
+	d.Register("", "", irc.RAW, h2)
 
 	privmsg := &irc.Event{Name: irc.PRIVMSG}
 	d.Dispatch(send, privmsg)
@@ -297,9 +297,9 @@ func TestDispatcher_Privmsg(t *testing.T) {
 	}}
 
 	d := NewDispatcher(core)
-	d.Register(irc.PRIVMSG, ph)
-	d.Register(irc.PRIVMSG, puh)
-	d.Register(irc.PRIVMSG, pch)
+	d.Register("", "", irc.PRIVMSG, ph)
+	d.Register("", "", irc.PRIVMSG, puh)
+	d.Register("", "", irc.PRIVMSG, pch)
 
 	d.Dispatch(nil, privUsermsg)
 	d.WaitForHandlers()
@@ -343,7 +343,7 @@ func TestDispatcher_PrivmsgMultiple(t *testing.T) {
 	}
 
 	d := NewDispatcher(core)
-	d.Register(irc.PRIVMSG, pall)
+	d.Register("", "", irc.PRIVMSG, pall)
 
 	p, pu, pc = nil, nil, nil
 	d.Dispatch(nil, privChanmsg)
@@ -399,9 +399,9 @@ func TestDispatcher_Notice(t *testing.T) {
 	}}
 
 	d := NewDispatcher(core)
-	d.Register(irc.NOTICE, nh)
-	d.Register(irc.NOTICE, nuh)
-	d.Register(irc.NOTICE, nch)
+	d.Register("", "", irc.NOTICE, nh)
+	d.Register("", "", irc.NOTICE, nuh)
+	d.Register("", "", irc.NOTICE, nch)
 
 	d.Dispatch(nil, noticeUsermsg)
 	d.WaitForHandlers()
@@ -445,7 +445,7 @@ func TestDispatcher_NoticeMultiple(t *testing.T) {
 	}
 
 	d := NewDispatcher(core)
-	d.Register(irc.NOTICE, nall)
+	d.Register("", "", irc.NOTICE, nall)
 
 	n, nu, nc = nil, nil, nil
 	d.Dispatch(nil, noticeChanmsg)
@@ -500,8 +500,8 @@ func TestDispatcher_CTCP(t *testing.T) {
 	}}
 
 	d := NewDispatcher(core)
-	d.Register(irc.CTCP, ch)
-	d.Register(irc.CTCP, cch)
+	d.Register("", "", irc.CTCP, ch)
+	d.Register("", "", irc.CTCP, cch)
 
 	d.Dispatch(nil, ctcpMsg)
 	d.WaitForHandlers()
@@ -536,7 +536,7 @@ func TestDispatcher_CTCPMultiple(t *testing.T) {
 	}
 
 	d := NewDispatcher(core)
-	d.Register(irc.CTCP, call)
+	d.Register("", "", irc.CTCP, call)
 
 	c, cc = nil, nil
 	d.Dispatch(nil, ctcpChanmsg)
@@ -576,7 +576,7 @@ func TestDispatcher_CTCPReply(t *testing.T) {
 	}}
 
 	d := NewDispatcher(core)
-	d.Register(irc.CTCPReply, ch)
+	d.Register("", "", irc.CTCPReply, ch)
 
 	d.Dispatch(nil, ctcpReplyMsg)
 	d.WaitForHandlers()
@@ -603,8 +603,8 @@ func TestDispatcher_FilterPrivmsgChannels(t *testing.T) {
 
 	dcore := NewDispatchCore(nil, "#CHAN")
 	d := NewDispatcher(dcore)
-	d.Register(irc.PRIVMSG, ph)
-	d.Register(irc.PRIVMSG, pch)
+	d.Register("", "", irc.PRIVMSG, ph)
+	d.Register("", "", irc.PRIVMSG, pch)
 
 	d.Dispatch(nil, privChanmsg)
 	d.WaitForHandlers()
@@ -645,8 +645,8 @@ func TestDispatcher_FilterNoticeChannels(t *testing.T) {
 
 	dcore := NewDispatchCore(nil, "#CHAN")
 	d := NewDispatcher(dcore)
-	d.Register(irc.NOTICE, uh)
-	d.Register(irc.NOTICE, uch)
+	d.Register("", "", irc.NOTICE, uh)
+	d.Register("", "", irc.NOTICE, uch)
 
 	d.Dispatch(nil, noticeChanmsg)
 	d.WaitForHandlers()
@@ -720,7 +720,7 @@ func TestDispatch_Panic(t *testing.T) {
 		},
 	}
 
-	d.Register(irc.RAW, handler)
+	d.Register("", "", irc.RAW, handler)
 	ev := irc.NewEvent("", netInfo, "dispatcher", irc.PRIVMSG, "panic test")
 	d.Dispatch(testPoint{irc.Helper{}}, ev)
 	d.WaitForHandlers()
