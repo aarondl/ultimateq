@@ -206,6 +206,15 @@ func (_ *Queryer) Calc(w irc.Writer, ev *cmd.Event) error {
 
 	if out, err := query.Wolfram(q, &queryConf); len(out) != 0 {
 		out = sanitize(out)
+
+		// Ensure two lines only
+		// ircmaxlen - maxhostsize - PRIVMSG - targetsize - spacing - colons
+		maxlen := 2 * (510 - 62 - 7 - len(ev.Target()) - 3 - 2)
+		if len(out) > maxlen {
+			out = out[:maxlen-3]
+			out += "..."
+		}
+
 		w.Notify(ev.Event, nick, out)
 	} else if err != nil {
 		w.Notice(nick, err.Error())
@@ -272,7 +281,7 @@ func putPeopleUp(ev *irc.Event, ch string,
 	return
 }
 
-func (h *Handler) PrivmsgUser(ev *irc.Event, w irc.Writer) {
+func (h *Handler) PrivmsgUser(w irc.Writer, ev *irc.Event) {
 	flds := strings.Fields(ev.Message())
 	if ev.Nick() == "Aaron" && flds[0] == "do" {
 		w.Send(strings.Join(flds[1:], " "))
