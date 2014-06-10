@@ -70,52 +70,12 @@ func (c *Config) FromReader(reader io.Reader) *Config {
 	defer c.protect.Unlock()
 	c.clear()
 
-	//var blec interface{}
-	_, err := toml.DecodeReader(reader, c)
-	//spew.Dump(&blec)
-	//spew.Dump(c)
+	_, err := toml.DecodeReader(reader, c.values)
 	if err != nil {
 		c.addError(errMsgInvalidConfigFile, err)
 	}
 
-	c.fixReferencesAndNames()
 	return c
-}
-
-// fixReferencesAndNames is called before a config-file-deserialized config
-// is returned to patch up backreferences to the main config as well as check
-// that the name/host are set properly.
-func (c *Config) fixReferencesAndNames() {
-	if c.Network == nil {
-		c.Network = &Network{InName: "global", protect: &c.protect}
-	}
-
-	for ename, ext := range c.Network.InExts {
-		ext.protect = &c.protect
-		ext.InName = ename
-	}
-
-	for name, network := range c.Networks {
-		if network == nil {
-			network = &Network{}
-			c.Networks[name] = network
-		}
-
-		network.parent = c
-		network.protect = &c.protect
-		network.InName = name
-
-		for ename, ext := range network.InExts {
-			if ext == nil {
-				ext = &Ext{}
-				network.InExts[ename] = ext
-			}
-
-			ext.parent = c.Network.InExts[ename]
-			ext.protect = &c.protect
-			ext.InName = ename
-		}
-	}
 }
 
 // ToFile writes a config out to a writer. If the filename is empty
@@ -152,7 +112,7 @@ func (c *Config) ToWriter(writer io.Writer) error {
 	defer c.protect.RUnlock()
 
 	encoder := toml.NewEncoder(writer)
-	err := encoder.Encode(c)
+	err := encoder.Encode(c.values)
 	if err != nil {
 		return err
 	}

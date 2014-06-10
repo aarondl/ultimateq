@@ -1,11 +1,5 @@
 package config
 
-import (
-	"strconv"
-	"strings"
-	"testing"
-)
-
 /*var cloneable = `global:
     nick: a
     realname: a
@@ -21,7 +15,7 @@ networks:
 `
 */
 
-var cloneable = `
+/*var cloneable = `
 nick = "a"
 realname = "a"
 username = "a"
@@ -830,52 +824,5 @@ func TestConfig_GetNetwork(t *testing.T) {
 func TestConfig_Clone(t *testing.T) {
 	t.Parallel()
 
-}*/
-
-func TestValidNames(t *testing.T) {
-	t.Parallel()
-	goodNicks := []string{`a1bc`, `a5bc`, `a9bc`, `MyNick`, `[MyNick`,
-		`My[Nick`, `]MyNick`, `My]Nick`, `\MyNick`, `My\Nick`, "MyNick",
-		"My`Nick", `_MyNick`, `My_Nick`, `^MyNick`, `My^Nick`, `{MyNick`,
-		`My{Nick`, `|MyNick`, `My|Nick`, `}MyNick`, `My}Nick`,
-	}
-
-	badNicks := []string{`My Name`, `My!Nick`, `My"Nick`, `My#Nick`, `My$Nick`,
-		`My%Nick`, `My&Nick`, `My'Nick`, `My/Nick`, `My(Nick`, `My)Nick`,
-		`My*Nick`, `My+Nick`, `My,Nick`, `My-Nick`, `My.Nick`, `My/Nick`,
-		`My;Nick`, `My:Nick`, `My<Nick`, `My=Nick`, `My>Nick`, `My?Nick`,
-		`My@Nick`, `1abc`, `5abc`, `9abc`, `@ChanServ`,
-	}
-
-	for i := 0; i < len(goodNicks); i++ {
-		if !rgxNickname.MatchString(goodNicks[i]) {
-			t.Errorf("Good nick failed regex: %v\n", goodNicks[i])
-		}
-	}
-	for i := 0; i < len(badNicks); i++ {
-		if rgxNickname.MatchString(badNicks[i]) {
-			t.Errorf("Bad nick passed regex: %v\n", badNicks[i])
-		}
-	}
 }
-
-func TestValidChannels(t *testing.T) {
-	t.Parallel()
-	// Check that the first letter must be {#+!&}
-	goodChannels := []string{"#ValidChannel", "+ValidChannel", "&ValidChannel",
-		"!12345", "#c++"}
-
-	badChannels := []string{"#Invalid Channel", "#Invalid,Channel",
-		"#Invalid\aChannel", "#", "+", "&", "InvalidChannel"}
-
-	for i := 0; i < len(goodChannels); i++ {
-		if !rgxChannel.MatchString(goodChannels[i]) {
-			t.Errorf("Good chan failed regex: %v\n", goodChannels[i])
-		}
-	}
-	for i := 0; i < len(badChannels); i++ {
-		if rgxChannel.MatchString(badChannels[i]) {
-			t.Errorf("Bad chan passed regex: %v\n", badChannels[i])
-		}
-	}
-}
+*/

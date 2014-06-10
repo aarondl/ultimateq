@@ -31,96 +31,141 @@ func (d *dyingWriter) Write(b []byte) (int, error) {
 	return 0, io.ErrUnexpectedEOF
 }
 
-/*var configuration = `global:
-    port: 5555
-    nick: nick
-    username: username
-    realname: realname
-    exts:
-        awesome:
-            config:
-                friend: bob
-            exec: /some/path/goes/here
-            isserver: true
-networks:
-    myserver:
-        servers:
-        - irc.gamesurge.net
-        nick: nickoverride
-    irc.gamesurge.net:
-        port: 3333
-`*/
+const configuration = `
+storefile = "/path/to/store/file.db"
+corecmds = false
 
-var configuration = `
-nick = "nick"
-username = "username"
-realname = "realname"
-port = 5555
+[networks.ircnet]
+	servers = ["localhost:3333", "server.com:6667"]
 
-[exts.awesome]
-exec = "/some/path/goes/here"
-isserver = "true"
+	nick = "Nick"
+	altnick = "Altnick"
+	username = "Username"
+	realname = "Realname"
+	password = "Password"
 
-[exts.awesome.config]
-friend = "bob"
+	ssl = true
+	sslcert = "/path/to/a.crt"
+	noverifycert = false
 
-[networks.myserver]
-servers = ["irc.gamesurge.net"]
-nick = "nickoverride"
+	nostate = false
+	nostore = false
 
-[networks.gamesurge]
-servers = ["irc.gamesurge.com"]
-port = 3333
+	floodlenpenalty = 120
+	floodtimeout = 10.0
+	floodstep = 2.0
+
+	keepalive = 60.0
+
+	noreconnect = false
+	reconnecttimeout = 20
+
+	# Optional, this is the hardcoded default value, you can set it if
+	# you don't feel like writing prefix in the channels all the time.
+	defaultprefix = "."
+
+	[[networks.ircnet.channels]]
+	name = "#channel1"
+	password = "password"
+	prefix = "!"
+
+# Ext provides defaults for all exts, much as the global definitions provide
+# defaults for all networks.
+[ext]
+	# Define listen to create a extension server for extensions to connect
+	listen = "localhost:3333"
+	# OR listen = "/path/to/unix.sock"
+
+	# Define the execdir to start all executables in the path.
+	execdir = "/path/to/executables"
+
+	# Control reconnection for remote extensions.
+	noreconnect = false
+	reconnecttimeout = 20
+
+	# Ext configuration is deeply nested so we can configure it globally
+	# based on the network, or based on the channel on that network, or even
+	# on all channels on that network.
+	[ext.config] # Global config value
+		key = "stringvalue"
+	[ext.config.channels.#channel] # All networks for #channel
+		key = "stringvalue"
+	[ext.config.networks.ircnet.config] # All channels on ircnet network
+		key = "stringvalue"
+	[ext.config.networks.ircnet.channels.#channel] # Freenode's #channel
+		key = "stringvalue"
+
+[exts.myext]
+	# Define exec to specify a path to the executable to launch.
+	exec = "/path/to/executable"
+
+	# Defining this means that the bot will try to connect to this extension
+	# rather than expecting it to connect to the listen server above.
+	server = ["localhost:44", "server.com:4444"]
+	ssl = true
+	sslcert = "/path/to/a.crt"
+	noverifycert = false
+
+	# Define the above connection properties, or simply this one property.
+	unix = "/path/to/sock.sock"
+
+	# Use json not gob.
+	usejson = false
+
+	[exts.myext.active]
+		ircnet = ["#channel1", "#channel2"]
 `
 
 func verifyFakeConfig(t *testing.T, conf *Config) {
-	net1 := conf.Networks["myserver"]
+	/*
+		net1 := conf.Networks["myserver"]
 
-	if exp, got := "nickoverride", net1.Nick(); exp != got {
-		t.Errorf("Expected: %v, got: %v", exp, got)
-	}
-	if exp, got := uint16(5555), net1.Port(); exp != got {
-		t.Errorf("Expected: %v, got: %v", exp, got)
-	}
-	if exp, got := "username", net1.Username(); exp != got {
-		t.Errorf("Expected: %v, got: %v", exp, got)
-	}
-	if exp, got := "realname", net1.Realname(); exp != got {
-		t.Errorf("Expected: %v, got: %v", exp, got)
-	}
+		if exp, got := "nickoverride", net1.Nick(); exp != got {
+			t.Errorf("Expected: %v, got: %v", exp, got)
+		}
+		if exp, got := uint16(5555), net1.Port(); exp != got {
+			t.Errorf("Expected: %v, got: %v", exp, got)
+		}
+		if exp, got := "username", net1.Username(); exp != got {
+			t.Errorf("Expected: %v, got: %v", exp, got)
+		}
+		if exp, got := "realname", net1.Realname(); exp != got {
+			t.Errorf("Expected: %v, got: %v", exp, got)
+		}
 
-	if exp, got := "myserver", net1.Name(); exp != got {
-		t.Errorf("Expected: %v, got: %v", exp, got)
-	}
-	if exp, got := "irc.gamesurge.net", net1.Servers()[0]; exp != got {
-		t.Errorf("Expected: %v, got: %v", exp, got)
-	}
+		if exp, got := "myserver", net1.Name(); exp != got {
+			t.Errorf("Expected: %v, got: %v", exp, got)
+		}
+		if exp, got := "irc.gamesurge.net", net1.Servers()[0]; exp != got {
+			t.Errorf("Expected: %v, got: %v", exp, got)
+		}
 
-	net2 := conf.Networks["gamesurge"]
+		net2 := conf.Networks["gamesurge"]
 
-	if exp, got := "nick", net2.Nick(); exp != got {
-		t.Errorf("Expected: %v, got: %v", exp, got)
-	}
-	if exp, got := "irc.gamesurge.com", net2.Servers()[0]; exp != got {
-		t.Errorf("Expected: %v, got: %v", exp, got)
-	}
+		if exp, got := "nick", net2.Nick(); exp != got {
+			t.Errorf("Expected: %v, got: %v", exp, got)
+		}
+		if exp, got := "irc.gamesurge.com", net2.Servers()[0]; exp != got {
+			t.Errorf("Expected: %v, got: %v", exp, got)
+		}
 
-	ext := conf.InExts["awesome"]
-	if ext == nil {
-		t.Error("There should be an extension called awesome.")
-	}
+		ext := conf.InExts["awesome"]
+		if ext == nil {
+			t.Error("There should be an extension called awesome.")
+		}
 
-	if ext.InConfig["friend"] != "bob" {
-		t.Error("It should load the configuration.")
-	}
+		if ext.InConfig["friend"] != "bob" {
+			t.Error("It should load the configuration.")
+		}
 
-	if ext.InExec != "/some/path/goes/here" {
-		t.Error("It should allow setting exec paths.")
-	}
+		if ext.InExec != "/some/path/goes/here" {
+			t.Error("It should allow setting exec paths.")
+		}
 
-	if ext.InIsServer != "true" {
-		t.Error("It should allow setting boolean strings.")
-	}
+		if ext.InIsServer != "true" {
+			t.Error("It should allow setting boolean strings.")
+		}
+	*/
 }
 
 func TestConfig_FromReader(t *testing.T) {
@@ -228,7 +273,7 @@ func TestConfig_ToWriter(t *testing.T) {
 func TestConfig_ToWriterErrors(t *testing.T) {
 	t.Parallel()
 
-	err := NewConfig().ToWriter(&dyingWriter{})
+	err := NewConfig().FromString(configuration).ToWriter(&dyingWriter{})
 	if err == nil || err == io.EOF {
 		t.Error("Expected to see an unconventional error.")
 	}
@@ -277,82 +322,5 @@ func TestConfig_toFileErrors(t *testing.T) {
 
 	if err == nil {
 		t.Error("Expected an error.")
-	}
-}
-
-func TestConfig_fixReferenceAndNames(t *testing.T) {
-	t.Parallel()
-
-	c := Config{Networks: make(map[string]*Network)}
-	c.Networks["test"] = nil
-	c.fixReferencesAndNames()
-
-	if c.Network == nil {
-		t.Error("It should set the network to empty not nil.")
-	}
-
-	if c.Network.InName != "global" {
-		t.Error("It should set the name.")
-	}
-
-	if c.Network.protect == nil {
-		t.Error("It should hook up the mutex.")
-	}
-
-	net := c.Networks["test"]
-	if net == nil {
-		t.Error("It should instantiate empty networks.")
-	}
-
-	if net.protect == nil {
-		t.Error("It should hook up the mutex.")
-	}
-
-	if net.InName != "test" {
-		t.Error("It should set the name.")
-	}
-}
-
-func TestConfig_fixReferenceAndNamesExts(t *testing.T) {
-	t.Parallel()
-
-	c := NewConfig()
-	c.Network.InExts = map[string]*Ext{
-		"ext": {},
-	}
-	c.Networks["net"] = &Network{
-		InExts: map[string]*Ext{
-			"ext": nil,
-		},
-	}
-	c.fixReferencesAndNames()
-
-	ext := c.Network.InExts["ext"]
-
-	if ext == nil {
-		t.Error("Expected it to instantiate empty extensions.")
-	}
-
-	if ext.InName != "ext" {
-		t.Error("It should set the name.")
-	}
-
-	if ext.protect == nil {
-		t.Error("It should hook up the mutex.")
-	}
-
-	n := c.Networks["net"]
-	ext = n.InExts["ext"]
-
-	if ext == nil {
-		t.Error("Expected it to instantiate empty extensions.")
-	}
-
-	if ext.InName != "ext" {
-		t.Error("It should set the name.")
-	}
-
-	if ext.protect == nil {
-		t.Error("It should hook up the mutex.")
 	}
 }
