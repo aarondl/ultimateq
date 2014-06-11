@@ -115,10 +115,10 @@ func (c *Config) Validate() bool {
 func (c *Config) validateRequired(ers *errList) {
 	var nets map[string]interface{}
 	if val, ok := c.values["networks"]; !ok {
-		ers.addError("Expected at least 1 network to be defined.")
+		ers.addError("Expected at least one network.")
 		return
 	} else if nets, ok = val.(map[string]interface{}); !ok {
-		ers.addError("Expected at least 1 network to be defined.")
+		ers.addError("Expected at least one network.")
 		return
 	}
 
@@ -129,7 +129,7 @@ func (c *Config) validateRequired(ers *errList) {
 		} else {
 			ctx := c.Network(name)
 			if srvs, ok := ctx.Servers(); !ok || len(srvs) == 0 {
-				ers.addError("(%s) Expected at least one server defined.", name)
+				ers.addError("(%s) Expected at least one server.", name)
 			}
 
 			if n, ok := ctx.Nick(); !ok || len(n) == 0 {
@@ -319,7 +319,7 @@ func validateActive(ext string, m map[string]interface{}, ers *errList) {
 		if acts, ok = actVal.([]interface{}); !ok {
 			ers.addError(
 				"(%s active) %s is %T but expected array [%v]",
-				ext, acts, acts)
+				ext, activeNet, actVal, actVal)
 			return
 		}
 

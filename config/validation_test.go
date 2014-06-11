@@ -6,6 +6,47 @@ import (
 	"testing"
 )
 
+func TestValidation(t *testing.T) {
+	t.Parallel()
+
+	c := NewConfig().FromString(`
+	[networks.net]
+	`)
+
+	if c.Validate() {
+		t.Error("Expected it to be invalid.")
+	}
+
+	expErr := "(net) Expected at least one server."
+	if ers := c.Errors(); len(ers) == 0 {
+		t.Error("Expected one error.")
+	} else if ers[0].Error() != expErr {
+		t.Error("Expected a particular error message, got:", ers[0])
+	}
+
+	c = NewConfig().FromString(`
+	nick = "n"
+	altnick = "n"
+	realname = "n"
+	username = "n"
+	prefix = 5
+
+	[networks.net]
+		servers = ["n"]
+	`)
+
+	if c.Validate() {
+		t.Error("Expected it to be invalid.")
+	}
+
+	expErr = "(global) prefix is int64 but expected string [5]"
+	if ers := c.Errors(); len(ers) == 0 {
+		t.Error("Expected one error.")
+	} else if ers[0].Error() != expErr {
+		t.Error("Expected a particular error message, got:", ers[0])
+	}
+}
+
 type rexpect struct {
 	context, message string
 }
@@ -18,7 +59,7 @@ func TestValidation_RequiredNoServers(t *testing.T) {
 	t.Parallel()
 
 	expects := []rexpect{
-		{"", "Expected at least 1 network to be defined."},
+		{"", "Expected at least one network."},
 	}
 
 	requiredTestHelper("", expects, t)
@@ -34,8 +75,22 @@ func TestValidation_RequiredServers(t *testing.T) {
 		{"hello", "Altnick is required."},
 		{"hello", "Username is required."},
 		{"hello", "Realname is required."},
-		{"hello", "Expected at least one server defined."},
+		{"hello", "Expected at least one server."},
 	}
+
+	requiredTestHelper(cfg, expects, t)
+}
+
+func TestValidation_RequiredTypes(t *testing.T) {
+	t.Parallel()
+
+	cfg := `networks = 5`
+	expects := []rexpect{{"", "Expected at least one network."}}
+
+	requiredTestHelper(cfg, expects, t)
+
+	cfg = "[networks]\nserver = 5"
+	expects = []rexpect{{"server", "Expected network to be a map, got int64"}}
 
 	requiredTestHelper(cfg, expects, t)
 }
@@ -135,13 +190,34 @@ func TestValidation_TypesConfig(t *testing.T) {
 	t.Parallel()
 
 	cfg := `
+	[ext.active]
+	list = 5
 	[ext.config]
 	networks = 5
-	channels = 5`
+	channels = 5
+	[ext.config.more]
+	list = 5
+	[exts.extname.active]
+	list = 5`
 
 	exps := []texpect{
+		{"ext active", "list", "array", "int64"},
+		{"extname active", "list", "array", "int64"},
 		{"ext config", "networks", "map", "int64"},
 		{"ext config", "channels", "map", "int64"},
+		{"ext config", "more", "string", "map[string]interface {}"},
+	}
+
+	typesTestHelper(cfg, exps, t)
+
+	cfg = `
+	[ext.config]
+	networks = "5"
+	channels = "5"`
+
+	exps = []texpect{
+		{"ext config", "networks", "map", "string"},
+		{"ext config", "channels", "map", "string"},
 	}
 
 	typesTestHelper(cfg, exps, t)

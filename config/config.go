@@ -176,7 +176,7 @@ func (c *Config) Clone() *Config {
 	c.protect.RLock()
 	defer c.protect.RUnlock()
 
-	// ? :D
+	// TODO: Make this?
 	return nil
 }
 
@@ -186,14 +186,15 @@ func (c *Config) Network(name string) *netCtx {
 	c.protect.RLock()
 	defer c.protect.RUnlock()
 
-	globalCtx := &netCtx{&c.protect, nil, c.values}
 	if len(name) == 0 {
-		return globalCtx
+		return &netCtx{&c.protect, nil, c.values}
 	} else {
-		if network, ok := getMap(globalCtx, "networks", false); ok {
-			if netval, ok := network[name]; ok {
-				if net, ok := netval.(map[string]interface{}); ok {
-					return &netCtx{&c.protect, c.values, net}
+		if networksVal, ok := c.values["networks"]; ok {
+			if networks, ok := networksVal.(map[string]interface{}); ok {
+				if netval, ok := networks[name]; ok {
+					if net, ok := netval.(map[string]interface{}); ok {
+						return &netCtx{&c.protect, c.values, net}
+					}
 				}
 			}
 		}
