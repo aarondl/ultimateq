@@ -1,8 +1,6 @@
 package config
 
-import (
-	"sync"
-)
+import "sync"
 
 // netCtx is a context for network parts of the config, allowing querying and
 // setting of network related values.
@@ -23,6 +21,10 @@ func (n *netCtx) get(key string) (interface{}, bool) {
 }
 
 func (n *netCtx) getParent(key string) (interface{}, bool) {
+	if n.parent == nil {
+		return nil, false
+	}
+
 	v, ok := n.parent[key]
 	return v, ok
 }
@@ -189,11 +191,7 @@ func (n *netCtx) Channels() ([]Channel, bool) {
 		return nil, false
 	}
 
-	if arr, ok = val.([]map[string]interface{}); !ok {
-		return nil, false
-	}
-
-	if len(arr) == 0 {
+	if arr, ok = val.([]map[string]interface{}); !ok || len(arr) == 0 {
 		return nil, false
 	}
 
@@ -216,7 +214,7 @@ func (n *netCtx) Channels() ([]Channel, bool) {
 		}
 	}
 
-	return nil, false
+	return ret, true
 }
 
 func (n *netCtx) SetChannels(val []Channel) {

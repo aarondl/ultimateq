@@ -33,16 +33,18 @@ func (d *dyingWriter) Write(b []byte) (int, error) {
 
 const configuration = `
 storefile = "/path/to/store/file.db"
-corecmds = false
+nocorecmds = false
 
+nick = "Nick"
+altnick = "Altnick"
+username = "Username"
+realname = "Realname"
+password = "Password"
+
+[networks.noirc]
+	servers = ["lol:3"]
 [networks.ircnet]
 	servers = ["localhost:3333", "server.com:6667"]
-
-	nick = "Nick"
-	altnick = "Altnick"
-	username = "Username"
-	realname = "Realname"
-	password = "Password"
 
 	ssl = true
 	sslcert = "/path/to/a.crt"
@@ -62,12 +64,17 @@ corecmds = false
 
 	# Optional, this is the hardcoded default value, you can set it if
 	# you don't feel like writing prefix in the channels all the time.
-	defaultprefix = "."
+	prefix = "."
 
 	[[networks.ircnet.channels]]
 	name = "#channel1"
-	password = "password"
+	password = "pass1"
 	prefix = "!"
+
+	[[networks.ircnet.channels]]
+	name = "#channel2"
+	password = "pass2"
+	prefix = "@"
 
 # Ext provides defaults for all exts, much as the global definitions provide
 # defaults for all networks.
@@ -82,6 +89,8 @@ corecmds = false
 	# Control reconnection for remote extensions.
 	noreconnect = false
 	reconnecttimeout = 20
+
+	usejson = true
 
 	# Ext configuration is deeply nested so we can configure it globally
 	# based on the network, or based on the channel on that network, or even
@@ -101,7 +110,7 @@ corecmds = false
 
 	# Defining this means that the bot will try to connect to this extension
 	# rather than expecting it to connect to the listen server above.
-	server = ["localhost:44", "server.com:4444"]
+	server = "localhost:44"
 	ssl = true
 	sslcert = "/path/to/a.crt"
 	noverifycert = false
@@ -117,55 +126,234 @@ corecmds = false
 `
 
 func verifyFakeConfig(t *testing.T, conf *Config) {
-	/*
-		net1 := conf.Networks["myserver"]
+	var exps string
+	var expb bool
+	var expu uint
+	var expf float64
 
-		if exp, got := "nickoverride", net1.Nick(); exp != got {
+	exps = "/path/to/store/file.db"
+	if got, ok := conf.StoreFile(); !ok || exps != got {
+		t.Errorf("Expected: %s, got: %s", exps, got)
+	}
+
+	expb = false
+	if got, ok := conf.NoCoreCmds(); !ok || expb != got {
+		t.Errorf("Expected: %v, got: %v", expb, got)
+	}
+
+	net1 := conf.Network("ircnet")
+	if net1 == nil {
+		t.Error("Expected ircnet to be configured.")
+	}
+
+	exps = "Nick"
+	if got, ok := net1.Nick(); !ok || exps != got {
+		t.Errorf("Expected: %s, got: %s", exps, got)
+	}
+
+	exps = "Altnick"
+	if got, ok := net1.Altnick(); !ok || exps != got {
+		t.Errorf("Expected: %s, got: %s", exps, got)
+	}
+
+	exps = "Username"
+	if got, ok := net1.Username(); !ok || exps != got {
+		t.Errorf("Expected: %s, got: %s", exps, got)
+	}
+
+	exps = "Realname"
+	if got, ok := net1.Realname(); !ok || exps != got {
+		t.Errorf("Expected: %s, got: %s", exps, got)
+	}
+
+	exps = "Password"
+	if got, ok := net1.Password(); !ok || exps != got {
+		t.Errorf("Expected: %s, got: %s", exps, got)
+	}
+
+	expb = true
+	if got, ok := net1.SSL(); !ok || expb != got {
+		t.Errorf("Expected: %v, got: %v", expb, got)
+	}
+
+	exps = "/path/to/a.crt"
+	if got, ok := net1.SSLCert(); !ok || exps != got {
+		t.Errorf("Expected: %s, got: %s", exps, got)
+	}
+
+	expb = false
+	if got, ok := net1.NoVerifyCert(); !ok || expb != got {
+		t.Errorf("Expected: %v, got: %v", expb, got)
+	}
+
+	expb = false
+	if got, ok := net1.NoState(); !ok || expb != got {
+		t.Errorf("Expected: %v, got: %v", expb, got)
+	}
+
+	expb = false
+	if got, ok := net1.NoStore(); !ok || expb != got {
+		t.Errorf("Expected: %v, got: %v", expb, got)
+	}
+
+	expu = 120
+	if got, ok := net1.FloodLenPenalty(); !ok || expu != got {
+		t.Errorf("Expected: %v, got: %v", expu, got)
+	}
+
+	expf = 10.0
+	if got, ok := net1.FloodTimeout(); !ok || expf != got {
+		t.Errorf("Expected: %v, got: %v", expf, got)
+	}
+
+	expf = 2.0
+	if got, ok := net1.FloodStep(); !ok || expf != got {
+		t.Errorf("Expected: %v, got: %v", expf, got)
+	}
+
+	expf = 60.0
+	if got, ok := net1.KeepAlive(); !ok || expf != got {
+		t.Errorf("Expected: %v, got: %v", expf, got)
+	}
+
+	expb = false
+	if got, ok := net1.NoReconnect(); !ok || expb != got {
+		t.Errorf("Expected: %v, got: %v", expb, got)
+	}
+
+	expu = 20
+	if got, ok := net1.ReconnectTimeout(); !ok || expu != got {
+		t.Errorf("Expected: %v, got: %v", expu, got)
+	}
+
+	exps = "."
+	if got, ok := net1.Prefix(); !ok || exps != got {
+		t.Errorf("Expected: %v, got: %v", exps, got)
+	}
+
+	if chans, ok := net1.Channels(); ok {
+		c1, c2 := chans[0], chans[1]
+
+		if exp, got := "#channel1", c1.Name; exp != got {
 			t.Errorf("Expected: %v, got: %v", exp, got)
 		}
-		if exp, got := uint16(5555), net1.Port(); exp != got {
+		if exp, got := "pass1", c1.Password; exp != got {
 			t.Errorf("Expected: %v, got: %v", exp, got)
 		}
-		if exp, got := "username", net1.Username(); exp != got {
-			t.Errorf("Expected: %v, got: %v", exp, got)
-		}
-		if exp, got := "realname", net1.Realname(); exp != got {
+		if exp, got := "!", c1.Prefix; exp != got {
 			t.Errorf("Expected: %v, got: %v", exp, got)
 		}
 
-		if exp, got := "myserver", net1.Name(); exp != got {
+		if exp, got := "#channel2", c2.Name; exp != got {
 			t.Errorf("Expected: %v, got: %v", exp, got)
 		}
-		if exp, got := "irc.gamesurge.net", net1.Servers()[0]; exp != got {
+		if exp, got := "pass2", c2.Password; exp != got {
 			t.Errorf("Expected: %v, got: %v", exp, got)
 		}
-
-		net2 := conf.Networks["gamesurge"]
-
-		if exp, got := "nick", net2.Nick(); exp != got {
+		if exp, got := "@", c2.Prefix; exp != got {
 			t.Errorf("Expected: %v, got: %v", exp, got)
 		}
-		if exp, got := "irc.gamesurge.com", net2.Servers()[0]; exp != got {
-			t.Errorf("Expected: %v, got: %v", exp, got)
-		}
+	} else {
+		t.Error("Expected to get some channels.")
+	}
 
-		ext := conf.InExts["awesome"]
-		if ext == nil {
-			t.Error("There should be an extension called awesome.")
+	if servers, ok := net1.Servers(); ok {
+		if servers[0] != "localhost:3333" {
+			t.Error("The first server was wrong:", servers[0])
 		}
+		if servers[1] != "server.com:6667" {
+			t.Error("The first server was wrong:", servers[1])
+		}
+	} else {
+		t.Error("Expected to get some servers.")
+	}
 
-		if ext.InConfig["friend"] != "bob" {
-			t.Error("It should load the configuration.")
-		}
+	net2 := conf.Network("noirc")
+	if net2 == nil {
+		t.Error("Expected noirc to be configured.")
+	}
 
-		if ext.InExec != "/some/path/goes/here" {
-			t.Error("It should allow setting exec paths.")
+	if servers, ok := net2.Servers(); ok {
+		if servers[0] != "lol:3" {
+			t.Error("The first server was wrong:", servers[0])
 		}
+	} else {
+		t.Error("Expected to get some servers.")
+	}
 
-		if ext.InIsServer != "true" {
-			t.Error("It should allow setting boolean strings.")
-		}
-	*/
+	globalExt := conf.ExtGlobal()
+
+	exps = "/path/to/executables"
+	if got, ok := globalExt.ExecDir(); !ok || exps != got {
+		t.Errorf("Expected: %v, got: %v", exps, got)
+	}
+
+	exps = "localhost:3333"
+	if got, ok := globalExt.Listen(); !ok || exps != got {
+		t.Errorf("Expected: %v, got: %v", exps, got)
+	}
+
+	expb = false
+	if got, ok := globalExt.NoReconnect(); !ok || expb != got {
+		t.Errorf("Expected: %v, got: %v", expb, got)
+	}
+
+	expu = 20
+	if got, ok := globalExt.ReconnectTimeout(); !ok || expu != got {
+		t.Errorf("Expected: %v, got: %v", expu, got)
+	}
+
+	expb = true
+	if got, ok := globalExt.UseJson(); !ok || expb != got {
+		t.Errorf("Expected: %v, got: %v", expb, got)
+	}
+
+	ext := conf.Ext("myext")
+
+	exps = "/path/to/executable"
+	if got, ok := ext.Exec(); !ok || exps != got {
+		t.Errorf("Expected: %v, got: %v", exps, got)
+	}
+
+	exps = "localhost:44"
+	if got, ok := ext.Server(); !ok || exps != got {
+		t.Errorf("Expected: %v, got: %v", exps, got)
+	}
+
+	expb = false
+	if got, ok := ext.NoReconnect(); !ok || expb != got {
+		t.Errorf("Expected: %v, got: %v", expb, got)
+	}
+
+	expu = 20
+	if got, ok := ext.ReconnectTimeout(); !ok || expu != got {
+		t.Errorf("Expected: %v, got: %v", expu, got)
+	}
+
+	expb = true
+	if got, ok := ext.SSL(); !ok || expb != got {
+		t.Errorf("Expected: %v, got: %v", expb, got)
+	}
+
+	exps = "/path/to/a.crt"
+	if got, ok := ext.SSLCert(); !ok || exps != got {
+		t.Errorf("Expected: %v, got: %v", exps, got)
+	}
+
+	expb = false
+	if got, ok := ext.NoVerifyCert(); !ok || expb != got {
+		t.Errorf("Expected: %v, got: %v", expb, got)
+	}
+
+	exps = "/path/to/sock.sock"
+	if got, ok := ext.Unix(); !ok || exps != got {
+		t.Errorf("Expected: %v, got: %v", exps, got)
+	}
+
+	expb = false
+	if got, ok := ext.UseJson(); !ok || expb != got {
+		t.Errorf("Expected: %v, got: %v", expb, got)
+	}
 }
 
 func TestConfig_FromReader(t *testing.T) {
@@ -257,6 +445,7 @@ func TestConfig_fromFileErrors(t *testing.T) {
 }
 
 func TestConfig_ToWriter(t *testing.T) {
+	t.SkipNow()
 	t.Parallel()
 	c := NewConfig().FromString(configuration)
 

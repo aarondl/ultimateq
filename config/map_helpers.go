@@ -86,8 +86,8 @@ func getUint(m mapGetter, key string, fallback bool) (uint, bool) {
 		return 0, false
 	}
 
-	if u, ok := val.(uint); ok {
-		return u, true
+	if u, ok := val.(int64); ok {
+		return uint(u), true
 	}
 
 	return 0, false
@@ -154,13 +154,17 @@ func getStrArr(m mapGetter, key string, fallback bool) ([]string, bool) {
 		return nil, false
 	}
 
-	if arr, ok := val.([]string); ok {
+	if arr, ok := val.([]interface{}); ok {
 		if len(arr) == 0 {
 			return nil, true
 		}
 
-		cpyArr := make([]string, len(arr))
-		copy(cpyArr, arr)
+		cpyArr := make([]string, 0, len(arr))
+		for _, strval := range arr {
+			if str, ok := strval.(string); ok {
+				cpyArr = append(cpyArr, str)
+			}
+		}
 
 		return cpyArr, true
 	}

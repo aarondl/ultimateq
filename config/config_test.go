@@ -1,5 +1,16 @@
 package config
 
+import "testing"
+
+func TestConfig_New(t *testing.T) {
+	t.Parallel()
+
+	c := NewConfig()
+	if c == nil {
+		t.Error("Expected a configuration to be created.")
+	}
+}
+
 /*var cloneable = `global:
     nick: a
     realname: a

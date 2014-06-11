@@ -8,7 +8,7 @@ An example configuration looks like this:
 	# defined here and all servers will use those values unless they have their
 	# own defined.
 	storefile = "/path/to/store/file.db"
-	corecmds = false
+	nocorecmds = false
 
 	[networks.ircnet]
 		servers = ["localhost:3333", "server.com:6667"]
@@ -41,8 +41,12 @@ An example configuration looks like this:
 
 		[[networks.ircnet.channels]]
 			name = "#channel1"
-			password = "password"
+			password = "pass1"
 			prefix = "!"
+		[[networks.ircnet.channels]]
+			name = "#channel2"
+			password = "pass2"
+			prefix = "@"
 
 	# Ext provides defaults for all exts, much as the global definitions provide
 	# defaults for all networks.
@@ -77,7 +81,7 @@ An example configuration looks like this:
 
 		# Defining this means that the bot will try to connect to this extension
 		# rather than expecting it to connect to the listen server above.
-		server = ["localhost:44", "server.com:4444"]
+		server = "localhost:44"
 		ssl = true
 		sslcert = "/path/to/a.crt"
 		noverifycert = false
@@ -164,7 +168,7 @@ func (c *Config) Clear() {
 // clear re-initializes all memory in the configuration without locking first.
 func (c *Config) clear() {
 	c.values = make(map[string]interface{})
-	c.errors = make(errList, 0)
+	c.errors = nil
 	c.filename = ""
 }
 
@@ -206,11 +210,15 @@ func (c *Config) Errors() []error {
 // helper.
 func (c *Config) IsValid() bool {
 	ers := make(errList, 0)
-	c.protect.RLock()
 
+	c.protect.RLock()
 	c.validateRequired(&ers)
+	c.protect.RUnlock()
 
 	if len(ers) > 0 {
+		c.protect.Lock()
+		c.errors = ers
+		c.protect.Unlock()
 		return false
 	}
 
@@ -239,6 +247,19 @@ func (c *Config) validateRequired(ers *errList) {
 			ctx := netCtx{&c.protect, c.values, net}
 			if srvs, ok := ctx.Servers(); !ok || len(srvs) == 0 {
 				ers.addError("(%s) Need at least one server defined", name)
+			}
+
+			if n, ok := ctx.Nick(); !ok || len(n) == 0 {
+				ers.addError("(%s) Nickname is required.", name)
+			}
+			if n, ok := ctx.Altnick(); !ok || len(n) == 0 {
+				ers.addError("(%s) Altnick is required.", name)
+			}
+			if n, ok := ctx.Username(); !ok || len(n) == 0 {
+				ers.addError("(%s) Username is required.", name)
+			}
+			if n, ok := ctx.Realname(); !ok || len(n) == 0 {
+				ers.addError("(%s) Realname is required.", name)
 			}
 		}
 	}
@@ -288,6 +309,68 @@ func (v validatorRules) validateMap(name string,
 	}
 }
 
+// Network returns the network context useable to get/set the fields for that.
+// Leave name blank to return the global network context.
+func (c *Config) Network(name string) *netCtx {
+	c.protect.RLock()
+	defer c.protect.RUnlock()
+
+	globalCtx := &netCtx{&c.protect, nil, c.values}
+	if len(name) == 0 {
+		return globalCtx
+	} else {
+		if network, ok := getMap(globalCtx, "networks", false); ok {
+			if netval, ok := network[name]; ok {
+				if net, ok := netval.(map[string]interface{}); ok {
+					return &netCtx{&c.protect, c.values, net}
+				}
+			}
+		}
+		return nil
+	}
+}
+
+// Ext returns the extension context useable to get/set fields for the given
+// extension name.
+func (c *Config) Ext(name string) *extNormalCtx {
+	c.protect.RLock()
+	defer c.protect.RUnlock()
+
+	var parent map[string]interface{}
+	if val, ok := c.values["ext"]; ok {
+		if ext, ok := val.(map[string]interface{}); ok {
+			parent = ext
+		}
+	}
+
+	if val, ok := c.values["exts"]; ok {
+		if exts, ok := val.(map[string]interface{}); ok {
+			if val, ok := exts[name]; ok {
+				if ext, ok := val.(map[string]interface{}); ok {
+					return &extNormalCtx{&extCtx{&c.protect, parent, ext}}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// ExtGlobal returns the global extension context useable to get/set fields for
+// all extensions.
+func (c *Config) ExtGlobal() *extGlobalCtx {
+	c.protect.RLock()
+	defer c.protect.RUnlock()
+
+	if val, ok := c.values["ext"]; ok {
+		if ext, ok := val.(map[string]interface{}); ok {
+			return &extGlobalCtx{&extCtx{&c.protect, nil, ext}}
+		}
+	}
+
+	return nil
+}
+
 // DisplayErrors is a helper function to log the output of all config to the
 // standard logger.
 func (c *Config) DisplayErrors() {
@@ -300,35 +383,35 @@ func (c *Config) DisplayErrors() {
 }
 
 // Filename returns fileName of the configuration, or the default.
-func (c *Config) Filename() (filename string) {
+func (c *Config) Filename() string {
 	c.protect.RLock()
 	defer c.protect.RUnlock()
 
-	filename = defaultConfigFileName
+	filename := defaultConfigFileName
 	if len(c.filename) > 0 {
 		filename = c.filename
 	}
-	return
+	return filename
 }
 
 // StoreFile gets the global storefile or defaultStoreFile.
-func (c *Config) StoreFile() (storefile string) {
+func (c *Config) StoreFile() (string, bool) {
 	c.protect.RLock()
 	defer c.protect.RUnlock()
 
-	storefile = defaultStoreFile
-	if val, ok := c.getStr("storefile"); ok {
-		storefile = val
+	storefile := defaultStoreFile
+	ctx := &netCtx{&c.protect, nil, c.values}
+	if val, ok := getStr(ctx, "storefile", false); ok {
+		return val, true
 	}
-	return storefile
+	return storefile, false
 }
 
-func (c *Config) getStr(key string) (string, bool) {
-	if val, ok := c.values[key]; ok {
-		if str, ok := val.(string); ok && len(str) > 0 {
-			return str, true
-		}
-	}
+func (c *Config) NoCoreCmds() (bool, bool) {
+	c.protect.RLock()
+	defer c.protect.RUnlock()
 
-	return "", false
+	ctx := &netCtx{&c.protect, nil, c.values}
+	val, ok := getBool(ctx, "nocorecmds", false)
+	return val, ok
 }
