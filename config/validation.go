@@ -115,13 +115,10 @@ func (c *Config) Validate() bool {
 func (c *Config) validateRequired(ers *errList) {
 	var nets map[string]interface{}
 	if val, ok := c.values["networks"]; !ok {
-		ers.addError("At least one network must be defined.")
+		ers.addError("Expected at least 1 network to be defined.")
+		return
 	} else if nets, ok = val.(map[string]interface{}); !ok {
-		ers.addError("Expected networks to be a map, got %T", val)
-	}
-
-	if len(nets) == 0 {
-		ers.addError("Expected at least 1 network.")
+		ers.addError("Expected at least 1 network to be defined.")
 		return
 	}
 
@@ -132,7 +129,7 @@ func (c *Config) validateRequired(ers *errList) {
 		} else {
 			ctx := c.Network(name)
 			if srvs, ok := ctx.Servers(); !ok || len(srvs) == 0 {
-				ers.addError("(%s) Need at least one server defined", name)
+				ers.addError("(%s) Expected at least one server defined.", name)
 			}
 
 			if n, ok := ctx.Nick(); !ok || len(n) == 0 {
@@ -159,7 +156,11 @@ func (c *Config) validateTypes(ers *errList) {
 	if netsVal, ok := c.values["networks"]; ok {
 		if nets, ok := netsVal.(map[string]interface{}); ok {
 			for name, netVal := range nets {
-				if net, ok := netVal.(map[string]interface{}); ok {
+				if net, ok := netVal.(map[string]interface{}); !ok {
+					ers.addError(
+						"(global networks) %s is %T but expected map [%v]",
+						name, netVal, netVal)
+				} else {
 					networkValidator.validateMap(name, net, ers)
 
 					if chanVal, ok := net["channels"]; ok {
@@ -177,12 +178,12 @@ func (c *Config) validateTypes(ers *errList) {
 
 	if extVal, ok := c.values["ext"]; ok {
 		if ext, ok := extVal.(map[string]interface{}); ok {
-			extCommonValidator.validateMap("globalext", ext, ers)
-			extGlobalValidator.validateMap("globalext", ext, ers)
+			extCommonValidator.validateMap("ext", ext, ers)
+			extGlobalValidator.validateMap("ext", ext, ers)
 
 			if actMap, ok := ext["active"]; ok {
 				if acts, ok := actMap.(map[string]interface{}); ok {
-					validateActive("globalext", acts, ers)
+					validateActive("ext", acts, ers)
 				}
 			}
 
@@ -197,7 +198,11 @@ func (c *Config) validateTypes(ers *errList) {
 	if extsVal, ok := c.values["exts"]; ok {
 		if exts, ok := extsVal.(map[string]interface{}); ok {
 			for name, extVal := range exts {
-				if ext, ok := extVal.(map[string]interface{}); ok {
+				if ext, ok := extVal.(map[string]interface{}); !ok {
+					ers.addError(
+						"(exts) %s is %T but expected map [%v]",
+						name, extVal, extVal)
+				} else {
 					extCommonValidator.validateMap(name, ext, ers)
 					extNormalValidator.validateMap(name, ext, ers)
 
@@ -215,7 +220,7 @@ func (c *Config) validateTypes(ers *errList) {
 func validateExtConfig(m map[string]interface{}, ers *errList) {
 	addErr := func(kind, key string, val interface{}) {
 		ers.addError(
-			"(globalext config) %s is %T but expected %s [%v]",
+			"(ext config) %s is %T but expected %s [%v]",
 			key, val, kind, val)
 	}
 
@@ -238,7 +243,14 @@ func validateExtConfig(m map[string]interface{}, ers *errList) {
 				addErr("map", key, val)
 			}
 		default:
-			addErr("string", key, val)
+			switch key {
+			case "networks":
+				fallthrough
+			case "channels":
+				addErr("map", key, val)
+			default:
+				addErr("string", key, val)
+			}
 		}
 	}
 }
@@ -246,7 +258,7 @@ func validateExtConfig(m map[string]interface{}, ers *errList) {
 func validateExtNetConfig(m map[string]interface{}, ers *errList) {
 	addErr := func(net, kind, key string, val interface{}) {
 		ers.addError(
-			"(globalext config%s) %s is %T but expected %s [%v]",
+			"(ext config%s) %s is %T but expected %s [%v]",
 			net, key, val, kind, val)
 	}
 
@@ -278,9 +290,9 @@ func validateExtChanConfig(net string, m map[string]interface{}, ers *errList) {
 		var ctx string
 		if len(net) > 0 {
 			ctx = fmt.Sprintf(
-				"globalext config %s%s", net, ch)
+				"ext config %s%s", net, ch)
 		} else {
-			ctx = fmt.Sprintf("globalext config%s", ch)
+			ctx = fmt.Sprintf("ext config%s", ch)
 		}
 		ers.addError("(%s) %s is %T but expected %s [%v]",
 			ctx, key, val, kind, val)

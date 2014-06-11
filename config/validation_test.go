@@ -6,100 +6,250 @@ import (
 	"testing"
 )
 
-const badconfig = `
-storefile = 5
-nocorecmds = "hello"
+type rexpect struct {
+	context, message string
+}
 
-nick = 6
-altnick = 7
-username = 8
-realname = 9
-password = 10
+type texpect struct {
+	context, key, kind, foundKind string
+}
 
-[networks.noirc]
-	servers = "farse"
-[networks.ircnet]
-	servers = [10]
-
-	ssl = "destroy"
-	sslcert = false
-	noverifycert = "lol"
-
-	nostate = 5
-	nostore = 6
-
-	floodlenpenalty = 20.0
-	floodtimeout = "anarchy"
-	floodstep = "string"
-
-	keepalive = "what"
-
-	noreconnect = "abc"
-	reconnecttimeout = 20.0
-
-	prefix = false
-
-	[[networks.ircnet.channels]]
-	name = 5
-	password = 5
-	prefix = 5
-
-	[[networks.ircnet.channels]]
-	name = "#channel2"
-	password = "pass2"
-	prefix = "@"
-
-[ext]
-	listen = 5
-	execdir = 20
-
-	noreconnect = "true"
-	reconnecttimeout = 40.0
-
-	usejson = "what"
-
-	[ext.config]
-		key = 5
-	[ext.config.channels.#channel]
-		key = 5
-	[ext.config.networks.ircnet]
-		key = 5
-	[ext.config.networks.ircnet.channels.#channel]
-		key = 5
-
-	[ext.active]
-		ircnet = [5, 6]
-
-[exts.myext]
-	exec = 5
-
-	server = 5
-	ssl = "hello"
-	sslcert = true
-	noverifycert = "what"
-
-	unix = 5
-
-	usejson = "there"
-
-	[exts.myext.active]
-		ircnet = [5, 6]
-`
-
-func TestValidation(t *testing.T) {
+func TestValidation_RequiredNoServers(t *testing.T) {
 	t.Parallel()
 
+	expects := []rexpect{
+		{"", "Expected at least 1 network to be defined."},
+	}
+
+	requiredTestHelper("", expects, t)
+}
+
+func TestValidation_RequiredServers(t *testing.T) {
+	t.Parallel()
+
+	cfg := `[networks.hello]`
+
+	expects := []rexpect{
+		{"hello", "Nickname is required."},
+		{"hello", "Altnick is required."},
+		{"hello", "Username is required."},
+		{"hello", "Realname is required."},
+		{"hello", "Expected at least one server defined."},
+	}
+
+	requiredTestHelper(cfg, expects, t)
+}
+
+func requiredTestHelper(cfg string, expects []rexpect, t *testing.T) {
 	ers := make(errList, 0)
 
-	c := NewConfig().FromString(badconfig)
-	c.validateTypes(&ers)
+	c := NewConfig().FromString(cfg)
+	c.validateRequired(&ers)
 
-	expect := []struct {
-		object    string
-		key       string
-		kind      string
-		foundKind string
-	}{
+	if len(expects) != len(ers) {
+		for _, e := range ers {
+			t.Error(e)
+		}
+		t.Errorf("Expected %d errors, but got %d", len(expects), len(ers))
+	}
+
+	founds := make([]bool, len(ers))
+
+	for _, expErr := range expects {
+		found := false
+		for i, e := range ers {
+			var er string
+			if len(expErr.context) == 0 {
+				er = fmt.Sprintf("%s", expErr.message)
+			} else {
+				er = fmt.Sprintf("(%s) %s", expErr.context, expErr.message)
+			}
+			if strings.HasPrefix(e.Error(), er) {
+				found = true
+				founds[i] = true
+				break
+			}
+		}
+		if !found {
+			t.Error("Expected to find error concerning:",
+				expErr.context, expErr.message)
+		}
+	}
+
+	for i, found := range founds {
+		if !found {
+			t.Error("Unexpected error occurred:", ers[i])
+		}
+	}
+}
+
+func TestValidation_TypesTopLevel(t *testing.T) {
+	t.Parallel()
+	cfg := `
+		networks = 5
+		ext = 5
+		exts = 5`
+
+	exps := []texpect{
+		{"global", "networks", "map", "int64"},
+		{"global", "ext", "map", "int64"},
+		{"global", "exts", "map", "int64"},
+	}
+
+	typesTestHelper(cfg, exps, t)
+}
+
+func TestValidation_TypesMidLevel(t *testing.T) {
+	t.Parallel()
+
+	cfg := `
+	[networks]
+	noirc = 5
+
+	[networks.ircnet]
+	channels = 5
+
+	[ext]
+	config = 5
+	active = 5
+
+	[exts]
+	myext = 5
+
+	[exts.extension]
+	active = 5`
+
+	exps := []texpect{
+		{"global networks", "noirc", "map", "int64"},
+		{"ircnet", "channels", "map array", "int64"},
+		{"ext", "config", "map", "int64"},
+		{"ext", "active", "map", "int64"},
+		{"exts", "myext", "map", "int64"},
+		{"extension", "active", "map", "int64"},
+	}
+
+	typesTestHelper(cfg, exps, t)
+}
+
+func TestValidation_TypesConfig(t *testing.T) {
+	t.Parallel()
+
+	cfg := `
+	[ext.config]
+	networks = 5
+	channels = 5`
+
+	exps := []texpect{
+		{"ext config", "networks", "map", "int64"},
+		{"ext config", "channels", "map", "int64"},
+	}
+
+	typesTestHelper(cfg, exps, t)
+}
+
+func TestValidation_TypesConfigMidLevel(t *testing.T) {
+	t.Parallel()
+
+	cfg := `
+	[ext.config.networks]
+	network = 5
+	[ext.config.channels]
+	channel = 5
+	[ext.config.networks.ircnet]
+	channels = 5`
+
+	exps := []texpect{
+		{"ext config", "network", "map", "int64"},
+		{"ext config", "channel", "map", "int64"},
+		{"ext config ircnet", "channels", "map", "int64"},
+	}
+
+	typesTestHelper(cfg, exps, t)
+}
+
+func TestValidation_TypesLeafs(t *testing.T) {
+	t.Parallel()
+
+	cfg := `
+		storefile = 5
+		nocorecmds = "hello"
+
+		nick = 6
+		altnick = 7
+		username = 8
+		realname = 9
+		password = 10
+
+		[networks.noirc]
+			servers = "farse"
+		[networks.ircnet]
+			servers = [10]
+
+			ssl = "destroy"
+			sslcert = false
+			noverifycert = "lol"
+
+			nostate = 5
+			nostore = 6
+
+			floodlenpenalty = 20.0
+			floodtimeout = "anarchy"
+			floodstep = "string"
+
+			keepalive = "what"
+
+			noreconnect = "abc"
+			reconnecttimeout = 20.0
+
+			prefix = false
+
+			[[networks.ircnet.channels]]
+			name = 5
+			password = 5
+			prefix = 5
+
+			[[networks.ircnet.channels]]
+			name = "#channel2"
+			password = "pass2"
+			prefix = "@"
+
+		[ext]
+			listen = 5
+			execdir = 20
+
+			noreconnect = "true"
+			reconnecttimeout = 40.0
+
+			usejson = "what"
+
+			[ext.config]
+				key = 5
+			[ext.config.channels.#channel]
+				key = 5
+			[ext.config.networks.ircnet]
+				key = 5
+			[ext.config.networks.ircnet.channels.#channel]
+				key = 5
+
+			[ext.active]
+				ircnet = [5, 6]
+
+		[exts.myext]
+			exec = 5
+
+			server = 5
+			ssl = "hello"
+			sslcert = true
+			noverifycert = "what"
+
+			unix = 5
+
+			usejson = "there"
+
+			[exts.myext.active]
+				ircnet = [5, 6]`
+
+	exps := []texpect{
 		{"global", "storefile", "string", "int64"},
 		{"global", "nocorecmds", "bool", "string"},
 		{"global", "nick", "string", "int64"},
@@ -127,17 +277,17 @@ func TestValidation(t *testing.T) {
 		{"ircnet channels", "password", "string", "int64"},
 		{"ircnet channels", "prefix", "string", "int64"},
 
-		{"globalext", "listen", "string", "int64"},
-		{"globalext", "execdir", "string", "int64"},
-		{"globalext", "noreconnect", "bool", "string"},
-		{"globalext", "reconnecttimeout", "int", "float64"},
-		{"globalext", "usejson", "bool", "string"},
-		{"globalext config", "key", "string", "int64"},
-		{"globalext config #channel", "key", "string", "int64"},
-		{"globalext config ircnet", "key", "string", "int64"},
-		{"globalext config ircnet #channel", "key", "string", "int64"},
-		{"globalext active ircnet", "channel 1", "string", "int64"},
-		{"globalext active ircnet", "channel 2", "string", "int64"},
+		{"ext", "listen", "string", "int64"},
+		{"ext", "execdir", "string", "int64"},
+		{"ext", "noreconnect", "bool", "string"},
+		{"ext", "reconnecttimeout", "int", "float64"},
+		{"ext", "usejson", "bool", "string"},
+		{"ext config", "key", "string", "int64"},
+		{"ext config #channel", "key", "string", "int64"},
+		{"ext config ircnet", "key", "string", "int64"},
+		{"ext config ircnet #channel", "key", "string", "int64"},
+		{"ext active ircnet", "channel 1", "string", "int64"},
+		{"ext active ircnet", "channel 2", "string", "int64"},
 
 		{"myext", "exec", "string", "int64"},
 		{"myext", "server", "string", "int64"},
@@ -150,20 +300,29 @@ func TestValidation(t *testing.T) {
 		{"myext active ircnet", "channel 2", "string", "int64"},
 	}
 
-	if len(expect) != len(ers) {
+	typesTestHelper(cfg, exps, t)
+}
+
+func typesTestHelper(cfg string, expects []texpect, t *testing.T) {
+	ers := make(errList, 0)
+
+	c := NewConfig().FromString(cfg)
+	c.validateTypes(&ers)
+
+	if len(expects) != len(ers) {
 		for _, e := range ers {
 			t.Error(e)
 		}
-		t.Errorf("Expected %d errors, but got %d", len(expect), len(ers))
+		t.Errorf("Expected %d errors, but got %d", len(expects), len(ers))
 	}
 
 	founds := make([]bool, len(ers))
 
-	for _, expErr := range expect {
+	for _, expErr := range expects {
 		found := false
 		for i, e := range ers {
 			er := fmt.Sprintf("(%s) %s is %s but expected %s",
-				expErr.object, expErr.key, expErr.foundKind, expErr.kind)
+				expErr.context, expErr.key, expErr.foundKind, expErr.kind)
 			if strings.HasPrefix(e.Error(), er) {
 				found = true
 				founds[i] = true
@@ -172,7 +331,7 @@ func TestValidation(t *testing.T) {
 		}
 		if !found {
 			t.Error("Expected to find error concerning:",
-				expErr.object, expErr.key, expErr.foundKind, expErr.kind)
+				expErr.context, expErr.key, expErr.foundKind, expErr.kind)
 		}
 	}
 
