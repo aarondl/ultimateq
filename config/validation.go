@@ -34,6 +34,10 @@ var networkValidator = validatorRules{
 	mapArrVals: []string{"channels"},
 }
 
+var channelValidator = validatorRules{
+	stringVals: []string{"name", "prefix", "password"},
+}
+
 var extCommonValidator = validatorRules{
 	boolVals: []string{
 		"usejson", "noreconnect",
@@ -49,7 +53,7 @@ var extGlobalValidator = validatorRules{
 
 var extNormalValidator = validatorRules{
 	stringVals: []string{"server", "exec", "sslcert", "unix"},
-	boolVals:   []string{"ssl", "noreconnect"},
+	boolVals:   []string{"ssl", "noreconnect", "noverifycert"},
 }
 
 // errList is an array of errors.
@@ -75,11 +79,11 @@ func (c *Config) Errors() []error {
 	return ers
 }
 
-// IsValid checks to see if the configuration is valid. If errors are found in
+// Validate checks to see if the configuration is valid. If errors are found in
 // the config the Config.Errors() will return the validation errors.
 // These can be used to display to the user. See DisplayErrors for a display
 // helper.
-func (c *Config) IsValid() bool {
+func (c *Config) Validate() bool {
 	ers := make(errList, 0)
 
 	c.protect.RLock()
@@ -96,6 +100,13 @@ func (c *Config) IsValid() bool {
 	c.protect.RLock()
 	c.validateTypes(&ers)
 	c.protect.RUnlock()
+
+	if len(ers) > 0 {
+		c.protect.Lock()
+		c.errors = ers
+		c.protect.Unlock()
+		return false
+	}
 
 	return true
 }
@@ -150,17 +161,34 @@ func (c *Config) validateTypes(ers *errList) {
 			for name, netVal := range nets {
 				if net, ok := netVal.(map[string]interface{}); ok {
 					networkValidator.validateMap(name, net, ers)
+
+					if chanVal, ok := net["channels"]; ok {
+						if chans, ok := chanVal.([]map[string]interface{}); ok {
+							for _, ch := range chans {
+								channelValidator.validateMap(
+									name+" channels", ch, ers)
+							}
+						}
+					}
 				}
 			}
 		}
 	}
 
-	if extsVal, ok := c.values["ext"]; ok {
-		if exts, ok := extsVal.(map[string]interface{}); ok {
-			for name, extVal := range exts {
-				if ext, ok := extVal.(map[string]interface{}); ok {
-					extCommonValidator.validateMap(name, ext, ers)
-					extGlobalValidator.validateMap(name, ext, ers)
+	if extVal, ok := c.values["ext"]; ok {
+		if ext, ok := extVal.(map[string]interface{}); ok {
+			extCommonValidator.validateMap("globalext", ext, ers)
+			extGlobalValidator.validateMap("globalext", ext, ers)
+
+			if actMap, ok := ext["active"]; ok {
+				if acts, ok := actMap.(map[string]interface{}); ok {
+					validateActive("globalext", acts, ers)
+				}
+			}
+
+			if cnfMap, ok := ext["config"]; ok {
+				if cnf, ok := cnfMap.(map[string]interface{}); ok {
+					validateExtConfig(cnf, ers)
 				}
 			}
 		}
@@ -172,7 +200,122 @@ func (c *Config) validateTypes(ers *errList) {
 				if ext, ok := extVal.(map[string]interface{}); ok {
 					extCommonValidator.validateMap(name, ext, ers)
 					extNormalValidator.validateMap(name, ext, ers)
+
+					if actMap, ok := ext["active"]; ok {
+						if acts, ok := actMap.(map[string]interface{}); ok {
+							validateActive(name, acts, ers)
+						}
+					}
 				}
+			}
+		}
+	}
+}
+
+func validateExtConfig(m map[string]interface{}, ers *errList) {
+	addErr := func(kind, key string, val interface{}) {
+		ers.addError(
+			"(globalext config) %s is %T but expected %s [%v]",
+			key, val, kind, val)
+	}
+
+	for key, val := range m {
+		switch v := val.(type) {
+		case map[string]interface{}:
+			switch key {
+			case "networks":
+				validateExtNetConfig(v, ers)
+			case "channels":
+				validateExtChanConfig("", v, ers)
+			default:
+				addErr("string", key, val)
+			}
+		case string:
+			switch key {
+			case "networks":
+				fallthrough
+			case "channels":
+				addErr("map", key, val)
+			}
+		default:
+			addErr("string", key, val)
+		}
+	}
+}
+
+func validateExtNetConfig(m map[string]interface{}, ers *errList) {
+	addErr := func(net, kind, key string, val interface{}) {
+		ers.addError(
+			"(globalext config%s) %s is %T but expected %s [%v]",
+			net, key, val, kind, val)
+	}
+
+	for key, val := range m {
+		switch v := val.(type) {
+		case map[string]interface{}:
+			for keyname, val := range v {
+				switch keyname {
+				case "channels":
+					if chs, ok := val.(map[string]interface{}); ok {
+						validateExtChanConfig(key, chs, ers)
+					} else {
+						addErr(" "+key, "map", keyname, val)
+					}
+				default:
+					if _, ok := val.(string); !ok {
+						addErr(" "+key, "string", keyname, val)
+					}
+				}
+			}
+		default:
+			addErr("", "map", key, val)
+		}
+	}
+}
+
+func validateExtChanConfig(net string, m map[string]interface{}, ers *errList) {
+	addErr := func(ch, kind, key string, val interface{}) {
+		var ctx string
+		if len(net) > 0 {
+			ctx = fmt.Sprintf(
+				"globalext config %s%s", net, ch)
+		} else {
+			ctx = fmt.Sprintf("globalext config%s", ch)
+		}
+		ers.addError("(%s) %s is %T but expected %s [%v]",
+			ctx, key, val, kind, val)
+	}
+
+	for key, val := range m {
+		switch v := val.(type) {
+		case map[string]interface{}:
+			for keyname, val := range v {
+				if _, ok := val.(string); !ok {
+					addErr(" "+key, "string", keyname, val)
+				}
+			}
+		default:
+			addErr("", "map", key, val)
+		}
+	}
+}
+
+func validateActive(ext string, m map[string]interface{}, ers *errList) {
+	var acts []interface{}
+	var ok bool
+	for activeNet, actVal := range m {
+		if acts, ok = actVal.([]interface{}); !ok {
+			ers.addError(
+				"(%s active) %s is %T but expected array [%v]",
+				ext, acts, acts)
+			return
+		}
+
+		for i, chval := range acts {
+			if _, ok = chval.(string); !ok {
+				ers.addError(
+					"(%s active %s) %v %d is %T but expected string [%v]",
+					ext, activeNet, "channel", i+1, chval, chval)
 			}
 		}
 	}
@@ -182,68 +325,71 @@ func (c *Config) validateTypes(ers *errList) {
 func (v validatorRules) validateMap(name string,
 	m map[string]interface{}, ers *errList) {
 
+	addErr := func(name, key, kind string, val interface{}) {
+		ers.addError("(%s) %s is %T but expected %s [%v]",
+			name, key, val, kind, val)
+	}
+
 	for _, key := range v.stringVals {
 		if val, ok := m[key]; !ok {
 			continue
 		} else if _, ok = val.(string); !ok {
-			ers.addError("(%s) %s is type %T but expected string [%v]",
-				name, key, val, val)
+			addErr(name, key, "string", val)
 		}
 	}
 	for _, key := range v.stringSliceVals {
 		if val, ok := m[key]; !ok {
 			continue
-		} else if _, ok = val.([]string); !ok {
-			ers.addError("(%s) %s is type %T but expected []string [%v]",
-				name, key, val, val)
+		} else if intfArr, ok := val.([]interface{}); !ok {
+			addErr(name, key, "array", val)
+		} else {
+			for i, val := range intfArr {
+				if _, ok := val.(string); !ok {
+					addErr(name, fmt.Sprintf("%s %d", key, i+1), "string", val)
+				}
+			}
 		}
 	}
 	for _, key := range v.boolVals {
 		if val, ok := m[key]; !ok {
 			continue
 		} else if _, ok = val.(bool); !ok {
-			ers.addError("(%s) %s is type %T but expected bool [%v]",
-				name, key, val, val)
+			addErr(name, key, "bool", val)
 		}
 	}
 	for _, key := range v.floatVals {
 		if val, ok := m[key]; !ok {
 			continue
 		} else if _, ok = val.(float64); !ok {
-			ers.addError("(%s) %s is type %T but expected float64 [%v]",
-				name, key, val, val)
+			addErr(name, key, "float64", val)
 		}
 	}
 	for _, key := range v.intVals {
 		if val, ok := m[key]; !ok {
 			continue
 		} else if _, ok = val.(int64); !ok {
-			ers.addError("(%s) %s is type %T but expected int [%v]",
-				name, key, val, val)
+			addErr(name, key, "int", val)
 		}
 	}
 	for _, key := range v.uintVals {
 		if val, ok := m[key]; !ok {
 			continue
 		} else if _, ok = val.(int64); !ok {
-			ers.addError("(%s) %s is type %T but expected int [%v]",
-				name, key, val, val)
+			addErr(name, key, "int", val)
 		}
 	}
 	for _, key := range v.mapVals {
 		if val, ok := m[key]; !ok {
 			continue
 		} else if _, ok = val.(map[string]interface{}); !ok {
-			ers.addError("(%s) %s is type %T but expected map [%v]",
-				name, key, val, val)
+			addErr(name, key, "map", val)
 		}
 	}
 	for _, key := range v.mapArrVals {
 		if val, ok := m[key]; !ok {
 			continue
 		} else if _, ok = val.([]map[string]interface{}); !ok {
-			ers.addError("(%s) %s is type %T but expected maparr [%v]",
-				name, key, val, val)
+			addErr(name, key, "map array", val)
 		}
 	}
 }

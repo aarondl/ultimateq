@@ -113,7 +113,11 @@ func (n *netCtx) SetNoStore(val bool) {
 }
 
 func (n *netCtx) FloodLenPenalty() (uint, bool) {
-	return getUint(n, "floodlenpenalty", true)
+	floodLenPenalty, ok := getUint(n, "floodlenpenalty", true)
+	if !ok {
+		return defaultFloodLenPenalty, ok
+	}
+	return floodLenPenalty, ok
 }
 
 func (n *netCtx) SetFloodLenPenalty(val uint) {
@@ -121,7 +125,11 @@ func (n *netCtx) SetFloodLenPenalty(val uint) {
 }
 
 func (n *netCtx) FloodTimeout() (float64, bool) {
-	return getFloat64(n, "floodtimeout", true)
+	floodTimeout, ok := getFloat64(n, "floodtimeout", true)
+	if !ok {
+		return defaultFloodTimeout, ok
+	}
+	return floodTimeout, ok
 }
 
 func (n *netCtx) SetFloodTimeout(val float64) {
@@ -129,7 +137,11 @@ func (n *netCtx) SetFloodTimeout(val float64) {
 }
 
 func (n *netCtx) FloodStep() (float64, bool) {
-	return getFloat64(n, "floodstep", true)
+	floodStep, ok := getFloat64(n, "floodstep", true)
+	if !ok {
+		return defaultFloodStep, ok
+	}
+	return floodStep, ok
 }
 
 func (n *netCtx) SetFloodStep(val float64) {
@@ -137,7 +149,11 @@ func (n *netCtx) SetFloodStep(val float64) {
 }
 
 func (n *netCtx) KeepAlive() (float64, bool) {
-	return getFloat64(n, "keepalive", true)
+	keepAlive, ok := getFloat64(n, "keepalive", true)
+	if !ok {
+		return defaultKeepAlive, ok
+	}
+	return keepAlive, ok
 }
 
 func (n *netCtx) SetKeepAlive(val float64) {
@@ -153,7 +169,11 @@ func (n *netCtx) SetNoReconnect(val bool) {
 }
 
 func (n *netCtx) ReconnectTimeout() (uint, bool) {
-	return getUint(n, "reconnecttimeout", true)
+	reconnTimeout, ok := getUint(n, "reconnecttimeout", true)
+	if !ok {
+		return defaultReconnectTimeout, ok
+	}
+	return reconnTimeout, ok
 }
 
 func (n *netCtx) SetReconnectTimeout(val uint) {
@@ -161,7 +181,11 @@ func (n *netCtx) SetReconnectTimeout(val uint) {
 }
 
 func (n *netCtx) Prefix() (string, bool) {
-	return getStr(n, "prefix", true)
+	prefix, ok := getStr(n, "prefix", true)
+	if !ok {
+		return string(defaultPrefix), ok
+	}
+	return prefix, ok
 }
 
 func (n *netCtx) SetPrefix(val string) {

@@ -19,7 +19,7 @@ password = 10
 [networks.noirc]
 	servers = "farse"
 [networks.ircnet]
-	servers = 10
+	servers = [10]
 
 	ssl = "destroy"
 	sslcert = false
@@ -40,58 +40,46 @@ password = 10
 	prefix = false
 
 	[[networks.ircnet.channels]]
-	name = "#channel1"
-	password = "pass1"
-	prefix = "!"
+	name = 5
+	password = 5
+	prefix = 5
 
 	[[networks.ircnet.channels]]
 	name = "#channel2"
 	password = "pass2"
 	prefix = "@"
 
-# Ext provides defaults for all exts, much as the global definitions provide
-# defaults for all networks.
 [ext]
-	# Define listen to create a extension server for extensions to connect
-	listen = "localhost:3333"
-	# OR listen = "/path/to/unix.sock"
+	listen = 5
+	execdir = 20
 
-	# Define the execdir to start all executables in the path.
-	execdir = "/path/to/executables"
+	noreconnect = "true"
+	reconnecttimeout = 40.0
 
-	# Control reconnection for remote extensions.
-	noreconnect = false
-	reconnecttimeout = 20
+	usejson = "what"
 
-	usejson = true
+	[ext.config]
+		key = 5
+	[ext.config.channels.#channel]
+		key = 5
+	[ext.config.networks.ircnet]
+		key = 5
+	[ext.config.networks.ircnet.channels.#channel]
+		key = 5
 
-	# Ext configuration is deeply nested so we can configure it globally
-	# based on the network, or based on the channel on that network, or even
-	# on all channels on that network.
-	[ext.config] # Global config value
-		key = 5
-	[ext.config.channels.#channel] # All networks for #channel
-		key = 5
-	[ext.config.networks.ircnet.config] # All channels on ircnet network
-		key = 5
-	[ext.config.networks.ircnet.channels.#channel] # Freenode's #channel
-		key = 5
+	[ext.active]
+		ircnet = [5, 6]
 
 [exts.myext]
-	# Define exec to specify a path to the executable to launch.
 	exec = 5
 
-	# Defining this means that the bot will try to connect to this extension
-	# rather than expecting it to connect to the listen server above.
 	server = 5
 	ssl = "hello"
-	sslcert = 5
+	sslcert = true
 	noverifycert = "what"
 
-	# Define the above connection properties, or simply this one property.
 	unix = 5
 
-	# Use json not gob.
 	usejson = "there"
 
 	[exts.myext.active]
@@ -119,8 +107,10 @@ func TestValidation(t *testing.T) {
 		{"global", "username", "string", "int64"},
 		{"global", "realname", "string", "int64"},
 		{"global", "password", "string", "int64"},
-		{"noirc", "servers", "[]string", "string"},
-		{"ircnet", "servers", "[]string", "int64"},
+
+		{"noirc", "servers", "array", "string"},
+
+		{"ircnet", "servers 1", "string", "int64"},
 		{"ircnet", "ssl", "bool", "string"},
 		{"ircnet", "sslcert", "string", "bool"},
 		{"ircnet", "noverifycert", "bool", "string"},
@@ -133,21 +123,62 @@ func TestValidation(t *testing.T) {
 		{"ircnet", "noreconnect", "bool", "string"},
 		{"ircnet", "reconnecttimeout", "int", "float64"},
 		{"ircnet", "prefix", "string", "bool"},
+		{"ircnet channels", "name", "string", "int64"},
+		{"ircnet channels", "password", "string", "int64"},
+		{"ircnet channels", "prefix", "string", "int64"},
+
+		{"globalext", "listen", "string", "int64"},
+		{"globalext", "execdir", "string", "int64"},
+		{"globalext", "noreconnect", "bool", "string"},
+		{"globalext", "reconnecttimeout", "int", "float64"},
+		{"globalext", "usejson", "bool", "string"},
+		{"globalext config", "key", "string", "int64"},
+		{"globalext config #channel", "key", "string", "int64"},
+		{"globalext config ircnet", "key", "string", "int64"},
+		{"globalext config ircnet #channel", "key", "string", "int64"},
+		{"globalext active ircnet", "channel 1", "string", "int64"},
+		{"globalext active ircnet", "channel 2", "string", "int64"},
+
+		{"myext", "exec", "string", "int64"},
+		{"myext", "server", "string", "int64"},
+		{"myext", "ssl", "bool", "string"},
+		{"myext", "sslcert", "string", "bool"},
+		{"myext", "noverifycert", "bool", "string"},
+		{"myext", "unix", "string", "int64"},
+		{"myext", "usejson", "bool", "string"},
+		{"myext active ircnet", "channel 1", "string", "int64"},
+		{"myext active ircnet", "channel 2", "string", "int64"},
 	}
+
+	if len(expect) != len(ers) {
+		for _, e := range ers {
+			t.Error(e)
+		}
+		t.Errorf("Expected %d errors, but got %d", len(expect), len(ers))
+	}
+
+	founds := make([]bool, len(ers))
 
 	for _, expErr := range expect {
 		found := false
-		for _, e := range ers {
-			er := fmt.Sprintf("(%s) %s is type %s but expected %s",
+		for i, e := range ers {
+			er := fmt.Sprintf("(%s) %s is %s but expected %s",
 				expErr.object, expErr.key, expErr.foundKind, expErr.kind)
 			if strings.HasPrefix(e.Error(), er) {
 				found = true
+				founds[i] = true
 				break
 			}
 		}
 		if !found {
 			t.Error("Expected to find error concerning:",
 				expErr.object, expErr.key, expErr.foundKind, expErr.kind)
+		}
+	}
+
+	for i, found := range founds {
+		if !found {
+			t.Error("Unexpected error occurred:", ers[i])
 		}
 	}
 }

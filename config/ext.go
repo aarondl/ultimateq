@@ -48,7 +48,11 @@ func (e *extCtx) SetNoReconnect(val bool) {
 }
 
 func (e *extCtx) ReconnectTimeout() (uint, bool) {
-	return getUint(e, "reconnecttimeout", true)
+	reconnTimeout, ok := getUint(e, "reconnecttimeout", true)
+	if !ok {
+		return defaultReconnectTimeout, ok
+	}
+	return reconnTimeout, ok
 }
 
 func (e *extCtx) SetReconnectTimeout(val uint) {

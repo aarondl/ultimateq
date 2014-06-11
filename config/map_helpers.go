@@ -143,6 +143,9 @@ func getMap(m mapGetter, key string, fallback bool) (
 
 // getStrArr gets a string array out of a map.
 func getStrArr(m mapGetter, key string, fallback bool) ([]string, bool) {
+	m.rlock()
+	defer m.runlock()
+
 	var val interface{}
 	var ok bool
 

@@ -99,7 +99,7 @@ password = "Password"
 		key = "stringvalue"
 	[ext.config.channels.#channel] # All networks for #channel
 		key = "stringvalue"
-	[ext.config.networks.ircnet.config] # All channels on ircnet network
+	[ext.config.networks.ircnet] # All channels on ircnet network
 		key = "stringvalue"
 	[ext.config.networks.ircnet.channels.#channel] # Freenode's #channel
 		key = "stringvalue"
@@ -371,7 +371,7 @@ func TestConfig_FromReader(t *testing.T) {
 	t.Parallel()
 	c := NewConfig().FromString(configuration)
 
-	if !c.IsValid() {
+	if !c.Validate() {
 		t.Error(c.errors)
 		t.Fatal("It should be a valid configuration.")
 	}
@@ -456,7 +456,6 @@ func TestConfig_fromFileErrors(t *testing.T) {
 }
 
 func TestConfig_ToWriter(t *testing.T) {
-	t.SkipNow()
 	t.Parallel()
 	c := NewConfig().FromString(configuration)
 

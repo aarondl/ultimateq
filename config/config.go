@@ -70,7 +70,7 @@ An example configuration looks like this:
 			key = "stringvalue"
 		[ext.config.channels.#channel] # All networks for #channel
 			key = "stringvalue"
-		[ext.config.networks.ircnet.config] # All channels on ircnet network
+		[ext.config.networks.ircnet] # All channels on ircnet network
 			key = "stringvalue"
 		[ext.config.networks.ircnet.channels.#channel] # Freenode's #channel
 			key = "stringvalue"
@@ -143,9 +143,9 @@ const (
 type Config struct {
 	values map[string]interface{}
 
-	errors   errList      `toml:"-" json:"-"`
-	filename string       `toml:"-" json:"-"`
-	protect  sync.RWMutex `toml:"-" json:"-"`
+	errors   errList
+	filename string
+	protect  sync.RWMutex
 }
 
 // NewConfig initializes a Config object.
