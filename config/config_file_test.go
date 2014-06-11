@@ -354,6 +354,17 @@ func verifyFakeConfig(t *testing.T, conf *Config) {
 	if got, ok := ext.UseJson(); !ok || expb != got {
 		t.Errorf("Expected: %v, got: %v", expb, got)
 	}
+
+	if active, ok := ext.Active("ircnet"); !ok || active == nil {
+		t.Error("Expected some active channels.")
+	} else {
+		if active[0] != "#channel1" {
+			t.Error("Expected #channel1 to be the first active channel.")
+		}
+		if active[1] != "#channel2" {
+			t.Error("Expected #channel2 to be the first active channel.")
+		}
+	}
 }
 
 func TestConfig_FromReader(t *testing.T) {

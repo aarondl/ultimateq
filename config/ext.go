@@ -2,10 +2,6 @@ package config
 
 import "sync"
 
-type extGlobalCtx struct {
-	*extCtx
-}
-
 type extCtx struct {
 	mutex  *sync.RWMutex
 	parent map[string]interface{}
@@ -35,6 +31,98 @@ func (e *extCtx) set(key string, value interface{}) {
 	e.ext[key] = value
 }
 
+func (e *extCtx) UseJson() (bool, bool) {
+	return getBool(e, "usejson", true)
+}
+
+func (e *extCtx) SetUseJson(val bool) {
+	setVal(e, "usejson", val)
+}
+
+func (e *extCtx) NoReconnect() (bool, bool) {
+	return getBool(e, "noreconnect", true)
+}
+
+func (e *extCtx) SetNoReconnect(val bool) {
+	setVal(e, "noreconnect", val)
+}
+
+func (e *extCtx) ReconnectTimeout() (uint, bool) {
+	return getUint(e, "reconnecttimeout", true)
+}
+
+func (e *extCtx) SetReconnectTimeout(val uint) {
+	setVal(e, "reconnecttimeout", val)
+}
+
+func (e *extCtx) Active(network string) ([]string, bool) {
+	e.rlock()
+	defer e.runlock()
+
+	var val interface{}
+	var actives map[string]interface{}
+	var ok bool
+
+	if val, ok = e.ext["active"]; !ok {
+		val, ok = e.parent["active"]
+	}
+
+	if !ok {
+		return nil, false
+	}
+
+	if actives, ok = val.(map[string]interface{}); !ok || len(actives) == 0 {
+		return nil, false
+	}
+
+	if interfaceValue, ok := actives[network]; ok {
+		newActives := make([]string, 0)
+
+		if strArr, ok := interfaceValue.([]interface{}); ok {
+			for _, strVal := range strArr {
+				if str, ok := strVal.(string); ok {
+					newActives = append(newActives, str)
+				}
+			}
+		}
+
+		if len(newActives) > 0 {
+			return newActives, true
+		} else {
+			return nil, false
+		}
+	}
+
+	return nil, false
+}
+
+func (e *extCtx) SetActive(network string, value []string) {
+	e.lock()
+	defer e.unlock()
+
+	var val interface{}
+	var actives map[string]interface{}
+	var ok bool
+
+	if val, ok = e.ext["active"]; !ok {
+		val, ok = e.parent["active"]
+	}
+
+	if !ok {
+		return
+	}
+
+	if actives, ok = val.(map[string]interface{}); !ok || len(actives) == 0 {
+		return
+	}
+
+	actives[network] = value
+}
+
+type extGlobalCtx struct {
+	*extCtx
+}
+
 func (e *extGlobalCtx) ExecDir() (string, bool) {
 	return getStr(e, "execdir", false)
 }
@@ -51,32 +139,12 @@ func (e *extGlobalCtx) SetListen(val string) {
 	setVal(e, "listen", val)
 }
 
-func (e *extGlobalCtx) NoReconnect() (bool, bool) {
-	return getBool(e, "noreconnect", false)
-}
-
-func (e *extGlobalCtx) SetNoReconnect(val bool) {
-	setVal(e, "noreconnect", val)
-}
-
-func (e *extGlobalCtx) ReconnectTimeout() (uint, bool) {
-	return getUint(e, "reconnecttimeout", false)
-}
-
-func (e *extGlobalCtx) SetReconnectTimeout(val uint) {
-	setVal(e, "reconnecttimeout", val)
-}
-
-func (e *extGlobalCtx) UseJson() (bool, bool) {
-	return getBool(e, "usejson", false)
-}
-
-func (e *extGlobalCtx) SetUseJson(val bool) {
-	setVal(e, "usejson", val)
-}
-
 type extNormalCtx struct {
 	*extCtx
+}
+
+func (e *extNormalCtx) Exec() (string, bool) {
+	return getStr(e, "exec", false)
 }
 
 func (e *extNormalCtx) Server() (string, bool) {
@@ -85,10 +153,6 @@ func (e *extNormalCtx) Server() (string, bool) {
 
 func (e *extNormalCtx) SetServer(val string) {
 	setVal(e, "server", val)
-}
-
-func (e *extNormalCtx) Exec() (string, bool) {
-	return getStr(e, "exec", false)
 }
 
 func (e *extNormalCtx) SetExec(val string) {
@@ -125,28 +189,4 @@ func (e *extNormalCtx) Unix() (string, bool) {
 
 func (e *extNormalCtx) SetUnix(val string) {
 	setVal(e, "unix", val)
-}
-
-func (e *extNormalCtx) NoReconnect() (bool, bool) {
-	return getBool(e, "noreconnect", true)
-}
-
-func (e *extNormalCtx) SetNoReconnect(val bool) {
-	setVal(e, "noreconnect", val)
-}
-
-func (e *extNormalCtx) ReconnectTimeout() (uint, bool) {
-	return getUint(e, "reconnecttimeout", true)
-}
-
-func (e *extNormalCtx) SetReconnectTimeout(val uint) {
-	setVal(e, "reconnecttimeout", val)
-}
-
-func (e *extNormalCtx) UseJson() (bool, bool) {
-	return getBool(e, "usejson", true)
-}
-
-func (e *extNormalCtx) SetUseJson(val bool) {
-	setVal(e, "usejson", val)
 }
