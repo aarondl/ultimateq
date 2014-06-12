@@ -238,6 +238,27 @@ func (_ *Queryer) Google(w irc.Writer, ev *cmd.Event) error {
 	return nil
 }
 
+func (_ *Queryer) Weather(m *irc.Message, e *data.DataEndpoint,
+	c *commander.CommandData) error {
+
+	c.Close()
+
+	q := c.GetArg("query")
+	nick := m.Nick()
+	if out, err := query.Weather(q); len(out) != 0 {
+		out = sanitize(out)
+		if targ := m.Target(); isNick(targ) {
+			e.Notice(nick, out)
+		} else {
+			e.Privmsg(targ, out)
+		}
+	} else if err != nil {
+		e.Notice(nick, err.Error())
+	}
+
+	return nil
+}
+
 /* =====================
  Handler methods.
 ===================== */
@@ -363,6 +384,13 @@ func main() {
 			"calc",
 			&queryer,
 			cmd.PRIVMSG, cmd.ALL, "query...",
+		))
+		b.RegisterCommand(commander.MkCmd(
+			"query",
+			"Fetches a weather report from yr.no.",
+			"weather",
+			&queryer,
+			commander.PRIVMSG, commander.ALL, "query...",
 		))
 
 		// Handler commands
