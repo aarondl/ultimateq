@@ -113,11 +113,10 @@ func (n *netCtx) SetNoStore(val bool) {
 }
 
 func (n *netCtx) FloodLenPenalty() (uint, bool) {
-	floodLenPenalty, ok := getUint(n, "floodlenpenalty", true)
-	if !ok {
-		return defaultFloodLenPenalty, ok
+	if floodLenPenalty, ok := getUint(n, "floodlenpenalty", true); ok {
+		return floodLenPenalty, true
 	}
-	return floodLenPenalty, ok
+	return defaultFloodLenPenalty, false
 }
 
 func (n *netCtx) SetFloodLenPenalty(val uint) {
@@ -125,11 +124,10 @@ func (n *netCtx) SetFloodLenPenalty(val uint) {
 }
 
 func (n *netCtx) FloodTimeout() (float64, bool) {
-	floodTimeout, ok := getFloat64(n, "floodtimeout", true)
-	if !ok {
-		return defaultFloodTimeout, ok
+	if floodTimeout, ok := getFloat64(n, "floodtimeout", true); ok {
+		return floodTimeout, ok
 	}
-	return floodTimeout, ok
+	return defaultFloodTimeout, false
 }
 
 func (n *netCtx) SetFloodTimeout(val float64) {
@@ -137,11 +135,10 @@ func (n *netCtx) SetFloodTimeout(val float64) {
 }
 
 func (n *netCtx) FloodStep() (float64, bool) {
-	floodStep, ok := getFloat64(n, "floodstep", true)
-	if !ok {
-		return defaultFloodStep, ok
+	if floodStep, ok := getFloat64(n, "floodstep", true); ok {
+		return floodStep, ok
 	}
-	return floodStep, ok
+	return defaultFloodStep, false
 }
 
 func (n *netCtx) SetFloodStep(val float64) {
@@ -149,11 +146,10 @@ func (n *netCtx) SetFloodStep(val float64) {
 }
 
 func (n *netCtx) KeepAlive() (float64, bool) {
-	keepAlive, ok := getFloat64(n, "keepalive", true)
-	if !ok {
-		return defaultKeepAlive, ok
+	if keepAlive, ok := getFloat64(n, "keepalive", true); ok {
+		return keepAlive, ok
 	}
-	return keepAlive, ok
+	return defaultKeepAlive, false
 }
 
 func (n *netCtx) SetKeepAlive(val float64) {
@@ -169,11 +165,10 @@ func (n *netCtx) SetNoReconnect(val bool) {
 }
 
 func (n *netCtx) ReconnectTimeout() (uint, bool) {
-	reconnTimeout, ok := getUint(n, "reconnecttimeout", true)
-	if !ok {
-		return defaultReconnectTimeout, ok
+	if reconnTimeout, ok := getUint(n, "reconnecttimeout", true); ok {
+		return reconnTimeout, ok
 	}
-	return reconnTimeout, ok
+	return defaultReconnectTimeout, false
 }
 
 func (n *netCtx) SetReconnectTimeout(val uint) {
@@ -181,11 +176,10 @@ func (n *netCtx) SetReconnectTimeout(val uint) {
 }
 
 func (n *netCtx) Prefix() (string, bool) {
-	prefix, ok := getStr(n, "prefix", true)
-	if !ok {
-		return string(defaultPrefix), ok
+	if prefix, ok := getStr(n, "prefix", true); ok {
+		return prefix, ok
 	}
-	return prefix, ok
+	return string(defaultPrefix), false
 }
 
 func (n *netCtx) SetPrefix(val string) {
@@ -204,7 +198,6 @@ func (n *netCtx) Channels() ([]Channel, bool) {
 	defer n.runlock()
 
 	var val interface{}
-	var arr []map[string]interface{}
 	var ok bool
 
 	if val, ok = n.network["channels"]; !ok {
@@ -215,37 +208,44 @@ func (n *netCtx) Channels() ([]Channel, bool) {
 		return nil, false
 	}
 
-	if arr, ok = val.([]map[string]interface{}); !ok || len(arr) == 0 {
-		return nil, false
+	if arr, ok := val.([]map[string]interface{}); ok {
+		ret := make([]Channel, len(arr))
+		for i, ch := range arr {
+			if nameVal, ok := ch["name"]; ok {
+				if name, ok := nameVal.(string); ok {
+					ret[i].Name = name
+				}
+			}
+			if passwordVal, ok := ch["password"]; ok {
+				if password, ok := passwordVal.(string); ok {
+					ret[i].Password = password
+				}
+			}
+			if prefixVal, ok := ch["prefix"]; ok {
+				if prefix, ok := prefixVal.(string); ok {
+					ret[i].Prefix = prefix
+				}
+			}
+		}
+
+		return ret, true
+	} else if arr, ok := val.([]Channel); ok {
+		ret := make([]Channel, len(arr))
+		copy(ret, arr)
+		return ret, true
 	}
 
-	ret := make([]Channel, len(arr))
-	for i, ch := range arr {
-		if nameVal, ok := ch["name"]; ok {
-			if name, ok := nameVal.(string); ok {
-				ret[i].Name = name
-			}
-		}
-		if passwordVal, ok := ch["password"]; ok {
-			if password, ok := passwordVal.(string); ok {
-				ret[i].Password = password
-			}
-		}
-		if prefixVal, ok := ch["prefix"]; ok {
-			if prefix, ok := prefixVal.(string); ok {
-				ret[i].Prefix = prefix
-			}
-		}
-	}
-
-	return ret, true
+	return nil, false
 }
 
 func (n *netCtx) SetChannels(val []Channel) {
 	setVal(n, "channels", val)
 }
 
-// Servers returns the list of servers for the network.
 func (n *netCtx) Servers() ([]string, bool) {
 	return getStrArr(n, "servers", false)
+}
+
+func (n *netCtx) SetServers(val []string) {
+	setVal(n, "servers", val)
 }

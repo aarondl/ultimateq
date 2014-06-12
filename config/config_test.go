@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func TestConfig_New(t *testing.T) {
 	t.Parallel()
@@ -8,6 +11,310 @@ func TestConfig_New(t *testing.T) {
 	c := NewConfig()
 	if c == nil {
 		t.Error("Expected a configuration to be created.")
+	}
+}
+
+func TestConfig_Clear(t *testing.T) {
+	t.Parallel()
+
+	c := NewConfig()
+	c.values = map[string]interface{}{"network": "something"}
+	c.errors = errList{errors.New("something")}
+	c.filename = "filename"
+
+	c.Clear()
+	if len(c.values) != 0 {
+		t.Error("Values should be blank, got:", c.values)
+	}
+	if len(c.errors) != 0 {
+		t.Error("Filename should be blank, got:", c.errors)
+	}
+	if len(c.filename) != 0 {
+		t.Error("Filename should be blank, got:", c.filename)
+	}
+}
+
+func TestConfig_Contexts(t *testing.T) {
+	t.Parallel()
+
+	c := NewConfig().FromString(configuration)
+
+	if c.Network("") == nil {
+		t.Error("Expected to be able to get global context.")
+	}
+	if c.Network("ircnet") == nil {
+		t.Error("Expected to be able to get network context.")
+	}
+	if c.ExtGlobal() == nil {
+		t.Error("Expected to be able to get ext context.")
+	}
+	if c.Ext("myext") == nil {
+		t.Error("Expected to be able to get ext context.")
+	}
+
+	if ctx := c.Network("nonexistent"); ctx != nil {
+		t.Error("Should retrieve no context for non-existent things, got:", ctx)
+	}
+	if ctx := c.Ext("nonexistent"); ctx != nil {
+		t.Error("Should retrieve no context for non-existent things, got:", ctx)
+	}
+}
+
+func TestConfig_NewThings(t *testing.T) {
+	t.Parallel()
+
+	c := NewConfig()
+	if net := c.NewNetwork("net1"); net == nil {
+		t.Error("Should have created a new network.")
+	}
+	if ext := c.NewExt("ext1"); ext == nil {
+		t.Error("Should have created a new extension.")
+	}
+
+	if net := c.NewNetwork("net2"); net == nil {
+		t.Error("Should have created a new network.")
+	}
+	if ext := c.NewExt("ext2"); ext == nil {
+		t.Error("Should have created a new extension.")
+	}
+
+	if net := c.NewNetwork("net1"); net != nil {
+		t.Error("Should not have created a new network.")
+	}
+	if ext := c.NewExt("ext2"); ext != nil {
+		t.Error("Should not have created a new extension.")
+	}
+}
+
+func TestConfig_Config_GetSet(t *testing.T) {
+	t.Parallel()
+
+	c := NewConfig()
+	if v, ok := c.StoreFile(); ok || v != defaultStoreFile {
+		t.Error("Expected store file not to be set, and to get default:", v)
+	}
+	c.SetStoreFile("a")
+	if v, ok := c.StoreFile(); !ok || v != "a" {
+		t.Error("Expected store file to be set, and to get a, got:", v)
+	}
+
+	if v, ok := c.NoCoreCmds(); ok || v != false {
+		t.Error("Expected store file not to be set, and to get default:", v)
+	}
+	c.SetNoCoreCmds(true)
+	if v, ok := c.NoCoreCmds(); !ok || v != true {
+		t.Error("Expected store file to be set, and to get a, got:", v)
+	}
+}
+
+func TestConfig_Network_GetSet(t *testing.T) {
+	t.Parallel()
+
+	c := NewConfig()
+	glb := c.Network("")
+	net := c.NewNetwork("net")
+
+	strCheck("nick", "", "nick1", "nick2",
+		(*netCtx).Nick, (*netCtx).SetNick, glb, net, t)
+
+	strCheck("altnick", "", "altnick1", "altnick2",
+		(*netCtx).Altnick, (*netCtx).SetAltnick, glb, net, t)
+
+	strCheck("username", "", "username1", "username2",
+		(*netCtx).Username, (*netCtx).SetUsername, glb, net, t)
+
+	strCheck("realname", "", "realname1", "realname2",
+		(*netCtx).Realname, (*netCtx).SetRealname, glb, net, t)
+
+	strCheck("password", "", "password1", "password2",
+		(*netCtx).Password, (*netCtx).SetPassword, glb, net, t)
+
+	boolCheck("ssl", false, false, true,
+		(*netCtx).SSL, (*netCtx).SetSSL, glb, net, t)
+
+	strCheck("sslcert", "", "sslcert1", "sslcert2",
+		(*netCtx).SSLCert, (*netCtx).SetSSLCert, glb, net, t)
+
+	boolCheck("noverifycert", false, false, true,
+		(*netCtx).NoVerifyCert, (*netCtx).SetNoVerifyCert, glb, net, t)
+
+	boolCheck("nostate", false, false, true,
+		(*netCtx).NoState, (*netCtx).SetNoState, glb, net, t)
+
+	boolCheck("nostore", false, false, true,
+		(*netCtx).NoStore, (*netCtx).SetNoStore, glb, net, t)
+
+	uintCheck("floodlenpenalty", defaultFloodLenPenalty, 20, 30,
+		(*netCtx).FloodLenPenalty, (*netCtx).SetFloodLenPenalty, glb, net, t)
+
+	float64Check("floodtimeout", defaultFloodTimeout, 20.0, 30.0,
+		(*netCtx).FloodTimeout, (*netCtx).SetFloodTimeout, glb, net, t)
+
+	float64Check("floodstep", defaultFloodStep, 20.0, 30.0,
+		(*netCtx).FloodStep, (*netCtx).SetFloodStep, glb, net, t)
+
+	float64Check("keepalive", defaultKeepAlive, 20.0, 30.0,
+		(*netCtx).KeepAlive, (*netCtx).SetKeepAlive, glb, net, t)
+
+	boolCheck("noreconnect", false, false, true,
+		(*netCtx).NoReconnect, (*netCtx).SetNoReconnect, glb, net, t)
+
+	uintCheck("reconnecttimeout", defaultReconnectTimeout, 20, 30,
+		(*netCtx).ReconnectTimeout, (*netCtx).SetReconnectTimeout, glb, net, t)
+
+	strCheck("prefix", ".", "!", "@",
+		(*netCtx).Prefix, (*netCtx).SetPrefix, glb, net, t)
+
+	if srvs, ok := net.Servers(); ok || len(srvs) != 0 {
+		t.Error("Expected servers to be empty.")
+	}
+
+	net.SetServers([]string{"srv"})
+
+	if srvs, ok := net.Servers(); !ok || len(srvs) != 1 {
+		t.Error("Expected servers not to be empty.")
+	} else if srvs[0] != "srv" {
+		t.Error("Expected the first server to be srv, got:", srvs[0])
+	}
+
+	if chans, ok := net.Channels(); ok || len(chans) != 0 {
+		t.Error("Expected servers to be empty.")
+	}
+
+	ch := Channel{"a", "b", "c"}
+	net.SetChannels([]Channel{ch})
+
+	if chans, ok := net.Channels(); !ok || len(chans) != 1 {
+		t.Error("Expected servers not to be empty.")
+	} else if chans[0] != ch {
+		t.Errorf("Expected the first channel to be %v, got: %v", ch, chans[0])
+	}
+}
+
+type (
+	tcString  func(*netCtx) (string, bool)
+	tsString  func(*netCtx, string)
+	tcBool    func(*netCtx) (bool, bool)
+	tsBool    func(*netCtx, bool)
+	tcFloat64 func(*netCtx) (float64, bool)
+	tsFloat64 func(*netCtx, float64)
+	tcUint    func(*netCtx) (uint, bool)
+	tsUint    func(*netCtx, uint)
+)
+
+func strCheck(
+	name, beforeGlobal, beforeNetwork, afterNetwork string,
+	toCheck tcString, toSet tsString,
+	global, network *netCtx, t *testing.T) {
+
+	if v, ok := toCheck(global); ok || v != beforeGlobal {
+		t.Errorf("Expected %s to be: %v, got: %v", name, beforeGlobal, v)
+	}
+	if v, ok := toCheck(network); ok || v != beforeGlobal {
+		t.Errorf("Expected %s to be: %v, got: %v", name, beforeGlobal, v)
+	}
+
+	toSet(global, beforeNetwork)
+	if v, ok := toCheck(global); !ok || v != beforeNetwork {
+		t.Errorf("Expected %s to be: %v, got: %v", name, beforeNetwork, v)
+	}
+	if v, ok := toCheck(network); !ok || v != beforeNetwork {
+		t.Errorf("Expected %s to be: %v, got: %v", name, beforeNetwork, v)
+	}
+
+	toSet(network, afterNetwork)
+	if v, ok := toCheck(global); !ok || v != beforeNetwork {
+		t.Errorf("Expected %s to be: %v, got: %v", name, beforeNetwork, v)
+	}
+	if v, ok := toCheck(network); !ok || v != afterNetwork {
+		t.Errorf("Expected %s to be: %v, got: %v", name, afterNetwork, v)
+	}
+}
+
+func boolCheck(
+	name string, beforeGlobal, beforeNetwork, afterNetwork bool,
+	toCheck tcBool, toSet tsBool,
+	global, network *netCtx, t *testing.T) {
+
+	if v, ok := toCheck(global); ok || v != beforeGlobal {
+		t.Errorf("Expected %s to be: %v, got: %v", name, beforeGlobal, v)
+	}
+	if v, ok := toCheck(network); ok || v != beforeGlobal {
+		t.Errorf("Expected %s to be: %v, got: %v", name, beforeGlobal, v)
+	}
+
+	toSet(global, beforeNetwork)
+	if v, ok := toCheck(global); !ok || v != beforeNetwork {
+		t.Errorf("Expected %s to be: %v, got: %v", name, beforeNetwork, v)
+	}
+	if v, ok := toCheck(network); !ok || v != beforeNetwork {
+		t.Errorf("Expected %s to be: %v, got: %v", name, beforeNetwork, v)
+	}
+
+	toSet(network, afterNetwork)
+	if v, ok := toCheck(global); !ok || v != beforeNetwork {
+		t.Errorf("Expected %s to be: %v, got: %v", name, beforeNetwork, v)
+	}
+	if v, ok := toCheck(network); !ok || v != afterNetwork {
+		t.Errorf("Expected %s to be: %v, got: %v", name, afterNetwork, v)
+	}
+}
+
+func float64Check(
+	name string, beforeGlobal, beforeNetwork, afterNetwork float64,
+	toCheck tcFloat64, toSet tsFloat64,
+	global, network *netCtx, t *testing.T) {
+
+	if v, ok := toCheck(global); ok || v != beforeGlobal {
+		t.Errorf("Expected %s to be: %v, got: %v", name, beforeGlobal, v)
+	}
+	if v, ok := toCheck(network); ok || v != beforeGlobal {
+		t.Errorf("Expected %s to be: %v, got: %v", name, beforeGlobal, v)
+	}
+
+	toSet(global, beforeNetwork)
+	if v, ok := toCheck(global); !ok || v != beforeNetwork {
+		t.Errorf("Expected %s to be: %v, got: %v", name, beforeNetwork, v)
+	}
+	if v, ok := toCheck(network); !ok || v != beforeNetwork {
+		t.Errorf("Expected %s to be: %v, got: %v", name, beforeNetwork, v)
+	}
+
+	toSet(network, afterNetwork)
+	if v, ok := toCheck(global); !ok || v != beforeNetwork {
+		t.Errorf("Expected %s to be: %v, got: %v", name, beforeNetwork, v)
+	}
+	if v, ok := toCheck(network); !ok || v != afterNetwork {
+		t.Errorf("Expected %s to be: %v, got: %v", name, afterNetwork, v)
+	}
+}
+
+func uintCheck(
+	name string, beforeGlobal, beforeNetwork, afterNetwork uint,
+	toCheck tcUint, toSet tsUint,
+	global, network *netCtx, t *testing.T) {
+
+	if v, ok := toCheck(global); ok || v != beforeGlobal {
+		t.Errorf("Expected %s to be: %v, got: %v", name, beforeGlobal, v)
+	}
+	if v, ok := toCheck(network); ok || v != beforeGlobal {
+		t.Errorf("Expected %s to be: %v, got: %v", name, beforeGlobal, v)
+	}
+
+	toSet(global, beforeNetwork)
+	if v, ok := toCheck(global); !ok || v != beforeNetwork {
+		t.Errorf("Expected %s to be: %v, got: %v", name, beforeNetwork, v)
+	}
+	if v, ok := toCheck(network); !ok || v != beforeNetwork {
+		t.Errorf("Expected %s to be: %v, got: %v", name, beforeNetwork, v)
+	}
+
+	toSet(network, afterNetwork)
+	if v, ok := toCheck(global); !ok || v != beforeNetwork {
+		t.Errorf("Expected %s to be: %v, got: %v", name, beforeNetwork, v)
+	}
+	if v, ok := toCheck(network); !ok || v != afterNetwork {
+		t.Errorf("Expected %s to be: %v, got: %v", name, afterNetwork, v)
 	}
 }
 

@@ -1,7 +1,9 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
+	"log"
 	"strings"
 	"testing"
 )
@@ -44,6 +46,33 @@ func TestValidation(t *testing.T) {
 		t.Error("Expected one error.")
 	} else if ers[0].Error() != expErr {
 		t.Error("Expected a particular error message, got:", ers[0])
+	}
+}
+
+func TestValidation_DisplayErrors(t *testing.T) {
+	t.Parallel()
+	b := &bytes.Buffer{}
+
+	log.SetOutput(b)
+
+	c := NewConfig().FromString(`
+	nick = "n"
+	altnick = "n"
+	realname = "n"
+	username = "n"
+	prefix = 5
+
+	[networks.net]
+	`)
+
+	if c.Validate() {
+		t.Error("Expected it to be invalid.")
+	}
+
+	c.DisplayErrors()
+
+	if !strings.Contains(b.String(), "(net) Expected at least one server.") {
+		t.Error("Expected a particular error message, got:", b.String())
 	}
 }
 

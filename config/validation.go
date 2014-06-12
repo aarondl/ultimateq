@@ -113,17 +113,14 @@ func (c *Config) Validate() bool {
 
 // validateRequired checks that all required fields are present.
 func (c *Config) validateRequired(ers *errList) {
-	var nets map[string]interface{}
-	if val, ok := c.values["networks"]; !ok {
-		ers.addError("Expected at least one network.")
-		return
-	} else if nets, ok = val.(map[string]interface{}); !ok {
+	var nets mp
+	if nets = c.values.get("networks"); nets == nil {
 		ers.addError("Expected at least one network.")
 		return
 	}
 
 	for name, netval := range nets {
-		if _, ok := netval.(map[string]interface{}); !ok {
+		if ok := intfToMp(netval); ok == nil {
 			ers.addError("(%s) Expected network to be a map, got %T", name,
 				netval)
 		} else {
@@ -153,64 +150,48 @@ func (c *Config) validateTypes(ers *errList) {
 	globalValidator.validateMap("global", c.values, ers)
 	networkValidator.validateMap("global", c.values, ers)
 
-	if netsVal, ok := c.values["networks"]; ok {
-		if nets, ok := netsVal.(map[string]interface{}); ok {
-			for name, netVal := range nets {
-				if net, ok := netVal.(map[string]interface{}); !ok {
-					ers.addError(
-						"(global networks) %s is %T but expected map [%v]",
-						name, netVal, netVal)
-				} else {
-					networkValidator.validateMap(name, net, ers)
+	if nets := c.values.get("networks"); nets != nil {
+		for name, netVal := range nets {
+			if net := intfToMp(netVal); net == nil {
+				ers.addError(
+					"(global networks) %s is %T but expected map [%v]",
+					name, netVal, netVal)
+			} else {
+				networkValidator.validateMap(name, net, ers)
 
-					if chanVal, ok := net["channels"]; ok {
-						if chans, ok := chanVal.([]map[string]interface{}); ok {
-							for _, ch := range chans {
-								channelValidator.validateMap(
-									name+" channels", ch, ers)
-							}
-						}
+				if chans := net.getArr("channels"); chans != nil {
+					for _, ch := range chans {
+						channelValidator.validateMap(name+" channels", ch, ers)
 					}
 				}
 			}
 		}
 	}
 
-	if extVal, ok := c.values["ext"]; ok {
-		if ext, ok := extVal.(map[string]interface{}); ok {
-			extCommonValidator.validateMap("ext", ext, ers)
-			extGlobalValidator.validateMap("ext", ext, ers)
+	if ext := c.values.get("ext"); ext != nil {
+		extCommonValidator.validateMap("ext", ext, ers)
+		extGlobalValidator.validateMap("ext", ext, ers)
 
-			if actMap, ok := ext["active"]; ok {
-				if acts, ok := actMap.(map[string]interface{}); ok {
-					validateActive("ext", acts, ers)
-				}
-			}
+		if active := ext.get("active"); active != nil {
+			validateActive("ext", active, ers)
+		}
 
-			if cnfMap, ok := ext["config"]; ok {
-				if cnf, ok := cnfMap.(map[string]interface{}); ok {
-					validateExtConfig(cnf, ers)
-				}
-			}
+		if config := ext.get("config"); config != nil {
+			validateExtConfig(config, ers)
 		}
 	}
 
-	if extsVal, ok := c.values["exts"]; ok {
-		if exts, ok := extsVal.(map[string]interface{}); ok {
-			for name, extVal := range exts {
-				if ext, ok := extVal.(map[string]interface{}); !ok {
-					ers.addError(
-						"(exts) %s is %T but expected map [%v]",
-						name, extVal, extVal)
-				} else {
-					extCommonValidator.validateMap(name, ext, ers)
-					extNormalValidator.validateMap(name, ext, ers)
+	if exts := c.values.get("exts"); exts != nil {
+		for name, extVal := range exts {
+			if ext := intfToMp(extVal); ext == nil {
+				ers.addError("(exts) %s is %T but expected map [%v]",
+					name, extVal, extVal)
+			} else {
+				extCommonValidator.validateMap(name, ext, ers)
+				extNormalValidator.validateMap(name, ext, ers)
 
-					if actMap, ok := ext["active"]; ok {
-						if acts, ok := actMap.(map[string]interface{}); ok {
-							validateActive(name, acts, ers)
-						}
-					}
+				if active := ext.get("active"); active != nil {
+					validateActive(name, active, ers)
 				}
 			}
 		}

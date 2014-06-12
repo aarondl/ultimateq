@@ -141,7 +141,7 @@ const (
 // Config holds all the information related to the bot including global settings
 // default settings, and network specific settings.
 type Config struct {
-	values map[string]interface{}
+	values mp
 
 	errors   errList
 	filename string
@@ -189,13 +189,9 @@ func (c *Config) Network(name string) *netCtx {
 	if len(name) == 0 {
 		return &netCtx{&c.protect, nil, c.values}
 	} else {
-		if networksVal, ok := c.values["networks"]; ok {
-			if networks, ok := networksVal.(map[string]interface{}); ok {
-				if netval, ok := networks[name]; ok {
-					if net, ok := netval.(map[string]interface{}); ok {
-						return &netCtx{&c.protect, c.values, net}
-					}
-				}
+		if nets := c.values.get("networks"); nets != nil {
+			if net := nets.get(name); net != nil {
+				return &netCtx{&c.protect, c.values, net}
 			}
 		}
 		return nil
@@ -208,20 +204,11 @@ func (c *Config) Ext(name string) *extNormalCtx {
 	c.protect.RLock()
 	defer c.protect.RUnlock()
 
-	var parent map[string]interface{}
-	if val, ok := c.values["ext"]; ok {
-		if ext, ok := val.(map[string]interface{}); ok {
-			parent = ext
-		}
-	}
+	parent := c.values.get("ext")
 
-	if val, ok := c.values["exts"]; ok {
-		if exts, ok := val.(map[string]interface{}); ok {
-			if val, ok := exts[name]; ok {
-				if ext, ok := val.(map[string]interface{}); ok {
-					return &extNormalCtx{&extCtx{&c.protect, parent, ext}}
-				}
-			}
+	if exts := c.values.get("exts"); exts != nil {
+		if ext := exts.get(name); ext != nil {
+			return &extNormalCtx{&extCtx{&c.protect, parent, ext}}
 		}
 	}
 
@@ -234,10 +221,8 @@ func (c *Config) ExtGlobal() *extGlobalCtx {
 	c.protect.RLock()
 	defer c.protect.RUnlock()
 
-	if val, ok := c.values["ext"]; ok {
-		if ext, ok := val.(map[string]interface{}); ok {
-			return &extGlobalCtx{&extCtx{&c.protect, nil, ext}}
-		}
+	if exts := c.values.get("ext"); exts != nil {
+		return &extGlobalCtx{&extCtx{&c.protect, nil, exts}}
 	}
 
 	return nil
@@ -271,19 +256,87 @@ func (c *Config) StoreFile() (string, bool) {
 	c.protect.RLock()
 	defer c.protect.RUnlock()
 
-	storefile := defaultStoreFile
-	ctx := &netCtx{&c.protect, nil, c.values}
-	if val, ok := getStr(ctx, "storefile", false); ok {
-		return val, true
+	if val, ok := c.values["storefile"]; ok {
+		if storefile, ok := val.(string); ok {
+			return storefile, true
+		}
 	}
-	return storefile, false
+	return defaultStoreFile, false
 }
 
+// SetStoreFile sets the global storefile or defaultStoreFile.
+func (c *Config) SetStoreFile(val string) {
+	c.protect.Lock()
+	defer c.protect.Unlock()
+
+	c.values["storefile"] = interface{}(val)
+}
+
+// NoCoreCmds gets the value of the corecmds variable.
 func (c *Config) NoCoreCmds() (bool, bool) {
 	c.protect.RLock()
 	defer c.protect.RUnlock()
 
-	ctx := &netCtx{&c.protect, nil, c.values}
-	val, ok := getBool(ctx, "nocorecmds", false)
-	return val, ok
+	if val, ok := c.values["nocorecmds"]; ok {
+		if corecmds, ok := val.(bool); ok {
+			return corecmds, true
+		}
+	}
+	return false, false
+}
+
+// SetNoCoreCmds gets the value of the corecmds variable.
+func (c *Config) SetNoCoreCmds(val bool) {
+	c.protect.Lock()
+	defer c.protect.Unlock()
+
+	c.values["nocorecmds"] = interface{}(val)
+}
+
+// NewNetwork creates a network and returns the network's context.
+// If the network exists, the context will be nil.
+func (c *Config) NewNetwork(name string) *netCtx {
+	c.protect.RLock()
+	defer c.protect.RUnlock()
+
+	var net, nets mp
+
+	if nets = c.values.get("networks"); nets == nil {
+		nets = make(mp)
+		c.values["networks"] = interface{}(nets)
+	}
+
+	if net = nets.get(name); net != nil {
+		return nil
+	}
+
+	net = make(mp)
+	nets[name] = net
+
+	return &netCtx{&c.protect, c.values, net}
+}
+
+// NewExt creates a extension and returns the extension's context.
+// If the extension exists, the context will be nil.
+func (c *Config) NewExt(name string) *extNormalCtx {
+	c.protect.RLock()
+	defer c.protect.RUnlock()
+
+	var ext, exts mp
+
+	if exts = c.values.get("exts"); exts == nil {
+		exts = make(mp)
+		c.values["exts"] = interface{}(exts)
+	}
+
+	if ext = exts.get(name); ext == nil {
+		ext = make(mp)
+		exts[name] = ext
+	} else {
+		return nil
+	}
+
+	parent := c.values.get("ext")
+
+	return &extNormalCtx{&extCtx{&c.protect, parent, ext}}
 }

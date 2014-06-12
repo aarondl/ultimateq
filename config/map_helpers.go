@@ -1,5 +1,48 @@
 package config
 
+// mp is used to provide helper methods on the map type we use most often
+// this cleans up a lot of excessive type assertion stuff.
+type mp map[string]interface{}
+
+func intfToMp(intf interface{}) mp {
+	if m, ok := intf.(map[string]interface{}); ok {
+		return m
+	}
+	return nil
+}
+
+func (m mp) get(name string) mp {
+	if m == nil {
+		return nil
+	}
+
+	if mpVal, ok := m[name]; ok {
+		switch v := mpVal.(type) {
+		case map[string]interface{}:
+			return v
+		case mp:
+			return v
+		}
+	}
+
+	return nil
+}
+
+func (m mp) getArr(name string) []map[string]interface{} {
+	if m == nil {
+		return nil
+	}
+
+	if mpVal, ok := m[name]; ok {
+		switch v := mpVal.(type) {
+		case []map[string]interface{}:
+			return v
+		}
+	}
+
+	return nil
+}
+
 type mapGetter interface {
 	get(string) (interface{}, bool)
 	getParent(string) (interface{}, bool)
@@ -86,8 +129,11 @@ func getUint(m mapGetter, key string, fallback bool) (uint, bool) {
 		return 0, false
 	}
 
-	if u, ok := val.(int64); ok {
-		return uint(u), true
+	switch v := val.(type) {
+	case int64: // After a toml parse.
+		return uint(v), true
+	case uint: // After a set.
+		return v, true
 	}
 
 	return 0, false
@@ -169,6 +215,10 @@ func getStrArr(m mapGetter, key string, fallback bool) ([]string, bool) {
 			}
 		}
 
+		return cpyArr, true
+	} else if arr, ok := val.([]string); ok {
+		cpyArr := make([]string, len(arr))
+		copy(cpyArr, arr)
 		return cpyArr, true
 	}
 
