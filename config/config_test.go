@@ -35,6 +35,20 @@ func TestConfig_Clear(t *testing.T) {
 	}
 }
 
+func TestConfig_Replace(t *testing.T) {
+	t.Parallel()
+
+	c1 := NewConfig().FromString(`nick = "hello"`)
+	c2 := NewConfig().FromString(`nick = "there"`)
+
+	if val, ok := c1.Network("").Nick(); !ok || val != "hello" {
+		t.Error(`Expected nick to be "hello", got:`, val)
+	}
+	if val, ok := c1.Replace(c2).Network("").Nick(); !ok || val != "there" {
+		t.Error(`Expected nick to be "there", got:`, val)
+	}
+}
+
 func TestConfig_Clone(t *testing.T) {
 	t.Parallel()
 

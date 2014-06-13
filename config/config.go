@@ -182,6 +182,20 @@ func (c *Config) Clone() *Config {
 	return nc
 }
 
+// Replace replaces the configuration with a new one.
+func (c *Config) Replace(newConfig *Config) *Config {
+	c.protect.Lock()
+	defer c.protect.Unlock()
+
+	newConfig.protect.RLock()
+	defer newConfig.protect.RUnlock()
+
+	c.values = make(map[string]interface{})
+	copyMap(c.values, newConfig.values)
+
+	return c
+}
+
 // Network returns the network context useable to get/set the fields for that.
 // Leave name blank to return the global network context.
 func (c *Config) Network(name string) *NetCTX {
