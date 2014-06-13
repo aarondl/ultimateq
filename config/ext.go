@@ -38,16 +38,18 @@ func (e *ExtCTX) UseJson() (bool, bool) {
 	return getBool(e, "usejson", true)
 }
 
-func (e *ExtCTX) SetUseJson(val bool) {
+func (e *ExtCTX) SetUseJson(val bool) *ExtCTX {
 	setVal(e, "usejson", val)
+	return e
 }
 
 func (e *ExtCTX) NoReconnect() (bool, bool) {
 	return getBool(e, "noreconnect", true)
 }
 
-func (e *ExtCTX) SetNoReconnect(val bool) {
+func (e *ExtCTX) SetNoReconnect(val bool) *ExtCTX {
 	setVal(e, "noreconnect", val)
+	return e
 }
 
 func (e *ExtCTX) ReconnectTimeout() (uint, bool) {
@@ -58,8 +60,9 @@ func (e *ExtCTX) ReconnectTimeout() (uint, bool) {
 	return reconnTimeout, ok
 }
 
-func (e *ExtCTX) SetReconnectTimeout(val uint) {
+func (e *ExtCTX) SetReconnectTimeout(val uint) *ExtCTX {
 	setVal(e, "reconnecttimeout", val)
+	return e
 }
 
 func (e *ExtCTX) Active(network string) ([]string, bool) {
@@ -120,7 +123,7 @@ func (e *ExtCTX) Active(network string) ([]string, bool) {
 	return nil, false
 }
 
-func (e *ExtCTX) SetActive(network string, value []string) {
+func (e *ExtCTX) SetActive(network string, value []string) *ExtCTX {
 	e.lock()
 	defer e.unlock()
 
@@ -131,6 +134,8 @@ func (e *ExtCTX) SetActive(network string, value []string) {
 			network: value,
 		}
 	}
+
+	return e
 }
 
 // ExtGlobalCTX is the configuration context for the global extension config
@@ -143,16 +148,18 @@ func (e *ExtGlobalCTX) ExecDir() (string, bool) {
 	return getStr(e, "execdir", false)
 }
 
-func (e *ExtGlobalCTX) SetExecDir(val string) {
+func (e *ExtGlobalCTX) SetExecDir(val string) *ExtGlobalCTX {
 	setVal(e, "execdir", val)
+	return e
 }
 
 func (e *ExtGlobalCTX) Listen() (string, bool) {
 	return getStr(e, "listen", false)
 }
 
-func (e *ExtGlobalCTX) SetListen(val string) {
+func (e *ExtGlobalCTX) SetListen(val string) *ExtGlobalCTX {
 	setVal(e, "listen", val)
+	return e
 }
 
 /*
@@ -238,7 +245,9 @@ level for that portion.
 		# SetConfig("ircnet", "#channel", "key", "val")
 		key = "val"
 */
-func (e *ExtGlobalCTX) SetConfig(network, channel, key, value string) {
+func (e *ExtGlobalCTX) SetConfig(network, channel, key,
+	value string) *ExtGlobalCTX {
+
 	var setMap map[string]interface{}
 	var m = mp(e.ext)
 
@@ -258,6 +267,7 @@ func (e *ExtGlobalCTX) SetConfig(network, channel, key, value string) {
 	}
 
 	setMap[key] = value
+	return e
 }
 
 // ExtNormalCTX is the configuration context for normal extensions (not global).
@@ -271,46 +281,52 @@ func (e *ExtNormalCTX) Exec() (string, bool) {
 	return getStr(e, "exec", false)
 }
 
-func (e *ExtNormalCTX) SetExec(val string) {
+func (e *ExtNormalCTX) SetExec(val string) *ExtNormalCTX {
 	setVal(e, "exec", val)
+	return e
 }
 
 func (e *ExtNormalCTX) Server() (string, bool) {
 	return getStr(e, "server", false)
 }
 
-func (e *ExtNormalCTX) SetServer(val string) {
+func (e *ExtNormalCTX) SetServer(val string) *ExtNormalCTX {
 	setVal(e, "server", val)
+	return e
 }
 
 func (e *ExtNormalCTX) SSL() (bool, bool) {
 	return getBool(e, "ssl", false)
 }
 
-func (e *ExtNormalCTX) SetSSL(val bool) {
+func (e *ExtNormalCTX) SetSSL(val bool) *ExtNormalCTX {
 	setVal(e, "ssl", val)
+	return e
 }
 
 func (e *ExtNormalCTX) SSLCert() (string, bool) {
 	return getStr(e, "sslcert", false)
 }
 
-func (e *ExtNormalCTX) SetSSLCert(val string) {
+func (e *ExtNormalCTX) SetSSLCert(val string) *ExtNormalCTX {
 	setVal(e, "sslcert", val)
+	return e
 }
 
 func (e *ExtNormalCTX) NoVerifyCert() (bool, bool) {
 	return getBool(e, "noverifycert", false)
 }
 
-func (e *ExtNormalCTX) SetNoVerifyCert(val bool) {
+func (e *ExtNormalCTX) SetNoVerifyCert(val bool) *ExtNormalCTX {
 	setVal(e, "noverifycert", val)
+	return e
 }
 
 func (e *ExtNormalCTX) Unix() (string, bool) {
 	return getStr(e, "unix", false)
 }
 
-func (e *ExtNormalCTX) SetUnix(val string) {
+func (e *ExtNormalCTX) SetUnix(val string) *ExtNormalCTX {
 	setVal(e, "unix", val)
+	return e
 }
