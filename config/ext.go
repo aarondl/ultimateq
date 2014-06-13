@@ -227,6 +227,56 @@ func (e *ExtGlobalCTX) Config(network, channel string) map[string]string {
 	return ret
 }
 
+// ConfigVal returns a value from the configuration with proper fallbacking
+// to the global extension config. Ok is false if the key was not found.
+func (e *ExtGlobalCTX) ConfigVal(network, channel, key string) (string, bool) {
+	nEmpty := len(network) == 0
+	cEmpty := len(channel) == 0
+
+	var m = mp(e.ext)
+	cfg := m.get("config")
+
+	var str string
+	var found bool
+
+	if cfg == nil {
+		return str, found
+	}
+
+	if cfg != nil {
+		if val, ok := cfg[key]; ok {
+			str, found = val.(string)
+		}
+	}
+
+	if !nEmpty && cEmpty {
+		if net := cfg.get("networks").get(network); net != nil {
+			if val, ok := net[key]; ok {
+				str, found = val.(string)
+			}
+		}
+	}
+
+	if !cEmpty && nEmpty {
+		if ch := cfg.get("channels").get(channel); ch != nil {
+			if val, ok := ch[key]; ok {
+				str, found = val.(string)
+			}
+		}
+	}
+
+	if !nEmpty && !cEmpty {
+		netchan := cfg.get("networks").get(network).get("channels").get(channel)
+		if netchan != nil {
+			if val, ok := netchan[key]; ok {
+				str, found = val.(string)
+			}
+		}
+	}
+
+	return str, found
+}
+
 /*
 SetConfig sets a key value pair for a given network and channel.
 If you leave either network or channel empty, then it's set at the global

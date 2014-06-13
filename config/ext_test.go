@@ -220,6 +220,49 @@ func TestExt_ConfigOverride(t *testing.T) {
 	}
 }
 
+func TestExt_ConfigVal(t *testing.T) {
+	t.Parallel()
+
+	c := NewConfig()
+	glb := c.ExtGlobal()
+
+	if _, ok := glb.ConfigVal("", "", "k"); ok {
+		t.Error("Expected there to be no value when map is empty.")
+	}
+
+	glb.SetConfig("", "", "global", "v")
+	glb.SetConfig("", "", "k", "v1")
+	glb.SetConfig("net", "", "k", "v2")
+	glb.SetConfig("", "chan", "k", "v3")
+	glb.SetConfig("net", "chan", "k", "v4")
+
+	if got, ok := glb.ConfigVal("", "", "k"); !ok || got != "v1" {
+		t.Error("Expected the global value of k to be v1.")
+	}
+	if got, ok := glb.ConfigVal("net", "", "k"); !ok || got != "v2" {
+		t.Error("Expected the net value of k to be v2.")
+	}
+	if got, ok := glb.ConfigVal("", "chan", "k"); !ok || got != "v3" {
+		t.Error("Expected the chan value of k to be v3.")
+	}
+	if got, ok := glb.ConfigVal("net", "chan", "k"); !ok || got != "v4" {
+		t.Error("Expected the netchan value of k to be v4.")
+	}
+
+	if got, ok := glb.ConfigVal("", "", "global"); !ok || got != "v" {
+		t.Error("Expected the global value of global to be v.")
+	}
+	if got, ok := glb.ConfigVal("net", "", "global"); !ok || got != "v" {
+		t.Error("Expected the net value of global to be v.")
+	}
+	if got, ok := glb.ConfigVal("", "chan", "global"); !ok || got != "v" {
+		t.Error("Expected the chan value of global to be v.")
+	}
+	if got, ok := glb.ConfigVal("net", "chan", "global"); !ok || got != "v" {
+		t.Error("Expected the netchan value of global to be v.")
+	}
+}
+
 func checkExt(
 	name string, defaultVal, afterGlobal, afterNormal interface{},
 	global *ExtGlobalCTX, normal *ExtNormalCTX, t *testing.T) {
