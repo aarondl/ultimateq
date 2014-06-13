@@ -2,25 +2,27 @@ package config
 
 import "sync"
 
-// netCtx is a context for network parts of the config, allowing querying and
-// setting of network related values.
-type netCtx struct {
+// NetCTX is a context for network parts of the config, allowing querying and
+// setting of network related values. If this context belongs to a specific
+// network and not the global network configuration, all the values will
+// fallback to the global configuration if not set.
+type NetCTX struct {
 	mutex   *sync.RWMutex
 	parent  map[string]interface{}
 	network map[string]interface{}
 }
 
-func (n *netCtx) lock()    { n.mutex.Lock() }
-func (n *netCtx) unlock()  { n.mutex.Unlock() }
-func (n *netCtx) rlock()   { n.mutex.RLock() }
-func (n *netCtx) runlock() { n.mutex.RUnlock() }
+func (n *NetCTX) lock()    { n.mutex.Lock() }
+func (n *NetCTX) unlock()  { n.mutex.Unlock() }
+func (n *NetCTX) rlock()   { n.mutex.RLock() }
+func (n *NetCTX) runlock() { n.mutex.RUnlock() }
 
-func (n *netCtx) get(key string) (interface{}, bool) {
+func (n *NetCTX) get(key string) (interface{}, bool) {
 	v, ok := n.network[key]
 	return v, ok
 }
 
-func (n *netCtx) getParent(key string) (interface{}, bool) {
+func (n *NetCTX) getParent(key string) (interface{}, bool) {
 	if n.parent == nil {
 		return nil, false
 	}
@@ -29,160 +31,160 @@ func (n *netCtx) getParent(key string) (interface{}, bool) {
 	return v, ok
 }
 
-func (n *netCtx) set(key string, value interface{}) {
+func (n *NetCTX) set(key string, value interface{}) {
 	n.network[key] = value
 }
 
-func (n *netCtx) Nick() (string, bool) {
+func (n *NetCTX) Nick() (string, bool) {
 	return getStr(n, "nick", true)
 }
 
-func (n *netCtx) SetNick(val string) {
+func (n *NetCTX) SetNick(val string) {
 	setVal(n, "nick", val)
 }
 
-func (n *netCtx) Altnick() (string, bool) {
+func (n *NetCTX) Altnick() (string, bool) {
 	return getStr(n, "altnick", true)
 }
 
-func (n *netCtx) SetAltnick(val string) {
+func (n *NetCTX) SetAltnick(val string) {
 	setVal(n, "altnick", val)
 }
-func (n *netCtx) Username() (string, bool) {
+func (n *NetCTX) Username() (string, bool) {
 	return getStr(n, "username", true)
 }
 
-func (n *netCtx) SetUsername(val string) {
+func (n *NetCTX) SetUsername(val string) {
 	setVal(n, "username", val)
 }
 
-func (n *netCtx) Realname() (string, bool) {
+func (n *NetCTX) Realname() (string, bool) {
 	return getStr(n, "realname", true)
 }
 
-func (n *netCtx) SetRealname(val string) {
+func (n *NetCTX) SetRealname(val string) {
 	setVal(n, "realname", val)
 }
 
-func (n *netCtx) Password() (string, bool) {
+func (n *NetCTX) Password() (string, bool) {
 	return getStr(n, "password", true)
 }
 
-func (n *netCtx) SetPassword(val string) {
+func (n *NetCTX) SetPassword(val string) {
 	setVal(n, "password", val)
 }
 
-func (n *netCtx) SSL() (bool, bool) {
+func (n *NetCTX) SSL() (bool, bool) {
 	return getBool(n, "ssl", true)
 }
 
-func (n *netCtx) SetSSL(val bool) {
+func (n *NetCTX) SetSSL(val bool) {
 	setVal(n, "ssl", val)
 }
 
-func (n *netCtx) SSLCert() (string, bool) {
+func (n *NetCTX) SSLCert() (string, bool) {
 	return getStr(n, "sslcert", true)
 }
 
-func (n *netCtx) SetSSLCert(val string) {
+func (n *NetCTX) SetSSLCert(val string) {
 	setVal(n, "sslcert", val)
 }
 
-func (n *netCtx) NoVerifyCert() (bool, bool) {
+func (n *NetCTX) NoVerifyCert() (bool, bool) {
 	return getBool(n, "noverifycert", true)
 }
 
-func (n *netCtx) SetNoVerifyCert(val bool) {
+func (n *NetCTX) SetNoVerifyCert(val bool) {
 	setVal(n, "noverifycert", val)
 }
 
-func (n *netCtx) NoState() (bool, bool) {
+func (n *NetCTX) NoState() (bool, bool) {
 	return getBool(n, "nostate", true)
 }
 
-func (n *netCtx) SetNoState(val bool) {
+func (n *NetCTX) SetNoState(val bool) {
 	setVal(n, "nostate", val)
 }
 
-func (n *netCtx) NoStore() (bool, bool) {
+func (n *NetCTX) NoStore() (bool, bool) {
 	return getBool(n, "nostore", true)
 }
 
-func (n *netCtx) SetNoStore(val bool) {
+func (n *NetCTX) SetNoStore(val bool) {
 	setVal(n, "nostore", val)
 }
 
-func (n *netCtx) FloodLenPenalty() (uint, bool) {
+func (n *NetCTX) FloodLenPenalty() (uint, bool) {
 	if floodLenPenalty, ok := getUint(n, "floodlenpenalty", true); ok {
 		return floodLenPenalty, true
 	}
 	return defaultFloodLenPenalty, false
 }
 
-func (n *netCtx) SetFloodLenPenalty(val uint) {
+func (n *NetCTX) SetFloodLenPenalty(val uint) {
 	setVal(n, "floodlenpenalty", val)
 }
 
-func (n *netCtx) FloodTimeout() (float64, bool) {
+func (n *NetCTX) FloodTimeout() (float64, bool) {
 	if floodTimeout, ok := getFloat64(n, "floodtimeout", true); ok {
 		return floodTimeout, ok
 	}
 	return defaultFloodTimeout, false
 }
 
-func (n *netCtx) SetFloodTimeout(val float64) {
+func (n *NetCTX) SetFloodTimeout(val float64) {
 	setVal(n, "floodtimeout", val)
 }
 
-func (n *netCtx) FloodStep() (float64, bool) {
+func (n *NetCTX) FloodStep() (float64, bool) {
 	if floodStep, ok := getFloat64(n, "floodstep", true); ok {
 		return floodStep, ok
 	}
 	return defaultFloodStep, false
 }
 
-func (n *netCtx) SetFloodStep(val float64) {
+func (n *NetCTX) SetFloodStep(val float64) {
 	setVal(n, "floodstep", val)
 }
 
-func (n *netCtx) KeepAlive() (float64, bool) {
+func (n *NetCTX) KeepAlive() (float64, bool) {
 	if keepAlive, ok := getFloat64(n, "keepalive", true); ok {
 		return keepAlive, ok
 	}
 	return defaultKeepAlive, false
 }
 
-func (n *netCtx) SetKeepAlive(val float64) {
+func (n *NetCTX) SetKeepAlive(val float64) {
 	setVal(n, "keepalive", val)
 }
 
-func (n *netCtx) NoReconnect() (bool, bool) {
+func (n *NetCTX) NoReconnect() (bool, bool) {
 	return getBool(n, "noreconnect", true)
 }
 
-func (n *netCtx) SetNoReconnect(val bool) {
+func (n *NetCTX) SetNoReconnect(val bool) {
 	setVal(n, "noreconnect", val)
 }
 
-func (n *netCtx) ReconnectTimeout() (uint, bool) {
+func (n *NetCTX) ReconnectTimeout() (uint, bool) {
 	if reconnTimeout, ok := getUint(n, "reconnecttimeout", true); ok {
 		return reconnTimeout, ok
 	}
 	return defaultReconnectTimeout, false
 }
 
-func (n *netCtx) SetReconnectTimeout(val uint) {
+func (n *NetCTX) SetReconnectTimeout(val uint) {
 	setVal(n, "reconnecttimeout", val)
 }
 
-func (n *netCtx) Prefix() (string, bool) {
+func (n *NetCTX) Prefix() (string, bool) {
 	if prefix, ok := getStr(n, "prefix", true); ok {
 		return prefix, ok
 	}
 	return string(defaultPrefix), false
 }
 
-func (n *netCtx) SetPrefix(val string) {
+func (n *NetCTX) SetPrefix(val string) {
 	setVal(n, "prefix", val)
 }
 
@@ -193,7 +195,7 @@ type Channel struct {
 	Prefix   string
 }
 
-func (n *netCtx) Channels() ([]Channel, bool) {
+func (n *NetCTX) Channels() ([]Channel, bool) {
 	n.rlock()
 	defer n.runlock()
 
@@ -238,14 +240,14 @@ func (n *netCtx) Channels() ([]Channel, bool) {
 	return nil, false
 }
 
-func (n *netCtx) SetChannels(val []Channel) {
+func (n *NetCTX) SetChannels(val []Channel) {
 	setVal(n, "channels", val)
 }
 
-func (n *netCtx) Servers() ([]string, bool) {
+func (n *NetCTX) Servers() ([]string, bool) {
 	return getStrArr(n, "servers", false)
 }
 
-func (n *netCtx) SetServers(val []string) {
+func (n *NetCTX) SetServers(val []string) {
 	setVal(n, "servers", val)
 }

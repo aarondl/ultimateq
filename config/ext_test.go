@@ -222,7 +222,7 @@ func TestExt_ConfigOverride(t *testing.T) {
 
 func checkExt(
 	name string, defaultVal, afterGlobal, afterNormal interface{},
-	global *extGlobalCtx, normal *extNormalCtx, t *testing.T) {
+	global *ExtGlobalCTX, normal *ExtNormalCTX, t *testing.T) {
 
 	globalCtxType := reflect.TypeOf(global)
 	normalCtxType := reflect.TypeOf(normal)

@@ -112,7 +112,7 @@ func TestConfig_Network_GetSetChannels(t *testing.T) {
 
 func check(
 	name string, defaultVal, afterGlobal, afterNetwork interface{},
-	global, network *netCtx, t *testing.T) {
+	global, network *NetCTX, t *testing.T) {
 
 	ctxType := reflect.TypeOf(network)
 	def := reflect.ValueOf(defaultVal)

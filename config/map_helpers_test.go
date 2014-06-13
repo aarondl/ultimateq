@@ -66,7 +66,7 @@ func TestMapHelpers_BadTypes(t *testing.T) {
 		"badfloat": true,
 		"badarr":   false,
 	}
-	ctx := &netCtx{&sync.RWMutex{}, nil, bad}
+	ctx := &NetCTX{&sync.RWMutex{}, nil, bad}
 
 	if _, ok := getStr(ctx, "badstr", false); ok {
 		t.Error("Expected the bad type to return nothing.")
@@ -94,7 +94,7 @@ func TestMapHelpers_GetStrArrEdgeCases(t *testing.T) {
 	}
 	child := make(map[string]interface{})
 
-	ctx := &netCtx{&sync.RWMutex{}, parent, child}
+	ctx := &NetCTX{&sync.RWMutex{}, parent, child}
 	if _, ok := getStrArr(ctx, "arr", true); ok {
 		t.Error("Expected empty array to return nothing.")
 	}

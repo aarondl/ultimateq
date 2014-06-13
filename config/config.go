@@ -182,16 +182,16 @@ func (c *Config) Clone() *Config {
 
 // Network returns the network context useable to get/set the fields for that.
 // Leave name blank to return the global network context.
-func (c *Config) Network(name string) *netCtx {
+func (c *Config) Network(name string) *NetCTX {
 	c.protect.RLock()
 	defer c.protect.RUnlock()
 
 	if len(name) == 0 {
-		return &netCtx{&c.protect, nil, c.values}
+		return &NetCTX{&c.protect, nil, c.values}
 	} else {
 		if nets := c.values.get("networks"); nets != nil {
 			if net := nets.get(name); net != nil {
-				return &netCtx{&c.protect, c.values, net}
+				return &NetCTX{&c.protect, c.values, net}
 			}
 		}
 		return nil
@@ -200,7 +200,7 @@ func (c *Config) Network(name string) *netCtx {
 
 // Ext returns the extension context useable to get/set fields for the given
 // extension name.
-func (c *Config) Ext(name string) *extNormalCtx {
+func (c *Config) Ext(name string) *ExtNormalCTX {
 	c.protect.RLock()
 	defer c.protect.RUnlock()
 
@@ -208,7 +208,7 @@ func (c *Config) Ext(name string) *extNormalCtx {
 
 	if exts := c.values.get("exts"); exts != nil {
 		if ext := exts.get(name); ext != nil {
-			return &extNormalCtx{&extCtx{&c.protect, parent, ext}}
+			return &ExtNormalCTX{&ExtCTX{&c.protect, parent, ext}}
 		}
 	}
 
@@ -217,16 +217,16 @@ func (c *Config) Ext(name string) *extNormalCtx {
 
 // ExtGlobal returns the global extension context useable to get/set fields for
 // all extensions.
-func (c *Config) ExtGlobal() *extGlobalCtx {
+func (c *Config) ExtGlobal() *ExtGlobalCTX {
 	c.protect.RLock()
 	defer c.protect.RUnlock()
 
 	if ext := c.values.get("ext"); ext != nil {
-		return &extGlobalCtx{&extCtx{&c.protect, nil, ext}}
+		return &ExtGlobalCTX{&ExtCTX{&c.protect, nil, ext}}
 	} else {
 		ext := make(map[string]interface{})
 		c.values["ext"] = ext
-		return &extGlobalCtx{&extCtx{&c.protect, nil, ext}}
+		return &ExtGlobalCTX{&ExtCTX{&c.protect, nil, ext}}
 	}
 }
 
@@ -297,7 +297,7 @@ func (c *Config) SetNoCoreCmds(val bool) {
 
 // NewNetwork creates a network and returns the network's context.
 // If the network exists, the context will be nil.
-func (c *Config) NewNetwork(name string) *netCtx {
+func (c *Config) NewNetwork(name string) *NetCTX {
 	c.protect.RLock()
 	defer c.protect.RUnlock()
 
@@ -315,12 +315,12 @@ func (c *Config) NewNetwork(name string) *netCtx {
 	net = make(mp)
 	nets[name] = net
 
-	return &netCtx{&c.protect, c.values, net}
+	return &NetCTX{&c.protect, c.values, net}
 }
 
 // NewExt creates a extension and returns the extension's context.
 // If the extension exists, the context will be nil.
-func (c *Config) NewExt(name string) *extNormalCtx {
+func (c *Config) NewExt(name string) *ExtNormalCTX {
 	c.protect.RLock()
 	defer c.protect.RUnlock()
 
@@ -340,5 +340,5 @@ func (c *Config) NewExt(name string) *extNormalCtx {
 
 	parent := c.values.get("ext")
 
-	return &extNormalCtx{&extCtx{&c.protect, parent, ext}}
+	return &ExtNormalCTX{&ExtCTX{&c.protect, parent, ext}}
 }
