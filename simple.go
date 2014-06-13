@@ -238,22 +238,16 @@ func (_ *Queryer) Google(w irc.Writer, ev *cmd.Event) error {
 	return nil
 }
 
-func (_ *Queryer) Weather(m *irc.Message, e *data.DataEndpoint,
-	c *commander.CommandData) error {
+func (_ *Queryer) Weather(w irc.Writer, ev *cmd.Event) error {
+	q := ev.GetArg("query")
+	nick := ev.Nick()
+	ev.Close()
 
-	c.Close()
-
-	q := c.GetArg("query")
-	nick := m.Nick()
 	if out, err := query.Weather(q); len(out) != 0 {
 		out = sanitize(out)
-		if targ := m.Target(); isNick(targ) {
-			e.Notice(nick, out)
-		} else {
-			e.Privmsg(targ, out)
-		}
+		w.Notify(ev.Event, nick, out)
 	} else if err != nil {
-		e.Notice(nick, err.Error())
+		w.Notice(nick, err.Error())
 	}
 
 	return nil
@@ -385,12 +379,12 @@ func main() {
 			&queryer,
 			cmd.PRIVMSG, cmd.ALL, "query...",
 		))
-		b.RegisterCommand(commander.MkCmd(
+		b.RegisterCmd(cmd.MkCmd(
 			"query",
 			"Fetches a weather report from yr.no.",
 			"weather",
 			&queryer,
-			commander.PRIVMSG, commander.ALL, "query...",
+			cmd.PRIVMSG, cmd.ALL, "query...",
 		))
 
 		// Handler commands
