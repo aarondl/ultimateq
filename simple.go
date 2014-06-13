@@ -243,7 +243,7 @@ func (_ *Queryer) Weather(w irc.Writer, ev *cmd.Event) error {
 	nick := ev.Nick()
 	ev.Close()
 
-	if out, err := query.Weather(q); len(out) != 0 {
+	if out, err := query.Weather(q, &queryConf); len(out) != 0 {
 		out = sanitize(out)
 		w.Notify(ev.Event, nick, out)
 	} else if err != nil {
