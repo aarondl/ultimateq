@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 )
 
@@ -31,6 +32,56 @@ func TestConfig_Clear(t *testing.T) {
 	}
 	if len(c.filename) != 0 {
 		t.Error("Filename should be blank, got:", c.filename)
+	}
+}
+
+func TestConfig_Clone(t *testing.T) {
+	t.Parallel()
+
+	c := NewConfig().FromString(`
+	string = "str"
+	[[channels]]
+		uint = 5
+	[networks.ircnet]
+		servers = ["str"]
+	`)
+
+	c.NewNetwork("othernet").
+		SetServers([]string{"str"}).
+		SetChannels([]Channel{{"a", "b", "c"}})
+
+	nc := c.Clone()
+
+	checkMap(nc.values, c.values, t)
+}
+
+// checkMap is essentially useless, but hopefully it's doing something.
+func checkMap(dest, src mp, t *testing.T) {
+	for key, value := range src {
+		switch v := value.(type) {
+		case map[string]interface{}:
+			checkMap(dest.get(key), v, t)
+		case mp:
+			checkMap(dest.get(key), v, t)
+		case []Channel:
+			destChans := dest[key].([]Channel)
+			for i, c := range v {
+				if &c == &destChans[i] {
+					t.Error("Expected channels to be deep copied.")
+				}
+			}
+		// The Following cases are immutable so we don't care so much.
+		case string:
+		case int:
+		case uint:
+		case float64:
+		default:
+			orig := reflect.ValueOf(v)
+			clone := reflect.ValueOf(dest[key])
+			if reflect.DeepEqual(orig, clone) {
+				t.Errorf("Expected %s to be deep copied.", key)
+			}
+		}
 	}
 }
 

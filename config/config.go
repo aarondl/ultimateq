@@ -176,8 +176,10 @@ func (c *Config) Clone() *Config {
 	c.protect.RLock()
 	defer c.protect.RUnlock()
 
-	// TODO: Make this?
-	return nil
+	nc := NewConfig()
+	copyMap(nc.values, c.values)
+
+	return nc
 }
 
 // Network returns the network context useable to get/set the fields for that.

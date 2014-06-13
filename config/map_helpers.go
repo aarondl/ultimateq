@@ -64,6 +64,45 @@ func (m mp) getArr(name string) []map[string]interface{} {
 	return nil
 }
 
+func copyMap(dest, src mp) {
+	for key, value := range src {
+		switch v := value.(type) {
+		case map[string]interface{}:
+			child := make(map[string]interface{})
+			dest[key] = child
+			copyMap(child, v)
+		case mp:
+			child := make(map[string]interface{})
+			dest[key] = child
+			copyMap(child, v)
+
+		// because we only use string or channel arrays, both of which are
+		// not holding reference types, these naive array copies should be ok.
+		case []interface{}:
+			intfArr := make([]interface{}, len(v))
+			copy(intfArr, v)
+			dest[key] = intfArr
+		case []map[string]interface{}:
+			mapArr := make([]map[string]interface{}, len(v))
+			copy(mapArr, v)
+			dest[key] = mapArr
+			for i, srcMap := range v {
+				copyMap(mapArr[i], srcMap)
+			}
+		case []string:
+			strArr := make([]string, len(v))
+			copy(strArr, v)
+			dest[key] = strArr
+		case []Channel:
+			chans := make([]Channel, len(v))
+			copy(chans, v)
+			dest[key] = chans
+		default:
+			dest[key] = v
+		}
+	}
+}
+
 type mapGetter interface {
 	get(string) (interface{}, bool)
 	getParent(string) (interface{}, bool)

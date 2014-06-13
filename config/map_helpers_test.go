@@ -30,6 +30,8 @@ func TestMapHelpers_Mp(t *testing.T) {
 }
 
 func TestMapHelpers_MpEnsure(t *testing.T) {
+	t.Parallel()
+
 	var m mp = map[string]interface{}{}
 	second := m.ensure("first").ensure("second")
 	if second == nil {
