@@ -63,37 +63,54 @@ func (e *extCtx) Active(network string) ([]string, bool) {
 	e.rlock()
 	defer e.runlock()
 
-	var val interface{}
 	var actives map[string]interface{}
+	var arrVal interface{}
 	var ok bool
 
-	if val, ok = e.ext["active"]; !ok {
-		val, ok = e.parent["active"]
-	}
-
-	if !ok {
-		return nil, false
-	}
-
-	if actives, ok = val.(map[string]interface{}); !ok || len(actives) == 0 {
-		return nil, false
-	}
-
-	if interfaceValue, ok := actives[network]; ok {
+	copyArr := func(arrVal interface{}) []string {
 		newActives := make([]string, 0)
 
-		if strArr, ok := interfaceValue.([]interface{}); ok {
-			for _, strVal := range strArr {
+		switch v := arrVal.(type) {
+		case []interface{}:
+			if len(v) == 0 {
+				return nil
+			}
+
+			for _, strVal := range v {
 				if str, ok := strVal.(string); ok {
 					newActives = append(newActives, str)
 				}
 			}
+		case []string:
+			if len(v) == 0 {
+				return nil
+			}
+
+			for _, str := range v {
+				newActives = append(newActives, str)
+			}
 		}
 
-		if len(newActives) > 0 {
-			return newActives, true
-		} else {
-			return nil, false
+		return newActives
+	}
+
+	if actives = mp(e.ext).get("active"); actives != nil {
+		if arrVal, ok = actives[network]; ok {
+			arr := copyArr(arrVal)
+			if len(arr) != 0 {
+				return arr, true
+			}
+		}
+	}
+
+	if e.parent != nil {
+		if actives = mp(e.parent).get("active"); actives != nil {
+			if arrVal, ok = actives[network]; ok {
+				arr := copyArr(arrVal)
+				if len(arr) != 0 {
+					return arr, true
+				}
+			}
 		}
 	}
 
@@ -104,23 +121,13 @@ func (e *extCtx) SetActive(network string, value []string) {
 	e.lock()
 	defer e.unlock()
 
-	var val interface{}
-	var actives map[string]interface{}
-	var ok bool
-
-	if val, ok = e.ext["active"]; !ok {
-		val, ok = e.parent["active"]
+	if acts := mp(e.ext).get("active"); acts != nil {
+		acts[network] = value
+	} else {
+		e.ext["active"] = map[string]interface{}{
+			network: value,
+		}
 	}
-
-	if !ok {
-		return
-	}
-
-	if actives, ok = val.(map[string]interface{}); !ok || len(actives) == 0 {
-		return
-	}
-
-	actives[network] = value
 }
 
 type extGlobalCtx struct {
@@ -143,6 +150,36 @@ func (e *extGlobalCtx) SetListen(val string) {
 	setVal(e, "listen", val)
 }
 
+/*
+Config returns a map of config values for the given network and channel.
+Global values are overidden by more specific ones, and all more-global values
+are picked up.
+*/
+func (e *extGlobalCtx) Config(network, channel string) map[string]string {
+	return nil
+}
+
+/*
+SetConfig sets a key value pair for a given network and channel.
+If you leave either network or channel empty, then it's set at the global
+level for that portion.
+
+	[ext.config]
+		# SetConfig("", "", "key", "val")
+		key = "val"
+	[ext.config.channels.#channel]
+		# SetConfig("", "#channel", "key", "val")
+		key = "val"
+	[ext.config.networks.ircnet]
+		# SetConfig("ircnet", "", "key", "val")
+		key = "val"
+	[ext.config.networks.ircnet.channels.#channel] # Freenode's #channel
+		# SetConfig("ircnet", "#channel", "key", "val")
+		key = "val"
+*/
+func (e *extGlobalCtx) SetConfig(network, channel, key, value string) {
+}
+
 type extNormalCtx struct {
 	*extCtx
 }
@@ -151,16 +188,16 @@ func (e *extNormalCtx) Exec() (string, bool) {
 	return getStr(e, "exec", false)
 }
 
+func (e *extNormalCtx) SetExec(val string) {
+	setVal(e, "exec", val)
+}
+
 func (e *extNormalCtx) Server() (string, bool) {
 	return getStr(e, "server", false)
 }
 
 func (e *extNormalCtx) SetServer(val string) {
 	setVal(e, "server", val)
-}
-
-func (e *extNormalCtx) SetExec(val string) {
-	setVal(e, "exec", val)
 }
 
 func (e *extNormalCtx) SSL() (bool, bool) {

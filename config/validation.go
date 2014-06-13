@@ -357,13 +357,14 @@ func (v validatorRules) validateMap(name string,
 			addErr(name, key, "float64", val)
 		}
 	}
+	/* These are not used for the time being
 	for _, key := range v.intVals {
 		if val, ok := m[key]; !ok {
 			continue
 		} else if _, ok = val.(int64); !ok {
 			addErr(name, key, "int", val)
 		}
-	}
+	}*/
 	for _, key := range v.uintVals {
 		if val, ok := m[key]; !ok {
 			continue

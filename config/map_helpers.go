@@ -162,31 +162,6 @@ func getFloat64(m mapGetter, key string, fallback bool) (float64, bool) {
 	return 0, false
 }
 
-// getMap gets a bool out of a map.
-func getMap(m mapGetter, key string, fallback bool) (
-	map[string]interface{}, bool) {
-
-	m.rlock()
-	defer m.runlock()
-
-	var val interface{}
-	var ok bool
-
-	if val, ok = m.get(key); !ok && fallback {
-		val, ok = m.getParent(key)
-	}
-
-	if !ok {
-		return nil, false
-	}
-
-	if mapvar, ok := val.(map[string]interface{}); ok {
-		return mapvar, true
-	}
-
-	return nil, false
-}
-
 // getStrArr gets a string array out of a map.
 func getStrArr(m mapGetter, key string, fallback bool) ([]string, bool) {
 	m.rlock()
@@ -205,7 +180,7 @@ func getStrArr(m mapGetter, key string, fallback bool) ([]string, bool) {
 
 	if arr, ok := val.([]interface{}); ok {
 		if len(arr) == 0 {
-			return nil, true
+			return nil, false
 		}
 
 		cpyArr := make([]string, 0, len(arr))
@@ -217,6 +192,10 @@ func getStrArr(m mapGetter, key string, fallback bool) ([]string, bool) {
 
 		return cpyArr, true
 	} else if arr, ok := val.([]string); ok {
+		if len(arr) == 0 {
+			return nil, false
+		}
+
 		cpyArr := make([]string, len(arr))
 		copy(cpyArr, arr)
 		return cpyArr, true

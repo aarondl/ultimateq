@@ -221,15 +221,17 @@ func (c *Config) ExtGlobal() *extGlobalCtx {
 	c.protect.RLock()
 	defer c.protect.RUnlock()
 
-	if exts := c.values.get("ext"); exts != nil {
-		return &extGlobalCtx{&extCtx{&c.protect, nil, exts}}
+	if ext := c.values.get("ext"); ext != nil {
+		return &extGlobalCtx{&extCtx{&c.protect, nil, ext}}
+	} else {
+		ext := make(map[string]interface{})
+		c.values["ext"] = ext
+		return &extGlobalCtx{&extCtx{&c.protect, nil, ext}}
 	}
-
-	return nil
 }
 
-// DisplayErrors is a helper function to log the output of all config to the
-// standard logger.
+// DisplayErrors is a helper function to log the output of all config errors to
+// the standard logger.
 func (c *Config) DisplayErrors() {
 	c.protect.RLock()
 	defer c.protect.RUnlock()
