@@ -85,6 +85,57 @@ func checkMap(dest, src mp, t *testing.T) {
 	}
 }
 
+func TestConfig_Networks(t *testing.T) {
+	t.Parallel()
+
+	if NewConfig().Networks() != nil {
+		t.Error("Expected networks to be empty.")
+	}
+
+	c := NewConfig().FromString(configuration)
+
+	nets := c.Networks()
+	exps := []string{"ircnet", "noirc"}
+
+	for _, exp := range exps {
+		found := false
+		for _, net := range nets {
+			if net == exp {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Did not find: %s in network list.", exp)
+		}
+	}
+}
+
+func TestConfig_Exts(t *testing.T) {
+	t.Parallel()
+
+	if NewConfig().Exts() != nil {
+		t.Error("Expected exts to be empty.")
+	}
+
+	c := NewConfig().FromString(configuration)
+	exts := c.Exts()
+	exps := []string{"myext"}
+
+	for _, exp := range exps {
+		found := false
+		for _, ext := range exts {
+			if ext == exp {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Did not find: %s in ext list.", exp)
+		}
+	}
+}
+
 func TestConfig_Contexts(t *testing.T) {
 	t.Parallel()
 

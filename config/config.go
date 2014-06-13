@@ -200,6 +200,24 @@ func (c *Config) Network(name string) *NetCTX {
 	}
 }
 
+// Networks returns a list of configured networks.
+func (c *Config) Networks() []string {
+	c.protect.RLock()
+	defer c.protect.RUnlock()
+
+	nets := c.values.get("networks")
+	if nets == nil {
+		return nil
+	}
+
+	rets := make([]string, 0)
+	for key, _ := range nets {
+		rets = append(rets, key)
+	}
+
+	return rets
+}
+
 // Ext returns the extension context useable to get/set fields for the given
 // extension name.
 func (c *Config) Ext(name string) *ExtNormalCTX {
@@ -230,6 +248,24 @@ func (c *Config) ExtGlobal() *ExtGlobalCTX {
 		c.values["ext"] = ext
 		return &ExtGlobalCTX{&ExtCTX{&c.protect, nil, ext}}
 	}
+}
+
+// Exts returns a list of configured extensions.
+func (c *Config) Exts() []string {
+	c.protect.RLock()
+	defer c.protect.RUnlock()
+
+	exts := c.values.get("exts")
+	if exts == nil {
+		return nil
+	}
+
+	rets := make([]string, 0)
+	for key, _ := range exts {
+		rets = append(rets, key)
+	}
+
+	return rets
 }
 
 // DisplayErrors is a helper function to log the output of all config errors to
