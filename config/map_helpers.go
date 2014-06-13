@@ -28,6 +28,27 @@ func (m mp) get(name string) mp {
 	return nil
 }
 
+func (m mp) ensure(name string) mp {
+	if m == nil {
+		return nil
+	}
+
+	if mpVal, ok := m[name]; ok {
+		switch v := mpVal.(type) {
+		case map[string]interface{}:
+			return v
+		case mp:
+			return v
+		default:
+			return nil
+		}
+	} else {
+		made := map[string]interface{}{}
+		m[name] = made
+		return made
+	}
+}
+
 func (m mp) getArr(name string) []map[string]interface{} {
 	if m == nil {
 		return nil

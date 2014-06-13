@@ -29,6 +29,33 @@ func TestMapHelpers_Mp(t *testing.T) {
 	}
 }
 
+func TestMapHelpers_MpEnsure(t *testing.T) {
+	var m mp = map[string]interface{}{}
+	second := m.ensure("first").ensure("second")
+	if second == nil {
+		t.Error("Expected it to return the new map.")
+	}
+	if m["first"] == nil {
+		t.Error("Expected first to be created.")
+	}
+	if m.get("first").get("second") == nil {
+		t.Error("Expected second to be created.")
+	}
+	if m.ensure("first") == nil {
+		t.Error("Expected to get an old map of type map[string]interface{}")
+	}
+
+	m["first"] = m
+	if m.ensure("first") == nil {
+		t.Error("Expected to get an old map of type mp.")
+	}
+
+	m["first"] = interface{}(5)
+	if nil != m.ensure("first").ensure("second") {
+		t.Error("Expected a bad type to break it.")
+	}
+}
+
 func TestMapHelpers_BadTypes(t *testing.T) {
 	t.Parallel()
 

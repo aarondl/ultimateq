@@ -83,6 +83,143 @@ func TestConfig_Ext_GetSetActive(t *testing.T) {
 	}
 }
 
+func TestExt_Config(t *testing.T) {
+	t.Parallel()
+
+	c := NewConfig()
+	glb := c.ExtGlobal()
+
+	if exp, got := 0, glb.Config("", ""); len(got) != exp {
+		t.Errorf("Expected: %d values but got: %d", exp, len(got))
+	}
+	if exp, got := 0, glb.Config("net", ""); len(got) != exp {
+		t.Errorf("Expected: %d values but got: %d", exp, len(got))
+	}
+	if exp, got := 0, glb.Config("", "chan"); len(got) != exp {
+		t.Errorf("Expected: %d values but got: %d", exp, len(got))
+	}
+	if exp, got := 0, glb.Config("net", "chan"); len(got) != exp {
+		t.Errorf("Expected: %d values but got: %d", exp, len(got))
+	}
+
+	glb.SetConfig("", "", "k1", "v")
+
+	if exp, got := 1, glb.Config("", ""); len(got) != exp {
+		t.Errorf("Expected: %d values but got: %d", exp, len(got))
+	}
+	if exp, got := 1, glb.Config("net", ""); len(got) != exp {
+		t.Errorf("Expected: %d values but got: %d", exp, len(got))
+	}
+	if exp, got := 1, glb.Config("", "chan"); len(got) != exp {
+		t.Errorf("Expected: %d values but got: %d", exp, len(got))
+	}
+	if exp, got := 1, glb.Config("net", "chan"); len(got) != exp {
+		t.Errorf("Expected: %d values but got: %d", exp, len(got))
+	}
+
+	glb.SetConfig("net", "", "k2", "v")
+
+	if exp, got := 1, glb.Config("", ""); len(got) != exp {
+		t.Errorf("Expected: %d values but got: %d", exp, len(got))
+	}
+	if exp, got := 2, glb.Config("net", ""); len(got) != exp {
+		t.Errorf("Expected: %d values but got: %d", exp, len(got))
+	}
+	if exp, got := 1, glb.Config("", "chan"); len(got) != exp {
+		t.Errorf("Expected: %d values but got: %d", exp, len(got))
+	}
+	if exp, got := 1, glb.Config("net", "chan"); len(got) != exp {
+		t.Errorf("Expected: %d values but got: %d", exp, len(got))
+	}
+
+	glb.SetConfig("", "chan", "k3", "v")
+
+	if exp, got := 1, glb.Config("", ""); len(got) != exp {
+		t.Errorf("Expected: %d values but got: %d", exp, len(got))
+	}
+	if exp, got := 2, glb.Config("net", ""); len(got) != exp {
+		t.Errorf("Expected: %d values but got: %d", exp, len(got))
+	}
+	if exp, got := 2, glb.Config("", "chan"); len(got) != exp {
+		t.Errorf("Expected: %d values but got: %d", exp, len(got))
+	}
+	if exp, got := 1, glb.Config("net", "chan"); len(got) != exp {
+		t.Errorf("Expected: %d values but got: %d", exp, len(got))
+	}
+
+	glb.SetConfig("net", "chan", "k4", "v")
+
+	if exp, got := 1, glb.Config("", ""); len(got) != exp {
+		t.Errorf("Expected: %d values but got: %d", exp, len(got))
+	}
+	if exp, got := 2, glb.Config("net", ""); len(got) != exp {
+		t.Errorf("Expected: %d values but got: %d", exp, len(got))
+	}
+	if exp, got := 2, glb.Config("", "chan"); len(got) != exp {
+		t.Errorf("Expected: %d values but got: %d", exp, len(got))
+	}
+	if exp, got := 2, glb.Config("net", "chan"); len(got) != exp {
+		t.Errorf("Expected: %d values but got: %d", exp, len(got))
+	}
+
+	global := glb.Config("", "")
+	net := glb.Config("net", "")
+	ch := glb.Config("", "chan")
+	netch := glb.Config("net", "chan")
+
+	if _, ok := global["k1"]; !ok {
+		t.Error("Expected to get a key of k1 in global.")
+	}
+	if _, ok := net["k1"]; !ok {
+		t.Error("Expected to get a key of k1 in net.")
+	}
+	if _, ok := net["k2"]; !ok {
+		t.Error("Expected to get a key of k2 in net.")
+	}
+	if _, ok := ch["k1"]; !ok {
+		t.Error("Expected to get a key of k1 in ch.")
+	}
+	if _, ok := ch["k3"]; !ok {
+		t.Error("Expected to get a key of k3 in ch.")
+	}
+	if _, ok := netch["k1"]; !ok {
+		t.Error("Expected to get a key of k1 in netch.")
+	}
+	if _, ok := netch["k4"]; !ok {
+		t.Error("Expected to get a key of k4 in netch.")
+	}
+}
+
+func TestExt_ConfigOverride(t *testing.T) {
+	t.Parallel()
+
+	c := NewConfig()
+	glb := c.ExtGlobal()
+
+	glb.SetConfig("", "", "k", "v1")
+	glb.SetConfig("net", "", "k", "v2")
+	glb.SetConfig("", "chan", "k", "v3")
+	glb.SetConfig("net", "chan", "k", "v4")
+
+	global := glb.Config("", "")
+	net := glb.Config("net", "")
+	ch := glb.Config("", "chan")
+	netch := glb.Config("net", "chan")
+
+	if v, ok := global["k"]; !ok || v != "v1" {
+		t.Error("Expected to get a value of v1 in global.")
+	}
+	if v, ok := net["k"]; !ok || v != "v2" {
+		t.Error("Expected to get a value of v2 in net.")
+	}
+	if v, ok := ch["k"]; !ok || v != "v3" {
+		t.Error("Expected to get a value of v3 in ch.")
+	}
+	if v, ok := netch["k"]; !ok || v != "v4" {
+		t.Error("Expected to get a value of v4 in netch.")
+	}
+}
+
 func checkExt(
 	name string, defaultVal, afterGlobal, afterNormal interface{},
 	global *extGlobalCtx, normal *extNormalCtx, t *testing.T) {

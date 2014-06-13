@@ -156,7 +156,47 @@ Global values are overidden by more specific ones, and all more-global values
 are picked up.
 */
 func (e *extGlobalCtx) Config(network, channel string) map[string]string {
-	return nil
+	ret := make(map[string]string)
+	nEmpty := len(network) == 0
+	cEmpty := len(channel) == 0
+
+	var m = mp(e.ext)
+	cfg := m.get("config")
+	net := cfg.get("networks").get(network)
+	ch := cfg.get("channels").get(channel)
+	netch := net.get("channels").get(channel)
+
+	for k, v := range cfg {
+		if str, ok := v.(string); ok {
+			ret[k] = str
+		}
+	}
+
+	if !nEmpty && cEmpty && net != nil {
+		for k, v := range net {
+			if str, ok := v.(string); ok {
+				ret[k] = str
+			}
+		}
+	}
+
+	if !cEmpty && nEmpty && ch != nil {
+		for k, v := range ch {
+			if str, ok := v.(string); ok {
+				ret[k] = str
+			}
+		}
+	}
+
+	if !nEmpty && !cEmpty && netch != nil {
+		for k, v := range netch {
+			if str, ok := v.(string); ok {
+				ret[k] = str
+			}
+		}
+	}
+
+	return ret
 }
 
 /*
@@ -173,11 +213,30 @@ level for that portion.
 	[ext.config.networks.ircnet]
 		# SetConfig("ircnet", "", "key", "val")
 		key = "val"
-	[ext.config.networks.ircnet.channels.#channel] # Freenode's #channel
+	[ext.config.networks.ircnet.channels.#channel]
 		# SetConfig("ircnet", "#channel", "key", "val")
 		key = "val"
 */
 func (e *extGlobalCtx) SetConfig(network, channel, key, value string) {
+	var setMap map[string]interface{}
+	var m = mp(e.ext)
+
+	nEmpty := len(network) == 0
+	cEmpty := len(channel) == 0
+
+	switch {
+	case nEmpty && cEmpty:
+		setMap = m.ensure("config")
+	case !nEmpty && cEmpty:
+		setMap = m.ensure("config").ensure("networks").ensure(network)
+	case nEmpty && !cEmpty:
+		setMap = m.ensure("config").ensure("channels").ensure(channel)
+	case !nEmpty && !cEmpty:
+		setMap = m.ensure("config").ensure("networks").ensure(network).
+			ensure("channels").ensure(channel)
+	}
+
+	setMap[key] = value
 }
 
 type extNormalCtx struct {
