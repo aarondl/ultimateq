@@ -62,7 +62,7 @@ func TestCoreHandler_Connect(t *testing.T) {
 	realname, _ := net.Realname()
 
 	handler := coreHandler{bot: b}
-	msg1 := fmt.Sprintf("PASSWORD :%v", password)
+	msg1 := fmt.Sprintf("PASS :%v", password)
 	msg2 := fmt.Sprintf("NICK :%v", nick)
 	msg3 := fmt.Sprintf("USER %v 0 * :%v", username, realname)
 

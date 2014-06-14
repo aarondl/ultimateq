@@ -41,7 +41,7 @@ func (c *coreHandler) HandleRaw(w irc.Writer, ev *irc.Event) {
 		realname, _ := cfg.Realname()
 
 		if password, ok := cfg.Password(); ok {
-			w.Send("PASSWORD :", password)
+			w.Send("PASS :", password)
 		}
 
 		w.Send("NICK :", nick)

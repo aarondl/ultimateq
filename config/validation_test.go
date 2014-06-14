@@ -69,9 +69,9 @@ func TestValidation_DisplayErrors(t *testing.T) {
 		t.Error("Expected it to be invalid.")
 	}
 
+	exp := "(global) prefix is int64 but expected string [5]"
 	c.DisplayErrors()
-
-	if !strings.Contains(b.String(), "(net) Expected at least one server.") {
+	if !strings.Contains(b.String(), exp) {
 		t.Error("Expected a particular error message, got:", b.String())
 	}
 }
