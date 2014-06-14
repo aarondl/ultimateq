@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"net"
+	"strings"
 	"testing"
 
+	"github.com/aarondl/ultimateq/config"
 	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/irc"
 )
@@ -26,7 +28,7 @@ func makeTestPoint(srv *Server) *testPoint {
 }
 
 func (t *testPoint) gets() string {
-	return string(t.buf.Bytes())
+	return t.buf.String()
 }
 
 func (t *testPoint) resetTestWritten() {
@@ -54,6 +56,11 @@ func TestCoreHandler_Ping(t *testing.T) {
 func TestCoreHandler_Connect(t *testing.T) {
 	cnf := fakeConfig.Clone()
 	net := cnf.Network(netID).SetPassword("password")
+
+	ch1 := config.Channel{Name: "#channel1", Password: "pass"}
+	ch2 := config.Channel{Name: "#channel2"}
+	net.SetChannels([]config.Channel{ch1, ch2})
+
 	b, _ := createBot(cnf, nil, nil, devNull, false, false)
 
 	password, _ := net.Password()
@@ -65,12 +72,23 @@ func TestCoreHandler_Connect(t *testing.T) {
 	msg1 := fmt.Sprintf("PASS :%v", password)
 	msg2 := fmt.Sprintf("NICK :%v", nick)
 	msg3 := fmt.Sprintf("USER %v 0 * :%v", username, realname)
+	msg4 := fmt.Sprintf("JOIN %v %v", ch1.Name, ch1.Password)
+	msg5 := fmt.Sprintf("JOIN %v", ch2.Name)
 
 	ev := irc.NewEvent(netID, netInfo, irc.CONNECT, "")
 	endpoint := makeTestPoint(b.servers[netID])
 	handler.HandleRaw(endpoint, ev)
 
-	expect := msg1 + msg2 + msg3
+	expect := msg1 + msg2 + msg3 + msg4 + msg5
+	if got := endpoint.gets(); got != expect {
+		t.Errorf("Expected: %s, got: %s", expect, got)
+	}
+
+	endpoint.resetTestWritten()
+
+	net.SetNoAutoJoin(true)
+	handler.HandleRaw(endpoint, ev)
+	expect = msg1 + msg2 + msg3
 	if got := endpoint.gets(); got != expect {
 		t.Errorf("Expected: %s, got: %s", expect, got)
 	}
@@ -104,6 +122,60 @@ func TestCoreHandler_Nick(t *testing.T) {
 	handler.HandleRaw(endpoint, ev)
 	if got := endpoint.gets(); got != nick3 {
 		t.Errorf("Expected: %s, got: %s", nick3, got)
+	}
+}
+
+func TestCoreHandler_Rejoin(t *testing.T) {
+	cnf := fakeConfig.Clone()
+	net := cnf.Network(netID).SetPassword("password").SetNoState(false).
+		SetNoAutoJoin(true)
+
+	nick, _ := net.Nick()
+	ch1 := config.Channel{Name: "#channel1", Password: "pass"}
+	ch2 := config.Channel{Name: "#channel2"}
+
+	b, _ := createBot(cnf, nil, nil, devNull, false, false)
+	st := b.servers[netID].state
+	st.Update(
+		irc.NewEvent(netID, netInfo, irc.RPL_WELCOME, "", "stuff", nick+"!a@b"),
+	)
+
+	endpoint := makeTestPoint(b.servers[netID])
+	banned := irc.NewEvent(netID, netInfo, irc.ERR_BANNEDFROMCHAN, netID,
+		nick, ch1.Name, "Banned message")
+	kicked := irc.NewEvent(netID, netInfo, irc.KICK, "badguy",
+		ch2.Name, nick, "Kick Message")
+
+	handler := coreHandler{bot: b}
+	handler.HandleRaw(endpoint, banned)
+	handler.HandleRaw(endpoint, kicked)
+
+	if got := endpoint.gets(); len(got) > 0 {
+		t.Error("Expected nothing to happen with noautojoin set.")
+	}
+
+	handler.HandleRaw(endpoint, banned)
+	handler.HandleRaw(endpoint, kicked)
+
+	net.SetNoAutoJoin(false)
+
+	if got := endpoint.gets(); len(got) > 0 {
+		t.Error("Expected nothing to happen without channels set.")
+	}
+
+	net.SetChannels([]config.Channel{ch1, ch2})
+
+	handler.HandleRaw(endpoint, banned)
+	handler.HandleRaw(endpoint, kicked)
+
+	exp1 := fmt.Sprintf("JOIN %v %v", ch1.Name, ch1.Password)
+	exp2 := fmt.Sprintf("JOIN %v", ch2.Name)
+	got := endpoint.gets()
+	if !strings.Contains(got, exp1) {
+		t.Error("Expected it to have joined #channel1 after ban.")
+	}
+	if !strings.Contains(got, exp2) {
+		t.Error("Expected it to have joined #channel1 after kick.")
 	}
 }
 

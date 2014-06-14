@@ -1,8 +1,12 @@
 package bot
 
 import (
+	"strings"
 	"sync"
+	"time"
 
+	"github.com/aarondl/ultimateq/config"
+	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/irc"
 )
 
@@ -14,7 +18,8 @@ type coreHandler struct {
 	bot *Bot
 
 	// How many nicks have been sent.
-	nickvalue int
+	nickvalue      int
+	untilJoinScale time.Duration
 
 	// Protect access to core Handler
 	protect sync.RWMutex
@@ -39,13 +44,77 @@ func (c *coreHandler) HandleRaw(w irc.Writer, ev *irc.Event) {
 		nick, _ := cfg.Nick()
 		uname, _ := cfg.Username()
 		realname, _ := cfg.Realname()
+		noautojoin, _ := cfg.NoAutoJoin()
+		joindelay, _ := cfg.JoinDelay()
 
 		if password, ok := cfg.Password(); ok {
 			w.Send("PASS :", password)
 		}
 
 		w.Send("NICK :", nick)
-		w.Sendf("USER %v 0 * :%v", uname, realname)
+		w.Sendf("USER %s 0 * :%s", uname, realname)
+
+		if noautojoin {
+			break
+		}
+
+		if chs, ok := cfg.Channels(); ok {
+			<-time.After(c.untilJoinScale * time.Duration(joindelay))
+			for _, ch := range chs {
+				if len(ch.Password) > 0 {
+					w.Sendf("JOIN %s %s", ch.Name, ch.Password)
+				} else {
+					w.Sendf("JOIN %s", ch.Name)
+				}
+			}
+		}
+	case irc.KICK, irc.ERR_BANNEDFROMCHAN:
+		server := c.getServer(ev.NetworkID)
+		cfg := server.conf.Network(ev.NetworkID)
+		noautojoin, _ := cfg.NoAutoJoin()
+		joindelay, _ := cfg.JoinDelay()
+
+		if noautojoin {
+			break
+		}
+
+		var chs []config.Channel
+		var ok bool
+		if chs, ok = cfg.Channels(); !ok {
+			break
+		}
+
+		var nick, channel, curNick string
+		if ev.Name == irc.KICK {
+			channel = strings.ToLower(ev.Args[0])
+			nick = strings.ToLower(ev.Args[1])
+		} else {
+			nick = strings.ToLower(ev.Args[0])
+			channel = strings.ToLower(ev.Args[1])
+		}
+
+		c.bot.UsingState(ev.NetworkID, func(st *data.State) {
+			curNick = strings.ToLower(st.Self.Nick())
+		})
+
+		if len(curNick) == 0 || nick != curNick {
+			break
+		}
+
+		for _, ch := range chs {
+			if strings.ToLower(ch.Name) != channel {
+				continue
+			}
+
+			if ev.Name == irc.ERR_BANNEDFROMCHAN {
+				<-time.After(c.untilJoinScale * time.Duration(joindelay))
+			}
+			if len(ch.Password) > 0 {
+				w.Sendf("JOIN %s %s", ch.Name, ch.Password)
+			} else {
+				w.Sendf("JOIN %s", ch.Name)
+			}
+		}
 
 	case irc.ERR_NICKNAMEINUSE:
 		server := c.getServer(ev.NetworkID)
