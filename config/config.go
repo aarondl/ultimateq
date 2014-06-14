@@ -9,6 +9,8 @@ An example configuration looks like this:
 	# own defined.
 	storefile = "/path/to/store/file.db"
 	nocorecmds = false
+	loglevel = "debug"
+	logfile = "/path/to/file.log"
 
 	[networks.ircnet]
 		servers = ["localhost:3333", "server.com:6667"]
@@ -101,8 +103,9 @@ as well as the exts and ext. This can save you lots of repetitive typing.
 package config
 
 import (
-	"log"
 	"sync"
+
+	"github.com/inconshreveable/log15"
 )
 
 const (
@@ -111,6 +114,8 @@ const (
 	// defaultStoreFile is where the bot will store it'n Store database if not
 	// overridden.
 	defaultStoreFile = "./store.db"
+	// defaultLogLevel is the log level of the bot.
+	defaultLogLevel = "info"
 	// defaultFloodLenPenalty is how many characters in a message by default
 	// warrant an extra second wait time.
 	defaultFloodLenPenalty = uint(120)
@@ -284,12 +289,12 @@ func (c *Config) Exts() []string {
 
 // DisplayErrors is a helper function to log the output of all config errors to
 // the standard logger.
-func (c *Config) DisplayErrors() {
+func (c *Config) DisplayErrors(logger log15.Logger) {
 	c.protect.RLock()
 	defer c.protect.RUnlock()
 
 	for _, e := range c.errors {
-		log.Println(e.Error())
+		logger.Error(e.Error())
 	}
 }
 
@@ -319,11 +324,56 @@ func (c *Config) StoreFile() (string, bool) {
 }
 
 // SetStoreFile sets the global storefile or defaultStoreFile.
-func (c *Config) SetStoreFile(val string) {
+func (c *Config) SetStoreFile(val string) *Config {
 	c.protect.Lock()
 	defer c.protect.Unlock()
 
 	c.values["storefile"] = interface{}(val)
+	return c
+}
+
+// LogFile gets the global logfile or defaultLogFile.
+func (c *Config) LogFile() (string, bool) {
+	c.protect.RLock()
+	defer c.protect.RUnlock()
+
+	if val, ok := c.values["logfile"]; ok {
+		if logfile, ok := val.(string); ok {
+			return logfile, true
+		}
+	}
+	return "", false
+}
+
+// SetLogFile sets the global logfile or defaultLogFile.
+func (c *Config) SetLogFile(val string) *Config {
+	c.protect.Lock()
+	defer c.protect.Unlock()
+
+	c.values["logfile"] = interface{}(val)
+	return c
+}
+
+// LogLevel gets the global loglevel or defaultLogLevel.
+func (c *Config) LogLevel() (string, bool) {
+	c.protect.RLock()
+	defer c.protect.RUnlock()
+
+	if val, ok := c.values["loglevel"]; ok {
+		if loglevel, ok := val.(string); ok {
+			return loglevel, true
+		}
+	}
+	return defaultLogLevel, false
+}
+
+// SetLogLevel sets the global loglevel or defaultLogLevel.
+func (c *Config) SetLogLevel(val string) *Config {
+	c.protect.Lock()
+	defer c.protect.Unlock()
+
+	c.values["loglevel"] = interface{}(val)
+	return c
 }
 
 // NoCoreCmds gets the value of the corecmds variable.
@@ -340,11 +390,12 @@ func (c *Config) NoCoreCmds() (bool, bool) {
 }
 
 // SetNoCoreCmds gets the value of the corecmds variable.
-func (c *Config) SetNoCoreCmds(val bool) {
+func (c *Config) SetNoCoreCmds(val bool) *Config {
 	c.protect.Lock()
 	defer c.protect.Unlock()
 
 	c.values["nocorecmds"] = interface{}(val)
+	return c
 }
 
 // NewNetwork creates a network and returns the network's context.

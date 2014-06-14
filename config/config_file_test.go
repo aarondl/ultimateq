@@ -34,6 +34,8 @@ func (d *dyingWriter) Write(b []byte) (int, error) {
 const configuration = `
 storefile = "/path/to/store/file.db"
 nocorecmds = false
+loglevel = "debug"
+logfile = "/path/to/file.log"
 
 nick = "Nick"
 altnick = "Altnick"
@@ -134,6 +136,16 @@ func verifyFakeConfig(t *testing.T, conf *Config) {
 
 	exps = "/path/to/store/file.db"
 	if got, ok := conf.StoreFile(); !ok || exps != got {
+		t.Errorf("Expected: %s, got: %s", exps, got)
+	}
+
+	exps = "/path/to/file.log"
+	if got, ok := conf.LogFile(); !ok || exps != got {
+		t.Errorf("Expected: %s, got: %s", exps, got)
+	}
+
+	exps = "debug"
+	if got, ok := conf.LogLevel(); !ok || exps != got {
 		t.Errorf("Expected: %s, got: %s", exps, got)
 	}
 

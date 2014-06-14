@@ -3,9 +3,10 @@ package config
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"strings"
 	"testing"
+
+	"github.com/inconshreveable/log15"
 )
 
 func TestValidation(t *testing.T) {
@@ -53,7 +54,8 @@ func TestValidation_DisplayErrors(t *testing.T) {
 	t.Parallel()
 	b := &bytes.Buffer{}
 
-	log.SetOutput(b)
+	logger := log15.New()
+	logger.SetHandler(log15.StreamHandler(b, log15.LogfmtFormat()))
 
 	c := NewConfig().FromString(`
 	nick = "n"
@@ -70,7 +72,7 @@ func TestValidation_DisplayErrors(t *testing.T) {
 	}
 
 	exp := "(global) prefix is int64 but expected string [5]"
-	c.DisplayErrors()
+	c.DisplayErrors(logger)
 	if !strings.Contains(b.String(), exp) {
 		t.Error("Expected a particular error message, got:", b.String())
 	}
@@ -277,6 +279,8 @@ func TestValidation_TypesLeafs(t *testing.T) {
 	cfg := `
 		storefile = 5
 		nocorecmds = "hello"
+		logfile = 5
+		loglevel = 5
 
 		nick = 6
 		altnick = 7
@@ -356,6 +360,8 @@ func TestValidation_TypesLeafs(t *testing.T) {
 	exps := []texpect{
 		{"global", "storefile", "string", "int64"},
 		{"global", "nocorecmds", "bool", "string"},
+		{"global", "loglevel", "string", "int64"},
+		{"global", "logfile", "string", "int64"},
 		{"global", "nick", "string", "int64"},
 		{"global", "altnick", "string", "int64"},
 		{"global", "username", "string", "int64"},
