@@ -102,7 +102,7 @@ type Bot struct {
 
 // CheckConfig checks a bots config for validity.
 func CheckConfig(c *config.Config) bool {
-	if !c.Validate() {
+	if ers := c.Errors(); len(ers) > 0 || !c.Validate() {
 		c.DisplayErrors()
 		return false
 	}
