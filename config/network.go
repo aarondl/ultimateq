@@ -193,15 +193,17 @@ func (n *NetCTX) SetReconnectTimeout(val uint) *NetCTX {
 	return n
 }
 
-func (n *NetCTX) Prefix() (string, bool) {
+func (n *NetCTX) Prefix() (rune, bool) {
 	if prefix, ok := getStr(n, "prefix", true); ok {
-		return prefix, ok
+		if len(prefix) > 0 {
+			return rune(prefix[0]), ok
+		}
 	}
-	return string(defaultPrefix), false
+	return defaultPrefix, false
 }
 
-func (n *NetCTX) SetPrefix(val string) *NetCTX {
-	setVal(n, "prefix", val)
+func (n *NetCTX) SetPrefix(val rune) *NetCTX {
+	setVal(n, "prefix", string(val))
 	return n
 }
 

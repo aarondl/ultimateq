@@ -353,14 +353,14 @@ func (c *Config) NewNetwork(name string) *NetCTX {
 	c.protect.RLock()
 	defer c.protect.RUnlock()
 
-	var net, nets mp
+	var net, nets map[string]interface{}
 
 	if nets = c.values.get("networks"); nets == nil {
-		nets = make(mp)
+		nets = make(map[string]interface{})
 		c.values["networks"] = interface{}(nets)
 	}
 
-	if net = nets.get(name); net != nil {
+	if net = mp(nets).get(name); net != nil {
 		return nil
 	}
 

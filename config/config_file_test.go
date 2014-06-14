@@ -130,6 +130,7 @@ func verifyFakeConfig(t *testing.T, conf *Config) {
 	var expb bool
 	var expu uint
 	var expf float64
+	var expr rune
 
 	exps = "/path/to/store/file.db"
 	if got, ok := conf.StoreFile(); !ok || exps != got {
@@ -226,9 +227,9 @@ func verifyFakeConfig(t *testing.T, conf *Config) {
 		t.Errorf("Expected: %v, got: %v", expu, got)
 	}
 
-	exps = "."
-	if got, ok := net1.Prefix(); !ok || exps != got {
-		t.Errorf("Expected: %v, got: %v", exps, got)
+	expr = '.'
+	if got, ok := net1.Prefix(); !ok || expr != got {
+		t.Errorf("Expected: %v, got: %v", expr, got)
 	}
 
 	if chans, ok := net1.Channels(); ok {

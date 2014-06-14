@@ -46,7 +46,7 @@ func TestConfig_Network_GetSet(t *testing.T) {
 	check("ReconnectTimeout", defaultReconnectTimeout,
 		uint(20), uint(30), glb, net, t)
 
-	check("Prefix", ".", "!", "@", glb, net, t)
+	check("Prefix", '.', '!', '@', glb, net, t)
 
 	if srvs, ok := net.Servers(); ok || len(srvs) != 0 {
 		t.Error("Expected servers to be empty.")

@@ -331,15 +331,18 @@ func (v validatorRules) validateMap(name string,
 		}
 	}
 	for _, key := range v.stringSliceVals {
-		if val, ok := m[key]; !ok {
-			continue
-		} else if intfArr, ok := val.([]interface{}); !ok {
-			addErr(name, key, "array", val)
-		} else {
-			for i, val := range intfArr {
-				if _, ok := val.(string); !ok {
-					addErr(name, fmt.Sprintf("%s %d", key, i+1), "string", val)
+		if val, ok := m[key]; ok {
+			switch v := val.(type) {
+			case []interface{}:
+				for i, val := range v {
+					if _, ok := val.(string); !ok {
+						indexErr := fmt.Sprintf("%s %d", key, i+1)
+						addErr(name, indexErr, "string", val)
+					}
 				}
+			case []string:
+			default:
+				addErr(name, key, "array", val)
 			}
 		}
 	}
