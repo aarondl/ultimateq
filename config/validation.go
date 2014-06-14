@@ -87,7 +87,7 @@ func (c *Config) Validate() bool {
 	ers := make(errList, 0)
 
 	c.protect.RLock()
-	c.validateRequired(&ers)
+	c.validateTypes(&ers)
 	c.protect.RUnlock()
 
 	if len(ers) > 0 {
@@ -98,7 +98,7 @@ func (c *Config) Validate() bool {
 	}
 
 	c.protect.RLock()
-	c.validateTypes(&ers)
+	c.validateRequired(&ers)
 	c.protect.RUnlock()
 
 	if len(ers) > 0 {
