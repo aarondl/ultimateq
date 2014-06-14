@@ -124,6 +124,27 @@ func (n *NetCTX) SetNoStore(val bool) *NetCTX {
 	return n
 }
 
+func (n *NetCTX) NoAutoJoin() (bool, bool) {
+	return getBool(n, "noautojoin", true)
+}
+
+func (n *NetCTX) SetNoAutoJoin(val bool) *NetCTX {
+	setVal(n, "noautojoin", val)
+	return n
+}
+
+func (n *NetCTX) JoinDelay() (uint, bool) {
+	if floodLenPenalty, ok := getUint(n, "joindelay", true); ok {
+		return floodLenPenalty, true
+	}
+	return defaultJoinDelay, false
+}
+
+func (n *NetCTX) SetJoinDelay(val uint) *NetCTX {
+	setVal(n, "joindelay", val)
+	return n
+}
+
 func (n *NetCTX) FloodLenPenalty() (uint, bool) {
 	if floodLenPenalty, ok := getUint(n, "floodlenpenalty", true); ok {
 		return floodLenPenalty, true

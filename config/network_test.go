@@ -32,6 +32,11 @@ func TestConfig_Network_GetSet(t *testing.T) {
 
 	check("NoStore", false, false, true, glb, net, t)
 
+	check("NoAutoJoin", false, false, true, glb, net, t)
+
+	check("JoinDelay", defaultJoinDelay, uint(20), uint(30),
+		glb, net, t)
+
 	check("FloodLenPenalty", defaultFloodLenPenalty, uint(20), uint(30),
 		glb, net, t)
 

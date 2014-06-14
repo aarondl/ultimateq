@@ -27,10 +27,11 @@ var networkValidator = validatorRules{
 	},
 	stringSliceVals: []string{"servers"},
 	boolVals: []string{
-		"ssl", "nostate", "nostore", "noreconnect", "noverifycert",
+		"ssl", "nostate", "nostore", "noautojoin",
+		"noreconnect", "noverifycert",
 	},
 	floatVals:  []string{"floodtimeout", "floodstep", "keepalive"},
-	uintVals:   []string{"reconnecttimeout", "floodlenpenalty"},
+	uintVals:   []string{"reconnecttimeout", "floodlenpenalty", "joindelay"},
 	mapArrVals: []string{"channels"},
 }
 

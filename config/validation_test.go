@@ -300,6 +300,9 @@ func TestValidation_TypesLeafs(t *testing.T) {
 			nostate = 5
 			nostore = 6
 
+			noautojoin = 5
+			joindelay = "lol"
+
 			floodlenpenalty = 20.0
 			floodtimeout = "anarchy"
 			floodstep = "string"
@@ -376,6 +379,8 @@ func TestValidation_TypesLeafs(t *testing.T) {
 		{"ircnet", "noverifycert", "bool", "string"},
 		{"ircnet", "nostate", "bool", "int64"},
 		{"ircnet", "nostore", "bool", "int64"},
+		{"ircnet", "noautojoin", "bool", "int64"},
+		{"ircnet", "joindelay", "int", "string"},
 		{"ircnet", "floodlenpenalty", "int", "float64"},
 		{"ircnet", "floodtimeout", "float64", "string"},
 		{"ircnet", "floodstep", "float64", "string"},

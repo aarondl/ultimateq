@@ -55,6 +55,9 @@ password = "Password"
 	nostate = false
 	nostore = false
 
+	noautojoin = false
+	joindelay = 5
+
 	floodlenpenalty = 120
 	floodtimeout = 10.0
 	floodstep = 2.0
@@ -64,8 +67,6 @@ password = "Password"
 	noreconnect = false
 	reconnecttimeout = 20
 
-	# Optional, this is the hardcoded default value, you can set it if
-	# you don't feel like writing prefix in the channels all the time.
 	prefix = "."
 
 	[[networks.ircnet.channels]]
@@ -78,49 +79,34 @@ password = "Password"
 	password = "pass2"
 	prefix = "@"
 
-# Ext provides defaults for all exts, much as the global definitions provide
-# defaults for all networks.
 [ext]
-	# Define listen to create a extension server for extensions to connect
 	listen = "localhost:3333"
-	# OR listen = "/path/to/unix.sock"
-
-	# Define the execdir to start all executables in the path.
 	execdir = "/path/to/executables"
 
-	# Control reconnection for remote extensions.
 	noreconnect = false
 	reconnecttimeout = 20
 
 	usejson = true
 
-	# Ext configuration is deeply nested so we can configure it globally
-	# based on the network, or based on the channel on that network, or even
-	# on all channels on that network.
-	[ext.config] # Global config value
+	[ext.config]
 		key = "stringvalue"
-	[ext.config.channels.#channel] # All networks for #channel
+	[ext.config.channels.#channel]
 		key = "stringvalue"
-	[ext.config.networks.ircnet] # All channels on ircnet network
+	[ext.config.networks.ircnet]
 		key = "stringvalue"
-	[ext.config.networks.ircnet.channels.#channel] # Freenode's #channel
+	[ext.config.networks.ircnet.channels.#channel]
 		key = "stringvalue"
 
 [exts.myext]
-	# Define exec to specify a path to the executable to launch.
 	exec = "/path/to/executable"
 
-	# Defining this means that the bot will try to connect to this extension
-	# rather than expecting it to connect to the listen server above.
 	server = "localhost:44"
 	ssl = true
 	sslcert = "/path/to/a.crt"
 	noverifycert = false
 
-	# Define the above connection properties, or simply this one property.
 	unix = "/path/to/sock.sock"
 
-	# Use json not gob.
 	usejson = false
 
 	[exts.myext.active]
@@ -207,6 +193,16 @@ func verifyFakeConfig(t *testing.T, conf *Config) {
 	expb = false
 	if got, ok := net1.NoStore(); !ok || expb != got {
 		t.Errorf("Expected: %v, got: %v", expb, got)
+	}
+
+	expb = false
+	if got, ok := net1.NoAutoJoin(); !ok || expb != got {
+		t.Errorf("Expected: %v, got: %v", expb, got)
+	}
+
+	expu = 5
+	if got, ok := net1.JoinDelay(); !ok || expu != got {
+		t.Errorf("Expected: %v, got: %v", expu, got)
 	}
 
 	expu = 120

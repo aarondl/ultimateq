@@ -12,6 +12,9 @@ An example configuration looks like this:
 	loglevel = "debug"
 	logfile = "/path/to/file.log"
 
+	# Most of the configuration values below have healthy defaults which means
+	# you don't have to set any of them. servers, nick, username, realname is
+	# enough!
 	[networks.ircnet]
 		servers = ["localhost:3333", "server.com:6667"]
 
@@ -21,24 +24,33 @@ An example configuration looks like this:
 		realname = "Realname"
 		password = "Password"
 
+		# SSL Options
 		ssl = true
 		sslcert = "/path/to/a.crt"
 		noverifycert = false
 
+		# Bot Internal Database Options
 		nostate = false
 		nostore = false
 
+		# Auto(Re)Join controls.
+		noautojoin = false
+		# How many seconds after connect or while banned to wait to rejoin.
+		joindelay = 5
+
+		# Flood control fine tuning knobs.
 		floodlenpenalty = 120
 		floodtimeout = 10.0
 		floodstep = 2.0
 
+		# Send a ping to the server every X seconds.
 		keepalive = 60.0
 
+		# Reconnection controls.
 		noreconnect = false
 		reconnecttimeout = 20
 
-		# Optional, this is the hardcoded default value, you can set it if
-		# you don't feel like writing prefix in the channels all the time.
+		# For fallback of channels below.
 		prefix = "."
 
 		[[networks.ircnet.channels]]
@@ -116,6 +128,9 @@ const (
 	defaultStoreFile = "./store.db"
 	// defaultLogLevel is the log level of the bot.
 	defaultLogLevel = "info"
+	// defaultJoinDelay is how many seconds to wait before auto (re)joining a
+	// channel.
+	defaultJoinDelay = uint(5)
 	// defaultFloodLenPenalty is how many characters in a message by default
 	// warrant an extra second wait time.
 	defaultFloodLenPenalty = uint(120)
