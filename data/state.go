@@ -537,7 +537,9 @@ func (s *State) rplWhoReply(ev *irc.Event) {
 	s.GetUser(fullhost).SetRealname(realname)
 	for _, modechar := range modes {
 		if mode := s.umodes.GetMode(modechar); mode != 0 {
-			s.GetUsersChannelModes(fullhost, channel).SetMode(mode)
+			if uc := s.GetUsersChannelModes(fullhost, channel); uc != nil {
+				uc.SetMode(mode)
+			}
 		}
 	}
 }
@@ -547,12 +549,16 @@ func (s *State) rplWhoReply(ev *irc.Event) {
 func (s *State) rplChannelModeIs(ev *irc.Event) {
 	channel := ev.Args[1]
 	modes := strings.Join(ev.Args[2:], " ")
-	s.GetChannel(channel).Apply(modes)
+	if ch := s.GetChannel(channel); ch != nil {
+		ch.Apply(modes)
+	}
 }
 
 // rplBanList alters the state of the database when a RPL_BANLIST message is
 // received.
 func (s *State) rplBanList(ev *irc.Event) {
 	channel := ev.Args[1]
-	s.GetChannel(channel).AddBan(ev.Args[2])
+	if ch := s.GetChannel(channel); ch != nil {
+		ch.AddBan(ev.Args[2])
+	}
 }
