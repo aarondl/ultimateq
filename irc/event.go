@@ -6,6 +6,7 @@ and constants.
 package irc
 
 import (
+	"bytes"
 	"strings"
 	"time"
 )
@@ -86,6 +87,28 @@ func (e *Event) IsTargetChan() bool {
 // that supports a Message argument.
 func (e *Event) Message() string {
 	return e.Args[1]
+}
+
+// String turns this back into an IRC style message.
+func (e *Event) String() string {
+	b := &bytes.Buffer{}
+	if len(e.Sender) > 0 {
+		b.WriteByte(':')
+		b.WriteString(e.Sender)
+		b.WriteByte(' ')
+	}
+	b.WriteString(e.Name)
+
+	lastArg := len(e.Args) - 1
+	for i, arg := range e.Args {
+		b.WriteByte(' ')
+		if lastArg == i && strings.ContainsRune(arg, ' ') {
+			b.WriteByte(':')
+		}
+		b.WriteString(arg)
+	}
+
+	return b.String()
 }
 
 // IsCTCP checks if this event is a CTCP event. This means it's delimited

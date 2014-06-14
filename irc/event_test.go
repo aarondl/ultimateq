@@ -90,3 +90,11 @@ func TestEvent_IsTargetChan(t *testing.T) {
 		t.Error("The target should not be a channel!")
 	}
 }
+
+func TestEvent_String(t *testing.T) {
+	ev := NewEvent("", nil, PRIVMSG, "n!u@h", "arg1", "arg2 with space")
+	exp := ":n!u@h PRIVMSG arg1 :arg2 with space"
+	if got := ev.String(); got != exp {
+		t.Errorf(`Expected: "%v", got "%v"`, exp, got)
+	}
+}
