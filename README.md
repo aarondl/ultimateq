@@ -20,7 +20,8 @@ import (
 )
 
 func main() {
-    b, err := bot.NewBot(bot.ConfigureFile("config.yaml"))
+    cfg := config.NewConfig().FromFile("config.toml")
+    b, err := bot.NewBot(cfg)
     if err != nil {
         log.Fatalln("Error creating bot:", err)
     }
@@ -48,16 +49,15 @@ func main() {
 
 Here's a quick sample config.yaml for use with the above:
 
-```yaml
-global:
-    nick: Bot
-    altnick: Bot_
-    username: notabot
-    realname: No Bot Here
-servers:
-    irc.test.com:
-        port: 3333
-        ssl: true
+```toml
+nick = "Bot"
+altnick = "Bot"
+username = "notabot"
+realname = "A real bot"
+
+[networks.test]
+	servers = ["localhost:3337"]
+	ssl = true
 ```
 
 ##Package status

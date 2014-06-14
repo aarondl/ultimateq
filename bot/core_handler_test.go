@@ -52,18 +52,25 @@ func TestCoreHandler_Ping(t *testing.T) {
 }
 
 func TestCoreHandler_Connect(t *testing.T) {
-	b, _ := createBot(fakeConfig, nil, nil, false, false)
-	cnf := fakeConfig.GetServer(netID)
+	cnf := fakeConfig.Clone()
+	net := cnf.Network(netID).SetPassword("password")
+	b, _ := createBot(cnf, nil, nil, false, false)
+
+	password, _ := net.Password()
+	nick, _ := net.Nick()
+	username, _ := net.Username()
+	realname, _ := net.Realname()
+
 	handler := coreHandler{bot: b}
-	msg1 := fmt.Sprintf("NICK :%v", cnf.GetNick())
-	msg2 := fmt.Sprintf("USER %v 0 * :%v",
-		cnf.GetUsername(), cnf.GetRealname())
+	msg1 := fmt.Sprintf("PASSWORD :%v", password)
+	msg2 := fmt.Sprintf("NICK :%v", nick)
+	msg3 := fmt.Sprintf("USER %v 0 * :%v", username, realname)
 
 	ev := irc.NewEvent(netID, netInfo, irc.CONNECT, "")
 	endpoint := makeTestPoint(b.servers[netID])
 	handler.HandleRaw(endpoint, ev)
 
-	expect := msg1 + msg2
+	expect := msg1 + msg2 + msg3
 	if got := endpoint.gets(); got != expect {
 		t.Errorf("Expected: %s, got: %s", expect, got)
 	}
@@ -71,16 +78,18 @@ func TestCoreHandler_Connect(t *testing.T) {
 
 func TestCoreHandler_Nick(t *testing.T) {
 	b, _ := createBot(fakeConfig, nil, nil, false, false)
-	cnf := fakeConfig.GetServer(netID)
+	cnf := fakeConfig.Network(netID)
 	handler := coreHandler{bot: b}
 	ev := irc.NewEvent(netID, netInfo, irc.ERR_NICKNAMEINUSE, "")
 
 	endpoint := makeTestPoint(b.servers[netID])
 
+	nick, _ := cnf.Nick()
+	altnick, _ := cnf.Altnick()
 	nickstr := "NICK :"
-	nick1 := nickstr + cnf.GetAltnick()
-	nick2 := nickstr + cnf.GetNick() + "_"
-	nick3 := nickstr + cnf.GetNick() + "__"
+	nick1 := nickstr + altnick
+	nick2 := nickstr + nick + "_"
+	nick3 := nickstr + nick + "__"
 
 	handler.HandleRaw(endpoint, ev)
 	if got := endpoint.gets(); got != nick1 {

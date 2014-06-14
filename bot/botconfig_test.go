@@ -18,9 +18,9 @@ func TestBotConfig_ReadConfig(t *testing.T) {
 	b, _ := createBot(fakeConfig, nil, nil, false, false)
 
 	b.ReadConfig(func(conf *config.Config) {
-		if conf.Servers[netID].GetNick() !=
-			fakeConfig.Servers[netID].GetNick() {
-
+		got, _ := conf.Network(netID).Nick()
+		exp, _ := conf.Network(netID).Nick()
+		if got != exp {
 			t.Error("The names should have been the same.")
 		}
 	})
@@ -30,9 +30,9 @@ func TestBotConfig_WriteConfig(t *testing.T) {
 	b, _ := createBot(fakeConfig, nil, nil, false, false)
 
 	b.WriteConfig(func(conf *config.Config) {
-		if conf.Servers[netID].GetNick() !=
-			fakeConfig.Servers[netID].GetNick() {
-
+		got, _ := conf.Network(netID).Nick()
+		exp, _ := conf.Network(netID).Nick()
+		if got != exp {
 			t.Error("The names should have been the same.")
 		}
 	})
@@ -77,7 +77,7 @@ func TestBotConfig_ReplaceConfig(t *testing.T) {
 	nick := []byte(irc.NICK + " :newnick\r\n")
 
 	conns := map[string]*mocks.Conn{
-		netID + ":6667":         mocks.NewConn(),
+		"irc.test.net":          mocks.NewConn(),
 		"newserver:6667":        mocks.NewConn(),
 		"anothernewserver:6667": mocks.NewConn(),
 	}
@@ -89,29 +89,28 @@ func TestBotConfig_ReplaceConfig(t *testing.T) {
 		return conns[srv], nil
 	}
 
-	chans1 := []string{"#chan1", "#chan2", "#chan3"}
+	/*chans1 := []string{"#chan1", "#chan2", "#chan3"}
 	chans2 := []string{"#chan1", "#chan3"}
-	chans3 := []string{"#chan1"}
+	chans3 := []string{"#chan1"}*/
 
-	c1 := fakeConfig.Clone().
-		GlobalContext().
-		Channels(chans1...).
-		Server("newserver")
+	c1 := fakeConfig.Clone()
+	c1.NewNetwork("newserver").SetServers([]string{"newserver:6667"})
+	/*GlobalContext().
+	Channels(chans1...).*/
 
-	c2 := fakeConfig.Clone().
-		GlobalContext().
-		Channels(chans2...).
-		ServerContext(netID).
-		Nick("newnick").
-		Channels(chans3...).
-		Server("anothernewserver")
+	c2 := fakeConfig.Clone()
+	//Channels(chans2...).
+	c2.Network(netID).SetNick("newnick")
+	c2.NewNetwork("anothernewserver").
+		SetServers([]string{"anothernewserver:6667"})
 
-	c3 := &config.Config{}
+	c3 := config.NewConfig()
 
 	b, _ := createBot(c1, connProvider, nil, false, false)
-	if len(c1.Servers) != len(b.servers) {
+	srvs := c1.Networks()
+	if len(srvs) != len(b.servers) {
 		t.Errorf("The number of servers (%v) should match the config (%v)",
-			len(b.servers), len(c1.Servers))
+			len(b.servers), len(srvs))
 	}
 
 	oldsrv1, oldsrv2 := b.servers[netID], b.servers["newserver"]
@@ -125,7 +124,7 @@ func TestBotConfig_ReplaceConfig(t *testing.T) {
 	<-old1listen
 	<-old2listen
 
-	if e := b.conf.Global.Channels; !contains(e, chans1) {
+	/*if e := b.conf.Global.Channels; !contains(e, chans1) {
 		t.Errorf("Expected elements: %v", e)
 	}
 	if e := oldsrv1.conf.GetChannels(); !contains(e, chans1) {
@@ -142,7 +141,7 @@ func TestBotConfig_ReplaceConfig(t *testing.T) {
 	}
 	if e := oldsrv2.dispatchCore.Channels(); !contains(e, chans1) {
 		t.Errorf("Expected elements: %v", e)
-	}
+	}*/
 
 	success := b.ReplaceConfig(c3) // Invalid Config
 	if success {
@@ -157,14 +156,15 @@ func TestBotConfig_ReplaceConfig(t *testing.T) {
 		t.Error("Expected a kill error")
 	}
 
-	newsrv1 := b.servers["anothernewserver"]
+	//newsrv1 := b.servers["anothernewserver"]
 
-	if len(c2.Servers) != len(b.servers) {
+	srvs = c2.Networks()
+	if len(srvs) != len(b.servers) {
 		t.Errorf("The number of servers (%v) should match the config (%v)",
-			len(b.servers), len(c2.Servers))
+			len(b.servers), len(srvs))
 	}
 
-	if e := b.conf.Global.Channels; !contains(e, chans2) {
+	/*if e := b.conf.Global.Channels; !contains(e, chans2) {
 		t.Errorf("Expected elements: %v", e)
 	}
 	if e := oldsrv1.conf.GetChannels(); !contains(e, chans3) {
@@ -181,9 +181,9 @@ func TestBotConfig_ReplaceConfig(t *testing.T) {
 	}
 	if e := newsrv1.dispatchCore.Channels(); !contains(e, chans2) {
 		t.Errorf("Expected elements: %v", e)
-	}
+	}*/
 
-	recv := conns[netID+":6667"].Receive(len(nick), nil)
+	recv := conns["irc.test.net"].Receive(len(nick), nil)
 	if bytes.Compare(recv, nick) != 0 {
 		t.Errorf("Was expecting a change in nick but got: %s", recv)
 	}

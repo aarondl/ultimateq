@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aarondl/ultimateq/config"
 	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/irc"
 )
@@ -22,7 +23,7 @@ const (
 	u2user   = "user2"
 	channel  = "#chan"
 	password = "password"
-	prefix   = "."
+	prefix   = '.'
 )
 
 var (
@@ -46,9 +47,11 @@ type tSetup struct {
 }
 
 func commandsSetup(t *testing.T) *tSetup {
-	conf := Configure().Nick("nobody").Altnick("nobody1").Username("nobody").
-		Userhost("host.com").Realname("ultimateq").NoReconnect(true).
-		Ssl(true).Prefix(prefix).Server(netID)
+	conf := config.NewConfig()
+	conf.Network("").SetNick("nobody").SetAltnick("nobody1").
+		SetUsername("nobody").SetRealname("ultimateq").
+		SetNoReconnect(true).SetSSL(true).SetPrefix(prefix)
+	conf.NewNetwork(netID)
 
 	b, err := createBot(conf, nil, func(_ string) (*data.Store, error) {
 		return data.NewStore(data.MemStoreProvider)
@@ -120,9 +123,11 @@ func prvRspChk(ts *tSetup, expected, to, sender string, args ...string) error {
 }
 
 func TestCoreCommands(t *testing.T) {
-	conf := Configure().Nick("nobody").Altnick("nobody1").Username("nobody").
-		Userhost("bitforge.ca").Realname("ultimateq").NoReconnect(true).
-		Ssl(true).Server(netID)
+	conf := config.NewConfig()
+	conf.Network("").SetNick("nobody").SetAltnick("nobody1").
+		SetUsername("nobody").SetRealname("ultimateq").SetNoReconnect(true).
+		SetSSL(true)
+	conf.NewNetwork(netID)
 
 	b, err := createBot(conf, nil, func(_ string) (*data.Store, error) {
 		return data.NewStore(data.MemStoreProvider)
@@ -289,7 +294,7 @@ func TestCoreCommands_Access(t *testing.T) {
 		t.Error(err)
 	}
 
-	err = pubRspChk(ts, accessSuccess, u1host, prefix+access)
+	err = pubRspChk(ts, accessSuccess, u1host, string(prefix)+access)
 	if err != nil {
 		t.Error(err)
 	}

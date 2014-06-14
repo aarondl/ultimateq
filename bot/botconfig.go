@@ -18,16 +18,12 @@ type configCallback func(*config.Config)
 // ReadConfig opens the config for reading, for the duration of the callback
 // the config is synchronized.
 func (b *Bot) ReadConfig(fn configCallback) {
-	b.protectConfig.RLock()
-	defer b.protectConfig.RUnlock()
 	fn(b.conf)
 }
 
 // WriteConfig opens the config for writing, for the duration of the callback
 // the config is synchronized.
 func (b *Bot) WriteConfig(fn configCallback) {
-	b.protectConfig.Lock()
-	defer b.protectConfig.Unlock()
 	fn(b.conf)
 }
 
@@ -37,45 +33,39 @@ func (b *Bot) WriteConfig(fn configCallback) {
 // from the new configuration for each server. Returns false if the config
 // had an error.
 func (b *Bot) ReplaceConfig(newConfig *config.Config) bool {
-	if !newConfig.IsValid() {
+	if !newConfig.Validate() {
 		return false
 	}
 
 	b.protectServers.Lock()
-	b.protectConfig.Lock()
 	defer b.protectServers.Unlock() // LIFO
-	defer b.protectConfig.Unlock()
 
 	b.startNewServers(newConfig)
 
-	for k, s := range b.servers {
-		if serverConf := newConfig.GetServer(k); nil == serverConf {
+	for netID, s := range b.servers {
+		if serverConf := newConfig.Network(netID); nil == serverConf {
 			b.stopServer(s)
-			delete(b.servers, k)
+			delete(b.servers, netID)
 			continue
 		} else {
-			s.rehashConfig(serverConf)
+			s.rehashConfig(newConfig)
 		}
 	}
 
-	if !contains(b.conf.Global.GetChannels(), newConfig.Global.GetChannels()) {
-		b.dispatchCore.SetChannels(newConfig.Global.GetChannels())
-	}
-
-	b.conf = newConfig
+	b.conf.Replace(newConfig)
 	return true
 }
 
 // startNewServers adds non-existing servers to the bot and starts them.
 func (b *Bot) startNewServers(newConfig *config.Config) {
-	for k, s := range newConfig.Servers {
-		if serverConf := b.conf.GetServer(k); nil == serverConf {
-			server, err := b.createServer(s)
+	for _, net := range newConfig.Networks() {
+		if serverConf := b.conf.Network(net); nil == serverConf {
+			server, err := b.createServer(net, newConfig)
 			if err != nil {
-				b.botEnd <- fmt.Errorf(errFmtNewServer, k, err)
+				b.botEnd <- fmt.Errorf(errFmtNewServer, net, err)
 				continue
 			}
-			b.servers[k] = server
+			b.servers[net] = server
 
 			go b.startServer(server, true, true)
 		}
@@ -83,17 +73,13 @@ func (b *Bot) startNewServers(newConfig *config.Config) {
 }
 
 // rehashConfig updates the server's config values from the new configuration.
-func (s *Server) rehashConfig(srvConfig *config.Server) {
-	setNick := s.conf.GetNick() != srvConfig.GetNick()
-	setChannels := !contains(s.conf.GetChannels(), srvConfig.GetChannels())
-
-	s.conf = srvConfig
+func (s *Server) rehashConfig(newConfig *config.Config) {
+	oldNick, _ := s.conf.Network(s.networkID).Nick()
+	newNick, _ := newConfig.Network(s.networkID).Nick()
+	setNick := newNick != oldNick
 
 	if setNick {
-		s.Write([]byte(irc.NICK + " :" + s.conf.GetNick()))
-	}
-	if setChannels {
-		s.dispatchCore.SetChannels(s.conf.GetChannels())
+		s.Write([]byte(irc.NICK + " :" + newNick))
 	}
 }
 
@@ -101,26 +87,21 @@ func (s *Server) rehashConfig(srvConfig *config.Server) {
 // config file name if loaded from a file... If not it will use a default file
 // name. It then calls Bot.ReplaceConfig.
 func (b *Bot) Rehash() error {
-	b.protectConfig.RLock()
-	name := b.conf.GetFilename()
-	b.protectConfig.RUnlock()
+	fname, _ := b.conf.StoreFile()
 
-	conf := config.NewConfigFromFile(name)
+	conf := config.NewConfig().FromFile(fname)
 	if !CheckConfig(conf) {
 		return errInvalidConfig
 	}
-	b.ReplaceConfig(conf)
+	b.conf.Replace(conf)
 	return nil
 }
 
 // DumpConfig dumps the config to a file. It attempts to use the previously read
 // config file name if loaded from a file... If not it will use a default file
 // name.
-func (b *Bot) DumpConfig() (err error) {
-	b.protectConfig.RLock()
-	defer b.protectConfig.RUnlock()
-	err = config.FlushConfigToFile(b.conf, b.conf.GetFilename())
-	return
+func (b *Bot) DumpConfig() error {
+	return b.conf.ToFile("")
 }
 
 // contains checks that the string arrays contain the same elements.

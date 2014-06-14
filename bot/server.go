@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net"
 	"os"
-	"strconv"
 	"sync"
 	"time"
 
@@ -49,8 +49,9 @@ var (
 // connResult is used to return results from the channel patterns in
 // createIrcClient
 type connResult struct {
-	conn net.Conn
-	err  error
+	conn      net.Conn
+	temporary bool
+	err       error
 }
 
 // certReader is for IoC of the createTlsConfig function.
@@ -59,15 +60,15 @@ type certReader func(string) (*x509.CertPool, error)
 // Server is all the details around a specific server connection. Also contains
 // the connection and configuration for the specific server.
 type Server struct {
-	bot  *Bot
-	name string
+	bot       *Bot
+	networkID string
 
 	// Status
 	status          Status
 	statusListeners [][]chan Status
 
 	// Configuration
-	conf    *config.Server
+	conf    *config.Config
 	netInfo *irc.NetworkInfo
 
 	// Dispatching
@@ -81,8 +82,9 @@ type Server struct {
 
 	// State and Connection
 	client      *inet.IrcClient
-	started     bool
 	state       *data.State
+	started     bool
+	serverIndex int
 	reconnScale time.Duration
 	killable    chan int
 
@@ -123,9 +125,9 @@ func (s *Server) createState() (err error) {
 
 // createIrcClient connects to the configured server, and creates an IrcClient
 // for use with that connection.
-func (s *Server) createIrcClient() error {
+func (s *Server) createIrcClient() (error, bool) {
 	if s.client != nil {
-		return fmt.Errorf(errFmtAlreadyConnected, s.name)
+		return fmt.Errorf(errFmtAlreadyConnected, s.networkID), false
 	}
 
 	var result *connResult
@@ -138,22 +140,28 @@ func (s *Server) createIrcClient() error {
 	case resultService <- resultChan:
 		result = <-resultChan
 		if result.err != nil {
-			return result.err
+			return result.err, result.temporary
 		}
 	case s.killable <- 0:
 		close(resultService)
-		return errServerKilledConn
+		return errServerKilledConn, false
 	}
 
+	cfg := s.conf.Network(s.networkID)
+	floodPenalty, _ := cfg.FloodLenPenalty()
+	floodTimeout, _ := cfg.FloodTimeout()
+	floodStep, _ := cfg.FloodStep()
+	keepAlive, _ := cfg.KeepAlive()
+
 	s.protect.Lock()
-	s.client = inet.NewIrcClient(result.conn, s.name,
-		int(s.conf.GetFloodLenPenalty()),
-		time.Duration(s.conf.GetFloodTimeout()*1000.0)*time.Millisecond,
-		time.Duration(s.conf.GetFloodStep()*1000.0)*time.Millisecond,
-		time.Duration(s.conf.GetKeepAlive())*time.Second,
+	s.client = inet.NewIrcClient(result.conn, s.networkID,
+		int(floodPenalty),
+		time.Duration(floodTimeout)*time.Second,
+		time.Duration(floodStep)*time.Second,
+		time.Duration(keepAlive)*time.Second,
 		time.Second)
 	s.protect.Unlock()
-	return nil
+	return nil, false
 }
 
 // createConnection creates a connection based off the server receiver's
@@ -161,15 +169,20 @@ func (s *Server) createIrcClient() error {
 // If the channel is closed before it can send it's result, it will close the
 // connection automatically.
 func (s *Server) createConnection(resultService chan chan *connResult) {
-	s.bot.protectConfig.RLock()
-	defer s.bot.protectConfig.RUnlock()
-
 	r := &connResult{}
-	port := strconv.Itoa(int(s.conf.GetPort()))
-	server := s.conf.GetHost() + ":" + port
+
+	cfg := s.conf.Network(s.networkID)
+	srvs, _ := cfg.Servers()
+	ssl, _ := cfg.SSL()
+	if s.serverIndex >= len(srvs) {
+		s.serverIndex = 0
+	}
+
+	server := srvs[s.serverIndex]
+	log.Printf("(%s) Connecting to: %s", s.networkID, server)
 
 	if s.bot.connProvider == nil {
-		if s.conf.GetSsl() {
+		if ssl {
 			var conf *tls.Config
 			conf, r.err = s.createTlsConfig(readCert)
 			if r.err == nil {
@@ -180,6 +193,16 @@ func (s *Server) createConnection(resultService chan chan *connResult) {
 		}
 	} else {
 		r.conn, r.err = s.bot.connProvider(server)
+	}
+
+	if r.err != nil {
+		log.Printf("(%s) Failed to connect: %v", s.networkID, server)
+		if e, ok := r.err.(net.Error); ok {
+			r.temporary = e.Temporary()
+		} else {
+			r.temporary = false
+		}
+		s.serverIndex++
 	}
 
 	if resultChan, ok := <-resultService; ok {
@@ -194,10 +217,12 @@ func (s *Server) createConnection(resultService chan chan *connResult) {
 // createTlsConfig creates a tls config appropriate for the
 func (s *Server) createTlsConfig(cr certReader) (conf *tls.Config, err error) {
 	conf = &tls.Config{}
-	conf.InsecureSkipVerify = s.conf.GetNoVerifyCert()
+	cfg := s.conf.Network(s.networkID)
+	skipVerify, _ := cfg.NoVerifyCert()
+	conf.InsecureSkipVerify = skipVerify
 
-	if len(s.conf.GetSslCert()) > 0 {
-		conf.RootCAs, err = cr(s.conf.GetSslCert())
+	if cert, ok := cfg.SSLCert(); ok {
+		conf.RootCAs, err = cr(cert)
 	}
 
 	return

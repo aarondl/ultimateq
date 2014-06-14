@@ -98,31 +98,11 @@ type Bot struct {
 	msgDispatchers sync.WaitGroup
 	protectStore   sync.RWMutex
 	protectServers sync.RWMutex
-	// protectConfig also provides locking for the server's config variables
-	// since they are the same config, just pointers to internal chunks.
-	protectConfig sync.RWMutex
-}
-
-// Configure starts a configuration by calling NewConfig. Alias for
-// config.NewConfig
-func Configure() *config.Config {
-	return config.NewConfig()
-}
-
-// ConfigureFile starts a configuration by reading in a file. Alias for
-// config.NewConfigFromFile
-func ConfigureFile(filename string) *config.Config {
-	return config.NewConfigFromFile(filename)
-}
-
-// ConfigureFunction creates a blank configuration and passes it into a function
-func ConfigureFunction(cnf func(*config.Config) *config.Config) *config.Config {
-	return cnf(config.NewConfig())
 }
 
 // CheckConfig checks a bots config for validity.
 func CheckConfig(c *config.Config) bool {
-	if !c.IsValid() {
+	if !c.Validate() {
 		c.DisplayErrors()
 		return false
 	}
@@ -207,6 +187,7 @@ func (b *Bot) StartNetwork(networkID string) (started bool) {
 func (b *Bot) startServer(srv *Server, writing, reading bool) {
 	var err error
 	var disconnect bool
+	var temporary bool
 
 	b.serverControl <- serverOp{srv, true, nil}
 	if !<-b.serverStart {
@@ -215,8 +196,8 @@ func (b *Bot) startServer(srv *Server, writing, reading bool) {
 
 	for err == nil {
 		srv.setStatus(STATUS_CONNECTING)
-		err = srv.createIrcClient()
-		disconnect = err != nil && err != errServerKilledConn
+		err, temporary = srv.createIrcClient()
+		disconnect = err != nil && temporary
 
 		if err == nil {
 			srv.setStatus(STATUS_STARTED)
@@ -227,19 +208,22 @@ func (b *Bot) startServer(srv *Server, writing, reading bool) {
 				break
 			}
 		}
+		log.Printf("(%s) Disconnected", srv.networkID)
 
-		b.protectConfig.RLock()
-		if !disconnect || srv.conf.GetNoReconnect() {
-			b.protectConfig.RUnlock()
+		cfg := srv.conf.Network(srv.networkID)
+		noReconn, _ := cfg.NoReconnect()
+		reconnTime, _ := cfg.ReconnectTimeout()
+
+		if !disconnect || noReconn {
 			break
 		}
 
 		err = nil
 		srv.Close()
-		wait := time.Duration(srv.conf.GetReconnectTimeout()) * srv.reconnScale
-		b.protectConfig.RUnlock()
+		wait := time.Duration(reconnTime) * srv.reconnScale
 
 		srv.setStatus(STATUS_RECONNECTING)
+		log.Printf("(%s) Reconnecting in %v", srv.networkID, wait)
 		select {
 		case srv.killable <- 0:
 			err = errServerKilledReconn
@@ -260,7 +244,7 @@ func (b *Bot) dispatch(srv *Server) (disconnect bool, err error) {
 	readCh := srv.client.ReadChannel()
 
 	b.dispatchMessage(srv,
-		irc.NewEvent(srv.name, srv.netInfo, irc.CONNECT, srv.name))
+		irc.NewEvent(srv.networkID, srv.netInfo, irc.CONNECT, srv.networkID))
 	for err == nil && !disconnect {
 		select {
 		case ev, ok := <-readCh:
@@ -274,7 +258,7 @@ func (b *Bot) dispatch(srv *Server) (disconnect bool, err error) {
 				log.Printf(errFmtParsingIrcMessage, parseErr, ev)
 				break
 			}
-			ircMsg.NetworkID = srv.name
+			ircMsg.NetworkID = srv.networkID
 			ircMsg.NetworkInfo = srv.netInfo
 
 			srv.protectState.Lock()
@@ -290,7 +274,7 @@ func (b *Bot) dispatch(srv *Server) (disconnect bool, err error) {
 	}
 
 	b.dispatchMessage(srv,
-		irc.NewEvent(srv.name, srv.netInfo, irc.DISCONNECT, srv.name))
+		irc.NewEvent(srv.networkID, srv.netInfo, irc.DISCONNECT, srv.networkID))
 	return
 }
 
@@ -298,8 +282,8 @@ func (b *Bot) dispatch(srv *Server) (disconnect bool, err error) {
 func (b *Bot) dispatchMessage(s *Server, ev *irc.Event) {
 	b.dispatcher.Dispatch(s.writer, ev)
 	s.dispatcher.Dispatch(s.writer, ev)
-	b.cmds.Dispatch(s.name, s.cmds.GetPrefix(), s.writer, ev, b)
-	s.cmds.Dispatch(s.name, 0, s.writer, ev, b)
+	b.cmds.Dispatch(s.networkID, s.cmds.GetPrefix(), s.writer, ev, b)
+	s.cmds.Dispatch(s.networkID, 0, s.writer, ev, b)
 }
 
 // Stop shuts down all connections and exits.
@@ -491,29 +475,35 @@ func createBot(conf *config.Config, connProv ConnProvider,
 		serverEnd:      make(chan serverOp),
 	}
 
-	b.createDispatching(conf.Global.GetPrefix(), conf.Global.GetChannels())
+	networks := conf.Networks()
+	cfg := conf.Network("")
+	pfx, _ := cfg.Prefix()
+	b.createDispatching(pfx, nil)
 
 	makeStore := false
-	for _, srv := range conf.Servers {
-		makeStore = makeStore || !srv.GetNoStore()
+	for _, net := range networks {
+		nostore, _ := conf.Network(net).NoStore()
+		makeStore = makeStore || !nostore
 	}
 
 	var err error
 	if makeStore {
-		if err = b.createStore(conf.GetStoreFile()); err != nil {
+		sfile, _ := conf.StoreFile()
+		if err = b.createStore(sfile); err != nil {
 			return nil, err
 		}
 	}
 
-	for name, srv := range conf.Servers {
-		server, err := b.createServer(srv)
+	for _, net := range networks {
+		server, err := b.createServer(net, conf)
 		if err != nil {
 			return nil, err
 		}
-		b.servers[name] = server
+		b.servers[net] = server
 	}
 
-	if attachCommands && !conf.Global.GetNoStore() {
+	nostore, _ := cfg.NoStore()
+	if attachCommands && !nostore {
 		b.coreCommands, err = NewCoreCmds(b)
 		if err != nil {
 			return nil, err
@@ -525,19 +515,22 @@ func createBot(conf *config.Config, connProv ConnProvider,
 
 // createServer creates a dispatcher, and an irc client to connect to this
 // server.
-func (b *Bot) createServer(conf *config.Server) (*Server, error) {
+func (b *Bot) createServer(netID string, conf *config.Config) (*Server, error) {
 	s := &Server{
 		bot:         b,
-		name:        conf.GetName(),
+		networkID:   netID,
 		netInfo:     irc.NewNetworkInfo(),
 		conf:        conf,
 		killable:    make(chan int),
 		reconnScale: defaultReconnScale,
 	}
 
-	s.createDispatching(conf.GetPrefix(), conf.GetChannels())
+	cfg := conf.Network(netID)
+	pfx, _ := cfg.Prefix()
+	s.createDispatching(pfx, nil)
 
-	if !conf.GetNoState() {
+	nostate, _ := cfg.NoState()
+	if !nostate {
 		if err := s.createState(); err != nil {
 			return nil, err
 		}
@@ -590,7 +583,8 @@ func (b *Bot) getServer(networkID string) *Server {
 func Run(cb func(b *Bot)) error {
 	log.SetOutput(os.Stdout)
 
-	b, err := NewBot(ConfigureFile("config.yaml"))
+	cfg := config.NewConfig().FromFile("config.toml")
+	b, err := NewBot(cfg)
 	if err != nil {
 		return err
 	}
@@ -620,7 +614,9 @@ func Run(cb func(b *Bot)) error {
 			b.Stop()
 			stop = true
 		case err, ok := <-end:
-			log.Println("Server death:", err)
+			if ok {
+				log.Println("Server death:", err)
+			}
 			stop = !ok
 		}
 	}

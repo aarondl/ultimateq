@@ -38,6 +38,12 @@ func (h testCommand) Cmd(cmd string,
 	return nil
 }
 
+type reconnErr struct{}
+
+func (r reconnErr) Error() string   { return "reconnErr" }
+func (r reconnErr) Timeout() bool   { return true }
+func (r reconnErr) Temporary() bool { return true }
+
 func init() {
 	f, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
 	if err != nil {
@@ -49,20 +55,21 @@ func init() {
 	data.UserAccessPwdCost = 4 // See bcrypt.MinCost
 }
 
-var netID = "irc.test.net"
+var netID = "test"
 
-var fakeConfig = Configure().
-	Nick("nobody").
-	Altnick("nobody1").
-	Username("nobody").
-	Userhost("bitforge.ca").
-	Realname("ultimateq").
-	NoReconnect(true).
-	NoStore(true).
-	NoVerifyCert(true).
-	SslCert("fakecert").
-	Ssl(true).
-	Server(netID)
+var fakeConfig = config.NewConfig().FromString(`
+nick = "nobody"
+altnick = "nobody1"
+username = "nobody"
+realname = "ultimateq"
+noreconnect = true
+nostore = true
+noverifycert = true
+sslcert = "fakecert"
+ssl = true
+[networks.test]
+	servers = ["irc.test.net"]
+`)
 
 //==================================
 // Tests begin
@@ -76,18 +83,10 @@ func TestBot_Create(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	_, err = NewBot(Configure())
+
+	_, err = NewBot(config.NewConfig())
 	if err != errInvalidConfig {
 		t.Error("Expected error:", errInvalidConfig, "got", err)
-	}
-
-	_, err = NewBot(ConfigureFunction(
-		func(conf *config.Config) *config.Config {
-			return fakeConfig
-		}),
-	)
-	if err != nil {
-		t.Error("Unexpected Error:", err)
 	}
 }
 
@@ -98,7 +97,7 @@ func TestBot_Start(t *testing.T) {
 	}
 	var err error
 	conf := fakeConfig.Clone()
-	conf.Server("otherserver")
+	conf.NewNetwork("otherserver").SetServers([]string{"o.com"})
 	b, _ := createBot(conf, connProvider, nil, false, false)
 	dead := 0
 	for err = range b.Start() {
@@ -107,7 +106,7 @@ func TestBot_Start(t *testing.T) {
 		}
 		dead++
 	}
-	if dead != len(conf.Servers) {
+	if dead != len(conf.Networks()) {
 		t.Error("It should die once for each server.")
 	}
 }
@@ -124,7 +123,7 @@ func TestBot_StartStopNetwork(t *testing.T) {
 		return conn2, nil
 	}
 	conf := fakeConfig.Clone()
-	conf.Server("othersrv").Host("other")
+	conf.NewNetwork("othersrv").SetServers([]string{"other:6667"})
 	b, _ := createBot(conf, connProvider, nil, false, false)
 	srv := b.servers[netID]
 
@@ -255,8 +254,8 @@ func TestBot_Reconnect(t *testing.T) {
 		return conn, nil
 	}
 
-	conf := fakeConfig.Clone().GlobalContext().NoReconnect(false).
-		ReconnectTimeout(1)
+	conf := fakeConfig.Clone()
+	conf.Network("").SetNoReconnect(false).SetReconnectTimeout(1)
 	b, _ := createBot(conf, connProvider, nil, false, false)
 	srv := b.servers[netID]
 	srv.reconnScale = time.Millisecond
@@ -285,11 +284,11 @@ func TestBot_ReconnectConnection(t *testing.T) {
 	wantedConn := make(chan int)
 	connProvider := func(srv string) (net.Conn, error) {
 		<-wantedConn
-		return nil, io.EOF
+		return nil, reconnErr{}
 	}
 
-	conf := fakeConfig.Clone().GlobalContext().NoReconnect(false).
-		ReconnectTimeout(1)
+	conf := fakeConfig.Clone()
+	conf.Network("").SetNoReconnect(false).SetReconnectTimeout(1)
 	b, _ := createBot(conf, connProvider, nil, false, false)
 	srv := b.servers[netID]
 	srv.reconnScale = time.Millisecond
@@ -317,11 +316,11 @@ func TestBot_ReconnectConnection(t *testing.T) {
 func TestBot_ReconnectKill(t *testing.T) {
 	t.Parallel()
 	connProvider := func(srv string) (net.Conn, error) {
-		return nil, io.EOF
+		return nil, reconnErr{}
 	}
 
-	conf := fakeConfig.Clone().GlobalContext().NoReconnect(false).
-		ReconnectTimeout(3)
+	conf := fakeConfig.Clone()
+	conf.Network("").SetNoReconnect(false).SetReconnectTimeout(3)
 	b, _ := createBot(conf, connProvider, nil, false, false)
 	srv := b.servers[netID]
 
@@ -412,9 +411,12 @@ func TestBot_RegisterCmd(t *testing.T) {
 
 func TestBot_Providers(t *testing.T) {
 	t.Parallel()
-	storeConf1 := fakeConfig.Clone().GlobalContext().NoStore(false)
-	storeConf2 := storeConf1.Clone().ServerContext(netID).NoStore(false)
-	storeConf3 := storeConf1.Clone().ServerContext(netID).NoStore(true)
+	storeConf1 := fakeConfig.Clone()
+	storeConf2 := storeConf1.Clone()
+	storeConf3 := storeConf1.Clone()
+	storeConf1.Network("").SetNoStore(false)
+	storeConf2.Network(netID).SetNoStore(false)
+	storeConf3.Network(netID).SetNoStore(true)
 
 	badConnProv := func(s string) (net.Conn, error) {
 		return nil, net.ErrWriteToConnected
@@ -448,7 +450,8 @@ func TestBot_Providers(t *testing.T) {
 
 func TestBot_Store(t *testing.T) {
 	t.Parallel()
-	conf := fakeConfig.Clone().GlobalContext().NoStore(false)
+	conf := fakeConfig.Clone()
+	conf.Network("").SetNoStore(false)
 	goodStoreProv := func(s string) (*data.Store, error) {
 		return data.NewStore(data.MemStoreProvider)
 	}
@@ -490,8 +493,9 @@ func TestBot_Locker(t *testing.T) {
 	goodStoreProv := func(s string) (*data.Store, error) {
 		return data.NewStore(data.MemStoreProvider)
 	}
-	b, err := createBot(fakeConfig.Clone().NoStore(false), nil,
-		goodStoreProv, false, false)
+	conf := fakeConfig.Clone()
+	conf.Network("").SetNoStore(false)
+	b, err := createBot(conf, nil, goodStoreProv, false, false)
 
 	if err != nil {
 		t.Error("Unexpected err:", err)

@@ -22,7 +22,8 @@ func TestServer_createIrcClient(t *testing.T) {
 	srv := b.servers[netID]
 
 	go func() {
-		errch <- srv.createIrcClient()
+		err, _ := srv.createIrcClient()
+		errch <- err
 	}()
 
 	if <-errch != nil {
@@ -43,7 +44,8 @@ func TestServer_createIrcClient_failConn(t *testing.T) {
 	srv := b.servers[netID]
 
 	go func() {
-		errch <- srv.createIrcClient()
+		err, _ := srv.createIrcClient()
+		errch <- err
 	}()
 
 	if <-errch != io.EOF {
@@ -62,7 +64,8 @@ func TestServer_createIrcClient_killConn(t *testing.T) {
 	srv := b.servers[netID]
 
 	go func() {
-		errch <- srv.createIrcClient()
+		err, _ := srv.createIrcClient()
+		errch <- err
 	}()
 
 	if _, ok := <-srv.killable; !ok {
@@ -102,7 +105,8 @@ func TestServer_Close(t *testing.T) {
 	srv := b.servers[netID]
 
 	go func() {
-		errch <- srv.createIrcClient()
+		err, _ := srv.createIrcClient()
+		errch <- err
 	}()
 
 	if err := <-errch; err != nil {

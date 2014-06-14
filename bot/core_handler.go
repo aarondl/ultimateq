@@ -30,26 +30,33 @@ func (c *coreHandler) HandleRaw(w irc.Writer, ev *irc.Event) {
 
 	case irc.CONNECT:
 		server := c.getServer(ev.NetworkID)
-		server.bot.protectConfig.Lock()
-		nick, uname, realname := server.conf.GetNick(),
-			server.conf.GetUsername(), server.conf.GetRealname()
-		server.bot.protectConfig.Unlock()
+
 		c.protect.Lock()
 		c.nickvalue = 0
 		c.protect.Unlock()
+
+		cfg := server.conf.Network(ev.NetworkID)
+		nick, _ := cfg.Nick()
+		uname, _ := cfg.Username()
+		realname, _ := cfg.Realname()
+
+		if password, ok := cfg.Password(); ok {
+			w.Send("PASSWORD :", password)
+		}
+
 		w.Send("NICK :", nick)
 		w.Sendf("USER %v 0 * :%v", uname, realname)
 
 	case irc.ERR_NICKNAMEINUSE:
 		server := c.getServer(ev.NetworkID)
 
-		c.bot.protectConfig.Lock()
-		defer c.bot.protectConfig.Unlock()
-		nick, altnick := server.conf.GetNick(), server.conf.GetAltnick()
+		cfg := server.conf.Network(ev.NetworkID)
+		nick, _ := cfg.Nick()
+		altnick, _ := cfg.Altnick()
 
 		c.protect.Lock()
 		defer c.protect.Unlock()
-		if c.nickvalue == 0 && 0 < len(altnick) {
+		if c.nickvalue == 0 && len(altnick) > 0 {
 			nick = altnick
 			c.nickvalue++
 		} else {
