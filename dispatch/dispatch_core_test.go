@@ -24,7 +24,7 @@ var netInfo = irc.NewNetworkInfo()
 
 func TestDispatchCore(t *testing.T) {
 	t.Parallel()
-	d := NewDispatchCore()
+	d := NewDispatchCore(nil)
 	if d == nil {
 		t.Error("Create should create things.")
 	}
@@ -32,7 +32,7 @@ func TestDispatchCore(t *testing.T) {
 
 func TestDispatchCore_Synchronization(t *testing.T) {
 	t.Parallel()
-	d := NewDispatchCore()
+	d := NewDispatchCore(nil)
 	d.HandlerStarted()
 	d.HandlerStarted()
 	d.HandlerFinished()
@@ -43,7 +43,7 @@ func TestDispatchCore_Synchronization(t *testing.T) {
 func TestDispatchCore_AddRemoveChannels(t *testing.T) {
 	t.Parallel()
 	chans := []string{"#chan1", "#chan2", "#chan3"}
-	d := NewDispatchCore(chans...)
+	d := NewDispatchCore(nil, chans...)
 
 	if err := checkArrays(chans, d.chans); err != nil {
 		t.Error(err)
@@ -85,7 +85,7 @@ func TestDispatchCore_AddRemoveChannels(t *testing.T) {
 
 func TestDispatchCore_Channels(t *testing.T) {
 	t.Parallel()
-	d := NewDispatchCore()
+	d := NewDispatchCore(nil)
 
 	if d.Channels() != nil {
 		t.Error("Should start uninitialized.")
@@ -106,7 +106,7 @@ func TestDispatchCore_Channels(t *testing.T) {
 
 func TestDispatchCore_UpdateChannels(t *testing.T) {
 	t.Parallel()
-	d := NewDispatchCore()
+	d := NewDispatchCore(nil)
 	chans := []string{"#chan1", "#chan2"}
 	d.SetChannels(chans)
 	if err := checkArrays(chans, d.chans); err != nil {
@@ -136,7 +136,7 @@ func TestDispatchCore_CheckTarget(t *testing.T) {
 	ev1 := irc.NewEvent("", ni1, irc.PRIVMSG, "", "#chan", "msg")
 	ev2 := irc.NewEvent("", ni1, irc.PRIVMSG, "", "&chan", "msg")
 
-	d := NewDispatchCore()
+	d := NewDispatchCore(nil)
 	if isChan, _ := d.CheckTarget(ev1); !isChan {
 		t.Error("Expected it to be a channel.")
 	}
@@ -157,7 +157,7 @@ func TestDispatchCore_CheckTarget(t *testing.T) {
 
 func TestDispatchCore_filterChannelDispatch(t *testing.T) {
 	t.Parallel()
-	d := NewDispatchCore([]string{"#CHAN"}...)
+	d := NewDispatchCore(nil, []string{"#CHAN"}...)
 	if d.chans == nil {
 		t.Error("Initialization failed.")
 	}

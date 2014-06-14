@@ -15,6 +15,7 @@ import (
 	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/dispatch/cmd"
 	"github.com/aarondl/ultimateq/irc"
+	"github.com/inconshreveable/log15"
 )
 
 var (
@@ -401,6 +402,6 @@ func main() {
 	})
 
 	if err != nil {
-		log.Fatalln(err)
+		log15.Error(err.Error())
 	}
 }

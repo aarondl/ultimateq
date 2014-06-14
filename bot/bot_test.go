@@ -13,6 +13,7 @@ import (
 	"github.com/aarondl/ultimateq/dispatch/cmd"
 	"github.com/aarondl/ultimateq/irc"
 	"github.com/aarondl/ultimateq/mocks"
+	"github.com/inconshreveable/log15"
 )
 
 type testHandler struct {
@@ -37,6 +38,8 @@ func (h testCommand) Cmd(cmd string,
 	}
 	return nil
 }
+
+var devNull = func() log15.Handler { return log15.DiscardHandler() }
 
 type reconnErr struct{}
 
@@ -84,9 +87,20 @@ func TestBot_Create(t *testing.T) {
 		t.Error(err)
 	}
 
+	log15.Root().SetHandler(log15.DiscardHandler())
 	_, err = NewBot(config.NewConfig())
 	if err != errInvalidConfig {
 		t.Error("Expected error:", errInvalidConfig, "got", err)
+	}
+}
+
+func TestBot_CreateLogger(t *testing.T) {
+	t.Parallel()
+
+	loglvlCfg := fakeConfig.Clone().SetLogLevel("crit")
+	bot, err := NewBot(loglvlCfg)
+	if bot == nil || err != nil {
+		t.Error("Bot should be created.")
 	}
 }
 
@@ -98,7 +112,7 @@ func TestBot_Start(t *testing.T) {
 	var err error
 	conf := fakeConfig.Clone()
 	conf.NewNetwork("otherserver").SetServers([]string{"o.com"})
-	b, _ := createBot(conf, connProvider, nil, false, false)
+	b, _ := createBot(conf, connProvider, nil, devNull, false, false)
 	dead := 0
 	for err = range b.Start() {
 		if err != io.EOF {
@@ -124,7 +138,7 @@ func TestBot_StartStopNetwork(t *testing.T) {
 	}
 	conf := fakeConfig.Clone()
 	conf.NewNetwork("othersrv").SetServers([]string{"other:6667"})
-	b, _ := createBot(conf, connProvider, nil, false, false)
+	b, _ := createBot(conf, connProvider, nil, devNull, false, false)
 	srv := b.servers[netID]
 
 	done := make(chan int)
@@ -164,7 +178,7 @@ func TestBot_Dispatching(t *testing.T) {
 	connProvider := func(srv string) (net.Conn, error) {
 		return conn, nil
 	}
-	b, _ := createBot(fakeConfig, connProvider, nil, false, false)
+	b, _ := createBot(fakeConfig, connProvider, nil, devNull, false, false)
 
 	result := make(chan *irc.Event)
 	thandler := &testHandler{
@@ -216,7 +230,7 @@ func TestBot_Dispatch_ConnectDisconnect(t *testing.T) {
 	connProvider := func(srv string) (net.Conn, error) {
 		return conn, nil
 	}
-	b, _ := createBot(fakeConfig, connProvider, nil, false, false)
+	b, _ := createBot(fakeConfig, connProvider, nil, devNull, false, false)
 
 	result := make(chan *irc.Event)
 	thandler := &testHandler{
@@ -256,7 +270,7 @@ func TestBot_Reconnect(t *testing.T) {
 
 	conf := fakeConfig.Clone()
 	conf.Network("").SetNoReconnect(false).SetReconnectTimeout(1)
-	b, _ := createBot(conf, connProvider, nil, false, false)
+	b, _ := createBot(conf, connProvider, nil, devNull, false, false)
 	srv := b.servers[netID]
 	srv.reconnScale = time.Millisecond
 
@@ -289,7 +303,7 @@ func TestBot_ReconnectConnection(t *testing.T) {
 
 	conf := fakeConfig.Clone()
 	conf.Network("").SetNoReconnect(false).SetReconnectTimeout(1)
-	b, _ := createBot(conf, connProvider, nil, false, false)
+	b, _ := createBot(conf, connProvider, nil, devNull, false, false)
 	srv := b.servers[netID]
 	srv.reconnScale = time.Millisecond
 
@@ -321,7 +335,7 @@ func TestBot_ReconnectKill(t *testing.T) {
 
 	conf := fakeConfig.Clone()
 	conf.Network("").SetNoReconnect(false).SetReconnectTimeout(3)
-	b, _ := createBot(conf, connProvider, nil, false, false)
+	b, _ := createBot(conf, connProvider, nil, devNull, false, false)
 	srv := b.servers[netID]
 
 	listen := make(chan Status)
@@ -340,7 +354,7 @@ func TestBot_ReconnectKill(t *testing.T) {
 
 func TestBot_Register(t *testing.T) {
 	t.Parallel()
-	b, _ := createBot(fakeConfig, nil, nil, false, false)
+	b, _ := createBot(fakeConfig, nil, nil, devNull, false, false)
 	gid := b.Register(irc.PRIVMSG, &coreHandler{})
 	id, err := b.RegisterNetwork(netID, irc.PRIVMSG, &coreHandler{})
 
@@ -372,7 +386,7 @@ func TestBot_RegisterCmd(t *testing.T) {
 	// t.Parallel() Cannot be parallel due to the nature of command registration
 	var err error
 	var success bool
-	b, _ := createBot(fakeConfig, nil, nil, false, false)
+	b, _ := createBot(fakeConfig, nil, nil, devNull, false, false)
 	command := "cmd"
 	err = b.RegisterCmd(cmd.MkCmd("ext", "desc", command, &testCommand{},
 		cmd.ALL, cmd.ALL))
@@ -425,24 +439,24 @@ func TestBot_Providers(t *testing.T) {
 		return nil, io.EOF
 	}
 
-	b, err := createBot(fakeConfig, badConnProv, nil, false, false)
+	b, err := createBot(fakeConfig, badConnProv, nil, devNull, false, false)
 	if err = <-b.Start(); err != net.ErrWriteToConnected {
 		t.Error("Expected:", net.ErrWriteToConnected, "got:", err)
 	}
 
-	b, err = createBot(fakeConfig, nil, badStoreProv, false, false)
+	b, err = createBot(fakeConfig, nil, badStoreProv, devNull, false, false)
 	if err != nil {
 		t.Error("Expected no errors.")
 	}
-	b, err = createBot(storeConf1, nil, badStoreProv, false, false)
+	b, err = createBot(storeConf1, nil, badStoreProv, devNull, false, false)
 	if err != io.EOF {
 		t.Error("Expected an error creating the store.")
 	}
-	b, err = createBot(storeConf2, nil, badStoreProv, false, false)
+	b, err = createBot(storeConf2, nil, badStoreProv, devNull, false, false)
 	if err != io.EOF {
 		t.Error("Expected an error creating the store.")
 	}
-	b, err = createBot(storeConf3, nil, badStoreProv, false, false)
+	b, err = createBot(storeConf3, nil, badStoreProv, devNull, false, false)
 	if err != nil {
 		t.Error("Expected no errors.")
 	}
@@ -455,7 +469,7 @@ func TestBot_Store(t *testing.T) {
 	goodStoreProv := func(s string) (*data.Store, error) {
 		return data.NewStore(data.MemStoreProvider)
 	}
-	b, err := createBot(conf, nil, goodStoreProv, false, false)
+	b, err := createBot(conf, nil, goodStoreProv, devNull, false, false)
 	if err != nil {
 		t.Error("Expected no errors.")
 	}
@@ -472,7 +486,7 @@ func TestBot_Stop(t *testing.T) {
 	connProvider := func(srv string) (net.Conn, error) {
 		return conn, nil
 	}
-	b, _ := createBot(fakeConfig, connProvider, nil, false, false)
+	b, _ := createBot(fakeConfig, connProvider, nil, devNull, false, false)
 	srv := b.servers[netID]
 
 	listen := make(chan Status)
@@ -495,7 +509,7 @@ func TestBot_Locker(t *testing.T) {
 	}
 	conf := fakeConfig.Clone()
 	conf.Network("").SetNoStore(false)
-	b, err := createBot(conf, nil, goodStoreProv, false, false)
+	b, err := createBot(conf, nil, goodStoreProv, devNull, false, false)
 
 	if err != nil {
 		t.Error("Unexpected err:", err)
@@ -535,7 +549,7 @@ func TestBot_GetEndpoint(t *testing.T) {
 	connProvider := func(srv string) (net.Conn, error) {
 		return conn, nil
 	}
-	b, _ := createBot(fakeConfig, connProvider, nil, false, false)
+	b, _ := createBot(fakeConfig, connProvider, nil, devNull, false, false)
 	srv := b.servers[netID]
 
 	listen := make(chan Status)

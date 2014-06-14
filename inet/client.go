@@ -7,10 +7,11 @@ package inet
 import (
 	"bytes"
 	"io"
-	"log"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/inconshreveable/log15"
 )
 
 const (
@@ -74,13 +75,6 @@ func (c ClientError) Error() string {
 	return b.String()
 }
 
-// Format strings for errors and logging output
-const (
-	fmtWrite    = "(%v) <- %s\n"
-	fmtWriteErr = "(%v) <- (%v) %s\n"
-	fmtRead     = "(%v) -> %s\n"
-)
-
 // IrcClient represents a connection to an irc server. It uses a queueing system
 // to throttle writes to the server. And it implements ReadWriteCloser interface
 type IrcClient struct {
@@ -95,8 +89,7 @@ type IrcClient struct {
 	killsiphon  chan error
 	queue       Queue
 
-	// The name of the connection for logging
-	name string
+	log log15.Logger
 
 	// write throttling
 	lastwrite        time.Time
@@ -116,13 +109,17 @@ type IrcClient struct {
 }
 
 // createIrcClient initializes the required fields in the IrcClient
-func createIrcClient(conn net.Conn, name string) *IrcClient {
+func createIrcClient(conn net.Conn, logger log15.Logger) *IrcClient {
+	if logger == nil {
+		logger = log15.New()
+		logger.SetHandler(log15.DiscardHandler())
+	}
 	return &IrcClient{
-		name:        name,
 		conn:        conn,
 		siphonchan:  make(chan []byte),
 		pumpchan:    make(chan []byte),
 		pumpservice: make(chan chan []byte),
+		log:         logger,
 		lastwrite:   time.Time{},
 		scale:       defaultTimeScale,
 	}
@@ -131,10 +128,10 @@ func createIrcClient(conn net.Conn, name string) *IrcClient {
 // NewIrcClient creates an irc client with optional flood protection and
 // keep alive. scale is used to round the final sleeping values as well as
 // scale the penalties incurred by lenPenaltyFactor, if 0 it is time.Second.
-func NewIrcClient(conn net.Conn, name string, lenPenaltyFactor int,
+func NewIrcClient(conn net.Conn, logger log15.Logger, lenPenaltyFactor int,
 	timeout, basestep, keepalive, scale time.Duration) *IrcClient {
 
-	c := createIrcClient(conn, name)
+	c := createIrcClient(conn, logger)
 	if scale != 0 {
 		c.scale = scale
 	}
@@ -263,10 +260,10 @@ func (c *IrcClient) writeMessage(msg []byte) error {
 		n, err = c.conn.Write(msg[written:])
 		wrote := msg[written : len(msg)-2]
 		if err != nil {
-			log.Printf(fmtWriteErr, c.name, err, wrote)
+			c.log.Error("Write error", "err", err, "msg", wrote)
 			return err
 		}
-		log.Printf(fmtWrite, c.name, wrote)
+		c.log.Debug(string(wrote), "sent", true)
 		c.lastwrite = time.Now()
 	}
 	return nil
@@ -313,7 +310,7 @@ func (c *IrcClient) extractMessages(buf []byte) (int, bool) {
 		copy(cpy, chunk[:len(chunk)-2])
 		select {
 		case c.siphonchan <- cpy:
-			log.Printf(fmtRead, c.name, cpy)
+			c.log.Debug(string(cpy), "sent", false)
 			return false
 		case c.killsiphon <- nil:
 			return true

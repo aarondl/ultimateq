@@ -18,7 +18,7 @@ func TestServer_createIrcClient(t *testing.T) {
 	connProvider := func(srv string) (net.Conn, error) {
 		return nil, nil
 	}
-	b, _ := createBot(fakeConfig, connProvider, nil, false, false)
+	b, _ := createBot(fakeConfig, connProvider, nil, devNull, false, false)
 	srv := b.servers[netID]
 
 	go func() {
@@ -40,7 +40,7 @@ func TestServer_createIrcClient_failConn(t *testing.T) {
 	connProvider := func(srv string) (net.Conn, error) {
 		return nil, io.EOF
 	}
-	b, _ := createBot(fakeConfig, connProvider, nil, false, false)
+	b, _ := createBot(fakeConfig, connProvider, nil, devNull, false, false)
 	srv := b.servers[netID]
 
 	go func() {
@@ -60,7 +60,7 @@ func TestServer_createIrcClient_killConn(t *testing.T) {
 		time.Sleep(time.Second * 5)
 		return nil, io.EOF
 	}
-	b, _ := createBot(fakeConfig, connProvider, nil, false, false)
+	b, _ := createBot(fakeConfig, connProvider, nil, devNull, false, false)
 	srv := b.servers[netID]
 
 	go func() {
@@ -78,7 +78,7 @@ func TestServer_createIrcClient_killConn(t *testing.T) {
 
 func TestServer_createTlsConfig(t *testing.T) {
 	t.Parallel()
-	b, _ := createBot(fakeConfig, nil, nil, false, false)
+	b, _ := createBot(fakeConfig, nil, nil, devNull, false, false)
 	srv := b.servers[netID]
 
 	pool := x509.NewCertPool()
@@ -101,7 +101,7 @@ func TestServer_Close(t *testing.T) {
 	connProvider := func(srv string) (net.Conn, error) {
 		return conn, nil
 	}
-	b, _ := createBot(fakeConfig, connProvider, nil, false, false)
+	b, _ := createBot(fakeConfig, connProvider, nil, devNull, false, false)
 	srv := b.servers[netID]
 
 	go func() {
@@ -179,7 +179,7 @@ func TestServer_Status(t *testing.T) {
 
 func TestServer_rehashNetworkInfo(t *testing.T) {
 	t.Parallel()
-	b, _ := createBot(fakeConfig, nil, nil, false, false)
+	b, _ := createBot(fakeConfig, nil, nil, devNull, false, false)
 	srv := b.servers[netID]
 
 	srv.netInfo.ParseISupport(&irc.Event{Args: []string{
@@ -202,7 +202,7 @@ func TestServer_Write(t *testing.T) {
 		return conn, nil
 	}
 
-	b, _ := createBot(fakeConfig, connProvider, nil, false, false)
+	b, _ := createBot(fakeConfig, connProvider, nil, devNull, false, false)
 	srv := b.servers[netID]
 
 	var err error

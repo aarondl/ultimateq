@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net"
 	"os"
 	"sync"
@@ -18,6 +17,7 @@ import (
 	"github.com/aarondl/ultimateq/dispatch/cmd"
 	"github.com/aarondl/ultimateq/inet"
 	"github.com/aarondl/ultimateq/irc"
+	"github.com/inconshreveable/log15"
 )
 
 // Status is the status of a network connection.
@@ -62,6 +62,8 @@ type certReader func(string) (*x509.CertPool, error)
 type Server struct {
 	bot       *Bot
 	networkID string
+
+	log15.Logger
 
 	// Status
 	status          Status
@@ -112,7 +114,7 @@ func (s *Server) Write(buf []byte) (int, error) {
 
 // createDispatcher uses the server's current ProtoCaps to create a dispatcher.
 func (s *Server) createDispatching(prefix rune, channels []string) {
-	s.dispatchCore = dispatch.NewDispatchCore(channels...)
+	s.dispatchCore = dispatch.NewDispatchCore(s.Logger, channels...)
 	s.dispatcher = dispatch.NewDispatcher(s.dispatchCore)
 	s.cmds = cmd.NewCmds(prefix, s.dispatchCore)
 }
@@ -154,12 +156,15 @@ func (s *Server) createIrcClient() (error, bool) {
 	keepAlive, _ := cfg.KeepAlive()
 
 	s.protect.Lock()
-	s.client = inet.NewIrcClient(result.conn, s.networkID,
+	s.client = inet.NewIrcClient(
+		result.conn,
+		s.Logger,
 		int(floodPenalty),
 		time.Duration(floodTimeout)*time.Second,
 		time.Duration(floodStep)*time.Second,
 		time.Duration(keepAlive)*time.Second,
-		time.Second)
+		time.Second,
+	)
 	s.protect.Unlock()
 	return nil, false
 }
@@ -179,7 +184,7 @@ func (s *Server) createConnection(resultService chan chan *connResult) {
 	}
 
 	server := srvs[s.serverIndex]
-	log.Printf("(%s) Connecting to: %s", s.networkID, server)
+	s.Info("Connecting", "host", server)
 
 	if s.bot.connProvider == nil {
 		if ssl {
@@ -196,7 +201,7 @@ func (s *Server) createConnection(resultService chan chan *connResult) {
 	}
 
 	if r.err != nil {
-		log.Printf("(%s) Failed to connect: %v", s.networkID, server)
+		s.Error("Failed to connect", "host", server)
 		if e, ok := r.err.(net.Error); ok {
 			r.temporary = e.Temporary()
 		} else {

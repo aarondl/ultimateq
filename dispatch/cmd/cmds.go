@@ -326,7 +326,7 @@ func (c *Cmds) Dispatch(networkID string, overridePrefix rune,
 
 	c.HandlerStarted()
 	go func() {
-		defer dispatch.PanicHandler()
+		defer c.PanicHandler()
 		defer c.HandlerFinished()
 		defer cmdEv.Close()
 		ok, err := cmdNameDispatch(command.Handler, cmd, writer, cmdEv)

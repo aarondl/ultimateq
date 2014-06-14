@@ -55,7 +55,7 @@ func commandsSetup(t *testing.T) *tSetup {
 
 	b, err := createBot(conf, nil, func(_ string) (*data.Store, error) {
 		return data.NewStore(data.MemStoreProvider)
-	}, true, true)
+	}, devNull, true, true)
 
 	if err != nil {
 		t.Fatal("Unexpected error:", err)
@@ -131,7 +131,7 @@ func TestCoreCommands(t *testing.T) {
 
 	b, err := createBot(conf, nil, func(_ string) (*data.Store, error) {
 		return data.NewStore(data.MemStoreProvider)
-	}, true, true)
+	}, devNull, true, true)
 
 	if err != nil {
 		t.Error("Unexpected error:", err)

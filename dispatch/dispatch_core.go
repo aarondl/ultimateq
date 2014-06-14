@@ -6,26 +6,27 @@ extract information from events, as well as define more succint handlers.
 package dispatch
 
 import (
-	"log"
 	"runtime"
 	"strings"
 	"sync"
 
 	"github.com/aarondl/ultimateq/irc"
+	"github.com/inconshreveable/log15"
 )
 
 // DispatchCore is a core for any dispatching mechanisms that includes a sync'd
 // list of channels, channel identification services, and a waiter to
 // synchronize the exit of all the event handlers sharing this core.
 type DispatchCore struct {
+	log     log15.Logger
 	waiter  sync.WaitGroup
 	chans   []string
 	protect sync.RWMutex
 }
 
 // NewDispatchCore initializes a dispatch core
-func NewDispatchCore(chans ...string) *DispatchCore {
-	d := &DispatchCore{}
+func NewDispatchCore(logger log15.Logger, chans ...string) *DispatchCore {
+	d := &DispatchCore{log: logger}
 	d.channels(chans)
 
 	return d
@@ -168,12 +169,13 @@ func (d *DispatchCore) hasChannel(channel string) bool {
 }
 
 // PanicHandler catches any panics and logs a stack trace
-func PanicHandler() {
+func (d *DispatchCore) PanicHandler() {
 	recovered := recover()
 	if recovered == nil {
 		return
 	}
 	buf := make([]byte, 1024)
 	runtime.Stack(buf, false)
-	log.Printf("Handler failed: %v\n%s", recovered, buf)
+	d.log.Error("Handler failed", "panic", recovered)
+	d.log.Error(string(buf))
 }

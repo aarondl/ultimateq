@@ -3,7 +3,6 @@ package cmd
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"regexp"
 	"strings"
 	"testing"
@@ -11,6 +10,7 @@ import (
 	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/dispatch"
 	"github.com/aarondl/ultimateq/irc"
+	"github.com/inconshreveable/log15"
 )
 
 var (
@@ -218,7 +218,7 @@ func setupForAuth() (state *data.State, store *data.Store,
 	return
 }
 
-var core = dispatch.NewDispatchCore()
+var core = dispatch.NewDispatchCore(nil)
 var prefix = '.'
 
 func TestCmds(t *testing.T) {
@@ -405,7 +405,7 @@ func TestCmds_RegisterProtected(t *testing.T) {
 }
 
 func TestCmds_Dispatch(t *testing.T) {
-	dcore := dispatch.NewDispatchCore()
+	dcore := dispatch.NewDispatchCore(nil)
 	c := NewCmds(prefix, dcore)
 	c.AddChannels(channel)
 	if c == nil {
@@ -1444,9 +1444,11 @@ func (l *lockWriter) Write(b []byte) (int, error) {
 func TestCmds_Panic(t *testing.T) {
 	ch := make(chan struct{}, 1)
 	lk := &lockWriter{&bytes.Buffer{}, ch}
-	log.SetOutput(lk)
+	logger := log15.New()
+	logger.SetHandler(log15.StreamHandler(lk, log15.LogfmtFormat()))
+	logCore := dispatch.NewDispatchCore(logger)
 
-	c := NewCmds(prefix, core)
+	c := NewCmds(prefix, logCore)
 	panicMsg := "dispatch panic"
 
 	state, store := setup()

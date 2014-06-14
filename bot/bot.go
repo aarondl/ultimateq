@@ -7,7 +7,6 @@ package bot
 import (
 	"bufio"
 	"errors"
-	"log"
 	"net"
 	"os"
 	"os/signal"
@@ -20,15 +19,13 @@ import (
 	"github.com/aarondl/ultimateq/dispatch/cmd"
 	"github.com/aarondl/ultimateq/irc"
 	"github.com/aarondl/ultimateq/parse"
+	"github.com/inconshreveable/log15"
 )
 
 const (
 	// defaultReconnScale is how the config's ReconnTimeout is scaled.
 	defaultReconnScale = time.Second
 
-	// errFmtParsingIrcMessage is when the bot fails to parse a message
-	// during it's dispatch loop.
-	errFmtParsingIrcMessage = "bot: Failed to parse irc message (%v) (%s)\n"
 	// errFmtReaderClosed is when a write fails due to a closed socket or
 	// a shutdown on the client.
 	errFmtReaderClosed = "bot: %v reader closed\n"
@@ -43,6 +40,11 @@ const (
 )
 
 var (
+	// errParsingIrcMessage is when the bot fails to parse a message
+	// during it's dispatch loop.
+	errParsingIrcMessage = "Failed to parse irc message"
+	// errLogFile is when the bot can't open the log file.
+	errLogFile = errors.New("bot: Could not open log file")
 	// errInvalidConfig is when NewBot was given an invalid configuration.
 	errInvalidConfig = errors.New("bot: Invalid Configuration")
 	// errInvalidServerId occurs when the user passes in an unknown
@@ -60,6 +62,8 @@ type (
 	ConnProvider func(string) (net.Conn, error)
 	// StoreProvider transforms an optional path into a store.
 	StoreProvider func(string) (*data.Store, error)
+	// LoggerProvider returns a log15.Handler suitable for logging.
+	LoggerProvider func() log15.Handler
 	// serverOp represents a server operation (starting/stopping).
 	serverOp struct {
 		server   *Server
@@ -75,6 +79,9 @@ type Bot struct {
 	servers map[string]*Server
 	conf    *config.Config
 	store   *data.Store
+
+	// Logging
+	log15.Logger
 
 	// Bot-server synchronization.
 	botEnd        chan error
@@ -93,6 +100,7 @@ type Bot struct {
 	attachHandlers bool
 	connProvider   ConnProvider
 	storeProvider  StoreProvider
+	logProvider    LoggerProvider
 
 	// Synchronization
 	msgDispatchers sync.WaitGroup
@@ -103,7 +111,7 @@ type Bot struct {
 // CheckConfig checks a bots config for validity.
 func CheckConfig(c *config.Config) bool {
 	if ers := c.Errors(); len(ers) > 0 || !c.Validate() {
-		c.DisplayErrors()
+		c.DisplayErrors(log15.Root())
 		return false
 	}
 	return true
@@ -115,7 +123,7 @@ func NewBot(conf *config.Config) (*Bot, error) {
 	if !CheckConfig(conf) {
 		return nil, errInvalidConfig
 	}
-	return createBot(conf, nil, nil, true, true)
+	return createBot(conf, nil, nil, nil, true, true)
 }
 
 // Start runs the bot. A channel is returned, every time a server is killed
@@ -200,6 +208,7 @@ func (b *Bot) startServer(srv *Server, writing, reading bool) {
 		disconnect = err != nil && temporary
 
 		if err == nil {
+			srv.Info("Connected")
 			srv.setStatus(STATUS_STARTED)
 
 			srv.client.SpawnWorkers(writing, reading)
@@ -208,7 +217,7 @@ func (b *Bot) startServer(srv *Server, writing, reading bool) {
 				break
 			}
 		}
-		log.Printf("(%s) Disconnected", srv.networkID)
+		srv.Info("Disconnected", "err", err)
 
 		cfg := srv.conf.Network(srv.networkID)
 		noReconn, _ := cfg.NoReconnect()
@@ -223,7 +232,7 @@ func (b *Bot) startServer(srv *Server, writing, reading bool) {
 		wait := time.Duration(reconnTime) * srv.reconnScale
 
 		srv.setStatus(STATUS_RECONNECTING)
-		log.Printf("(%s) Reconnecting in %v", srv.networkID, wait)
+		srv.Info("Reconnecting", "timeout", wait)
 		select {
 		case srv.killable <- 0:
 			err = errServerKilledReconn
@@ -255,7 +264,7 @@ func (b *Bot) dispatch(srv *Server) (disconnect bool, err error) {
 
 			ircMsg, parseErr = parse.Parse(ev)
 			if parseErr != nil {
-				log.Printf(errFmtParsingIrcMessage, parseErr, ev)
+				b.Warn(errParsingIrcMessage, "err", parseErr, "ev", ev)
 				break
 			}
 			ircMsg.NetworkID = srv.networkID
@@ -459,14 +468,16 @@ func (b *Bot) NetworkWriter(networkID string) (w irc.Writer) {
 // createBot creates a bot from the given configuration, using the providers
 // given to create connections and protocol.
 func createBot(conf *config.Config, connProv ConnProvider,
-	storeProv StoreProvider,
+	storeProv StoreProvider, logProv LoggerProvider,
 	attachHandlers, attachCommands bool) (*Bot, error) {
 
 	b := &Bot{
 		conf:           conf,
+		Logger:         log15.New(),
 		servers:        make(map[string]*Server, 0),
 		connProvider:   connProv,
 		storeProvider:  storeProv,
+		logProvider:    logProv,
 		attachHandlers: attachHandlers,
 		botEnd:         make(chan error),
 		serverControl:  make(chan serverOp),
@@ -474,6 +485,29 @@ func createBot(conf *config.Config, connProv ConnProvider,
 		serverStop:     make(chan bool),
 		serverEnd:      make(chan serverOp),
 	}
+
+	var err error
+	var logHandler log15.Handler
+
+	if logProv != nil {
+		logHandler = logProv()
+	} else {
+		if file, ok := conf.LogFile(); ok {
+			logHandler, err = log15.FileHandler(file, log15.LogfmtFormat())
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			logHandler = log15.StdoutHandler
+		}
+		if level, ok := conf.LogLevel(); ok {
+			lvl, _ := log15.LvlFromString(level)
+			logHandler = log15.LvlFilterHandler(lvl, logHandler)
+		} else {
+			logHandler = log15.LvlFilterHandler(log15.LvlInfo, logHandler)
+		}
+	}
+	b.Logger.SetHandler(logHandler)
 
 	networks := conf.Networks()
 	cfg := conf.Network("")
@@ -486,7 +520,6 @@ func createBot(conf *config.Config, connProv ConnProvider,
 		makeStore = makeStore || !nostore
 	}
 
-	var err error
 	if makeStore {
 		sfile, _ := conf.StoreFile()
 		if err = b.createStore(sfile); err != nil {
@@ -518,6 +551,7 @@ func createBot(conf *config.Config, connProv ConnProvider,
 func (b *Bot) createServer(netID string, conf *config.Config) (*Server, error) {
 	s := &Server{
 		bot:         b,
+		Logger:      b.Logger.New("net", netID),
 		networkID:   netID,
 		netInfo:     irc.NewNetworkInfo(),
 		conf:        conf,
@@ -548,7 +582,7 @@ func (b *Bot) createServer(netID string, conf *config.Config) (*Server, error) {
 
 // createDispatcher uses the bot's current ProtoCaps to create a dispatcher.
 func (b *Bot) createDispatching(prefix rune, channels []string) {
-	b.dispatchCore = dispatch.NewDispatchCore(channels...)
+	b.dispatchCore = dispatch.NewDispatchCore(b.Logger, channels...)
 	b.dispatcher = dispatch.NewDispatcher(b.dispatchCore)
 	b.cmds = cmd.NewCmds(prefix, b.dispatchCore)
 }
@@ -581,8 +615,6 @@ func (b *Bot) getServer(networkID string) *Server {
 // Watches for Keyboard Input OR SIGTERM OR SIGKILL and shuts down normally.
 // Creates a logger on stdout.
 func Run(cb func(b *Bot)) error {
-	log.SetOutput(os.Stdout)
-
 	cfg := config.NewConfig().FromFile("config.toml")
 	b, err := NewBot(cfg)
 	if err != nil {
@@ -615,13 +647,13 @@ func Run(cb func(b *Bot)) error {
 			stop = true
 		case err, ok := <-end:
 			if ok {
-				log.Println("Server death:", err)
+				b.Info("Server death", "err", err)
 			}
 			stop = !ok
 		}
 	}
 
-	log.Println("Shutting down...")
+	b.Info("Shutting down...")
 	<-time.After(1 * time.Second)
 
 	return nil

@@ -2,13 +2,13 @@ package dispatch
 
 import (
 	"bytes"
-	"log"
 	"testing"
 
 	"github.com/aarondl/ultimateq/irc"
+	"github.com/inconshreveable/log15"
 )
 
-var core = NewDispatchCore()
+var core = NewDispatchCore(nil)
 
 //===========================================================
 // Set up a type that can be used to mock irc.Writer
@@ -587,9 +587,10 @@ func TestDispatcher_CTCPReply(t *testing.T) {
 func TestDispatcher_FilterPrivmsgChannels(t *testing.T) {
 	t.Parallel()
 	chanmsg2 := &irc.Event{
-		Name:   irc.PRIVMSG,
-		Args:   []string{"#chan2", "ev"},
-		Sender: "nick!user@host.com",
+		Name:        irc.PRIVMSG,
+		Args:        []string{"#chan2", "ev"},
+		Sender:      "nick!user@host.com",
+		NetworkInfo: netInfo,
 	}
 
 	var p, pc *irc.Event
@@ -600,7 +601,7 @@ func TestDispatcher_FilterPrivmsgChannels(t *testing.T) {
 		pc = ev
 	}}
 
-	dcore := NewDispatchCore("#CHAN")
+	dcore := NewDispatchCore(nil, "#CHAN")
 	d := NewDispatcher(dcore)
 	d.Register(irc.PRIVMSG, ph)
 	d.Register(irc.PRIVMSG, pch)
@@ -628,9 +629,10 @@ func TestDispatcher_FilterPrivmsgChannels(t *testing.T) {
 func TestDispatcher_FilterNoticeChannels(t *testing.T) {
 	t.Parallel()
 	chanmsg2 := &irc.Event{
-		Name:   irc.NOTICE,
-		Args:   []string{"#chan2", "ev"},
-		Sender: "nick!user@host.com",
+		Name:        irc.NOTICE,
+		Args:        []string{"#chan2", "ev"},
+		Sender:      "nick!user@host.com",
+		NetworkInfo: netInfo,
 	}
 
 	var u, uc *irc.Event
@@ -641,7 +643,7 @@ func TestDispatcher_FilterNoticeChannels(t *testing.T) {
 		uc = ev
 	}}
 
-	dcore := NewDispatchCore("#CHAN")
+	dcore := NewDispatchCore(nil, "#CHAN")
 	d := NewDispatcher(dcore)
 	d.Register(irc.NOTICE, uh)
 	d.Register(irc.NOTICE, uch)
@@ -705,9 +707,11 @@ func (l *lockWriter) Write(b []byte) (int, error) {
 func TestDispatch_Panic(t *testing.T) {
 	ch := make(chan struct{}, 1)
 	lk := &lockWriter{&bytes.Buffer{}, ch}
-	log.SetOutput(lk)
 
-	d := NewDispatcher(core)
+	logger := log15.New()
+	logger.SetHandler(log15.StreamHandler(lk, log15.LogfmtFormat()))
+	logCore := NewDispatchCore(logger)
+	d := NewDispatcher(logCore)
 	panicMsg := "dispatch panic"
 
 	handler := testHandler{

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"log"
 	"regexp"
 	"sort"
 	"strconv"
@@ -50,9 +49,9 @@ const (
 	errFmtInternal = `commander: Error processing command %v (%v)`
 	errFmtExpired  = `commander: Data expired between locks. ` +
 		`Could not find user [%v]`
-	fmtCmdExec          = "bot: Core command executed (%v)"
-	errFmtInternalError = "bot: Core command (%v) error: %v"
-	errFmtInternalPanic = "bot: Core command (%v) error: %v"
+	cmdExec          = "bot: Core command executed"
+	errInternalError = "bot: Core command error"
+	errInternalPanic = "bot: Core command error"
 
 	errMsgAuthed        = `You are already authenticated.`
 	errFmtUserNotFound  = `The user [%v] could not be found.`
@@ -242,11 +241,11 @@ func (c *coreCmds) Cmd(cmd string, w irc.Writer,
 
 	var external error
 
-	log.Printf(fmtCmdExec, cmd)
+	c.b.Info(cmdExec, "cmd", cmd)
 
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf(errFmtInternalPanic, r)
+			c.b.Error(errInternalPanic, "cmd", cmd, "panic", r)
 		}
 	}()
 
@@ -296,7 +295,7 @@ func (c *coreCmds) Cmd(cmd string, w irc.Writer,
 	}
 
 	if internal != nil {
-		log.Printf(errFmtInternalError, cmd, internal)
+		c.b.Error(errInternalError, "cmd", cmd, "err", internal)
 	}
 
 	return external

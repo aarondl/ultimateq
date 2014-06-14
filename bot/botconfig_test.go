@@ -8,6 +8,7 @@ import (
 	"github.com/aarondl/ultimateq/config"
 	"github.com/aarondl/ultimateq/irc"
 	"github.com/aarondl/ultimateq/mocks"
+	"github.com/inconshreveable/log15"
 )
 
 var zeroConnProvider = func(srv string) (net.Conn, error) {
@@ -15,7 +16,7 @@ var zeroConnProvider = func(srv string) (net.Conn, error) {
 }
 
 func TestBotConfig_ReadConfig(t *testing.T) {
-	b, _ := createBot(fakeConfig, nil, nil, false, false)
+	b, _ := createBot(fakeConfig, nil, nil, devNull, false, false)
 
 	b.ReadConfig(func(conf *config.Config) {
 		got, _ := conf.Network(netID).Nick()
@@ -27,7 +28,7 @@ func TestBotConfig_ReadConfig(t *testing.T) {
 }
 
 func TestBotConfig_WriteConfig(t *testing.T) {
-	b, _ := createBot(fakeConfig, nil, nil, false, false)
+	b, _ := createBot(fakeConfig, nil, nil, devNull, false, false)
 
 	b.WriteConfig(func(conf *config.Config) {
 		got, _ := conf.Network(netID).Nick()
@@ -106,7 +107,8 @@ func TestBotConfig_ReplaceConfig(t *testing.T) {
 
 	c3 := config.NewConfig()
 
-	b, _ := createBot(c1, connProvider, nil, false, false)
+	b, _ := createBot(c1, connProvider, nil, devNull, false, false)
+	b.Logger.SetHandler(log15.DiscardHandler())
 	srvs := c1.Networks()
 	if len(srvs) != len(b.servers) {
 		t.Errorf("The number of servers (%v) should match the config (%v)",

@@ -54,7 +54,7 @@ func TestCoreHandler_Ping(t *testing.T) {
 func TestCoreHandler_Connect(t *testing.T) {
 	cnf := fakeConfig.Clone()
 	net := cnf.Network(netID).SetPassword("password")
-	b, _ := createBot(cnf, nil, nil, false, false)
+	b, _ := createBot(cnf, nil, nil, devNull, false, false)
 
 	password, _ := net.Password()
 	nick, _ := net.Nick()
@@ -77,7 +77,7 @@ func TestCoreHandler_Connect(t *testing.T) {
 }
 
 func TestCoreHandler_Nick(t *testing.T) {
-	b, _ := createBot(fakeConfig, nil, nil, false, false)
+	b, _ := createBot(fakeConfig, nil, nil, devNull, false, false)
 	cnf := fakeConfig.Network(netID)
 	handler := coreHandler{bot: b}
 	ev := irc.NewEvent(netID, netInfo, irc.ERR_NICKNAMEINUSE, "")
@@ -112,7 +112,7 @@ func TestCoreHandler_NetInfo(t *testing.T) {
 		return nil, nil
 	}
 
-	b, _ := createBot(fakeConfig, connProvider, nil, true, false)
+	b, _ := createBot(fakeConfig, connProvider, nil, devNull, true, false)
 
 	msg1 := irc.NewEvent(netID, netInfo, irc.RPL_MYINFO, "",
 		"NICK", "irc.test.net", "testircd-1.2", "acCior", "beiIklmno")
@@ -143,7 +143,7 @@ func TestCoreHandler_Join(t *testing.T) {
 		return nil, nil
 	}
 
-	b, _ := createBot(fakeConfig, connProvider, nil, true, false)
+	b, _ := createBot(fakeConfig, connProvider, nil, devNull, true, false)
 	srv := b.servers[netID]
 
 	srv.state.Self.User = data.NewUser("nick!user@host")

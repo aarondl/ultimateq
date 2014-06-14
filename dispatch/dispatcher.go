@@ -113,7 +113,7 @@ func (d *Dispatcher) dispatchHelper(event string,
 func (d *Dispatcher) resolveHandler(
 	handler interface{}, event string, w irc.Writer, ev *irc.Event) {
 
-	defer PanicHandler()
+	defer d.PanicHandler()
 	defer d.HandlerFinished()
 
 	var handled bool
