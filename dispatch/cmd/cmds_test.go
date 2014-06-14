@@ -1405,19 +1405,14 @@ func TestCmds_EachCmd(t *testing.T) {
 		t.Error("Unexpected:", err)
 	}
 
-	visitedCmd, visitedOther := false, false
+	visited := 0
 	EachCmd(func(command *Cmd) bool {
-		visitedCmd = visitedCmd || command.Cmd == cmd
-		visitedOther = visitedOther || command.Cmd == "other"
-		return visitedCmd
+		visited++
+		return true
 	})
 
-	if !visitedCmd {
-		t.Error("Expected iteration over cmd.")
-	}
-
-	if visitedOther {
-		t.Error("Expected iteration abort before visitedOther.")
+	if visited != 1 {
+		t.Error("Expected to stop after one iteration.")
 	}
 
 	success := c.Unregister(GLOBAL, cmd)
