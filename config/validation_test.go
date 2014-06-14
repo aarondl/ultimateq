@@ -101,7 +101,6 @@ func TestValidation_RequiredServers(t *testing.T) {
 
 	expects := []rexpect{
 		{"hello", "Nickname is required."},
-		{"hello", "Altnick is required."},
 		{"hello", "Username is required."},
 		{"hello", "Realname is required."},
 		{"hello", "Expected at least one server."},

@@ -132,9 +132,6 @@ func (c *Config) validateRequired(ers *errList) {
 			if n, ok := ctx.Nick(); !ok || len(n) == 0 {
 				ers.addError("(%s) Nickname is required.", name)
 			}
-			if n, ok := ctx.Altnick(); !ok || len(n) == 0 {
-				ers.addError("(%s) Altnick is required.", name)
-			}
 			if n, ok := ctx.Username(); !ok || len(n) == 0 {
 				ers.addError("(%s) Username is required.", name)
 			}
