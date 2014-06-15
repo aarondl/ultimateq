@@ -44,6 +44,7 @@ type StoredUser struct {
 	Global   *Access
 	Server   map[string]*Access
 	Channel  map[string]map[string]*Access
+	JSONStorer
 }
 
 // StoredUserPwdCost is the cost factor for bcrypt. It should not be set
@@ -60,7 +61,8 @@ func NewStoredUser(un, pw string,
 	}
 
 	a := &StoredUser{
-		Username: strings.ToLower(un),
+		Username:   strings.ToLower(un),
+		JSONStorer: make(JSONStorer),
 	}
 
 	err := a.SetPassword(pw)
