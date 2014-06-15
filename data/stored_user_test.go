@@ -76,12 +76,12 @@ func TestStoredUser_SerializeDeserialize(t *testing.T) {
 		t.Error("Serialization did not yield a serialized copy.")
 	}
 
-	b, err := deserialize(serialized)
+	b, err := deserializeUser(serialized)
 	if err != nil {
 		t.Fatal("Deserialization failed.")
 	}
 	if a.Username != b.Username || bytes.Compare(a.Password, b.Password) != 0 {
-		t.Error("Username or Password did not deserialize.")
+		t.Error("Username or Password did not deserializeUser.")
 	}
 	if len(a.Masks) != len(b.Masks) {
 		t.Error("Masks were not serialized.")

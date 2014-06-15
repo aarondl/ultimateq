@@ -16,3 +16,24 @@ func TestStoredChannel(t *testing.T) {
 		t.Error("Did not initialize JSONStorer")
 	}
 }
+
+func TestStoredChannel_SerializeDeserialize(t *testing.T) {
+	channel := "#bots"
+	a := NewStoredChannel(channel)
+
+	serialized, err := a.serialize()
+	if err != nil {
+		t.Fatal("Unexpected error:", err)
+	}
+	if len(serialized) == 0 {
+		t.Error("Serialization did not yield a serialized copy.")
+	}
+
+	b, err := deserializeChannel(serialized)
+	if err != nil {
+		t.Fatal("Deserialization failed.")
+	}
+	if a.Name != b.Name {
+		t.Error("Channelname or Password did not deserializeChannel.")
+	}
+}

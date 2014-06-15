@@ -478,3 +478,140 @@ func TestStore_AuthError(t *testing.T) {
 		t.Error("The error message builder is not working correctly.")
 	}
 }
+
+func TestStore_SaveChannel(t *testing.T) {
+	t.Parallel()
+	s, err := NewStore(MemStoreProvider)
+	defer s.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ua1 := &StoredChannel{Name: uname}
+	ua2 := &StoredChannel{Name: uname + uname}
+
+	err = s.SaveChannel(ua1)
+	if err != nil {
+		t.Fatal("Error adding channel:", err)
+	}
+
+	err = s.SaveChannel(ua2)
+	if err != nil {
+		t.Fatal("Error adding channel:", err)
+	}
+
+	c1, err := s.FindChannel(ua1.Name)
+
+	if err != nil {
+		t.Fatal("Cannot get channel", err)
+	}
+
+	c2, err := s.FindChannel(ua2.Name)
+
+	if err != nil {
+		t.Fatal("Cannot get channel", err)
+	}
+
+	if ua1.Name != c1.Name {
+		t.Error("Name mismatch", ua1.Name, c1.Name)
+	}
+
+	if ua2.Name != c2.Name {
+		t.Error("Name mismatch", ua2.Name, c2.Name)
+	}
+
+}
+
+func TestStore_RemoveChannel(t *testing.T) {
+	t.Parallel()
+	s, err := NewStore(MemStoreProvider)
+	defer s.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ua1 := &StoredChannel{Name: uname}
+
+	err = s.SaveChannel(ua1)
+	if err != nil {
+		t.Fatal("Error adding channel:", err)
+	}
+
+	c1, err := s.FindChannel(ua1.Name)
+
+	if err != nil {
+		t.Fatal("Cannot get channel", err)
+	}
+
+	var removed bool
+	removed, err = s.RemoveChannel(ua1.Name)
+	if err != nil {
+		t.Fatal("Error removing channel:", err)
+	}
+	if !removed {
+		t.Error("Channel was not reported as removed.")
+	}
+
+	c1, err = s.FindChannel(ua1.Name)
+	if err != nil {
+		t.Fatal("Unexpected error:", err)
+	}
+	if c1 != nil {
+		t.Error("Channel should be removed.")
+	}
+}
+
+func TestStore_Channels(t *testing.T) {
+	t.Parallel()
+	s, err := NewStore(MemStoreProvider)
+	defer s.Close()
+	if err != nil {
+		t.Error("Unexpected error:", err)
+	}
+
+	list, err := s.Channels()
+	if list != nil || err != nil {
+		t.Error("When db is empty both return params should be nil.")
+	}
+
+	ua1 := &StoredChannel{Name: uname}
+	ua2 := &StoredChannel{Name: uname + uname}
+
+	err = s.SaveChannel(ua1)
+	if err != nil {
+		t.Fatal("Error adding channel:", err)
+	}
+	err = s.SaveChannel(ua2)
+	if err != nil {
+		t.Fatal("Error adding channel:", err)
+	}
+
+	list, err = s.Channels()
+	if len(list) != 2 {
+		t.Error("There should be exactly 2 global channels.")
+	}
+
+	found := false
+	for _, ch := range list {
+		if ch.Name == ua1.Name {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Error("ua1 not found.")
+	}
+
+	found = false
+	for _, ch := range list {
+		if ch.Name == ua2.Name {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Error("ua2 not found.")
+	}
+}

@@ -192,8 +192,8 @@ func (a *StoredUser) serialize() ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
-// deserialize reverses the Serialize process.
-func deserialize(serialized []byte) (*StoredUser, error) {
+// deserializeUser reverses the Serialize process.
+func deserializeUser(serialized []byte) (*StoredUser, error) {
 	buffer := &bytes.Buffer{}
 	decoder := gob.NewDecoder(buffer)
 	if _, err := buffer.Write(serialized); err != nil {

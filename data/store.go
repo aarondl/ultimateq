@@ -125,7 +125,7 @@ func iterate(db *kv.DB, filter func(*StoredUser) bool) ([]*StoredUser, error) {
 	var stop error
 	var val []byte
 	for ; stop == nil; _, val, stop = e.Next() {
-		if ua, err := deserialize(val); err == nil && filter(ua) {
+		if ua, err := deserializeUser(val); err == nil && filter(ua) {
 			list = append(list, ua)
 		}
 	}
@@ -275,8 +275,80 @@ func (s *Store) fetchUser(username string) (user *StoredUser, err error) {
 		return
 	}
 
-	user, err = deserialize(serialized)
+	user, err = deserializeUser(serialized)
 	return
+}
+
+// SaveChannel saves a channel to the database.
+func (s *Store) SaveChannel(sc *StoredChannel) error {
+	var err error
+	var serialized []byte
+
+	serialized, err = sc.serialize()
+	if err != nil {
+		return err
+	}
+
+	s.db.Set([]byte(sc.Name), serialized)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// RemoveChannel removes a channel from the database, returns true if successful.
+func (s *Store) RemoveChannel(name string) (removed bool, err error) {
+	name = strings.ToLower(name)
+	var exists *StoredChannel
+	exists, err = s.FindChannel(name)
+	if err != nil || exists == nil {
+		return
+	}
+
+	err = s.db.Delete([]byte(name))
+	if err != nil {
+		return
+	}
+	removed = true
+	return
+}
+
+// FindChannel looks up a channel based on name. It caches the result if found.
+func (s *Store) FindChannel(name string) (channel *StoredChannel, err error) {
+	name = strings.ToLower(name)
+
+	var serialized []byte
+	serialized, err = s.db.Get(nil, []byte(name))
+	if err != nil || serialized == nil {
+		return
+	}
+
+	channel, err = deserializeChannel(serialized)
+	return
+}
+
+// Channels returns a slice of the channels found in the database.
+func (s *Store) Channels() ([]*StoredChannel, error) {
+	list := make([]*StoredChannel, 0)
+
+	e, err := s.db.SeekFirst()
+	switch {
+	case err == io.EOF:
+		return nil, nil
+	case err != nil:
+		return nil, err
+	}
+
+	var stop error
+	var val []byte
+	for ; stop == nil; _, val, stop = e.Next() {
+		if ua, err := deserializeChannel(val); err == nil {
+			list = append(list, ua)
+		}
+	}
+
+	return list, nil
 }
 
 // checkCacheLimits verifies if adding one to the size of the cache will
