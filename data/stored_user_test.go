@@ -58,6 +58,7 @@ func TestStoredUser_VerifyPassword(t *testing.T) {
 }
 
 func TestStoredUser_SerializeDeserialize(t *testing.T) {
+	t.Parallel()
 	var masks = []string{`*!*@host`, `*!user@*`}
 	a, err := NewStoredUser(uname, password, masks...)
 	if err != nil {
@@ -498,6 +499,8 @@ func TestStoredUser_HasChannelFlags(t *testing.T) {
 }
 
 func TestStoredUser_String(t *testing.T) {
+	t.Parallel()
+
 	var table = []struct {
 		HasGlobal       bool
 		GlobalLevel     uint8

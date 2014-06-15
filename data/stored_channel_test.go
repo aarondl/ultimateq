@@ -3,23 +3,27 @@ package data
 import "testing"
 
 func TestStoredChannel(t *testing.T) {
-	sc := NewStoredChannel("Hello")
+	t.Parallel()
+
+	sc := NewStoredChannel("netID", "name")
 	if sc == nil {
 		t.Error("Failed creating new stored channel.")
 	}
 
-	if sc.Name != "Hello" {
-		t.Error("Expected Hello, got", sc.Name)
+	if sc.NetID != "netID" || sc.Name != "name" {
+		t.Error("Values not set correctly.")
 	}
 
 	if sc.JSONStorer == nil {
-		t.Error("Did not initialize JSONStorer")
+		t.Error("Did not initialize JSONStorer.")
 	}
 }
 
 func TestStoredChannel_SerializeDeserialize(t *testing.T) {
-	channel := "#bots"
-	a := NewStoredChannel(channel)
+	t.Parallel()
+
+	netID, channel := "netID", "#bots"
+	a := NewStoredChannel(netID, channel)
 
 	serialized, err := a.serialize()
 	if err != nil {
@@ -33,7 +37,11 @@ func TestStoredChannel_SerializeDeserialize(t *testing.T) {
 	if err != nil {
 		t.Fatal("Deserialization failed.")
 	}
+
 	if a.Name != b.Name {
-		t.Error("Channelname or Password did not deserializeChannel.")
+		t.Error("Name not deserlialize correctly.")
+	}
+	if a.NetID != b.NetID {
+		t.Error("NetID not deserlialize correctly.")
 	}
 }

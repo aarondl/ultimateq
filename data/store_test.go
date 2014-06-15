@@ -460,6 +460,7 @@ func TestStore_ChanUsers(t *testing.T) {
 }
 
 func TestStore_AuthError(t *testing.T) {
+	t.Parallel()
 	var err1 error = AuthError{
 		errFmtBadHost,
 		[]interface{}{"h", "u"},
@@ -487,8 +488,9 @@ func TestStore_SaveChannel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ua1 := &StoredChannel{Name: uname}
-	ua2 := &StoredChannel{Name: uname + uname}
+	netID := "netID"
+	ua1 := &StoredChannel{NetID: netID, Name: uname}
+	ua2 := &StoredChannel{NetID: netID, Name: uname + uname}
 
 	err = s.SaveChannel(ua1)
 	if err != nil {
@@ -500,13 +502,13 @@ func TestStore_SaveChannel(t *testing.T) {
 		t.Fatal("Error adding channel:", err)
 	}
 
-	c1, err := s.FindChannel(ua1.Name)
+	c1, err := s.FindChannel(netID, ua1.Name)
 
 	if err != nil {
 		t.Fatal("Cannot get channel", err)
 	}
 
-	c2, err := s.FindChannel(ua2.Name)
+	c2, err := s.FindChannel(netID, ua2.Name)
 
 	if err != nil {
 		t.Fatal("Cannot get channel", err)
@@ -515,11 +517,16 @@ func TestStore_SaveChannel(t *testing.T) {
 	if ua1.Name != c1.Name {
 		t.Error("Name mismatch", ua1.Name, c1.Name)
 	}
+	if ua1.NetID != c1.NetID {
+		t.Error("NetID mismatch", ua1.NetID, c1.NetID)
+	}
 
 	if ua2.Name != c2.Name {
 		t.Error("Name mismatch", ua2.Name, c2.Name)
 	}
-
+	if ua2.NetID != c2.NetID {
+		t.Error("NetID mismatch", ua2.NetID, c2.NetID)
+	}
 }
 
 func TestStore_RemoveChannel(t *testing.T) {
@@ -530,21 +537,22 @@ func TestStore_RemoveChannel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ua1 := &StoredChannel{Name: uname}
+	netID := "netID"
+	ua1 := &StoredChannel{NetID: netID, Name: uname}
 
 	err = s.SaveChannel(ua1)
 	if err != nil {
 		t.Fatal("Error adding channel:", err)
 	}
 
-	c1, err := s.FindChannel(ua1.Name)
+	c1, err := s.FindChannel(netID, ua1.Name)
 
 	if err != nil {
 		t.Fatal("Cannot get channel", err)
 	}
 
 	var removed bool
-	removed, err = s.RemoveChannel(ua1.Name)
+	removed, err = s.RemoveChannel(netID, ua1.Name)
 	if err != nil {
 		t.Fatal("Error removing channel:", err)
 	}
@@ -552,7 +560,7 @@ func TestStore_RemoveChannel(t *testing.T) {
 		t.Error("Channel was not reported as removed.")
 	}
 
-	c1, err = s.FindChannel(ua1.Name)
+	c1, err = s.FindChannel(netID, ua1.Name)
 	if err != nil {
 		t.Fatal("Unexpected error:", err)
 	}

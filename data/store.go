@@ -289,7 +289,7 @@ func (s *Store) SaveChannel(sc *StoredChannel) error {
 		return err
 	}
 
-	s.db.Set([]byte(sc.Name), serialized)
+	s.db.Set([]byte(sc.makeID()), serialized)
 	if err != nil {
 		return err
 	}
@@ -297,16 +297,18 @@ func (s *Store) SaveChannel(sc *StoredChannel) error {
 	return nil
 }
 
-// RemoveChannel removes a channel from the database, returns true if successful.
-func (s *Store) RemoveChannel(name string) (removed bool, err error) {
-	name = strings.ToLower(name)
+// RemoveChannel removes a channel from the database, returns true if successful
+func (s *Store) RemoveChannel(netID, name string) (removed bool, err error) {
 	var exists *StoredChannel
-	exists, err = s.FindChannel(name)
+	exists, err = s.FindChannel(netID, name)
 	if err != nil || exists == nil {
 		return
 	}
 
-	err = s.db.Delete([]byte(name))
+	ch := StoredChannel{NetID: netID, Name: name}
+	key := ch.makeID()
+
+	err = s.db.Delete([]byte(key))
 	if err != nil {
 		return
 	}
@@ -315,11 +317,14 @@ func (s *Store) RemoveChannel(name string) (removed bool, err error) {
 }
 
 // FindChannel looks up a channel based on name. It caches the result if found.
-func (s *Store) FindChannel(name string) (channel *StoredChannel, err error) {
-	name = strings.ToLower(name)
+func (s *Store) FindChannel(netID, name string) (channel *StoredChannel,
+	err error) {
+
+	ch := StoredChannel{NetID: netID, Name: name}
+	key := ch.makeID()
 
 	var serialized []byte
-	serialized, err = s.db.Get(nil, []byte(name))
+	serialized, err = s.db.Get(nil, []byte(key))
 	if err != nil || serialized == nil {
 		return
 	}

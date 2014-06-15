@@ -3,24 +3,32 @@ package data
 import (
 	"bytes"
 	"encoding/gob"
+	"fmt"
+	"strings"
 )
 
 // StoredChannel stores attributes for channels.
 type StoredChannel struct {
-	Name string
+	NetID string
+	Name  string
 	JSONStorer
 }
 
 // NewStoredChannel creates a new stored channel.
-func NewStoredChannel(name string) *StoredChannel {
-	return &StoredChannel{name, make(JSONStorer)}
+func NewStoredChannel(netID, name string) *StoredChannel {
+	return &StoredChannel{netID, name, make(JSONStorer)}
+}
+
+// makeID is used to create a key to store this instance by.
+func (s *StoredChannel) makeID() string {
+	return strings.ToLower(fmt.Sprintf("%s.%s", s.Name, s.NetID))
 }
 
 // serialize turns the StoredChannel into bytes for storage.
-func (a *StoredChannel) serialize() ([]byte, error) {
+func (s *StoredChannel) serialize() ([]byte, error) {
 	buffer := &bytes.Buffer{}
 	encoder := gob.NewEncoder(buffer)
-	err := encoder.Encode(a)
+	err := encoder.Encode(s)
 	if err != nil {
 		return nil, err
 	}
