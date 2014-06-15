@@ -453,7 +453,7 @@ func TestCoreCommands_Passwd(t *testing.T) {
 	defer commandsTeardown(ts, t)
 
 	var err error
-	var access *data.UserAccess
+	var access *data.StoredUser
 
 	newpasswd := "newpasswd"
 
@@ -504,7 +504,7 @@ func TestCoreCommands_Masks(t *testing.T) {
 	)
 
 	var err error
-	var access *data.UserAccess
+	var access *data.StoredUser
 
 	err = rspChk(ts, registerSuccessFirst, u1host, register, password, u1user)
 	if err != nil {
@@ -610,7 +610,7 @@ func TestCoreCommands_Resetpasswd(t *testing.T) {
 	ts := commandsSetup(t)
 	defer commandsTeardown(ts, t)
 	var err error
-	var access *data.UserAccess
+	var access *data.StoredUser
 
 	err = rspChk(ts, registerSuccessFirst, u1host, register, password, u1user)
 	if err != nil {
@@ -648,7 +648,7 @@ func TestCoreCommands_GiveTakeGlobal(t *testing.T) {
 	ts := commandsSetup(t)
 	defer commandsTeardown(ts, t)
 	var err error
-	var a *data.UserAccess
+	var a *data.StoredUser
 
 	err = rspChk(ts, registerSuccessFirst, u1host, register, password, u1user)
 	if err != nil {
@@ -717,7 +717,7 @@ func TestCoreCommands_GiveTakeServer(t *testing.T) {
 	ts := commandsSetup(t)
 	defer commandsTeardown(ts, t)
 	var err error
-	var a *data.UserAccess
+	var a *data.StoredUser
 
 	err = rspChk(ts, registerSuccessFirst, u1host, register, password, u1user)
 	if err != nil {
@@ -786,7 +786,7 @@ func TestCoreCommands_GiveTakeChannel(t *testing.T) {
 	ts := commandsSetup(t)
 	defer commandsTeardown(ts, t)
 	var err error
-	var a *data.UserAccess
+	var a *data.StoredUser
 
 	err = rspChk(ts, registerSuccessFirst, u1host, register, password, u1user)
 	if err != nil {
@@ -904,7 +904,7 @@ func TestCoreCommands_Help(t *testing.T) {
 func TestCoreCommands_Gusers(t *testing.T) {
 	ts := commandsSetup(t)
 	defer commandsTeardown(ts, t)
-	var a1, a2 *data.UserAccess
+	var a1, a2 *data.StoredUser
 	var err error
 
 	err = rspChk(ts, gusersNoUsers, u1host, gusers)
@@ -948,7 +948,7 @@ func TestCoreCommands_Gusers(t *testing.T) {
 func TestCoreCommands_Susers(t *testing.T) {
 	ts := commandsSetup(t)
 	defer commandsTeardown(ts, t)
-	var a1, a2 *data.UserAccess
+	var a1, a2 *data.StoredUser
 	var err error
 
 	err = rspChk(ts, susersNoUsers, u1host, susers)
@@ -997,7 +997,7 @@ func TestCoreCommands_Susers(t *testing.T) {
 func TestCoreCommands_Users(t *testing.T) {
 	ts := commandsSetup(t)
 	defer commandsTeardown(ts, t)
-	var a1, a2 *data.UserAccess
+	var a1, a2 *data.StoredUser
 	var err error
 
 	err = rspChk(ts, gusersNoUsers, u1host, gusers)

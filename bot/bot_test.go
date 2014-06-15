@@ -55,7 +55,7 @@ func init() {
 		log.SetOutput(f)
 	}
 
-	data.UserAccessPwdCost = 4 // See bcrypt.MinCost
+	data.StoredUserPwdCost = 4 // See bcrypt.MinCost
 }
 
 var netID = "test"

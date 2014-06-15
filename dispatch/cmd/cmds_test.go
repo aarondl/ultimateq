@@ -19,7 +19,7 @@ var (
 )
 
 func init() {
-	data.UserAccessPwdCost = 4 // See constant for bcrypt.MinCost
+	data.StoredUserPwdCost = 4 // See constant for bcrypt.MinCost
 }
 
 func newWriter() (*bytes.Buffer, irc.Writer) {
@@ -54,11 +54,11 @@ type commandHandler struct {
 	channel         *data.Channel
 	targChan        *data.Channel
 	usrchanmodes    *data.UserModes
-	access          *data.UserAccess
+	access          *data.StoredUser
 	targUsers       map[string]*data.User
 	targVarUsers    []*data.User
-	targUserAccs    map[string]*data.UserAccess
-	targVarUserAccs []*data.UserAccess
+	targUserAccs    map[string]*data.StoredUser
+	targVarUserAccs []*data.StoredUser
 	args            map[string]string
 	state           *data.State
 	store           *data.Store
@@ -72,14 +72,14 @@ func (b *commandHandler) Cmd(cmd string,
 	b.w = w
 	b.ev = ev.Event
 	b.user = ev.User
-	b.access = ev.UserAccess
+	b.access = ev.StoredUser
 	b.usrchanmodes = ev.UserChannelModes
 	b.channel = ev.Channel
 	b.targChan = ev.TargetChannel
 	b.targUsers = ev.TargetUsers
-	b.targUserAccs = ev.TargetUserAccess
+	b.targUserAccs = ev.TargetStoredUser
 	b.targVarUsers = ev.TargetVarUsers
-	b.targVarUserAccs = ev.TargetVarUserAccess
+	b.targVarUserAccs = ev.TargetVarStoredUser
 	b.args = ev.args
 	b.state = ev.State
 	b.store = ev.Store
@@ -194,7 +194,7 @@ func setup() (state *data.State, store *data.Store) {
 }
 
 func setupForAuth() (state *data.State, store *data.Store,
-	user *data.UserAccess) {
+	user *data.StoredUser) {
 
 	var err error
 	state, _ = setup()
@@ -202,7 +202,7 @@ func setupForAuth() (state *data.State, store *data.Store,
 	if err != nil {
 		panic(err)
 	}
-	user, err = data.NewUserAccess("user", "pass", "*!*@host")
+	user, err = data.NewStoredUser("user", "pass", "*!*@host")
 	if err != nil {
 		panic(err)
 	}
@@ -1168,7 +1168,7 @@ func TestCmds_DispatchVariadicUsers(t *testing.T) {
 	}
 
 	if u := handler.targVarUserAccs; u == nil {
-		t.Error("UserAccess var args was not set or empty.")
+		t.Error("StoredUser var args was not set or empty.")
 	} else if len(u) != 2 {
 		t.Error("Unexpected number of users:", len(u))
 	} else {

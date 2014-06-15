@@ -33,8 +33,8 @@ func TestStore_AddUser(t *testing.T) {
 		t.Error("Pre-warmed cache somehow exists.")
 	}
 
-	ua1 := &UserAccess{Username: uname}
-	ua2 := &UserAccess{Username: uname + uname}
+	ua1 := &StoredUser{Username: uname}
+	ua2 := &StoredUser{Username: uname + uname}
 
 	err = s.AddUser(ua1)
 	if err != nil {
@@ -79,7 +79,7 @@ func TestStore_RemoveUser(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ua1 := &UserAccess{Username: uname}
+	ua1 := &StoredUser{Username: uname}
 
 	err = s.AddUser(ua1)
 	if err != nil {
@@ -126,7 +126,7 @@ func TestStore_AuthUser(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ua1, err := NewUserAccess(uname, password, `*!*@host`)
+	ua1, err := NewStoredUser(uname, password, `*!*@host`)
 	if err != nil {
 		t.Fatal("Error creating user:", err)
 	}
@@ -201,7 +201,7 @@ func TestStore_AuthLogout(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ua1, err := NewUserAccess(uname, password)
+	ua1, err := NewStoredUser(uname, password)
 	if err != nil {
 		t.Fatal("Error creating user:", err)
 	}
@@ -210,7 +210,7 @@ func TestStore_AuthLogout(t *testing.T) {
 		t.Fatal("Error adding user:", err)
 	}
 
-	s.cache = make(map[string]*UserAccess)
+	s.cache = make(map[string]*StoredUser)
 
 	user, err := s.AuthUser(server, host, uname, password)
 	if err != nil {
@@ -260,8 +260,8 @@ func TestStore_Finding(t *testing.T) {
 		t.Error("Pre-warmed cache somehow exists.")
 	}
 
-	ua1 := &UserAccess{Username: uname}
-	ua2 := &UserAccess{Username: uname + uname}
+	ua1 := &StoredUser{Username: uname}
+	ua2 := &StoredUser{Username: uname + uname}
 
 	err = s.AddUser(ua1)
 	if err != nil {
@@ -272,7 +272,7 @@ func TestStore_Finding(t *testing.T) {
 		t.Fatal("Could not add user.")
 	}
 
-	s.cache = make(map[string]*UserAccess)
+	s.cache = make(map[string]*StoredUser)
 
 	found, err := s.fetchUser(ua1.Username)
 	if err != nil {
@@ -361,9 +361,9 @@ func TestStore_GlobalUsers(t *testing.T) {
 		t.Error("When db is empty both return params should be nil.")
 	}
 
-	ua1 := &UserAccess{Username: uname}
+	ua1 := &StoredUser{Username: uname}
 	ua1.GrantGlobalLevel(5)
-	ua2 := &UserAccess{Username: uname + uname}
+	ua2 := &StoredUser{Username: uname + uname}
 	ua2.GrantServerLevel(server, 5)
 	ua2.GrantChannelLevel(server, channel, 5)
 
@@ -398,9 +398,9 @@ func TestStore_ServerUsers(t *testing.T) {
 		t.Error("When db is empty both return params should be nil.")
 	}
 
-	ua1 := &UserAccess{Username: uname}
+	ua1 := &StoredUser{Username: uname}
 	ua1.GrantServerLevel(server, 5)
-	ua2 := &UserAccess{Username: uname + uname}
+	ua2 := &StoredUser{Username: uname + uname}
 	ua2.GrantGlobalLevel(5)
 	ua2.GrantChannelLevel(server, channel, 5)
 
@@ -435,9 +435,9 @@ func TestStore_ChanUsers(t *testing.T) {
 		t.Error("When db is empty both return params should be nil.")
 	}
 
-	ua1 := &UserAccess{Username: uname}
+	ua1 := &StoredUser{Username: uname}
 	ua1.GrantChannelLevel(server, channel, 5)
-	ua2 := &UserAccess{Username: uname + uname}
+	ua2 := &StoredUser{Username: uname + uname}
 	ua2.GrantGlobalLevel(5)
 	ua2.GrantServerLevel(server, 5)
 

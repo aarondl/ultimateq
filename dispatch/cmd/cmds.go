@@ -297,7 +297,7 @@ func (c *Cmds) Dispatch(networkID string, overridePrefix rune,
 	cmdEv.Store = store
 
 	if command.RequireAuth {
-		if cmdEv.UserAccess, err = filterAccess(store, command, networkID,
+		if cmdEv.StoredUser, err = filterAccess(store, command, networkID,
 			ch, ev); err != nil {
 
 			cmdEv.Close()
@@ -382,7 +382,7 @@ func cmdNameDispatch(handler CmdHandler, cmd string, writer irc.Writer,
 // filterAccess ensures that a user has the correct access to perform the given
 // command.
 func filterAccess(store *data.Store, command *Cmd, server, channel string,
-	ev *irc.Event) (*data.UserAccess, error) {
+	ev *irc.Event) (*data.StoredUser, error) {
 
 	hasLevel := command.ReqLevel != 0
 	hasFlags := len(command.ReqFlags) != 0
@@ -528,16 +528,16 @@ func (c *Cmds) parseUserArg(ev *Event, state *data.State,
 	vargs := (t & VARIADIC) != 0
 	nUsers := len(users)
 
-	var access *data.UserAccess
+	var access *data.StoredUser
 	var user *data.User
 	var err error
 
 	addData := func(index int) {
 		if access != nil {
 			if vargs {
-				ev.TargetVarUserAccess[index] = access
+				ev.TargetVarStoredUser[index] = access
 			} else {
-				ev.TargetUserAccess[name] = access
+				ev.TargetStoredUser[name] = access
 			}
 		}
 		if user != nil {
@@ -560,10 +560,10 @@ func (c *Cmds) parseUserArg(ev *Event, state *data.State,
 	switch t & USERMASK {
 	case USER:
 		if vargs {
-			ev.TargetVarUserAccess = make([]*data.UserAccess, nUsers)
+			ev.TargetVarStoredUser = make([]*data.StoredUser, nUsers)
 		} else {
-			if ev.TargetUserAccess == nil {
-				ev.TargetUserAccess = make(map[string]*data.UserAccess)
+			if ev.TargetStoredUser == nil {
+				ev.TargetStoredUser = make(map[string]*data.StoredUser)
 			}
 		}
 		for i, u := range users {

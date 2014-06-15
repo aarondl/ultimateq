@@ -36,8 +36,8 @@ type Event struct {
 	*data.Store
 	// User can be nil if the bot's State is disabled.
 	User *data.User
-	// UserAccess will be nil when there is no required access.
-	UserAccess *data.UserAccess
+	// StoredUser will be nil when there is no required access.
+	StoredUser *data.StoredUser
 	// UserChannelModes will be nil when the message was not sent to a channel.
 	UserChannelModes *data.UserModes
 	// Channel will be nil when the message was not sent to a channel.
@@ -50,16 +50,16 @@ type Event struct {
 	// as a byproduct of looking up authentication, when the arguments contain
 	// a *user argument, and a nickname is passed instead of a *username.
 	TargetUsers map[string]*data.User
-	// TargetUserAccess is populated when the arguments contain a *user
+	// TargetStoredUser is populated when the arguments contain a *user
 	// argument.
-	TargetUserAccess map[string]*data.UserAccess
+	TargetStoredUser map[string]*data.StoredUser
 	// TargetVarUsers is populated when the arguments contain a ~nick...
 	// argument. When a *user... parameter is used, it will be sparsely filled
 	// whenever a user is requested by nickname not *username.
 	TargetVarUsers []*data.User
 	// TargetVarUsers is populated when the arguments contain a *user...
 	// argument.
-	TargetVarUserAccess []*data.UserAccess
+	TargetVarStoredUser []*data.StoredUser
 
 	args map[string]string
 	once sync.Once
@@ -101,7 +101,7 @@ func (ev *Event) FindUserByNick(nick string) (*data.User, error) {
 // is done. An error occurs if the user is not found, the user is not authed,
 // the username is not registered, etc.
 func (ev *Event) FindAccessByUser(server, nickOrUser string) (
-	access *data.UserAccess, user *data.User, err error) {
+	access *data.StoredUser, user *data.User, err error) {
 	if ev.Store == nil {
 		err = errors.New(errMsgStoreDisabled)
 		return
@@ -150,7 +150,7 @@ func (ev *Event) FindAccessByUser(server, nickOrUser string) (
 func (ev *Event) Close() error {
 	ev.once.Do(func() {
 		ev.User = nil
-		ev.UserAccess = nil
+		ev.StoredUser = nil
 		ev.UserChannelModes = nil
 		ev.Channel = nil
 		ev.State = nil

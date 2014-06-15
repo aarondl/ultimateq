@@ -57,12 +57,12 @@ var (
 // DbProvider is a function that provides an internal database.
 type DbProvider func() (*kv.DB, error)
 
-// Store is used to store UserAccess objects, and cache their lookup.
+// Store is used to store StoredUser objects, and cache their lookup.
 type Store struct {
 	db           *kv.DB
-	cache        map[string]*UserAccess
+	cache        map[string]*StoredUser
 	protectCache sync.Mutex
-	authed       map[string]*UserAccess
+	authed       map[string]*StoredUser
 	checkedFirst bool
 }
 
@@ -75,8 +75,8 @@ func NewStore(prov DbProvider) (*Store, error) {
 
 	s := &Store{
 		db:     db,
-		cache:  make(map[string]*UserAccess),
-		authed: make(map[string]*UserAccess),
+		cache:  make(map[string]*StoredUser),
+		authed: make(map[string]*StoredUser),
 	}
 
 	return s, nil
@@ -88,31 +88,31 @@ func (s *Store) Close() error {
 }
 
 // GlobalUsers gets users with global access
-func (s *Store) GlobalUsers() ([]*UserAccess, error) {
-	return iterate(s.db, func(ua *UserAccess) bool {
+func (s *Store) GlobalUsers() ([]*StoredUser, error) {
+	return iterate(s.db, func(ua *StoredUser) bool {
 		a := ua.GetGlobal()
 		return a != nil && !a.IsZero()
 	})
 }
 
 // ServerUsers gets users with Server access
-func (s *Store) ServerUsers(server string) ([]*UserAccess, error) {
-	return iterate(s.db, func(ua *UserAccess) bool {
+func (s *Store) ServerUsers(server string) ([]*StoredUser, error) {
+	return iterate(s.db, func(ua *StoredUser) bool {
 		a := ua.GetServer(server)
 		return a != nil && !a.IsZero()
 	})
 }
 
 // ChanUsers gets users with access to a channel
-func (s *Store) ChanUsers(server, channel string) ([]*UserAccess, error) {
-	return iterate(s.db, func(ua *UserAccess) bool {
+func (s *Store) ChanUsers(server, channel string) ([]*StoredUser, error) {
+	return iterate(s.db, func(ua *StoredUser) bool {
 		a := ua.GetChannel(server, channel)
 		return a != nil && !a.IsZero()
 	})
 }
 
-func iterate(db *kv.DB, filter func(*UserAccess) bool) ([]*UserAccess, error) {
-	list := make([]*UserAccess, 0)
+func iterate(db *kv.DB, filter func(*StoredUser) bool) ([]*StoredUser, error) {
+	list := make([]*StoredUser, 0)
 
 	e, err := db.SeekFirst()
 	switch {
@@ -134,7 +134,7 @@ func iterate(db *kv.DB, filter func(*UserAccess) bool) ([]*UserAccess, error) {
 }
 
 // AddUser adds a user to the database.
-func (s *Store) AddUser(ua *UserAccess) error {
+func (s *Store) AddUser(ua *StoredUser) error {
 	var err error
 	var serialized []byte
 
@@ -156,7 +156,7 @@ func (s *Store) AddUser(ua *UserAccess) error {
 // RemoveUser removes a user from the database, returns true if successful.
 func (s *Store) RemoveUser(username string) (removed bool, err error) {
 	username = strings.ToLower(username)
-	var exists *UserAccess
+	var exists *StoredUser
 	exists, err = s.FindUser(username)
 	if err != nil || exists == nil {
 		return
@@ -171,13 +171,13 @@ func (s *Store) RemoveUser(username string) (removed bool, err error) {
 	return
 }
 
-// AuthUser authenticates a user. UserAccess will be not nil iff the user
+// AuthUser authenticates a user. StoredUser will be not nil iff the user
 // is found and authenticates successfully.
 func (s *Store) AuthUser(
-	server, host, username, password string) (*UserAccess, error) {
+	server, host, username, password string) (*StoredUser, error) {
 
 	username = strings.ToLower(username)
-	var user *UserAccess
+	var user *StoredUser
 	var ok bool
 	var err error
 
@@ -219,7 +219,7 @@ func (s *Store) AuthUser(
 }
 
 // GetAuthedUser looks up a user that was authenticated previously.
-func (s *Store) GetAuthedUser(server, host string) *UserAccess {
+func (s *Store) GetAuthedUser(server, host string) *StoredUser {
 	return s.authed[server+host]
 }
 
@@ -244,7 +244,7 @@ func (s *Store) LogoutByUsername(username string) {
 }
 
 // FindUser looks up a user based on username. It caches the result if found.
-func (s *Store) FindUser(username string) (user *UserAccess, err error) {
+func (s *Store) FindUser(username string) (user *StoredUser, err error) {
 	username = strings.ToLower(username)
 	// We're writing to cache in a method that should be considered safe by
 	// read-only locked friends, so we have to protect the cache.
@@ -267,7 +267,7 @@ func (s *Store) FindUser(username string) (user *UserAccess, err error) {
 }
 
 // fetchUser gets a user from the database based on username.
-func (s *Store) fetchUser(username string) (user *UserAccess, err error) {
+func (s *Store) fetchUser(username string) (user *StoredUser, err error) {
 	username = strings.ToLower(username)
 	var serialized []byte
 	serialized, err = s.db.Get(nil, []byte(username))
@@ -283,7 +283,7 @@ func (s *Store) fetchUser(username string) (user *UserAccess, err error) {
 // cross it's boundaries, if so, it dumps the cache.
 func (s *Store) checkCacheLimits() {
 	if len(s.cache)+1 > nMaxCache {
-		s.cache = make(map[string]*UserAccess)
+		s.cache = make(map[string]*StoredUser)
 	}
 }
 

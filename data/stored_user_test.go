@@ -8,14 +8,14 @@ import (
 	"testing"
 )
 
-func TestUserAccess(t *testing.T) {
+func TestStoredUser(t *testing.T) {
 	t.Parallel()
-	var a *UserAccess
+	var a *StoredUser
 	var err error
 	var masks = []string{`*!*@host`, `*!user@*`}
 
-	a = &UserAccess{}
-	a, err = NewUserAccess(uname, password, masks...)
+	a = &StoredUser{}
+	a, err = NewStoredUser(uname, password, masks...)
 	if err != nil {
 		t.Fatal("Unexpected error:", err)
 	}
@@ -29,23 +29,23 @@ func TestUserAccess(t *testing.T) {
 		t.Errorf("Masks are %#v not %#v", a.Masks, masks)
 	}
 
-	a, err = NewUserAccess("", password, masks...)
+	a, err = NewStoredUser("", password, masks...)
 	if a != nil || err != errMissingUnameOrPwd {
 		t.Error("Empty username should fail creation.")
 	}
-	a, err = NewUserAccess(uname, "", masks...)
+	a, err = NewStoredUser(uname, "", masks...)
 	if a != nil || err != errMissingUnameOrPwd {
 		t.Error("Empty password should fail creation.")
 	}
-	a, err = NewUserAccess(uname, password, "a", "a")
+	a, err = NewStoredUser(uname, password, "a", "a")
 	if a != nil || err != errDuplicateMask {
 		t.Error("Duplicate masks should generate an error.")
 	}
 }
 
-func TestUserAccess_VerifyPassword(t *testing.T) {
+func TestStoredUser_VerifyPassword(t *testing.T) {
 	t.Parallel()
-	a, err := NewUserAccess(uname, password)
+	a, err := NewStoredUser(uname, password)
 	if err != nil {
 		t.Fatal("Unexpected Error:", err)
 	}
@@ -57,9 +57,9 @@ func TestUserAccess_VerifyPassword(t *testing.T) {
 	}
 }
 
-func TestUserAccess_SerializeDeserialize(t *testing.T) {
+func TestStoredUser_SerializeDeserialize(t *testing.T) {
 	var masks = []string{`*!*@host`, `*!user@*`}
-	a, err := NewUserAccess(uname, password, masks...)
+	a, err := NewStoredUser(uname, password, masks...)
 	if err != nil {
 		t.Fatal("Unexpected error:", err)
 	}
@@ -106,10 +106,10 @@ func TestUserAccess_SerializeDeserialize(t *testing.T) {
 	}
 }
 
-func TestUserAccess_AddMasks(t *testing.T) {
+func TestStoredUser_AddMasks(t *testing.T) {
 	t.Parallel()
 	masks := []string{`*!*@host`, `*!user@*`}
-	a := createUserAccess()
+	a := createStoredUser()
 	if len(a.Masks) != 0 {
 		t.Error("Masks should be empty.")
 	}
@@ -125,10 +125,10 @@ func TestUserAccess_AddMasks(t *testing.T) {
 	}
 }
 
-func TestUserAccess_DelMasks(t *testing.T) {
+func TestStoredUser_DelMasks(t *testing.T) {
 	t.Parallel()
 	masks := []string{`*!*@host`, `*!user@*`, `nick!*@*`}
-	a := createUserAccess(masks...)
+	a := createStoredUser(masks...)
 	if len(a.Masks) != 3 {
 		t.Error("User should have the masks:", masks)
 	}
@@ -143,10 +143,10 @@ func TestUserAccess_DelMasks(t *testing.T) {
 	}
 }
 
-func TestUserAccess_ValidateMasks(t *testing.T) {
+func TestStoredUser_ValidateMasks(t *testing.T) {
 	t.Parallel()
 	masks := []string{`*!*@host`, `*!user@*`}
-	a := createUserAccess(masks[1:]...)
+	a := createStoredUser(masks[1:]...)
 
 	if a.ValidateMask(masks[0]) {
 		t.Error("Should not have validated this mask.")
@@ -155,15 +155,15 @@ func TestUserAccess_ValidateMasks(t *testing.T) {
 		t.Error("Should have validated this mask.")
 	}
 
-	a = createUserAccess(masks[1:]...)
+	a = createStoredUser(masks[1:]...)
 	if !a.ValidateMask(masks[1]) {
 		t.Error("When masks are empty should validate any mask.")
 	}
 }
 
-func TestUserAccess_Has(t *testing.T) {
+func TestStoredUser_Has(t *testing.T) {
 	t.Parallel()
-	a := createUserAccess()
+	a := createStoredUser()
 
 	var check = func(
 		level uint8, flags string, has, hasLevel, hasFlags bool) string {
@@ -224,23 +224,23 @@ func TestUserAccess_Has(t *testing.T) {
 	}
 }
 
-func TestUserAccess_GrantGlobal(t *testing.T) {
+func TestStoredUser_GrantGlobal(t *testing.T) {
 	t.Parallel()
-	a := createUserAccess()
+	a := createStoredUser()
 	a.GrantGlobalLevel(100)
 	s := a.GetGlobal()
 	if s.Level != 100 {
 		t.Error("Level not set.")
 	}
 
-	a = createUserAccess()
+	a = createStoredUser()
 	a.GrantGlobalFlags("aB")
 	s = a.GetGlobal()
 	if !s.HasFlag('a') || !s.HasFlag('a') {
 		t.Error("Flags not set.")
 	}
 
-	a = createUserAccess()
+	a = createStoredUser()
 	a.GrantGlobal(100, "aB")
 	s = a.GetGlobal()
 	if s.Level != 100 {
@@ -251,9 +251,9 @@ func TestUserAccess_GrantGlobal(t *testing.T) {
 	}
 }
 
-func TestUserAccess_RevokeGlobal(t *testing.T) {
+func TestStoredUser_RevokeGlobal(t *testing.T) {
 	t.Parallel()
-	a := createUserAccess()
+	a := createStoredUser()
 	a.GrantGlobal(100, "aB")
 	a.RevokeGlobalLevel()
 	if a.Global.Level != 0 {
@@ -269,9 +269,9 @@ func TestUserAccess_RevokeGlobal(t *testing.T) {
 	}
 }
 
-func TestUserAccess_HasGlobalLevel(t *testing.T) {
+func TestStoredUser_HasGlobalLevel(t *testing.T) {
 	t.Parallel()
-	a := createUserAccess()
+	a := createStoredUser()
 	if a.HasGlobalLevel(50) {
 		t.Error("Should not have any access.")
 	}
@@ -284,9 +284,9 @@ func TestUserAccess_HasGlobalLevel(t *testing.T) {
 	}
 }
 
-func TestUserAccess_HasGlobalFlags(t *testing.T) {
+func TestStoredUser_HasGlobalFlags(t *testing.T) {
 	t.Parallel()
-	a := createUserAccess()
+	a := createStoredUser()
 	if a.HasGlobalFlags("ab") {
 		t.Error("Should not have any flags.")
 	}
@@ -302,15 +302,15 @@ func TestUserAccess_HasGlobalFlags(t *testing.T) {
 	}
 }
 
-func TestUserAccess_GrantServer(t *testing.T) {
+func TestStoredUser_GrantServer(t *testing.T) {
 	t.Parallel()
-	a := createUserAccess()
+	a := createStoredUser()
 	s := a.GetServer(server)
 	if s != nil {
 		t.Error("There should be no server access.")
 	}
 
-	a = createUserAccess()
+	a = createStoredUser()
 	a.GrantServer(server, 100, "aB")
 	s = a.GetServer(server)
 	if s == nil {
@@ -324,7 +324,7 @@ func TestUserAccess_GrantServer(t *testing.T) {
 		}
 	}
 
-	a = createUserAccess()
+	a = createStoredUser()
 	a.GrantServerLevel(server, 100)
 	s = a.GetServer(server)
 	if s == nil {
@@ -332,7 +332,7 @@ func TestUserAccess_GrantServer(t *testing.T) {
 	} else if s.Level != 100 {
 		t.Error("Level not set.")
 	}
-	a = createUserAccess()
+	a = createStoredUser()
 	a.GrantServerFlags(server, "aB")
 	s = a.GetServer(server)
 	if s == nil {
@@ -342,9 +342,9 @@ func TestUserAccess_GrantServer(t *testing.T) {
 	}
 }
 
-func TestUserAccess_RevokeServer(t *testing.T) {
+func TestStoredUser_RevokeServer(t *testing.T) {
 	t.Parallel()
-	a := createUserAccess()
+	a := createStoredUser()
 	a.GrantServer(server, 100, "abc")
 	if a.GetServer(server) == nil {
 		t.Error("Server permissions not granted.")
@@ -366,9 +366,9 @@ func TestUserAccess_RevokeServer(t *testing.T) {
 	}
 }
 
-func TestUserAccess_HasServerLevel(t *testing.T) {
+func TestStoredUser_HasServerLevel(t *testing.T) {
 	t.Parallel()
-	a := createUserAccess()
+	a := createStoredUser()
 	if a.HasServerLevel(server, 50) {
 		t.Error("Should not have any access.")
 	}
@@ -381,9 +381,9 @@ func TestUserAccess_HasServerLevel(t *testing.T) {
 	}
 }
 
-func TestUserAccess_HasServerFlags(t *testing.T) {
+func TestStoredUser_HasServerFlags(t *testing.T) {
 	t.Parallel()
-	a := createUserAccess()
+	a := createStoredUser()
 	if a.HasServerFlags(server, "ab") {
 		t.Error("Should not have any flags.")
 	}
@@ -399,15 +399,15 @@ func TestUserAccess_HasServerFlags(t *testing.T) {
 	}
 }
 
-func TestUserAccess_GrantChannel(t *testing.T) {
+func TestStoredUser_GrantChannel(t *testing.T) {
 	t.Parallel()
-	a := createUserAccess()
+	a := createStoredUser()
 	s := a.GetChannel(server, channel)
 	if s != nil {
 		t.Error("There should be no global access.")
 	}
 
-	a = createUserAccess()
+	a = createStoredUser()
 	a.GrantChannel(server, channel, 100, "aB")
 	s = a.GetChannel(server, channel)
 	if s == nil {
@@ -421,7 +421,7 @@ func TestUserAccess_GrantChannel(t *testing.T) {
 		}
 	}
 
-	a = createUserAccess()
+	a = createStoredUser()
 	a.GrantChannelLevel(server, channel, 100)
 	s = a.GetChannel(server, channel)
 	if s == nil {
@@ -429,7 +429,7 @@ func TestUserAccess_GrantChannel(t *testing.T) {
 	} else if s.Level != 100 {
 		t.Error("Level not set.")
 	}
-	a = createUserAccess()
+	a = createStoredUser()
 	a.GrantChannelFlags(server, channel, "aB")
 	s = a.GetChannel(server, channel)
 	if s == nil {
@@ -439,9 +439,9 @@ func TestUserAccess_GrantChannel(t *testing.T) {
 	}
 }
 
-func TestUserAccess_RevokeChannel(t *testing.T) {
+func TestStoredUser_RevokeChannel(t *testing.T) {
 	t.Parallel()
-	a := createUserAccess()
+	a := createStoredUser()
 	a.GrantChannel(server, channel, 100, "abc")
 	if a.GetChannel(server, channel) == nil {
 		t.Error("Channel permissions not granted.")
@@ -463,9 +463,9 @@ func TestUserAccess_RevokeChannel(t *testing.T) {
 	}
 }
 
-func TestUserAccess_HasChannelLevel(t *testing.T) {
+func TestStoredUser_HasChannelLevel(t *testing.T) {
 	t.Parallel()
-	a := createUserAccess()
+	a := createStoredUser()
 	if a.HasChannelLevel(server, channel, 50) {
 		t.Error("Should not have any access.")
 	}
@@ -478,9 +478,9 @@ func TestUserAccess_HasChannelLevel(t *testing.T) {
 	}
 }
 
-func TestUserAccess_HasChannelFlags(t *testing.T) {
+func TestStoredUser_HasChannelFlags(t *testing.T) {
 	t.Parallel()
-	a := createUserAccess()
+	a := createStoredUser()
 	if a.HasChannelFlags(server, channel, "ab") {
 		t.Error("Should not have any flags.")
 	}
@@ -497,7 +497,7 @@ func TestUserAccess_HasChannelFlags(t *testing.T) {
 	}
 }
 
-func TestUserAccess_String(t *testing.T) {
+func TestStoredUser_String(t *testing.T) {
 	var table = []struct {
 		HasGlobal       bool
 		GlobalLevel     uint8
@@ -525,7 +525,7 @@ func TestUserAccess_String(t *testing.T) {
 	}
 
 	for _, test := range table {
-		a := createUserAccess()
+		a := createStoredUser()
 		if test.HasGlobal {
 			a.GrantGlobal(test.GlobalLevel, test.GlobalFlags)
 		}
@@ -561,9 +561,9 @@ func TestUserAccess_String(t *testing.T) {
 	}
 }
 
-func TestUserAccess_ResetPassword(t *testing.T) {
+func TestStoredUser_ResetPassword(t *testing.T) {
 	t.Parallel()
-	a, err := NewUserAccess(uname, password)
+	a, err := NewStoredUser(uname, password)
 	if err != nil {
 		t.Error(err)
 	}

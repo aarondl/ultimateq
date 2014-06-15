@@ -259,7 +259,7 @@ func (_ *Queryer) Weather(w irc.Writer, ev *cmd.Event) error {
 ===================== */
 
 func (h *Handler) Up(w irc.Writer, ev *cmd.Event) error {
-	user := ev.UserAccess
+	user := ev.StoredUser
 	ch := ev.TargetChannel
 	if ch == nil {
 		return fmt.Errorf("Must be a channel that the bot is on.")
@@ -283,7 +283,7 @@ func (h *Handler) HandleRaw(w irc.Writer, ev *irc.Event) {
 }
 
 func putPeopleUp(ev *irc.Event, ch string,
-	a *data.UserAccess, w irc.Writer) (did bool) {
+	a *data.StoredUser, w irc.Writer) (did bool) {
 	if a != nil {
 		nick := ev.Nick()
 		if a.HasFlag(ev.NetworkID, ch, 'o') {

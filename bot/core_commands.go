@@ -153,8 +153,8 @@ const (
 
 type (
 	argv           []string
-	giveHelperFunc func(*data.UserAccess, uint8, string) (string, bool)
-	takeHelperFunc func(*data.UserAccess, bool, bool, string) (string, bool)
+	giveHelperFunc func(*data.StoredUser, uint8, string) (string, bool)
+	takeHelperFunc func(*data.StoredUser, bool, bool, string) (string, bool)
 )
 
 var commands = []struct {
@@ -305,7 +305,7 @@ func (c *coreCmds) Cmd(cmd string, w irc.Writer,
 func (c *coreCmds) register(w irc.Writer,
 	ev *cmd.Event) (internal, external error) {
 
-	var access *data.UserAccess
+	var access *data.StoredUser
 
 	pwd := ev.GetArg("password")
 	uname := ev.GetArg("username")
@@ -313,7 +313,7 @@ func (c *coreCmds) register(w irc.Writer,
 		uname = strings.TrimLeft(ev.User.Username(), "~")
 	}
 
-	access = ev.UserAccess
+	access = ev.StoredUser
 	if access == nil {
 		access = ev.GetAuthedUser(ev.NetworkID, ev.User.Host())
 	}
@@ -329,7 +329,7 @@ func (c *coreCmds) register(w irc.Writer,
 		return nil, fmt.Errorf(registerFailure, uname)
 	}
 
-	access, internal = data.NewUserAccess(uname, pwd)
+	access, internal = data.NewStoredUser(uname, pwd)
 	if internal != nil {
 		return
 	}
@@ -372,7 +372,7 @@ func (c *coreCmds) register(w irc.Writer,
 func (c *coreCmds) auth(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	var access *data.UserAccess
+	var access *data.StoredUser
 	pwd := ev.GetArg("password")
 	uname := ev.GetArg("username")
 	if len(uname) == 0 {
@@ -381,7 +381,7 @@ func (c *coreCmds) auth(w irc.Writer, ev *cmd.Event) (
 
 	host, nick := ev.User.Host(), ev.User.Nick()
 
-	access = ev.UserAccess
+	access = ev.StoredUser
 	if access == nil {
 		access = ev.GetAuthedUser(ev.NetworkID, host)
 	}
@@ -413,11 +413,11 @@ func (c *coreCmds) auth(w irc.Writer, ev *cmd.Event) (
 func (c *coreCmds) logout(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	user := ev.TargetUserAccess["user"]
+	user := ev.TargetStoredUser["user"]
 	uname := ""
 	host, nick := ev.User.Host(), ev.User.Nick()
 	if user != nil {
-		if !ev.UserAccess.HasGlobalFlag('G') {
+		if !ev.StoredUser.HasGlobalFlag('G') {
 			external = cmd.MakeGlobalFlagsError("G")
 			return
 		}
@@ -443,9 +443,9 @@ func (c *coreCmds) logout(w irc.Writer, ev *cmd.Event) (
 func (c *coreCmds) access(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	access := ev.TargetUserAccess["user"]
+	access := ev.TargetStoredUser["user"]
 	if access == nil {
-		access = ev.UserAccess
+		access = ev.StoredUser
 	}
 
 	ch := ""
@@ -462,8 +462,8 @@ func (c *coreCmds) access(w irc.Writer, ev *cmd.Event) (
 func (c *coreCmds) gusers(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	var list []*data.UserAccess
-	var ua *data.UserAccess
+	var list []*data.StoredUser
+	var ua *data.StoredUser
 
 	nick := ev.User.Nick()
 
@@ -494,8 +494,8 @@ func (c *coreCmds) gusers(w irc.Writer, ev *cmd.Event) (
 func (c *coreCmds) susers(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	var list []*data.UserAccess
-	var ua *data.UserAccess
+	var list []*data.StoredUser
+	var ua *data.StoredUser
 
 	nick := ev.User.Nick()
 
@@ -526,8 +526,8 @@ func (c *coreCmds) susers(w irc.Writer, ev *cmd.Event) (
 func (c *coreCmds) users(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	var list []*data.UserAccess
-	var ua *data.UserAccess
+	var list []*data.StoredUser
+	var ua *data.StoredUser
 	var ch string
 
 	if ev.GetArg("chan") != `` {
@@ -570,11 +570,11 @@ func (c *coreCmds) deluser(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
 	param := ev.GetArg("user")
-	if !ev.UserAccess.HasGlobalFlag('G') {
+	if !ev.StoredUser.HasGlobalFlag('G') {
 		external = cmd.MakeGlobalFlagsError("G")
 		return
 	}
-	uname := ev.TargetUserAccess["user"].Username
+	uname := ev.TargetStoredUser["user"].Username
 
 	nick := ev.User.Nick()
 	ev.Close()
@@ -604,7 +604,7 @@ func (c *coreCmds) delme(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
 	host, nick := ev.User.Host(), ev.User.Nick()
-	uname := ev.UserAccess.Username
+	uname := ev.StoredUser.Username
 	ev.Close()
 	c.b.protectStore.Lock()
 	defer c.b.protectStore.Unlock()
@@ -631,8 +631,8 @@ func (c *coreCmds) passwd(w irc.Writer, ev *cmd.Event) (
 	oldpasswd := ev.GetArg("oldpassword")
 	newpasswd := ev.GetArg("newpassword")
 	nick := ev.User.Nick()
-	uname := ev.UserAccess.Username
-	if !ev.UserAccess.VerifyPassword(oldpasswd) {
+	uname := ev.StoredUser.Username
+	if !ev.StoredUser.VerifyPassword(oldpasswd) {
 		w.Notice(nick, passwdFailure)
 		return
 	}
@@ -642,7 +642,7 @@ func (c *coreCmds) passwd(w irc.Writer, ev *cmd.Event) (
 	defer c.b.protectStore.Unlock()
 	store := c.b.store
 
-	var access *data.UserAccess
+	var access *data.StoredUser
 	access, internal = store.FindUser(uname)
 	if internal != nil {
 		return
@@ -668,10 +668,10 @@ func (c *coreCmds) passwd(w irc.Writer, ev *cmd.Event) (
 func (c *coreCmds) masks(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	access := ev.UserAccess
-	user := ev.TargetUserAccess["user"]
+	access := ev.StoredUser
+	user := ev.TargetStoredUser["user"]
 	if user != nil {
-		if !ev.UserAccess.HasGlobalFlag('G') {
+		if !ev.StoredUser.HasGlobalFlag('G') {
 			external = cmd.MakeGlobalFlagsError("G")
 			return
 		}
@@ -694,11 +694,11 @@ func (c *coreCmds) addmask(w irc.Writer, ev *cmd.Event) (
 
 	mask := ev.GetArg("mask")
 	nick := ev.User.Nick()
-	uname := ev.UserAccess.Username
+	uname := ev.StoredUser.Username
 
-	user := ev.TargetUserAccess["user"]
+	user := ev.TargetStoredUser["user"]
 	if user != nil {
-		if !ev.UserAccess.HasGlobalFlag('G') {
+		if !ev.StoredUser.HasGlobalFlag('G') {
 			external = cmd.MakeGlobalFlagsError("G")
 			return
 		}
@@ -710,7 +710,7 @@ func (c *coreCmds) addmask(w irc.Writer, ev *cmd.Event) (
 	defer c.b.protectStore.Unlock()
 	store := c.b.store
 
-	var access *data.UserAccess
+	var access *data.StoredUser
 	access, internal = store.FindUser(uname)
 	if internal != nil {
 		return
@@ -739,11 +739,11 @@ func (c *coreCmds) delmask(w irc.Writer, ev *cmd.Event) (
 
 	mask := ev.GetArg("mask")
 	nick := ev.User.Nick()
-	uname := ev.UserAccess.Username
+	uname := ev.StoredUser.Username
 
-	user := ev.TargetUserAccess["user"]
+	user := ev.TargetStoredUser["user"]
 	if user != nil {
-		if !ev.UserAccess.HasGlobalFlag('G') {
+		if !ev.StoredUser.HasGlobalFlag('G') {
 			external = cmd.MakeGlobalFlagsError("G")
 			return
 		}
@@ -755,7 +755,7 @@ func (c *coreCmds) delmask(w irc.Writer, ev *cmd.Event) (
 	defer c.b.protectStore.Unlock()
 	store := c.b.store
 
-	var access *data.UserAccess
+	var access *data.StoredUser
 	access, internal = store.FindUser(uname)
 	if internal != nil {
 		return
@@ -782,7 +782,7 @@ func (c *coreCmds) delmask(w irc.Writer, ev *cmd.Event) (
 func (c *coreCmds) resetpasswd(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	uname := ev.TargetUserAccess["user"].Username
+	uname := ev.TargetStoredUser["user"].Username
 	resetnick := ev.TargetUsers["nick"].Nick()
 	nick := ev.User.Nick()
 	newpasswd := ""
@@ -792,7 +792,7 @@ func (c *coreCmds) resetpasswd(w irc.Writer, ev *cmd.Event) (
 	defer c.b.protectStore.Unlock()
 	store := c.b.store
 
-	var access *data.UserAccess
+	var access *data.StoredUser
 	access, internal = store.FindUser(uname)
 	if internal != nil {
 		return
@@ -819,7 +819,7 @@ func (c *coreCmds) resetpasswd(w irc.Writer, ev *cmd.Event) (
 func (c *coreCmds) ggive(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 	return c.giveHelper(w, ev,
-		func(a *data.UserAccess, level uint8, flags string) (string, bool) {
+		func(a *data.StoredUser, level uint8, flags string) (string, bool) {
 			if level > 0 {
 				a.GrantGlobalLevel(level)
 			}
@@ -841,7 +841,7 @@ func (c *coreCmds) sgive(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 	server := ev.NetworkID
 	return c.giveHelper(w, ev,
-		func(a *data.UserAccess, level uint8, flags string) (string, bool) {
+		func(a *data.StoredUser, level uint8, flags string) (string, bool) {
 			if level > 0 {
 				a.GrantServerLevel(server, level)
 			}
@@ -868,7 +868,7 @@ func (c *coreCmds) give(w irc.Writer, ev *cmd.Event) (
 	server := ev.NetworkID
 	channel := ev.GetArg("chan")
 	return c.giveHelper(w, ev,
-		func(a *data.UserAccess, level uint8, flags string) (string, bool) {
+		func(a *data.StoredUser, level uint8, flags string) (string, bool) {
 			if level > 0 {
 				a.GrantChannelLevel(server, channel, level)
 			}
@@ -893,7 +893,7 @@ func (c *coreCmds) give(w irc.Writer, ev *cmd.Event) (
 func (c *coreCmds) gtake(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 	return c.takeHelper(w, ev,
-		func(a *data.UserAccess, all, level bool, flags string) (string, bool) {
+		func(a *data.StoredUser, all, level bool, flags string) (string, bool) {
 			var save bool
 			if all {
 				if a.HasGlobalLevel(1) || a.HasGlobalFlags(flags) {
@@ -926,7 +926,7 @@ func (c *coreCmds) stake(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 	server := ev.NetworkID
 	return c.takeHelper(w, ev,
-		func(a *data.UserAccess, all, level bool, flags string) (string, bool) {
+		func(a *data.StoredUser, all, level bool, flags string) (string, bool) {
 			var save bool
 			if all {
 				if a.HasServerLevel(server, 1) ||
@@ -962,7 +962,7 @@ func (c *coreCmds) take(w irc.Writer, ev *cmd.Event) (
 	server := ev.NetworkID
 	channel := ev.GetArg("chan")
 	return c.takeHelper(w, ev,
-		func(a *data.UserAccess, all, level bool, flags string) (string, bool) {
+		func(a *data.StoredUser, all, level bool, flags string) (string, bool) {
 			var save bool
 			if all {
 				if a.HasChannelLevel(server, channel, 1) ||
@@ -996,7 +996,7 @@ func (c *coreCmds) take(w irc.Writer, ev *cmd.Event) (
 func (c *coreCmds) giveHelper(w irc.Writer, ev *cmd.Event,
 	g giveHelperFunc) (internal, external error) {
 
-	uname := ev.TargetUserAccess["user"].Username
+	uname := ev.TargetStoredUser["user"].Username
 	args := ev.SplitArg("levelOrFlags")
 	nick := ev.User.Nick()
 
@@ -1005,7 +1005,7 @@ func (c *coreCmds) giveHelper(w irc.Writer, ev *cmd.Event,
 	defer c.b.protectStore.Unlock()
 	store := c.b.store
 
-	var access *data.UserAccess
+	var access *data.StoredUser
 	access, internal = store.FindUser(uname)
 	if internal != nil {
 		return
@@ -1046,7 +1046,7 @@ func (c *coreCmds) giveHelper(w irc.Writer, ev *cmd.Event,
 func (c *coreCmds) takeHelper(w irc.Writer, ev *cmd.Event,
 	t takeHelperFunc) (internal, external error) {
 
-	uname := ev.TargetUserAccess["user"].Username
+	uname := ev.TargetStoredUser["user"].Username
 	arg := ev.GetArg("allOrFlags")
 	nick := ev.User.Nick()
 
@@ -1055,7 +1055,7 @@ func (c *coreCmds) takeHelper(w irc.Writer, ev *cmd.Event,
 	defer c.b.protectStore.Unlock()
 	store := c.b.store
 
-	var access *data.UserAccess
+	var access *data.StoredUser
 	access, internal = store.FindUser(uname)
 	if internal != nil {
 		return
@@ -1175,7 +1175,7 @@ func filterFlags(flags string, check func(rune) bool) string {
 }
 
 // userListWidth calculates the width of the userList's "User" column.
-func userListWidth(users []*data.UserAccess) int {
+func userListWidth(users []*data.StoredUser) int {
 	minl := len(usersListHeadUser)
 	for _, u := range users {
 		l := len(u.Username)

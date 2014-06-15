@@ -21,7 +21,7 @@ var (
 	// a user is empty string.
 	errMissingUnameOrPwd = errors.New("data: Missing username or password")
 	// errDuplicateMask is given when a duplicate mask is passed into the
-	// NewUserAccess method.
+	// NewStoredUser method.
 	errDuplicateMask = errors.New("data: Duplicate mask in user creation")
 )
 
@@ -35,9 +35,9 @@ const (
 	lettersSpecialCharsEnd   = 96
 )
 
-// UserAccess provides access for a user to the bot, servers, and channels.
+// StoredUser provides access for a user to the bot, servers, and channels.
 // This information is protected by a username and crypted password combo.
-type UserAccess struct {
+type StoredUser struct {
 	Username string
 	Password []byte
 	Masks    []string
@@ -46,20 +46,20 @@ type UserAccess struct {
 	Channel  map[string]map[string]*Access
 }
 
-// UserAccessPwdCost is the cost factor for bcrypt. It should not be set
+// StoredUserPwdCost is the cost factor for bcrypt. It should not be set
 // unless the reasoning is good and the consequences are known.
-var UserAccessPwdCost = bcrypt.DefaultCost
+var StoredUserPwdCost = bcrypt.DefaultCost
 
-// NewUserAccess initializes an access user. Requires username and password,
+// NewStoredUser initializes an access user. Requires username and password,
 // but masks are optional.
-func NewUserAccess(un, pw string,
-	masks ...string) (*UserAccess, error) {
+func NewStoredUser(un, pw string,
+	masks ...string) (*StoredUser, error) {
 
 	if len(un) == 0 || len(pw) == 0 {
 		return nil, errMissingUnameOrPwd
 	}
 
-	a := &UserAccess{
+	a := &StoredUser{
 		Username: strings.ToLower(un),
 	}
 
@@ -77,10 +77,10 @@ func NewUserAccess(un, pw string,
 	return a, nil
 }
 
-// createUserAccess creates a useraccess that doesn't care about security.
+// createStoredUser creates a useraccess that doesn't care about security.
 // Mostly for testing. Will return nil if duplicate masks are given.
-func createUserAccess(masks ...string) *UserAccess {
-	a := &UserAccess{}
+func createStoredUser(masks ...string) *StoredUser {
+	a := &StoredUser{}
 	for _, mask := range masks {
 		if !a.AddMask(mask) {
 			return nil
@@ -91,7 +91,7 @@ func createUserAccess(masks ...string) *UserAccess {
 }
 
 // ensureServer that the server access object is created.
-func (a *UserAccess) ensureServer(server string) (access *Access) {
+func (a *StoredUser) ensureServer(server string) (access *Access) {
 	server = strings.ToLower(server)
 	if a.Server == nil {
 		a.Server = make(map[string]*Access)
@@ -104,7 +104,7 @@ func (a *UserAccess) ensureServer(server string) (access *Access) {
 }
 
 // ensureChannel ensures that the server access object is created.
-func (a *UserAccess) ensureChannel(server, channel string) (access *Access) {
+func (a *StoredUser) ensureChannel(server, channel string) (access *Access) {
 	server = strings.ToLower(server)
 	channel = strings.ToLower(channel)
 	var chans map[string]*Access
@@ -123,7 +123,7 @@ func (a *UserAccess) ensureChannel(server, channel string) (access *Access) {
 }
 
 // doServer get's the server access, calls a callback if the server exists.
-func (a *UserAccess) doServer(server string, do func(string, *Access)) {
+func (a *StoredUser) doServer(server string, do func(string, *Access)) {
 	server = strings.ToLower(server)
 	if access, ok := a.Server[server]; ok {
 		do(server, access)
@@ -131,7 +131,7 @@ func (a *UserAccess) doServer(server string, do func(string, *Access)) {
 }
 
 // doChannel get's the server access, calls a callback if the channel exists.
-func (a *UserAccess) doChannel(server, channel string,
+func (a *StoredUser) doChannel(server, channel string,
 	do func(string, string, *Access)) {
 
 	server = strings.ToLower(server)
@@ -144,9 +144,9 @@ func (a *UserAccess) doChannel(server, channel string,
 }
 
 // SetPassword encrypts the password string, and sets the Password property.
-func (a *UserAccess) SetPassword(password string) (err error) {
+func (a *StoredUser) SetPassword(password string) (err error) {
 	var pwd []byte
-	pwd, err = bcrypt.GenerateFromPassword([]byte(password), UserAccessPwdCost)
+	pwd, err = bcrypt.GenerateFromPassword([]byte(password), StoredUserPwdCost)
 	if err != nil {
 		return
 	}
@@ -156,7 +156,7 @@ func (a *UserAccess) SetPassword(password string) (err error) {
 
 // ResetPassword generates a new random password, and sets the user's password
 // to that.
-func (a *UserAccess) ResetPassword() (newpasswd string, err error) {
+func (a *StoredUser) ResetPassword() (newpasswd string, err error) {
 	b := make([]byte, nNewPasswordLen)
 	for i := 0; i < nNewPasswordLen; i++ {
 		r := newPasswordStart + rand.Intn(newPasswordEnd-newPasswordStart)
@@ -174,12 +174,12 @@ func (a *UserAccess) ResetPassword() (newpasswd string, err error) {
 
 // VerifyPassword checks to see if the given password matches the stored
 // password.
-func (a *UserAccess) VerifyPassword(password string) bool {
+func (a *StoredUser) VerifyPassword(password string) bool {
 	return nil == bcrypt.CompareHashAndPassword(a.Password, []byte(password))
 }
 
 // serialize turns the useraccess into bytes for storage.
-func (a *UserAccess) serialize() ([]byte, error) {
+func (a *StoredUser) serialize() ([]byte, error) {
 	buffer := &bytes.Buffer{}
 	encoder := gob.NewEncoder(buffer)
 	err := encoder.Encode(a)
@@ -191,21 +191,21 @@ func (a *UserAccess) serialize() ([]byte, error) {
 }
 
 // deserialize reverses the Serialize process.
-func deserialize(serialized []byte) (*UserAccess, error) {
+func deserialize(serialized []byte) (*StoredUser, error) {
 	buffer := &bytes.Buffer{}
 	decoder := gob.NewDecoder(buffer)
 	if _, err := buffer.Write(serialized); err != nil {
 		return nil, err
 	}
 
-	dec := &UserAccess{}
+	dec := &StoredUser{}
 	err := decoder.Decode(dec)
 	return dec, err
 }
 
 // AddMask adds a mask to this users list of wildcard masks. If a duplicate is
 // given it returns false.
-func (a *UserAccess) AddMask(mask string) bool {
+func (a *StoredUser) AddMask(mask string) bool {
 	mask = strings.ToLower(mask)
 	for i := 0; i < len(a.Masks); i++ {
 		if mask == a.Masks[i] {
@@ -218,7 +218,7 @@ func (a *UserAccess) AddMask(mask string) bool {
 
 // DelMask deletes a mask from this users list of wildcard masks. Returns true
 // if the mask was found and deleted.
-func (a *UserAccess) DelMask(mask string) (deleted bool) {
+func (a *StoredUser) DelMask(mask string) (deleted bool) {
 	mask = strings.ToLower(mask)
 	length := len(a.Masks)
 	for i := 0; i < length; i++ {
@@ -233,7 +233,7 @@ func (a *UserAccess) DelMask(mask string) (deleted bool) {
 }
 
 // ValidateMask checks to see if this user has the given masks.
-func (a *UserAccess) ValidateMask(mask string) (has bool) {
+func (a *StoredUser) ValidateMask(mask string) (has bool) {
 	if len(a.Masks) == 0 {
 		return true
 	}
@@ -249,7 +249,7 @@ func (a *UserAccess) ValidateMask(mask string) (has bool) {
 
 // Has checks if a user has the given level and flags. Where his access is
 // overridden thusly: Global > Server > Channel
-func (a *UserAccess) Has(server, channel string,
+func (a *StoredUser) Has(server, channel string,
 	level uint8, flags ...string) bool {
 
 	server = strings.ToLower(server)
@@ -283,7 +283,7 @@ func (a *UserAccess) Has(server, channel string,
 
 // HasLevel checks if a user has a given level of access. Where his access is
 // overridden thusly: Global > Server > Channel
-func (a *UserAccess) HasLevel(server, channel string, level uint8) bool {
+func (a *StoredUser) HasLevel(server, channel string, level uint8) bool {
 	if a.HasGlobalLevel(level) {
 		return true
 	}
@@ -298,7 +298,7 @@ func (a *UserAccess) HasLevel(server, channel string, level uint8) bool {
 
 // HasFlags checks if a user has a given level of access. Where his access is
 // overridden thusly: Global > Server > Channel
-func (a *UserAccess) HasFlags(server, channel string, flags ...string) bool {
+func (a *StoredUser) HasFlags(server, channel string, flags ...string) bool {
 	var searchBits = getFlagBits(flags...)
 
 	server = strings.ToLower(server)
@@ -328,7 +328,7 @@ func (a *UserAccess) HasFlags(server, channel string, flags ...string) bool {
 
 // HasFlag checks if a user has a given flag. Where his access is
 // overridden thusly: Global > Server > Channel
-func (a *UserAccess) HasFlag(server, channel string, flag rune) bool {
+func (a *StoredUser) HasFlag(server, channel string, flag rune) bool {
 	if a.HasGlobalFlag(flag) {
 		return true
 	}
@@ -342,13 +342,13 @@ func (a *UserAccess) HasFlag(server, channel string, flag rune) bool {
 }
 
 // GrantGlobal sets both Level and Flags at the same time.
-func (a *UserAccess) GrantGlobal(level uint8, flags ...string) {
+func (a *StoredUser) GrantGlobal(level uint8, flags ...string) {
 	a.GrantGlobalLevel(level)
 	a.GrantGlobalFlags(flags...)
 }
 
 // GrantGlobalFlags sets global flags.
-func (a *UserAccess) GrantGlobalFlags(flags ...string) {
+func (a *StoredUser) GrantGlobalFlags(flags ...string) {
 	if a.Global == nil {
 		a.Global = &Access{}
 	}
@@ -356,7 +356,7 @@ func (a *UserAccess) GrantGlobalFlags(flags ...string) {
 }
 
 // GrantGlobalLevel sets global level.
-func (a *UserAccess) GrantGlobalLevel(level uint8) {
+func (a *StoredUser) GrantGlobalLevel(level uint8) {
 	if a.Global == nil {
 		a.Global = &Access{}
 	}
@@ -364,32 +364,32 @@ func (a *UserAccess) GrantGlobalLevel(level uint8) {
 }
 
 // RevokeGlobal removes a user's global access.
-func (a *UserAccess) RevokeGlobal() {
+func (a *StoredUser) RevokeGlobal() {
 	a.Global = nil
 }
 
 // RevokeGlobalLevel removes global access.
-func (a *UserAccess) RevokeGlobalLevel() {
+func (a *StoredUser) RevokeGlobalLevel() {
 	if a.Global != nil {
 		a.Global.Level = 0
 	}
 }
 
 // RevokeGlobalFlags removes flags from the global level.
-func (a *UserAccess) RevokeGlobalFlags(flags ...string) {
+func (a *StoredUser) RevokeGlobalFlags(flags ...string) {
 	if a.Global != nil {
 		a.Global.ClearFlags(flags...)
 	}
 }
 
 // GetGlobal returns the global access.
-func (a *UserAccess) GetGlobal() *Access {
+func (a *StoredUser) GetGlobal() *Access {
 	return a.Global
 }
 
 // HasGlobalLevel checks a user to see if their global level access is equal
 // or above the specified access.
-func (a *UserAccess) HasGlobalLevel(level uint8) (has bool) {
+func (a *StoredUser) HasGlobalLevel(level uint8) (has bool) {
 	if a.Global != nil {
 		has = a.Global.HasLevel(level)
 	}
@@ -398,7 +398,7 @@ func (a *UserAccess) HasGlobalLevel(level uint8) (has bool) {
 
 // HasGlobalFlags checks a user to see if their global level flags contain the
 // given flags.
-func (a *UserAccess) HasGlobalFlags(flags ...string) (has bool) {
+func (a *StoredUser) HasGlobalFlags(flags ...string) (has bool) {
 	if a.Global != nil {
 		has = a.Global.HasFlags(flags...)
 	}
@@ -407,7 +407,7 @@ func (a *UserAccess) HasGlobalFlags(flags ...string) (has bool) {
 
 // HasGlobalFlag checks a user to see if their global level flags contain the
 // given flag.
-func (a *UserAccess) HasGlobalFlag(flag rune) (has bool) {
+func (a *StoredUser) HasGlobalFlag(flag rune) (has bool) {
 	if a.Global != nil {
 		has = a.Global.HasFlag(flag)
 	}
@@ -415,43 +415,43 @@ func (a *UserAccess) HasGlobalFlag(flag rune) (has bool) {
 }
 
 // GrantServer sets both Level and Flags at the same time.
-func (a *UserAccess) GrantServer(server string, level uint8, flags ...string) {
+func (a *StoredUser) GrantServer(server string, level uint8, flags ...string) {
 	a.ensureServer(server).SetAccess(level, flags...)
 }
 
 // GrantServerFlags sets server flags.
-func (a *UserAccess) GrantServerFlags(server string, flags ...string) {
+func (a *StoredUser) GrantServerFlags(server string, flags ...string) {
 	a.ensureServer(server).SetFlags(flags...)
 }
 
 // GrantServerLevel sets server level.
-func (a *UserAccess) GrantServerLevel(server string, level uint8) {
+func (a *StoredUser) GrantServerLevel(server string, level uint8) {
 	a.ensureServer(server).Level = level
 }
 
 // RevokeServer removes a user's server access.
-func (a *UserAccess) RevokeServer(server string) {
+func (a *StoredUser) RevokeServer(server string) {
 	a.doServer(server, func(srv string, _ *Access) {
 		delete(a.Server, srv)
 	})
 }
 
 // RevokeServerLevel removes server access.
-func (a *UserAccess) RevokeServerLevel(server string) {
+func (a *StoredUser) RevokeServerLevel(server string) {
 	a.doServer(server, func(_ string, access *Access) {
 		access.Level = 0
 	})
 }
 
 // RevokeServerFlags removes flags from the server level.
-func (a *UserAccess) RevokeServerFlags(server string, flags ...string) {
+func (a *StoredUser) RevokeServerFlags(server string, flags ...string) {
 	a.doServer(server, func(_ string, access *Access) {
 		access.ClearFlags(flags...)
 	})
 }
 
 // GetServer gets the server access for the given server.
-func (a *UserAccess) GetServer(server string) (access *Access) {
+func (a *StoredUser) GetServer(server string) (access *Access) {
 	a.doServer(server, func(_ string, acc *Access) {
 		access = acc
 	})
@@ -460,7 +460,7 @@ func (a *UserAccess) GetServer(server string) (access *Access) {
 
 // HasServerLevel checks a user to see if their server level access is equal
 // or above the specified access.
-func (a *UserAccess) HasServerLevel(server string, level uint8) (has bool) {
+func (a *StoredUser) HasServerLevel(server string, level uint8) (has bool) {
 	a.doServer(server, func(_ string, access *Access) {
 		has = access.HasLevel(level)
 	})
@@ -469,7 +469,7 @@ func (a *UserAccess) HasServerLevel(server string, level uint8) (has bool) {
 
 // HasServerFlags checks a user to see if their server level flags contain the
 // given flags.
-func (a *UserAccess) HasServerFlags(server string, flags ...string) (has bool) {
+func (a *StoredUser) HasServerFlags(server string, flags ...string) (has bool) {
 	a.doServer(server, func(_ string, access *Access) {
 		has = access.HasFlags(flags...)
 	})
@@ -478,7 +478,7 @@ func (a *UserAccess) HasServerFlags(server string, flags ...string) (has bool) {
 
 // HasServerFlag checks a user to see if their server level flags contain the
 // given flag.
-func (a *UserAccess) HasServerFlag(server string, flag rune) (has bool) {
+func (a *StoredUser) HasServerFlag(server string, flag rune) (has bool) {
 	a.doServer(server, func(_ string, access *Access) {
 		has = access.HasFlag(flag)
 	})
@@ -486,40 +486,40 @@ func (a *UserAccess) HasServerFlag(server string, flag rune) (has bool) {
 }
 
 // GrantChannel sets both Level and Flags at the same time.
-func (a *UserAccess) GrantChannel(server, channel string, level uint8,
+func (a *StoredUser) GrantChannel(server, channel string, level uint8,
 	flags ...string) {
 
 	a.ensureChannel(server, channel).SetAccess(level, flags...)
 }
 
 // GrantChannelFlags sets channel flags.
-func (a *UserAccess) GrantChannelFlags(server, channel string,
+func (a *StoredUser) GrantChannelFlags(server, channel string,
 	flags ...string) {
 
 	a.ensureChannel(server, channel).SetFlags(flags...)
 }
 
 // GrantChannelLevel sets channel level.
-func (a *UserAccess) GrantChannelLevel(server, channel string, level uint8) {
+func (a *StoredUser) GrantChannelLevel(server, channel string, level uint8) {
 	a.ensureChannel(server, channel).Level = level
 }
 
 // RevokeChannel removes a user's channel access.
-func (a *UserAccess) RevokeChannel(server, channel string) {
+func (a *StoredUser) RevokeChannel(server, channel string) {
 	a.doChannel(server, channel, func(srv, ch string, _ *Access) {
 		delete(a.Channel[srv], ch)
 	})
 }
 
 // RevokeChannelLevel removes channel access.
-func (a *UserAccess) RevokeChannelLevel(server, channel string) {
+func (a *StoredUser) RevokeChannelLevel(server, channel string) {
 	a.doChannel(server, channel, func(_, _ string, access *Access) {
 		access.Level = 0
 	})
 }
 
 // RevokeChannelFlags removes flags from the channel level.
-func (a *UserAccess) RevokeChannelFlags(server, channel string,
+func (a *StoredUser) RevokeChannelFlags(server, channel string,
 	flags ...string) {
 	a.doChannel(server, channel, func(_, _ string, access *Access) {
 		access.ClearFlags(flags...)
@@ -527,7 +527,7 @@ func (a *UserAccess) RevokeChannelFlags(server, channel string,
 }
 
 // GetChannel gets the server access for the given channel.
-func (a *UserAccess) GetChannel(server, channel string) (access *Access) {
+func (a *StoredUser) GetChannel(server, channel string) (access *Access) {
 	a.doChannel(server, channel, func(_, _ string, acc *Access) {
 		access = acc
 	})
@@ -536,7 +536,7 @@ func (a *UserAccess) GetChannel(server, channel string) (access *Access) {
 
 // HasChannelLevel checks a user to see if their channel level access is equal
 // or above the specified access.
-func (a *UserAccess) HasChannelLevel(server, channel string,
+func (a *StoredUser) HasChannelLevel(server, channel string,
 	level uint8) (has bool) {
 
 	a.doChannel(server, channel, func(_, _ string, access *Access) {
@@ -547,7 +547,7 @@ func (a *UserAccess) HasChannelLevel(server, channel string,
 
 // HasChannelFlags checks a user to see if their channel level flags contain the
 // given flags.
-func (a *UserAccess) HasChannelFlags(server, channel string,
+func (a *StoredUser) HasChannelFlags(server, channel string,
 	flags ...string) (has bool) {
 
 	a.doChannel(server, channel, func(_, _ string, access *Access) {
@@ -558,7 +558,7 @@ func (a *UserAccess) HasChannelFlags(server, channel string,
 
 // HasChannelFlag checks a user to see if their channel level flags contain the
 // given flag.
-func (a *UserAccess) HasChannelFlag(server, channel string,
+func (a *StoredUser) HasChannelFlag(server, channel string,
 	flag rune) (has bool) {
 
 	a.doChannel(server, channel, func(_, _ string, access *Access) {
@@ -567,8 +567,8 @@ func (a *UserAccess) HasChannelFlag(server, channel string,
 	return
 }
 
-// String turns UserAccess into a user consumable format.
-func (a *UserAccess) String(server, channel string) (str string) {
+// String turns StoredUser into a user consumable format.
+func (a *StoredUser) String(server, channel string) (str string) {
 	var wrote bool
 
 	if a.Global != nil && (a.Global.Level > 0 || a.Global.Flags > 0) {
