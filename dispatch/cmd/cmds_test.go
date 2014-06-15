@@ -206,7 +206,7 @@ func setupForAuth() (state *data.State, store *data.Store,
 	if err != nil {
 		panic(err)
 	}
-	err = store.AddUser(user)
+	err = store.SaveUser(user)
 	if err != nil {
 		panic(err)
 	}

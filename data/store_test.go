@@ -21,7 +21,7 @@ func TestStore(t *testing.T) {
 	}
 }
 
-func TestStore_AddUser(t *testing.T) {
+func TestStore_SaveUser(t *testing.T) {
 	t.Parallel()
 	s, err := NewStore(MemStoreProvider)
 	defer s.Close()
@@ -36,7 +36,7 @@ func TestStore_AddUser(t *testing.T) {
 	ua1 := &StoredUser{Username: uname}
 	ua2 := &StoredUser{Username: uname + uname}
 
-	err = s.AddUser(ua1)
+	err = s.SaveUser(ua1)
 	if err != nil {
 		t.Fatal("Error adding user:", err)
 	}
@@ -44,7 +44,7 @@ func TestStore_AddUser(t *testing.T) {
 		t.Error("User was not cached.")
 	}
 
-	err = s.AddUser(ua2)
+	err = s.SaveUser(ua2)
 	if err != nil {
 		t.Fatal("Error adding user:", err)
 	}
@@ -81,7 +81,7 @@ func TestStore_RemoveUser(t *testing.T) {
 
 	ua1 := &StoredUser{Username: uname}
 
-	err = s.AddUser(ua1)
+	err = s.SaveUser(ua1)
 	if err != nil {
 		t.Fatal("Error adding user:", err)
 	}
@@ -130,7 +130,7 @@ func TestStore_AuthUser(t *testing.T) {
 	if err != nil {
 		t.Fatal("Error creating user:", err)
 	}
-	err = s.AddUser(ua1)
+	err = s.SaveUser(ua1)
 	if err != nil {
 		t.Fatal("Error adding user:", err)
 	}
@@ -205,7 +205,7 @@ func TestStore_AuthLogout(t *testing.T) {
 	if err != nil {
 		t.Fatal("Error creating user:", err)
 	}
-	err = s.AddUser(ua1)
+	err = s.SaveUser(ua1)
 	if err != nil {
 		t.Fatal("Error adding user:", err)
 	}
@@ -263,11 +263,11 @@ func TestStore_Finding(t *testing.T) {
 	ua1 := &StoredUser{Username: uname}
 	ua2 := &StoredUser{Username: uname + uname}
 
-	err = s.AddUser(ua1)
+	err = s.SaveUser(ua1)
 	if err != nil {
 		t.Fatal("Could not add user.")
 	}
-	err = s.AddUser(ua2)
+	err = s.SaveUser(ua2)
 	if err != nil {
 		t.Fatal("Could not add user.")
 	}
@@ -367,11 +367,11 @@ func TestStore_GlobalUsers(t *testing.T) {
 	ua2.GrantServerLevel(server, 5)
 	ua2.GrantChannelLevel(server, channel, 5)
 
-	err = s.AddUser(ua1)
+	err = s.SaveUser(ua1)
 	if err != nil {
 		t.Fatal("Error adding user:", err)
 	}
-	err = s.AddUser(ua2)
+	err = s.SaveUser(ua2)
 	if err != nil {
 		t.Fatal("Error adding user:", err)
 	}
@@ -404,11 +404,11 @@ func TestStore_ServerUsers(t *testing.T) {
 	ua2.GrantGlobalLevel(5)
 	ua2.GrantChannelLevel(server, channel, 5)
 
-	err = s.AddUser(ua1)
+	err = s.SaveUser(ua1)
 	if err != nil {
 		t.Fatal("Error adding user:", err)
 	}
-	err = s.AddUser(ua2)
+	err = s.SaveUser(ua2)
 	if err != nil {
 		t.Fatal("Error adding user:", err)
 	}
@@ -441,11 +441,11 @@ func TestStore_ChanUsers(t *testing.T) {
 	ua2.GrantGlobalLevel(5)
 	ua2.GrantServerLevel(server, 5)
 
-	err = s.AddUser(ua1)
+	err = s.SaveUser(ua1)
 	if err != nil {
 		t.Fatal("Error adding user:", err)
 	}
-	err = s.AddUser(ua2)
+	err = s.SaveUser(ua2)
 	if err != nil {
 		t.Fatal("Error adding user:", err)
 	}

@@ -133,8 +133,8 @@ func iterate(db *kv.DB, filter func(*StoredUser) bool) ([]*StoredUser, error) {
 	return list, nil
 }
 
-// AddUser adds a user to the database.
-func (s *Store) AddUser(ua *StoredUser) error {
+// SaveUser saves a user to the database.
+func (s *Store) SaveUser(ua *StoredUser) error {
 	var err error
 	var serialized []byte
 

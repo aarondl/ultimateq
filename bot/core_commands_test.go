@@ -931,7 +931,7 @@ func TestCoreCommands_Gusers(t *testing.T) {
 		t.Fatal("Could not find user1.")
 	}
 	a2.GrantGlobal(100, "abc")
-	if err = ts.store.AddUser(a2); err != nil {
+	if err = ts.store.SaveUser(a2); err != nil {
 		t.Fatal("Could not save user.")
 	}
 
@@ -977,10 +977,10 @@ func TestCoreCommands_Susers(t *testing.T) {
 	}
 	a2.GrantServer(netID, 100, "abc")
 
-	if err = ts.store.AddUser(a1); err != nil {
+	if err = ts.store.SaveUser(a1); err != nil {
 		t.Fatal("Could not save user.")
 	}
-	if err = ts.store.AddUser(a2); err != nil {
+	if err = ts.store.SaveUser(a2); err != nil {
 		t.Fatal("Could not save user.")
 	}
 
@@ -1026,10 +1026,10 @@ func TestCoreCommands_Users(t *testing.T) {
 	}
 	a2.GrantChannel(netID, channel, 100, "abc")
 
-	if err = ts.store.AddUser(a1); err != nil {
+	if err = ts.store.SaveUser(a1); err != nil {
 		t.Fatal("Could not save user.")
 	}
-	if err = ts.store.AddUser(a2); err != nil {
+	if err = ts.store.SaveUser(a2); err != nil {
 		t.Fatal("Could not save user.")
 	}
 

@@ -349,7 +349,7 @@ func (c *coreCmds) register(w irc.Writer,
 		access.Global = &data.Access{^uint8(0), ^uint64(0)}
 	}
 
-	internal = store.AddUser(access)
+	internal = store.SaveUser(access)
 	if internal != nil {
 		return
 	}
@@ -655,7 +655,7 @@ func (c *coreCmds) passwd(w irc.Writer, ev *cmd.Event) (
 	if internal != nil {
 		return
 	}
-	internal = store.AddUser(access)
+	internal = store.SaveUser(access)
 	if internal != nil {
 		return
 	}
@@ -721,7 +721,7 @@ func (c *coreCmds) addmask(w irc.Writer, ev *cmd.Event) (
 	}
 
 	if access.AddMask(mask) {
-		internal = store.AddUser(access)
+		internal = store.SaveUser(access)
 		if internal != nil {
 			return
 		}
@@ -766,7 +766,7 @@ func (c *coreCmds) delmask(w irc.Writer, ev *cmd.Event) (
 	}
 
 	if access.DelMask(mask) {
-		internal = store.AddUser(access)
+		internal = store.SaveUser(access)
 		if internal != nil {
 			return
 		}
@@ -805,7 +805,7 @@ func (c *coreCmds) resetpasswd(w irc.Writer, ev *cmd.Event) (
 	if internal != nil {
 		return
 	}
-	internal = store.AddUser(access)
+	internal = store.SaveUser(access)
 	if internal != nil {
 		return
 	}
@@ -1030,7 +1030,7 @@ func (c *coreCmds) giveHelper(w irc.Writer, ev *cmd.Event,
 	if (level > 0 && level < 256) || len(flags) > 0 {
 		str, dosave := g(access, uint8(level), flags)
 		if dosave {
-			if internal = store.AddUser(access); internal != nil {
+			if internal = store.SaveUser(access); internal != nil {
 				return
 			}
 		}
@@ -1082,7 +1082,7 @@ func (c *coreCmds) takeHelper(w irc.Writer, ev *cmd.Event,
 
 	str, dosave := t(access, all, level, flags)
 	if dosave {
-		if internal = store.AddUser(access); internal != nil {
+		if internal = store.SaveUser(access); internal != nil {
 			return
 		}
 	}
