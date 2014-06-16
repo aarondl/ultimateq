@@ -612,8 +612,9 @@ func (b *Bot) getServer(networkID string) *Server {
 // before starting to allow registration of extensions etc. Returns error
 // if the bot could not be created. Does NOT return until dead.
 // The following are featured behaviors:
+// Reads configuration file from ./config.toml
 // Watches for Keyboard Input OR SIGTERM OR SIGKILL and shuts down normally.
-// Creates a logger on stdout.
+// Pauses after death to allow all goroutines to come to a graceful shutdown.
 func Run(cb func(b *Bot)) error {
 	cfg := config.NewConfig().FromFile("config.toml")
 	b, err := NewBot(cfg)
