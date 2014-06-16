@@ -11,7 +11,7 @@ many bots to connect to them.
 
 What follows is a sample of the bot api for some basic greeter bot.
 Keep in mind that he can use much more fine-grained APIs allowing you more
-control of how he's run. ALso see simple.go for a much bigger example.
+control of how he's run. See simple.go for a much bigger example.
 
 The bot.Run() function reads in a config.toml, sets up keyboard and signal
 handlers, and runs the bot until all networks are permanently disconnected.
