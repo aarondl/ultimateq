@@ -523,12 +523,16 @@ func TestBot_Locker(t *testing.T) {
 	if !called || !reallyCalled {
 		t.Error("The state callback was not called:", called, reallyCalled)
 	}
+
+	reallyCalled = false
 	called = b.ReadStore(func(_ *data.Store) {
 		reallyCalled = true
 	})
 	if !called || !reallyCalled {
 		t.Error("The store callback was not called:", called, reallyCalled)
 	}
+
+	reallyCalled = false
 	called = b.WriteStore(func(_ *data.Store) {
 		reallyCalled = true
 	})
