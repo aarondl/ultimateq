@@ -135,7 +135,7 @@ func TestStore_AuthUser(t *testing.T) {
 		t.Fatal("Error adding user:", err)
 	}
 
-	user, err := s.AuthUser(server, host, uname+uname, password)
+	user, err := s.AuthUser(network, host, uname+uname, password)
 	if user != nil || err == nil {
 		t.Error("Failed to reject bad authentication.")
 	}
@@ -147,7 +147,7 @@ func TestStore_AuthUser(t *testing.T) {
 		t.Error("Error was not an AuthError:", err)
 	}
 
-	user, err = s.AuthUser(server, `nick!user@host.com`, uname, password)
+	user, err = s.AuthUser(network, `nick!user@host.com`, uname, password)
 	if user != nil || err == nil {
 		t.Error("Failed to reject bad authentication.")
 	}
@@ -159,7 +159,7 @@ func TestStore_AuthUser(t *testing.T) {
 		t.Error("Error was not an AuthError:", err)
 	}
 
-	user, err = s.AuthUser(server, host, uname, password+password)
+	user, err = s.AuthUser(network, host, uname, password+password)
 	if user != nil {
 		t.Error("Failed to reject bad authentication.")
 	}
@@ -171,7 +171,7 @@ func TestStore_AuthUser(t *testing.T) {
 		t.Error("Error was not an AuthError:", err)
 	}
 
-	user, err = s.AuthUser(server, host, uname, password)
+	user, err = s.AuthUser(network, host, uname, password)
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
@@ -179,12 +179,12 @@ func TestStore_AuthUser(t *testing.T) {
 		t.Error("Rejected good authentication.")
 	}
 
-	if s.authed[server+host] == nil {
+	if s.authed[network+host] == nil {
 		t.Error("User is not authenticated.")
 	}
 
 	// Testing previously authenticated look up.
-	user, err = s.AuthUser(server, host, uname, password)
+	user, err = s.AuthUser(network, host, uname, password)
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
@@ -212,7 +212,7 @@ func TestStore_AuthLogout(t *testing.T) {
 
 	s.cache = make(map[string]*StoredUser)
 
-	user, err := s.AuthUser(server, host, uname, password)
+	user, err := s.AuthUser(network, host, uname, password)
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
@@ -223,17 +223,17 @@ func TestStore_AuthLogout(t *testing.T) {
 	if len(s.cache) == 0 {
 		t.Error("Auth is not using cache.")
 	}
-	if s.GetAuthedUser(server, host) == nil {
+	if s.GetAuthedUser(network, host) == nil {
 		t.Error("User is not authenticated.")
 	}
 
-	s.Logout(server, host)
+	s.Logout(network, host)
 
-	if s.authed[server+host] != nil {
+	if s.authed[network+host] != nil {
 		t.Error("User is still authenticated.")
 	}
 
-	user, err = s.AuthUser(server, host, uname, password)
+	user, err = s.AuthUser(network, host, uname, password)
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
@@ -243,7 +243,7 @@ func TestStore_AuthLogout(t *testing.T) {
 
 	s.LogoutByUsername(uname)
 
-	if s.authed[server+host] != nil {
+	if s.authed[network+host] != nil {
 		t.Error("User is still authenticated.")
 	}
 }
@@ -364,8 +364,8 @@ func TestStore_GlobalUsers(t *testing.T) {
 	ua1 := &StoredUser{Username: uname}
 	ua1.GrantGlobalLevel(5)
 	ua2 := &StoredUser{Username: uname + uname}
-	ua2.GrantServerLevel(server, 5)
-	ua2.GrantChannelLevel(server, channel, 5)
+	ua2.GrantNetworkLevel(network, 5)
+	ua2.GrantChannelLevel(network, channel, 5)
 
 	err = s.SaveUser(ua1)
 	if err != nil {
@@ -385,7 +385,7 @@ func TestStore_GlobalUsers(t *testing.T) {
 	}
 }
 
-func TestStore_ServerUsers(t *testing.T) {
+func TestStore_NetworkUsers(t *testing.T) {
 	t.Parallel()
 	s, err := NewStore(MemStoreProvider)
 	defer s.Close()
@@ -393,16 +393,16 @@ func TestStore_ServerUsers(t *testing.T) {
 		t.Error("Unexpected error:", err)
 	}
 
-	list, err := s.ServerUsers(server)
+	list, err := s.NetworkUsers(network)
 	if list != nil || err != nil {
 		t.Error("When db is empty both return params should be nil.")
 	}
 
 	ua1 := &StoredUser{Username: uname}
-	ua1.GrantServerLevel(server, 5)
+	ua1.GrantNetworkLevel(network, 5)
 	ua2 := &StoredUser{Username: uname + uname}
 	ua2.GrantGlobalLevel(5)
-	ua2.GrantChannelLevel(server, channel, 5)
+	ua2.GrantChannelLevel(network, channel, 5)
 
 	err = s.SaveUser(ua1)
 	if err != nil {
@@ -413,7 +413,7 @@ func TestStore_ServerUsers(t *testing.T) {
 		t.Fatal("Error adding user:", err)
 	}
 
-	list, err = s.ServerUsers(server)
+	list, err = s.NetworkUsers(network)
 	if len(list) != 1 {
 		t.Error("There should be exactly 1 global user now.")
 	}
@@ -430,16 +430,16 @@ func TestStore_ChanUsers(t *testing.T) {
 		t.Error("Unexpected error:", err)
 	}
 
-	list, err := s.ChanUsers(server, channel)
+	list, err := s.ChanUsers(network, channel)
 	if list != nil || err != nil {
 		t.Error("When db is empty both return params should be nil.")
 	}
 
 	ua1 := &StoredUser{Username: uname}
-	ua1.GrantChannelLevel(server, channel, 5)
+	ua1.GrantChannelLevel(network, channel, 5)
 	ua2 := &StoredUser{Username: uname + uname}
 	ua2.GrantGlobalLevel(5)
-	ua2.GrantServerLevel(server, 5)
+	ua2.GrantNetworkLevel(network, 5)
 
 	err = s.SaveUser(ua1)
 	if err != nil {
@@ -450,7 +450,7 @@ func TestStore_ChanUsers(t *testing.T) {
 		t.Fatal("Error adding user:", err)
 	}
 
-	list, err = s.ChanUsers(server, channel)
+	list, err = s.ChanUsers(network, channel)
 	if len(list) != 1 {
 		t.Fatal("There should be exactly 1 global user now.")
 	}

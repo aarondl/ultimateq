@@ -95,18 +95,18 @@ func (s *Store) GlobalUsers() ([]*StoredUser, error) {
 	})
 }
 
-// ServerUsers gets users with Server access
-func (s *Store) ServerUsers(server string) ([]*StoredUser, error) {
+// NetworkUsers gets users with Network access
+func (s *Store) NetworkUsers(network string) ([]*StoredUser, error) {
 	return iterate(s.db, func(ua *StoredUser) bool {
-		a := ua.GetServer(server)
+		a := ua.GetNetwork(network)
 		return a != nil && !a.IsZero()
 	})
 }
 
 // ChanUsers gets users with access to a channel
-func (s *Store) ChanUsers(server, channel string) ([]*StoredUser, error) {
+func (s *Store) ChanUsers(network, channel string) ([]*StoredUser, error) {
 	return iterate(s.db, func(ua *StoredUser) bool {
-		a := ua.GetChannel(server, channel)
+		a := ua.GetChannel(network, channel)
 		return a != nil && !a.IsZero()
 	})
 }
@@ -174,14 +174,14 @@ func (s *Store) RemoveUser(username string) (removed bool, err error) {
 // AuthUser authenticates a user. StoredUser will be not nil iff the user
 // is found and authenticates successfully.
 func (s *Store) AuthUser(
-	server, host, username, password string) (*StoredUser, error) {
+	network, host, username, password string) (*StoredUser, error) {
 
 	username = strings.ToLower(username)
 	var user *StoredUser
 	var ok bool
 	var err error
 
-	if user, ok = s.authed[server+host]; ok {
+	if user, ok = s.authed[network+host]; ok {
 		return user, nil
 	}
 
@@ -214,18 +214,18 @@ func (s *Store) AuthUser(
 		}
 	}
 
-	s.authed[server+host] = user
+	s.authed[network+host] = user
 	return user, nil
 }
 
 // GetAuthedUser looks up a user that was authenticated previously.
-func (s *Store) GetAuthedUser(server, host string) *StoredUser {
-	return s.authed[server+host]
+func (s *Store) GetAuthedUser(network, host string) *StoredUser {
+	return s.authed[network+host]
 }
 
 // Logout logs an authenticated host out.
-func (s *Store) Logout(server, host string) {
-	delete(s.authed, server+host)
+func (s *Store) Logout(network, host string) {
+	delete(s.authed, network+host)
 }
 
 // LogoutByUsername logs an authenticated username out.

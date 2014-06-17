@@ -35,14 +35,14 @@ const (
 	lettersSpecialCharsEnd   = 96
 )
 
-// StoredUser provides access for a user to the bot, servers, and channels.
+// StoredUser provides access for a user to the bot, networks, and channels.
 // This information is protected by a username and crypted password combo.
 type StoredUser struct {
 	Username string
 	Password []byte
 	Masks    []string
 	Global   *Access
-	Server   map[string]*Access
+	Network  map[string]*Access
 	Channel  map[string]map[string]*Access
 	JSONStorer
 }
@@ -92,30 +92,30 @@ func createStoredUser(masks ...string) *StoredUser {
 	return a
 }
 
-// ensureServer that the server access object is created.
-func (a *StoredUser) ensureServer(server string) (access *Access) {
-	server = strings.ToLower(server)
-	if a.Server == nil {
-		a.Server = make(map[string]*Access)
+// ensureNetwork that the network access object is created.
+func (a *StoredUser) ensureNetwork(network string) (access *Access) {
+	network = strings.ToLower(network)
+	if a.Network == nil {
+		a.Network = make(map[string]*Access)
 	}
-	if access = a.Server[server]; access == nil {
+	if access = a.Network[network]; access == nil {
 		access = NewAccess(0)
-		a.Server[server] = access
+		a.Network[network] = access
 	}
 	return
 }
 
-// ensureChannel ensures that the server access object is created.
-func (a *StoredUser) ensureChannel(server, channel string) (access *Access) {
-	server = strings.ToLower(server)
+// ensureChannel ensures that the network access object is created.
+func (a *StoredUser) ensureChannel(network, channel string) (access *Access) {
+	network = strings.ToLower(network)
 	channel = strings.ToLower(channel)
 	var chans map[string]*Access
 	if a.Channel == nil {
 		a.Channel = make(map[string]map[string]*Access)
 	}
-	if chans = a.Channel[server]; chans == nil {
-		a.Channel[server] = make(map[string]*Access)
-		chans = a.Channel[server]
+	if chans = a.Channel[network]; chans == nil {
+		a.Channel[network] = make(map[string]*Access)
+		chans = a.Channel[network]
 	}
 	if access = chans[channel]; access == nil {
 		access = NewAccess(0)
@@ -124,23 +124,23 @@ func (a *StoredUser) ensureChannel(server, channel string) (access *Access) {
 	return
 }
 
-// doServer get's the server access, calls a callback if the server exists.
-func (a *StoredUser) doServer(server string, do func(string, *Access)) {
-	server = strings.ToLower(server)
-	if access, ok := a.Server[server]; ok {
-		do(server, access)
+// doNetwork get's the network access, calls a callback if the network exists.
+func (a *StoredUser) doNetwork(network string, do func(string, *Access)) {
+	network = strings.ToLower(network)
+	if access, ok := a.Network[network]; ok {
+		do(network, access)
 	}
 }
 
-// doChannel get's the server access, calls a callback if the channel exists.
-func (a *StoredUser) doChannel(server, channel string,
+// doChannel get's the network access, calls a callback if the channel exists.
+func (a *StoredUser) doChannel(network, channel string,
 	do func(string, string, *Access)) {
 
-	server = strings.ToLower(server)
+	network = strings.ToLower(network)
 	channel = strings.ToLower(channel)
-	if chanMap, ok := a.Channel[server]; ok {
+	if chanMap, ok := a.Channel[network]; ok {
 		if access, ok := chanMap[channel]; ok {
-			do(server, channel, access)
+			do(network, channel, access)
 		}
 	}
 }
@@ -250,11 +250,11 @@ func (a *StoredUser) ValidateMask(mask string) (has bool) {
 }
 
 // Has checks if a user has the given level and flags. Where his access is
-// overridden thusly: Global > Server > Channel
-func (a *StoredUser) Has(server, channel string,
+// overridden thusly: Global > Network > Channel
+func (a *StoredUser) Has(network, channel string,
 	level uint8, flags ...string) bool {
 
-	server = strings.ToLower(server)
+	network = strings.ToLower(network)
 	channel = strings.ToLower(channel)
 
 	var searchBits = getFlagBits(flags...)
@@ -271,10 +271,10 @@ func (a *StoredUser) Has(server, channel string,
 	if check(a.Global) {
 		return true
 	}
-	if check(a.Server[server]) {
+	if check(a.Network[network]) {
 		return true
 	}
-	if chans, ok := a.Channel[server]; ok {
+	if chans, ok := a.Channel[network]; ok {
 		if check(chans[channel]) {
 			return true
 		}
@@ -284,26 +284,26 @@ func (a *StoredUser) Has(server, channel string,
 }
 
 // HasLevel checks if a user has a given level of access. Where his access is
-// overridden thusly: Global > Server > Channel
-func (a *StoredUser) HasLevel(server, channel string, level uint8) bool {
+// overridden thusly: Global > Network > Channel
+func (a *StoredUser) HasLevel(network, channel string, level uint8) bool {
 	if a.HasGlobalLevel(level) {
 		return true
 	}
-	if a.HasServerLevel(server, level) {
+	if a.HasNetworkLevel(network, level) {
 		return true
 	}
-	if a.HasChannelLevel(server, channel, level) {
+	if a.HasChannelLevel(network, channel, level) {
 		return true
 	}
 	return false
 }
 
 // HasFlags checks if a user has a given level of access. Where his access is
-// overridden thusly: Global > Server > Channel
-func (a *StoredUser) HasFlags(server, channel string, flags ...string) bool {
+// overridden thusly: Global > Network > Channel
+func (a *StoredUser) HasFlags(network, channel string, flags ...string) bool {
 	var searchBits = getFlagBits(flags...)
 
-	server = strings.ToLower(server)
+	network = strings.ToLower(network)
 	channel = strings.ToLower(channel)
 
 	var check = func(access *Access) (had bool) {
@@ -316,10 +316,10 @@ func (a *StoredUser) HasFlags(server, channel string, flags ...string) bool {
 	if check(a.Global) {
 		return true
 	}
-	if check(a.Server[server]) {
+	if check(a.Network[network]) {
 		return true
 	}
-	if chans, ok := a.Channel[server]; ok {
+	if chans, ok := a.Channel[network]; ok {
 		if check(chans[channel]) {
 			return true
 		}
@@ -329,15 +329,15 @@ func (a *StoredUser) HasFlags(server, channel string, flags ...string) bool {
 }
 
 // HasFlag checks if a user has a given flag. Where his access is
-// overridden thusly: Global > Server > Channel
-func (a *StoredUser) HasFlag(server, channel string, flag rune) bool {
+// overridden thusly: Global > Network > Channel
+func (a *StoredUser) HasFlag(network, channel string, flag rune) bool {
 	if a.HasGlobalFlag(flag) {
 		return true
 	}
-	if a.HasServerFlag(server, flag) {
+	if a.HasNetworkFlag(network, flag) {
 		return true
 	}
-	if a.HasChannelFlag(server, channel, flag) {
+	if a.HasChannelFlag(network, channel, flag) {
 		return true
 	}
 	return false
@@ -416,121 +416,125 @@ func (a *StoredUser) HasGlobalFlag(flag rune) (has bool) {
 	return
 }
 
-// GrantServer sets both Level and Flags at the same time.
-func (a *StoredUser) GrantServer(server string, level uint8, flags ...string) {
-	a.ensureServer(server).SetAccess(level, flags...)
+// GrantNetwork sets both Level and Flags at the same time.
+func (a *StoredUser) GrantNetwork(network string, level uint8,
+	flags ...string) {
+
+	a.ensureNetwork(network).SetAccess(level, flags...)
 }
 
-// GrantServerFlags sets server flags.
-func (a *StoredUser) GrantServerFlags(server string, flags ...string) {
-	a.ensureServer(server).SetFlags(flags...)
+// GrantNetworkFlags sets network flags.
+func (a *StoredUser) GrantNetworkFlags(network string, flags ...string) {
+	a.ensureNetwork(network).SetFlags(flags...)
 }
 
-// GrantServerLevel sets server level.
-func (a *StoredUser) GrantServerLevel(server string, level uint8) {
-	a.ensureServer(server).Level = level
+// GrantNetworkLevel sets network level.
+func (a *StoredUser) GrantNetworkLevel(network string, level uint8) {
+	a.ensureNetwork(network).Level = level
 }
 
-// RevokeServer removes a user's server access.
-func (a *StoredUser) RevokeServer(server string) {
-	a.doServer(server, func(srv string, _ *Access) {
-		delete(a.Server, srv)
+// RevokeNetwork removes a user's network access.
+func (a *StoredUser) RevokeNetwork(network string) {
+	a.doNetwork(network, func(srv string, _ *Access) {
+		delete(a.Network, srv)
 	})
 }
 
-// RevokeServerLevel removes server access.
-func (a *StoredUser) RevokeServerLevel(server string) {
-	a.doServer(server, func(_ string, access *Access) {
+// RevokeNetworkLevel removes network access.
+func (a *StoredUser) RevokeNetworkLevel(network string) {
+	a.doNetwork(network, func(_ string, access *Access) {
 		access.Level = 0
 	})
 }
 
-// RevokeServerFlags removes flags from the server level.
-func (a *StoredUser) RevokeServerFlags(server string, flags ...string) {
-	a.doServer(server, func(_ string, access *Access) {
+// RevokeNetworkFlags removes flags from the network level.
+func (a *StoredUser) RevokeNetworkFlags(network string, flags ...string) {
+	a.doNetwork(network, func(_ string, access *Access) {
 		access.ClearFlags(flags...)
 	})
 }
 
-// GetServer gets the server access for the given server.
-func (a *StoredUser) GetServer(server string) (access *Access) {
-	a.doServer(server, func(_ string, acc *Access) {
+// GetNetwork gets the network access for the given network.
+func (a *StoredUser) GetNetwork(network string) (access *Access) {
+	a.doNetwork(network, func(_ string, acc *Access) {
 		access = acc
 	})
 	return
 }
 
-// HasServerLevel checks a user to see if their server level access is equal
+// HasNetworkLevel checks a user to see if their network level access is equal
 // or above the specified access.
-func (a *StoredUser) HasServerLevel(server string, level uint8) (has bool) {
-	a.doServer(server, func(_ string, access *Access) {
+func (a *StoredUser) HasNetworkLevel(network string, level uint8) (has bool) {
+	a.doNetwork(network, func(_ string, access *Access) {
 		has = access.HasLevel(level)
 	})
 	return
 }
 
-// HasServerFlags checks a user to see if their server level flags contain the
+// HasNetworkFlags checks a user to see if their network level flags contain the
 // given flags.
-func (a *StoredUser) HasServerFlags(server string, flags ...string) (has bool) {
-	a.doServer(server, func(_ string, access *Access) {
+func (a *StoredUser) HasNetworkFlags(network string,
+	flags ...string) (has bool) {
+
+	a.doNetwork(network, func(_ string, access *Access) {
 		has = access.HasFlags(flags...)
 	})
 	return
 }
 
-// HasServerFlag checks a user to see if their server level flags contain the
+// HasNetworkFlag checks a user to see if their network level flags contain the
 // given flag.
-func (a *StoredUser) HasServerFlag(server string, flag rune) (has bool) {
-	a.doServer(server, func(_ string, access *Access) {
+func (a *StoredUser) HasNetworkFlag(network string, flag rune) (has bool) {
+	a.doNetwork(network, func(_ string, access *Access) {
 		has = access.HasFlag(flag)
 	})
 	return
 }
 
 // GrantChannel sets both Level and Flags at the same time.
-func (a *StoredUser) GrantChannel(server, channel string, level uint8,
+func (a *StoredUser) GrantChannel(network, channel string, level uint8,
 	flags ...string) {
 
-	a.ensureChannel(server, channel).SetAccess(level, flags...)
+	a.ensureChannel(network, channel).SetAccess(level, flags...)
 }
 
 // GrantChannelFlags sets channel flags.
-func (a *StoredUser) GrantChannelFlags(server, channel string,
+func (a *StoredUser) GrantChannelFlags(network, channel string,
 	flags ...string) {
 
-	a.ensureChannel(server, channel).SetFlags(flags...)
+	a.ensureChannel(network, channel).SetFlags(flags...)
 }
 
 // GrantChannelLevel sets channel level.
-func (a *StoredUser) GrantChannelLevel(server, channel string, level uint8) {
-	a.ensureChannel(server, channel).Level = level
+func (a *StoredUser) GrantChannelLevel(network, channel string, level uint8) {
+	a.ensureChannel(network, channel).Level = level
 }
 
 // RevokeChannel removes a user's channel access.
-func (a *StoredUser) RevokeChannel(server, channel string) {
-	a.doChannel(server, channel, func(srv, ch string, _ *Access) {
+func (a *StoredUser) RevokeChannel(network, channel string) {
+	a.doChannel(network, channel, func(srv, ch string, _ *Access) {
 		delete(a.Channel[srv], ch)
 	})
 }
 
 // RevokeChannelLevel removes channel access.
-func (a *StoredUser) RevokeChannelLevel(server, channel string) {
-	a.doChannel(server, channel, func(_, _ string, access *Access) {
+func (a *StoredUser) RevokeChannelLevel(network, channel string) {
+	a.doChannel(network, channel, func(_, _ string, access *Access) {
 		access.Level = 0
 	})
 }
 
 // RevokeChannelFlags removes flags from the channel level.
-func (a *StoredUser) RevokeChannelFlags(server, channel string,
+func (a *StoredUser) RevokeChannelFlags(network, channel string,
 	flags ...string) {
-	a.doChannel(server, channel, func(_, _ string, access *Access) {
+	a.doChannel(network, channel, func(_, _ string, access *Access) {
 		access.ClearFlags(flags...)
 	})
 }
 
-// GetChannel gets the server access for the given channel.
-func (a *StoredUser) GetChannel(server, channel string) (access *Access) {
-	a.doChannel(server, channel, func(_, _ string, acc *Access) {
+// GetChannel gets the network access for the given channel.
+func (a *StoredUser) GetChannel(network, channel string) (access *Access) {
+	a.doChannel(network, channel, func(_, _ string, acc *Access) {
 		access = acc
 	})
 	return
@@ -538,10 +542,10 @@ func (a *StoredUser) GetChannel(server, channel string) (access *Access) {
 
 // HasChannelLevel checks a user to see if their channel level access is equal
 // or above the specified access.
-func (a *StoredUser) HasChannelLevel(server, channel string,
+func (a *StoredUser) HasChannelLevel(network, channel string,
 	level uint8) (has bool) {
 
-	a.doChannel(server, channel, func(_, _ string, access *Access) {
+	a.doChannel(network, channel, func(_, _ string, access *Access) {
 		has = access.HasLevel(level)
 	})
 	return
@@ -549,10 +553,10 @@ func (a *StoredUser) HasChannelLevel(server, channel string,
 
 // HasChannelFlags checks a user to see if their channel level flags contain the
 // given flags.
-func (a *StoredUser) HasChannelFlags(server, channel string,
+func (a *StoredUser) HasChannelFlags(network, channel string,
 	flags ...string) (has bool) {
 
-	a.doChannel(server, channel, func(_, _ string, access *Access) {
+	a.doChannel(network, channel, func(_, _ string, access *Access) {
 		has = access.HasFlags(flags...)
 	})
 	return
@@ -560,17 +564,17 @@ func (a *StoredUser) HasChannelFlags(server, channel string,
 
 // HasChannelFlag checks a user to see if their channel level flags contain the
 // given flag.
-func (a *StoredUser) HasChannelFlag(server, channel string,
+func (a *StoredUser) HasChannelFlag(network, channel string,
 	flag rune) (has bool) {
 
-	a.doChannel(server, channel, func(_, _ string, access *Access) {
+	a.doChannel(network, channel, func(_, _ string, access *Access) {
 		has = access.HasFlag(flag)
 	})
 	return
 }
 
 // String turns StoredUser into a user consumable format.
-func (a *StoredUser) String(server, channel string) (str string) {
+func (a *StoredUser) String(network, channel string) (str string) {
 	var wrote bool
 
 	if a.Global != nil && (a.Global.Level > 0 || a.Global.Flags > 0) {
@@ -578,7 +582,7 @@ func (a *StoredUser) String(server, channel string) (str string) {
 		wrote = true
 	}
 
-	a.doServer(server, func(_ string, srv *Access) {
+	a.doNetwork(network, func(_ string, srv *Access) {
 		if wrote {
 			str += " "
 		}
@@ -586,9 +590,9 @@ func (a *StoredUser) String(server, channel string) (str string) {
 		wrote = true
 	})
 
-	server = strings.ToLower(server)
+	network = strings.ToLower(network)
 	channel = strings.ToLower(channel)
-	if chsrv, ok := a.Channel[server]; ok {
+	if chsrv, ok := a.Channel[network]; ok {
 		if len(channel) != 0 {
 			if ch, ok := chsrv[channel]; ok && (ch.Level > 0 || ch.Flags > 0) {
 				if wrote {

@@ -132,7 +132,7 @@ type Self struct {
 	*ChannelModes
 }
 
-// State is the main data container. It represents the state on a server
+// State is the main data container. It represents the state on a network
 // including all channels, users, and the client's self.
 type State struct {
 	Self Self

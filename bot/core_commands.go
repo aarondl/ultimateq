@@ -100,16 +100,16 @@ const (
 	ggiveDesc = `Gives global access to a user.` +
 		` Arguments can be numeric levels or flags.`
 	ggiveSuccess = `User [%v] now has: (%v) globally.`
-	sgiveDesc    = `Gives server access to a user.` +
+	sgiveDesc    = `Gives network access to a user.` +
 		` Arguments can be numeric levels or flags.`
-	sgiveSuccess = `User [%v] now has: (%v) server-wide.`
+	sgiveSuccess = `User [%v] now has: (%v) network-wide.`
 	giveDesc     = `Gives channel access to a user.` +
 		` Arguments can be numeric levels or flags.`
 	giveSuccess = `User [%v] now has: (%v) on %v`
 	gtakeDesc   = `Takes global access from a user. If no arguments are ` +
 		`given, takes the level access, otherwise removes the given flags. ` +
 		`Use all to take all access.`
-	stakeDesc = `Takes server access from a user. If no arguments are ` +
+	stakeDesc = `Takes network access from a user. If no arguments are ` +
 		`given, takes the level access, otherwise removes the given flags. ` +
 		`Use all to take all access.`
 	takeDesc = `Takes channel access from a user. If no arguments are ` +
@@ -134,7 +134,7 @@ const (
 	usersNoUsers = `No users for %v`
 	usersHead    = `Showing %v users for %v:`
 
-	susersDesc    = `Lists all the users added to the server's access list. `
+	susersDesc    = `Lists all the users added to the network's access list. `
 	susersNoUsers = `No users for %v`
 	susersHead    = `Showing %v users for %v:`
 
@@ -490,7 +490,7 @@ func (c *coreCmds) gusers(w irc.Writer, ev *cmd.Event) (
 	return
 }
 
-//susers provides a list of users with server access
+//susers provides a list of users with network access
 func (c *coreCmds) susers(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
@@ -499,7 +499,7 @@ func (c *coreCmds) susers(w irc.Writer, ev *cmd.Event) (
 
 	nick := ev.User.Nick()
 
-	list, internal = c.b.store.ServerUsers(ev.NetworkID)
+	list, internal = c.b.store.NetworkUsers(ev.NetworkID)
 	if internal != nil {
 		return
 	}
@@ -515,7 +515,7 @@ func (c *coreCmds) susers(w irc.Writer, ev *cmd.Event) (
 		usersListHeadUser, usersListHeadAccess)
 
 	for _, ua = range list {
-		sa := ua.GetServer(ev.NetworkID)
+		sa := ua.GetNetwork(ev.NetworkID)
 		w.Noticef(nick, usersList, usersWidth, ua.Username, sa)
 	}
 
@@ -836,27 +836,27 @@ func (c *coreCmds) ggive(w irc.Writer, ev *cmd.Event) (
 	)
 }
 
-// sgive gives server access to a user.
+// sgive gives network access to a user.
 func (c *coreCmds) sgive(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
-	server := ev.NetworkID
+	network := ev.NetworkID
 	return c.giveHelper(w, ev,
 		func(a *data.StoredUser, level uint8, flags string) (string, bool) {
 			if level > 0 {
-				a.GrantServerLevel(server, level)
+				a.GrantNetworkLevel(network, level)
 			}
 			if len(flags) != 0 {
 				filtered := filterFlags(flags, func(r rune) bool {
-					return a.HasServerFlag(server, r)
+					return a.HasNetworkFlag(network, r)
 				})
 
 				if len(filtered) == 0 && level == 0 {
 					return fmt.Sprintf(giveFailureHas, a.Username,
-						a.GetServer(server), flags), false
+						a.GetNetwork(network), flags), false
 				}
-				a.GrantServerFlags(server, filtered)
+				a.GrantNetworkFlags(network, filtered)
 			}
-			return fmt.Sprintf(sgiveSuccess, a.Username, a.GetServer(server)),
+			return fmt.Sprintf(sgiveSuccess, a.Username, a.GetNetwork(network)),
 				true
 		},
 	)
@@ -865,26 +865,26 @@ func (c *coreCmds) sgive(w irc.Writer, ev *cmd.Event) (
 // give gives channel access to a user.
 func (c *coreCmds) give(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
-	server := ev.NetworkID
+	network := ev.NetworkID
 	channel := ev.GetArg("chan")
 	return c.giveHelper(w, ev,
 		func(a *data.StoredUser, level uint8, flags string) (string, bool) {
 			if level > 0 {
-				a.GrantChannelLevel(server, channel, level)
+				a.GrantChannelLevel(network, channel, level)
 			}
 			if len(flags) != 0 {
 				filtered := filterFlags(flags, func(r rune) bool {
-					return a.HasChannelFlag(server, channel, r)
+					return a.HasChannelFlag(network, channel, r)
 				})
 
 				if len(filtered) == 0 && level == 0 {
 					return fmt.Sprintf(giveFailureHas, a.Username,
-						a.GetChannel(server, channel), flags), false
+						a.GetChannel(network, channel), flags), false
 				}
-				a.GrantChannelFlags(server, channel, filtered)
+				a.GrantChannelFlags(network, channel, filtered)
 			}
 			return fmt.Sprintf(giveSuccess, a.Username,
-				a.GetChannel(server, channel), channel), true
+				a.GetChannel(network, channel), channel), true
 		},
 	)
 }
@@ -921,31 +921,31 @@ func (c *coreCmds) gtake(w irc.Writer, ev *cmd.Event) (
 	)
 }
 
-// stake takes server access from a user.
+// stake takes network access from a user.
 func (c *coreCmds) stake(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
-	server := ev.NetworkID
+	network := ev.NetworkID
 	return c.takeHelper(w, ev,
 		func(a *data.StoredUser, all, level bool, flags string) (string, bool) {
 			var save bool
 			if all {
-				if a.HasServerLevel(server, 1) ||
-					a.HasServerFlags(server, flags) {
+				if a.HasNetworkLevel(network, 1) ||
+					a.HasNetworkFlags(network, flags) {
 
-					a.RevokeServer(server)
+					a.RevokeNetwork(network)
 					save = true
 				}
 			} else if level {
-				if a.HasServerLevel(server, 1) {
-					a.RevokeServerLevel(server)
+				if a.HasNetworkLevel(network, 1) {
+					a.RevokeNetworkLevel(network)
 					save = true
 				}
-			} else if a.HasServerFlags(server, flags) {
-				a.RevokeServerFlags(server, flags)
+			} else if a.HasNetworkFlags(network, flags) {
+				a.RevokeNetworkFlags(network, flags)
 				save = true
 			}
 
-			var rstr = a.GetServer(server).String()
+			var rstr = a.GetNetwork(network).String()
 			if save {
 				rstr = fmt.Sprintf(sgiveSuccess, a.Username, rstr)
 			} else {
@@ -959,29 +959,29 @@ func (c *coreCmds) stake(w irc.Writer, ev *cmd.Event) (
 // take takes global access from a user.
 func (c *coreCmds) take(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
-	server := ev.NetworkID
+	network := ev.NetworkID
 	channel := ev.GetArg("chan")
 	return c.takeHelper(w, ev,
 		func(a *data.StoredUser, all, level bool, flags string) (string, bool) {
 			var save bool
 			if all {
-				if a.HasChannelLevel(server, channel, 1) ||
-					a.HasChannelFlags(server, channel, flags) {
+				if a.HasChannelLevel(network, channel, 1) ||
+					a.HasChannelFlags(network, channel, flags) {
 
-					a.RevokeChannel(server, channel)
+					a.RevokeChannel(network, channel)
 					save = true
 				}
 			} else if level {
-				if a.HasChannelLevel(server, channel, 1) {
-					a.RevokeChannelLevel(server, channel)
+				if a.HasChannelLevel(network, channel, 1) {
+					a.RevokeChannelLevel(network, channel)
 					save = true
 				}
-			} else if a.HasChannelFlags(server, channel, flags) {
-				a.RevokeChannelFlags(server, channel, flags)
+			} else if a.HasChannelFlags(network, channel, flags) {
+				a.RevokeChannelFlags(network, channel, flags)
 				save = true
 			}
 
-			var rstr = a.GetChannel(server, channel).String()
+			var rstr = a.GetChannel(network, channel).String()
 			if save {
 				rstr = fmt.Sprintf(giveSuccess, a.Username, rstr, channel)
 			} else {

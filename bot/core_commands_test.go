@@ -713,7 +713,7 @@ func TestCoreCommands_GiveTakeGlobal(t *testing.T) {
 	}
 }
 
-func TestCoreCommands_GiveTakeServer(t *testing.T) {
+func TestCoreCommands_GiveTakeNetwork(t *testing.T) {
 	ts := commandsSetup(t)
 	defer commandsTeardown(ts, t)
 	var err error
@@ -739,8 +739,8 @@ func TestCoreCommands_GiveTakeServer(t *testing.T) {
 		t.Error(err)
 	}
 
-	if !a.HasServerFlag(netID, 'h') || !a.HasServerLevel(netID, 100) {
-		t.Error("Server access not granted correctly.")
+	if !a.HasNetworkFlag(netID, 'h') || !a.HasNetworkLevel(netID, 100) {
+		t.Error("Network access not granted correctly.")
 	}
 
 	err = rspChk(ts, giveFailureHas, u1host, sgive, u2nick, "h")
@@ -753,8 +753,8 @@ func TestCoreCommands_GiveTakeServer(t *testing.T) {
 		t.Error(err)
 	}
 
-	if a.HasServerLevel(netID, 100) {
-		t.Error("Server access not taken correctly.")
+	if a.HasNetworkLevel(netID, 100) {
+		t.Error("Network access not taken correctly.")
 	}
 
 	err = rspChk(ts, sgiveSuccess, u1host, stake, u2nick, "h")
@@ -762,18 +762,18 @@ func TestCoreCommands_GiveTakeServer(t *testing.T) {
 		t.Error(err)
 	}
 
-	if a.HasServerFlag(netID, 'h') {
-		t.Error("Server access not taken correctly.")
+	if a.HasNetworkFlag(netID, 'h') {
+		t.Error("Network access not taken correctly.")
 	}
 
-	a.GrantServer(netID, 100, "h")
+	a.GrantNetwork(netID, 100, "h")
 	err = rspChk(ts, sgiveSuccess, u1host, stake, u2nick, "all")
 	if err != nil {
 		t.Error(err)
 	}
 
-	if a.HasServerLevel(netID, 100) || a.HasServerFlag(netID, 'h') {
-		t.Error("Server access not taken correctly.")
+	if a.HasNetworkLevel(netID, 100) || a.HasNetworkFlag(netID, 'h') {
+		t.Error("Network access not taken correctly.")
 	}
 
 	err = rspChk(ts, takeFailureNo, u1host, stake, u2nick, "h")
@@ -970,12 +970,12 @@ func TestCoreCommands_Susers(t *testing.T) {
 	if err != nil {
 		t.Fatal("Could not find user1.")
 	}
-	a1.GrantServer(netID, 2, "b")
+	a1.GrantNetwork(netID, 2, "b")
 	a2, err = ts.store.FindUser(u2user)
 	if err != nil {
 		t.Fatal("Could not find user1.")
 	}
-	a2.GrantServer(netID, 100, "abc")
+	a2.GrantNetwork(netID, 100, "abc")
 
 	if err = ts.store.SaveUser(a1); err != nil {
 		t.Fatal("Could not save user.")
@@ -986,8 +986,8 @@ func TestCoreCommands_Susers(t *testing.T) {
 
 	check := susersHead +
 		`NOTICE .* :` + usersListHeadUser + `.*` + usersListHeadAccess +
-		`NOTICE .* :` + u1user + `.*` + a1.GetServer(netID).String() +
-		`NOTICE .* :` + u2user + `.*` + a2.GetServer(netID).String()
+		`NOTICE .* :` + u1user + `.*` + a1.GetNetwork(netID).String() +
+		`NOTICE .* :` + u2user + `.*` + a2.GetNetwork(netID).String()
 	err = rspChk(ts, check, u1host, susers)
 	if err != nil {
 		t.Error(err)

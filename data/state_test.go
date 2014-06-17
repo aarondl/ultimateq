@@ -25,7 +25,7 @@ var (
 	uname    = "user"
 	password = "pass"
 	host     = `nick!user@host`
-	server   = "irc.server.net"
+	network  = "irc.network.net"
 	users    = []string{"nick1!user1@host1", "nick2!user2@host2"}
 	nicks    = []string{"nick1", "nick2"}
 	channels = []string{"#CHAN1", "#CHAN2"}
@@ -712,7 +712,7 @@ func (s *s) TestState_UpdateRplTopic(c *C) {
 
 	ev := &irc.Event{
 		Name:   irc.RPL_TOPIC,
-		Sender: server,
+		Sender: network,
 		Args:   []string{self.Nick(), channels[0], "topic topic"},
 	}
 
@@ -742,7 +742,7 @@ func (s *s) TestState_UpdatePrivmsg(c *C) {
 	c.Check(st.GetUser(users[0]), NotNil)
 	c.Check(st.GetUsersChannelModes(users[0], channels[0]), NotNil)
 
-	ev.Sender = server
+	ev.Sender = network
 	size := len(st.users)
 	st.Update(ev)
 	c.Check(len(st.users), Equals, size)
@@ -767,7 +767,7 @@ func (s *s) TestState_UpdateNotice(c *C) {
 	c.Check(st.GetUser(users[0]), NotNil)
 	c.Check(st.GetUsersChannelModes(users[0], channels[0]), NotNil)
 
-	ev.Sender = server
+	ev.Sender = network
 	size := len(st.users)
 	st.Update(ev)
 	c.Check(len(st.users), Equals, size)
@@ -778,7 +778,7 @@ func (s *s) TestState_UpdateWelcome(c *C) {
 	c.Check(err, IsNil)
 	ev := &irc.Event{
 		Name:   irc.RPL_WELCOME,
-		Sender: server,
+		Sender: network,
 		Args:   []string{nicks[1], "Welcome to"},
 	}
 
@@ -788,7 +788,7 @@ func (s *s) TestState_UpdateWelcome(c *C) {
 
 	ev = &irc.Event{
 		Name:   irc.RPL_WELCOME,
-		Sender: server,
+		Sender: network,
 		Args:   []string{nicks[1], "Welcome to " + users[1]},
 	}
 
@@ -803,7 +803,7 @@ func (s *s) TestState_UpdateRplNamereply(c *C) {
 
 	ev := &irc.Event{
 		Name:   irc.RPL_NAMREPLY,
-		Sender: server,
+		Sender: network,
 		Args: []string{
 			self.Nick(), "=", channels[0],
 			"@" + nicks[0] + " +" + nicks[1] + " " + self.Nick(),
@@ -830,10 +830,10 @@ func (s *s) TestState_RplWhoReply(c *C) {
 
 	ev := &irc.Event{
 		Name:   irc.RPL_WHOREPLY,
-		Sender: server,
+		Sender: network,
 		Args: []string{
 			self.Nick(), channels[0], irc.Username(users[0]),
-			irc.Hostname(users[0]), "*.server.net", nicks[0], "Hx@d",
+			irc.Hostname(users[0]), "*.network.net", nicks[0], "Hx@d",
 			"3 real name",
 		},
 	}
@@ -856,7 +856,7 @@ func (s *s) TestState_UpdateRplMode(c *C) {
 
 	ev := &irc.Event{
 		Name:   irc.RPL_CHANNELMODEIS,
-		Sender: server,
+		Sender: network,
 		Args:   []string{self.Nick(), channels[0], "+ntzl", "10"},
 	}
 
@@ -873,7 +873,7 @@ func (s *s) TestState_UpdateRplBanlist(c *C) {
 
 	ev := &irc.Event{
 		Name:   irc.RPL_BANLIST,
-		Sender: server,
+		Sender: network,
 		Args: []string{self.Nick(), channels[0], nicks[0] + "!*@*", nicks[1],
 			"1367197165"},
 	}
