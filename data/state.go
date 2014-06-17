@@ -1,5 +1,115 @@
 /*
-Package data is used to turn irc.IrcMessages into a stateful database.
+Package data is used to store and fetch data about the irc environment.
+
+It comes in three major pieces; State, Store, Locker. These are the main types
+that provide access to all others.
+
+Locker
+
+We have to start with a discussion on how before we get to what. The data
+package assumes that the world is pleasant and provides no protections for
+concurrent access via multiple goroutines. The solution to this problem for
+clients that wish to use the data package in a concurrent world is to implement
+the data.Locker interface.
+
+ultimateq/bot.Bot is one such implementing client. The following example uses
+the locker interface on the bot.Bot type to safely access the state database
+for the testnetwork.
+
+	// Where b is a *bot.Bot from the ultimateq/bot package.
+	b.ReadState("testnetwork", func(state *data.State) {
+		// Do what we have to with state. For the duration of this function
+		// it is safe to read from.
+	})
+
+If you find the lambda syntax burdensome, then you may use the alternative
+syntax:
+
+	store := b.OpenWriteStore()
+	defer b.CloseWriteStore()
+
+Keep in mind that since there is locking, that means that users consuming the
+interface must be mindful to keep locks for as short a duration as possible.
+The locks are read-writer locks so multiple readers can access in parallel but
+it's not possible to update during this time and something bad could happen
+if a reader doesn't allow the writer to update for an extended period of time.
+
+State
+
+State is the state about the irc world. Who is online, in what channel, what
+modes are on the channel or user, what topic is set. All of this information
+is readable (not writeable) using State. This is per-network data, so each
+network has it's own State database.
+
+When using state the important types are: User, Channel, ChannelUser and
+UserChannel. These types provide you with the information, and the many
+state.Get* methods can retrieve instances of these types to query.
+Examples follow.
+
+	// The client's personal information is stored in the Self instance.
+	mynick := state.Self.Nick()
+
+	state.EachChannel(func (ch *Channel) {
+		fmt.Println(ch.Name)
+	})
+
+	user := state.GetUser("nick!user@host") //Can look up by host or nick.
+	if user != nil {
+		fmt.Println(user)
+	}
+
+Store
+
+Store is about writing persisted data, and authenticating stored entities.
+Store is interested in persisting two types of objects: StoredChannels and
+StoredUsers. Both types embed a JSONStorer to store extension-specific data and
+can be used in any way that's desireable by extensions to persist their data
+across sessions.
+
+StoredChannel is simply a JSONStorer with the channel and network ID to separate
+it in the key value database. JSONStorer is a map that can be used directly
+or using the marshalling helpers PutJSON and GetJSON.
+
+	sc := NewStoredChannel(networkID, "#channelname")
+
+	// Store an array
+	err := sc.JSONPut("myfriends", []string{"happy", "go", "lucky"})
+	store.SaveChannel(sc)
+
+	// Retrieve the array
+	sc = store.FindChannel(networkID, "#channelname")
+	var array []string
+	found, err := sc.JSONGet("myfriends", &array)
+
+StoredUser in addition to it's JSONStorer interface, has a multi-tiered user
+access scheme. There is the potential for a global level, for each network,
+and for each channel to have it's own Access that defines a set of
+permissions (level and flags). These permissions cascade down so that when
+querying the permissions of the channel, the global and network permissions will
+also be present. These permissions are protected by a username and crypted
+password as well as optional whitelist host masks.
+The Store can authenticate against all of these credentials, see Authentication
+section below.
+
+	su := store.FindUser("username")
+
+	// Check some permissions
+	hasGoodEnougLevel := su.HasChannelLevel(networkID, "#channelname", 100)
+	global := su.GetGlobal()
+	fmt.Println(global.HasFlags("abc"))
+
+	// Write some permissions
+	su.GrantGlobalFlags("abc")
+	su.RevokeChannelFlags(networkID, "#channelname", "a")
+
+	// Must save afterwards.
+	store.SaveUser(su)
+
+Authentication is done by the store for users in order to become "authed" and
+succeed in subsequent GetAuthedUser() calls, a user must succeed in an AuthUser
+call providing the username and password as well a host to bind this
+authentication to. Use this system by calling the functions: AuthUser,
+GetAuthedUser, Logout.
 */
 package data
 
@@ -14,14 +124,16 @@ var (
 	errProtoCapsMissing = errors.New("data: Protocaps missing")
 )
 
-// Self is the bot's user, he's a special case since he has to hold a Modeset.
+// Self is the client's user, a special case since user modes must be stored.
+// Despite using the ChannelModes type, these are actually irc user modes that
+// have nothing to do with channels. For example +i or +x on some networks.
 type Self struct {
 	*User
 	*ChannelModes
 }
 
 // State is the main data container. It represents the state on a server
-// including all channels, users, and self.
+// including all channels, users, and the client's self.
 type State struct {
 	Self Self
 

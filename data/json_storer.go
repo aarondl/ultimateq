@@ -2,7 +2,7 @@ package data
 
 import "encoding/json"
 
-// JSONStorer allows storage of json values into a map.
+// JSONStorer allows storage of normal strings and json values into a map.
 type JSONStorer map[string]string
 
 // Put puts a regular string into the map.
