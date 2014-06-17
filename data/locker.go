@@ -23,6 +23,6 @@ type Locker interface {
 	WriteStore(fn func(*Store)) bool
 	// OpenWriteStore locks the store db, and returns it
 	OpenWriteStore() *Store
-	// CloseWriteStore unlocks the store db after use by OpenState.
+	// CloseWriteStore unlocks the store db after use by OpenWriteStore.
 	CloseWriteStore()
 }
