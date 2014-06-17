@@ -93,7 +93,7 @@ func (c *coreHandler) HandleRaw(w irc.Writer, ev *irc.Event) {
 			channel = strings.ToLower(ev.Args[1])
 		}
 
-		c.bot.UsingState(ev.NetworkID, func(st *data.State) {
+		c.bot.ReadState(ev.NetworkID, func(st *data.State) {
 			curNick = strings.ToLower(st.Self.Nick())
 		})
 

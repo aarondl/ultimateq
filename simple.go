@@ -274,7 +274,7 @@ func (h *Handler) Up(w irc.Writer, ev *cmd.Event) error {
 
 func (h *Handler) HandleRaw(w irc.Writer, ev *irc.Event) {
 	if ev.Name == irc.JOIN {
-		h.b.UsingStore(func(s *data.Store) {
+		h.b.ReadStore(func(s *data.Store) {
 			a := s.GetAuthedUser(ev.NetworkID, ev.Sender)
 			ch := ev.Target()
 			putPeopleUp(ev, ch, a, w)

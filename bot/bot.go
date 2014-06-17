@@ -393,9 +393,9 @@ func (b *Bot) UnregisterNetworkCmd(networkID, command string) bool {
 	return false
 }
 
-// UsingState calls a callback if the requested network can present a state db.
+// ReadState calls a callback if the requested network can present a state db.
 // The returned boolean is whether or not the function was called.
-func (b *Bot) UsingState(networkID string, fn func(*data.State)) (called bool) {
+func (b *Bot) ReadState(networkID string, fn func(*data.State)) (called bool) {
 	s := b.getServer(networkID)
 	if s == nil {
 		return false
@@ -431,9 +431,9 @@ func (b *Bot) CloseState(networkID string) {
 	}
 }
 
-// UsingStore calls a callback if the bot can present a store db.
+// ReadStore calls a callback if the bot can present a store db.
 // The returned boolean is whether or not the function was called.
-func (b *Bot) UsingStore(fn func(*data.Store)) (called bool) {
+func (b *Bot) ReadStore(fn func(*data.Store)) (called bool) {
 	b.protectStore.RLock()
 	defer b.protectStore.RUnlock()
 	if b.store != nil {
@@ -443,17 +443,42 @@ func (b *Bot) UsingStore(fn func(*data.Store)) (called bool) {
 	return
 }
 
-// OpenStore locks the store db, and returns it. CloseStore must be called or
-// the lock will never be released and the bot will sieze up. The store must
+// OpenReadStore locks the store db, and returns it. CloseStore must be called
+// or the lock will never be released and the bot will sieze up. The store must
 // be checked for nil.
-func (b *Bot) OpenStore() *data.Store {
+func (b *Bot) OpenReadStore() *data.Store {
 	b.protectStore.RLock()
 	return b.store
 }
 
-// CloseStore unlocks the data store after use by OpenState.
-func (b *Bot) CloseStore() {
+// CloseReadStore unlocks the data store after use by OpenState.
+func (b *Bot) CloseReadStore() {
 	b.protectStore.RUnlock()
+}
+
+// WriteStore calls a callback if the bot can present a store db.
+// The returned boolean is whether or not the function was called.
+func (b *Bot) WriteStore(fn func(*data.Store)) (called bool) {
+	b.protectStore.Lock()
+	defer b.protectStore.Unlock()
+	if b.store != nil {
+		fn(b.store)
+		called = true
+	}
+	return
+}
+
+// OpenWriteStore locks the store db, and returns it. CloseStore must be called
+// or the lock will never be released and the bot will sieze up. The store must
+// be checked for nil.
+func (b *Bot) OpenWriteStore() *data.Store {
+	b.protectStore.Lock()
+	return b.store
+}
+
+// CloseWriteStore unlocks the data store after use by OpenWriteStore.
+func (b *Bot) CloseWriteStore() {
+	b.protectStore.Unlock()
 }
 
 // NetworkWriter retrieves a network's writer. Will be nil if the network does

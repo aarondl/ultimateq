@@ -32,18 +32,25 @@ type badLocker struct {
 	*data.Store
 }
 
-func (b badLocker) UsingState(networkID string, fn func(*data.State)) bool {
+func (b badLocker) ReadState(networkID string, fn func(*data.State)) bool {
 	fn(b.State)
 	return true
 }
 func (b badLocker) OpenState(networkID string) *data.State { return b.State }
 func (b badLocker) CloseState(networkID string)            {}
-func (b badLocker) UsingStore(fn func(*data.Store)) bool {
+
+func (b badLocker) ReadStore(fn func(*data.Store)) bool {
 	fn(b.Store)
 	return true
 }
-func (b badLocker) OpenStore() *data.Store { return b.Store }
-func (b badLocker) CloseStore()            {}
+func (b badLocker) WriteStore(fn func(*data.Store)) bool {
+	fn(b.Store)
+	return true
+}
+func (b badLocker) OpenReadStore() *data.Store  { return b.Store }
+func (b badLocker) CloseReadStore()             {}
+func (b badLocker) OpenWriteStore() *data.Store { return b.Store }
+func (b badLocker) CloseWriteStore()            {}
 
 type commandHandler struct {
 	called          bool

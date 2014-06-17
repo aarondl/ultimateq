@@ -292,7 +292,7 @@ func (c *Cmds) Dispatch(networkID string, overridePrefix rune,
 	}
 
 	state := locker.OpenState(networkID)
-	store := locker.OpenStore()
+	store := locker.OpenReadStore()
 	cmdEv.State = state
 	cmdEv.Store = store
 

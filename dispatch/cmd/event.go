@@ -156,7 +156,7 @@ func (ev *Event) Close() error {
 		ev.State = nil
 		ev.Store = nil
 		ev.locker.CloseState(ev.NetworkID)
-		ev.locker.CloseStore()
+		ev.locker.CloseReadStore()
 	})
 	return nil
 }

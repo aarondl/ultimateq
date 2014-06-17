@@ -517,13 +517,19 @@ func TestBot_Locker(t *testing.T) {
 	var _ data.Locker = b // Check conformity
 
 	var called, reallyCalled bool
-	called = b.UsingState(netID, func(_ *data.State) {
+	called = b.ReadState(netID, func(_ *data.State) {
 		reallyCalled = true
 	})
 	if !called || !reallyCalled {
 		t.Error("The state callback was not called:", called, reallyCalled)
 	}
-	called = b.UsingStore(func(_ *data.Store) {
+	called = b.ReadStore(func(_ *data.Store) {
+		reallyCalled = true
+	})
+	if !called || !reallyCalled {
+		t.Error("The store callback was not called:", called, reallyCalled)
+	}
+	called = b.WriteStore(func(_ *data.Store) {
 		reallyCalled = true
 	})
 	if !called || !reallyCalled {
@@ -536,11 +542,17 @@ func TestBot_Locker(t *testing.T) {
 	}
 	b.CloseState(netID)
 
-	ostore := b.OpenStore()
+	ostore := b.OpenReadStore()
 	if ostore != b.store {
 		t.Error("Wrong object came back:", ostore)
 	}
-	b.CloseStore()
+	b.CloseReadStore()
+
+	ostore = b.OpenWriteStore()
+	if ostore != b.store {
+		t.Error("Wrong object came back:", ostore)
+	}
+	b.CloseWriteStore()
 }
 
 func TestBot_GetEndpoint(t *testing.T) {
