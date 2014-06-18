@@ -64,6 +64,19 @@ func TestDispatcher_Registration(t *testing.T) {
 	}
 }
 
+func TestDispatcher_RegistrationBadHandler(t *testing.T) {
+	t.Parallel()
+
+	defer func() {
+		if rec := recover(); rec == nil {
+			t.Error("Expected a panic when bad handler is registered.")
+		}
+	}()
+
+	d := NewDispatcher(core)
+	d.Register("", "", irc.PRIVMSG, 5)
+}
+
 func TestDispatcher_Dispatching(t *testing.T) {
 	t.Parallel()
 	var msg1, msg2, msg3 *irc.Event
@@ -118,6 +131,88 @@ func TestDispatcher_Dispatching(t *testing.T) {
 	}
 }
 
+func TestDispatcher_Filtering(t *testing.T) {
+	t.Parallel()
+
+	d := NewDispatcher(core)
+
+	var called bool
+	h := testHandler{func(w irc.Writer, ev *irc.Event) {
+		called = true
+	}}
+
+	var tests = []struct {
+		netID, channel, msg string
+		should              bool
+	}{
+		{"", "", "", true},
+
+		// Varying filters
+		{"net", "", "", true},
+		{"diff", "", "", false},
+		{"", "#chan", "", true},
+		{"", "#diff", "", false},
+		{"", "", irc.NOTICE, true},
+		{"", "", irc.PRIVMSG, false},
+
+		// Net constant
+		{"net", "#chan", "", true},
+		{"net", "#diff", "", false},
+		{"net", "", irc.NOTICE, true},
+		{"net", "", irc.PRIVMSG, false},
+
+		// Chan constant
+		{"", "#chan", irc.NOTICE, true},
+		{"", "#chan", irc.PRIVMSG, false},
+		{"net", "#chan", "", true},
+		{"diff", "#chan", "", false},
+
+		// Msg constant
+		{"net", "", irc.NOTICE, true},
+		{"diff", "", irc.NOTICE, false},
+		{"", "#chan", irc.NOTICE, true},
+		{"", "#diff", irc.NOTICE, false},
+
+		// Net & Chan Constant
+		{"net", "#chan", irc.NOTICE, true},
+		{"net", "#chan", irc.PRIVMSG, false},
+
+		// Chan & Msg Constant
+		{"net", "#chan", irc.NOTICE, true},
+		{"diff", "#chan", irc.NOTICE, false},
+
+		// Net & Msg Constant
+		{"net", "#chan", irc.NOTICE, true},
+		{"net", "#diff", irc.NOTICE, false},
+	}
+
+	notice := &irc.Event{
+		NetworkID:   "net",
+		NetworkInfo: netInfo,
+		Name:        irc.NOTICE,
+		Args:        []string{"#chan", "msg"},
+	}
+
+	for _, test := range tests {
+		id := d.Register(test.netID, test.channel, test.msg, h)
+
+		called = false
+
+		d.Dispatch(nil, notice)
+		d.WaitForHandlers()
+
+		if called != test.should {
+			t.Error("Expected called to be:", test.should)
+			t.Errorf("net: %q, ch: %q, msg: %q",
+				test.netID, test.channel, test.msg)
+		}
+
+		if !d.Unregister(id) {
+			t.Fatal("Could not unregister id:", id)
+		}
+	}
+}
+
 func TestDispatcher_RawDispatch(t *testing.T) {
 	t.Parallel()
 	var msg1, msg2 *irc.Event
@@ -131,7 +226,7 @@ func TestDispatcher_RawDispatch(t *testing.T) {
 	d := NewDispatcher(core)
 	send := testPoint{irc.Helper{}}
 	d.Register("", "", irc.PRIVMSG, h1)
-	d.Register("", "", irc.RAW, h2)
+	d.Register("", "", "", h2)
 
 	privmsg := &irc.Event{Name: irc.PRIVMSG}
 	d.Dispatch(send, privmsg)
@@ -720,7 +815,7 @@ func TestDispatch_Panic(t *testing.T) {
 		},
 	}
 
-	d.Register("", "", irc.RAW, handler)
+	d.Register("", "", "", handler)
 	ev := irc.NewEvent("", netInfo, "dispatcher", irc.PRIVMSG, "panic test")
 	d.Dispatch(testPoint{irc.Helper{}}, ev)
 	d.WaitForHandlers()

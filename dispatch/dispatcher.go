@@ -16,12 +16,12 @@ type EventHandler interface {
 
 type (
 	// eventTable is the storage used to keep id -> interface{} mappings in the
-	// eventTableState map.
+	// eventIDs map.
 	eventTable map[uint64]interface{}
-	// eventTableState is the map used to hold the event handlers for an event
-	eventTableState map[string]eventTable
+	// eventIDs is the map used to hold the event handlers for an event
+	eventIDs map[string]eventTable
 	// channelEvents is the map used to filter based on channels.
-	channelEvents map[string]eventTableState
+	channelEvents map[string]eventIDs
 	// networkEvents is the map used to filter based on networks.
 	networkEvents map[string]channelEvents
 )
@@ -45,15 +45,25 @@ func NewDispatcher(core *DispatchCore) *Dispatcher {
 // Register registers an event handler to a particular event. In return a
 // unique identifer is given to later pass into Unregister in case of a need
 // to unregister the event handler. Pass in an empty string to any of network,
-// channel or event to prevent filtering on that parameter.
+// channel or event to prevent filtering on that parameter. Panics if it's
+// given a type that doesn't implement any of the correct interfaces.
 func (d *Dispatcher) Register(
 	network, channel, event string, handler interface{}) uint64 {
+
+	switch handler.(type) {
+	case EventHandler:
+	case PrivmsgHandler, PrivmsgChannelHandler, PrivmsgUserHandler:
+	case NoticeHandler, NoticeChannelHandler, NoticeUserHandler:
+	case CTCPHandler, CTCPChannelHandler, CTCPReplyHandler:
+	default:
+		panic("dispatch: Handler must implement dispatch handler interfaces.")
+	}
 
 	event = strings.ToUpper(event)
 	network = strings.ToLower(network)
 	channel = strings.ToLower(channel)
 
-	var ets eventTableState
+	var ets eventIDs
 	var et eventTable
 	var ce channelEvents
 	var ok bool
@@ -66,7 +76,7 @@ func (d *Dispatcher) Register(
 		d.events[network] = ce
 	}
 	if ets, ok = ce[channel]; !ok {
-		ets = make(eventTableState)
+		ets = make(eventIDs)
 		ce[channel] = ets
 	}
 	if et, ok = ets[event]; !ok {
@@ -74,8 +84,8 @@ func (d *Dispatcher) Register(
 		ets[event] = et
 	}
 
-	et[d.eventID] = handler
 	d.eventID++
+	et[d.eventID] = handler
 	return d.eventID
 }
 
@@ -151,13 +161,11 @@ func (d *Dispatcher) filterChannel(
 }
 
 func (d *Dispatcher) filterEvent(
-	ets eventTableState, w irc.Writer, ev *irc.Event) bool {
+	ets eventIDs, w irc.Writer, ev *irc.Event) bool {
 
 	called := false
 
-	event := strings.ToLower(ev.Name)
-
-	if et, ok := ets[event]; ok {
+	if et, ok := ets[ev.Name]; ok {
 		for _, handler := range et {
 			d.HandlerStarted()
 			go d.resolveHandler(handler, w, ev)
