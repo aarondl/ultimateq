@@ -363,7 +363,8 @@ func sandboxGo(w irc.Writer, ev *cmd.Event, basecode string) error {
 		return nil
 	}
 
-	out := fmt.Sprintf("\x02go:\x02 %s", stdout.Bytes())
+	outbytes := bytes.Replace(stdout.Bytes(), []byte{1}, []byte{}, -1)
+	out := fmt.Sprintf("\x02go:\x02 %s", outbytes)
 	// ircmaxlen - maxhostsize - PRIVMSG - targetsize - spacing - colons
 	maxlen := 2 * (510 - 62 - 7 - len(targ) - 3 - 2)
 	if len(out) > maxlen {
