@@ -1,6 +1,6 @@
 /*
 Package irc defines types to be used by most other packages in
-the ultimateq systee. It is small and comprised mostly of helper like types
+the ultimateq system. It is small and comprised mostly of helper like types
 and constants.
 */
 package irc
