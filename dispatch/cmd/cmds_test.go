@@ -425,8 +425,8 @@ func TestCmds_Dispatch(t *testing.T) {
 
 	ccmd := string(c.prefix) + cmd
 	cmsg := []string{channel, ccmd}
-	notcmd := []string{nick, "not a command"}
-	cnotcmd := []string{channel, string(c.prefix) + "not a command"}
+	//notcmd := []string{nick, "not a command"}
+	//cnotcmd := []string{channel, string(c.prefix) + "not a command"}
 	badcmsg := []string{"#otherchan", string(c.prefix) + cmd}
 	umsg := []string{nick, cmd}
 	uargmsg := []string{nick, "cmd arg1 arg2"}
@@ -467,8 +467,8 @@ func TestCmds_Dispatch(t *testing.T) {
 		{arg1opt1var, ALL, ALL, irc.PRIVMSG, unil, false, ""},
 
 		{nil, ALL, ALL, irc.PRIVMSG, umsg, true, ""},
-		{nil, ALL, ALL, irc.PRIVMSG, notcmd, false, errFmtCmdNotFound},
-		{nil, ALL, ALL, irc.PRIVMSG, cnotcmd, false, errFmtCmdNotFound},
+		//{nil, ALL, ALL, irc.PRIVMSG, notcmd, false, errFmtCmdNotFound},
+		//{nil, ALL, ALL, irc.PRIVMSG, cnotcmd, false, errFmtCmdNotFound},
 		{nil, ALL, ALL, irc.PRIVMSG, uargmsg, false, errMsgUnexpectedArgument},
 		{arg1opt, ALL, ALL, irc.PRIVMSG, umsg, true, ""},
 		{arg1opt1var, ALL, ALL, irc.PRIVMSG, uargvargs, true, ""},
