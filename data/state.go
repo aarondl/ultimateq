@@ -375,7 +375,8 @@ func (s *State) removeUser(nickorhost string) {
 func (s *State) addChannel(channel string) *Channel {
 	chankey := strings.ToLower(channel)
 	var ch *Channel
-	if ch, ok := s.channels[chankey]; !ok {
+	var ok bool
+	if ch, ok = s.channels[chankey]; !ok {
 		ch = NewChannel(channel, &s.kinds, &s.umodes)
 		s.channels[chankey] = ch
 	}
@@ -575,7 +576,11 @@ func (s *State) mode(ev *irc.Event) {
 func (s *State) topic(ev *irc.Event) {
 	chname := strings.ToLower(ev.Args[0])
 	if ch, ok := s.channels[chname]; ok {
-		ch.SetTopic(ev.Args[1])
+		if len(ev.Args) >= 2 {
+			ch.SetTopic(ev.Args[1])
+		} else {
+			ch.SetTopic("")
+		}
 	}
 }
 

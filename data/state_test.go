@@ -723,6 +723,25 @@ func (s *s) TestState_UpdateRplTopic(c *C) {
 	c.Check(st.GetChannel(channels[0]).Topic(), Equals, "topic topic")
 }
 
+func (s *s) TestState_UpdateEmptyTopic(c *C) {
+	st, err := NewState(netInfo)
+	st.Self = self
+	c.Check(err, IsNil)
+
+	ev := &irc.Event{
+		Name:   irc.TOPIC,
+		Sender: users[1],
+		Args:   []string{channels[0], ""},
+	}
+
+	ch := st.addChannel(channels[0])
+	ch.SetTopic("topic topic")
+
+	c.Check(st.GetChannel(channels[0]).Topic(), Equals, "topic topic")
+	st.Update(ev)
+	c.Check(st.GetChannel(channels[0]).Topic(), Equals, "")
+}
+
 func (s *s) TestState_UpdatePrivmsg(c *C) {
 	st, err := NewState(netInfo)
 	st.Self = self
