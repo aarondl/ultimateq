@@ -199,6 +199,11 @@ func (q *Quoter) Details(w irc.Writer, ev *cmd.Event) error {
 	return nil
 }
 
+func (q *Quoter) Quoteweb(w irc.Writer, ev *cmd.Event) error {
+	w.Notify(ev.Event, ev.Nick(), "\x02Quote:\x02 http://bitforge.ca:8000")
+	return nil
+}
+
 /* =====================
  Queryer methods.
 ===================== */
@@ -435,9 +440,12 @@ func main() {
 	} else {
 		log.Println("Error loading wolfram configuration.")
 	}
+
 	qdb, err := quotes.OpenDB("quotes.sqlite3")
 	if err != nil {
 		log.Fatalln("Error opening quotes db:", err)
+	} else {
+		qdb.StartServer(":8000")
 	}
 	defer qdb.Close()
 	var quoter = Quoter{qdb}
@@ -485,6 +493,13 @@ func main() {
 			"editquote",
 			&quoter,
 			cmd.PRIVMSG, cmd.ALL, 0, "Q", "id", "quote...",
+		))
+		b.RegisterCmd(cmd.MkCmd(
+			"quote",
+			"Shows the address for the quote webserver.",
+			"quoteweb",
+			&quoter,
+			cmd.PRIVMSG, cmd.ALL,
 		))
 
 		// Queryer commands
