@@ -267,14 +267,14 @@ func TestCmds_Register(t *testing.T) {
 
 	var success bool
 	var err error
-	err = c.Register(GLOBAL, MkCmd(ext, dsc, cmd, nil, ALL, ALL))
+	err = c.Register(GLOBAL, MkCmd(ext, dsc, cmd, nil, ALLKINDS, ALLSCOPES))
 	err = chkErr(err, errMsgHandlerRequired)
 	if err != nil {
 		t.Error(err)
 	}
 
 	helper := func(args ...string) *Cmd {
-		return MkCmd(ext, dsc, cmd, handler, ALL, ALL, args...)
+		return MkCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES, args...)
 	}
 
 	brokenCmd := helper()
@@ -401,7 +401,7 @@ func TestCmds_RegisterProtected(t *testing.T) {
 	var success bool
 	var err error
 	err = c.Register(GLOBAL,
-		MkAuthCmd(ext, dsc, cmd, handler, ALL, ALL, 100, "ab"))
+		MkAuthCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES, 100, "ab"))
 	if err != nil {
 		t.Error("Unexpected Error:", err)
 	}
@@ -425,8 +425,8 @@ func TestCmds_Dispatch(t *testing.T) {
 
 	ccmd := string(c.prefix) + cmd
 	cmsg := []string{channel, ccmd}
-	//notcmd := []string{nick, "not a command"}
-	//cnotcmd := []string{channel, string(c.prefix) + "not a command"}
+	notcmd := []string{nick, "not a command"}
+	cnotcmd := []string{channel, string(c.prefix) + "not a command"}
 	badcmsg := []string{"#otherchan", string(c.prefix) + cmd}
 	umsg := []string{nick, cmd}
 	uargmsg := []string{nick, "cmd arg1 arg2"}
@@ -454,84 +454,84 @@ func TestCmds_Dispatch(t *testing.T) {
 
 	var table = []struct {
 		CmdArgs []string
-		MsgType int
-		Scope   int
+		Kind    MsgKind
+		Scope   MsgScope
 		Name    string
 		MsgArgs []string
 		Called  bool
 		ErrMsg  string
 	}{
 		// Args
-		{nil, ALL, ALL, irc.PRIVMSG, unil, false, ""},
-		{arg1opt, ALL, ALL, irc.PRIVMSG, unil, false, ""},
-		{arg1opt1var, ALL, ALL, irc.PRIVMSG, unil, false, ""},
+		{nil, ALLKINDS, ALLSCOPES, irc.PRIVMSG, unil, false, ""},
+		{arg1opt, ALLKINDS, ALLSCOPES, irc.PRIVMSG, unil, false, ""},
+		{arg1opt1var, ALLKINDS, ALLSCOPES, irc.PRIVMSG, unil, false, ""},
 
-		{nil, ALL, ALL, irc.PRIVMSG, umsg, true, ""},
-		//{nil, ALL, ALL, irc.PRIVMSG, notcmd, false, errFmtCmdNotFound},
-		//{nil, ALL, ALL, irc.PRIVMSG, cnotcmd, false, errFmtCmdNotFound},
-		{nil, ALL, ALL, irc.PRIVMSG, uargmsg, false, errMsgUnexpectedArgument},
-		{arg1opt, ALL, ALL, irc.PRIVMSG, umsg, true, ""},
-		{arg1opt1var, ALL, ALL, irc.PRIVMSG, uargvargs, true, ""},
-		{arg1req, ALL, ALL, irc.PRIVMSG, umsg, false, argErr},
-		{arg1req1opt, ALL, ALL, irc.PRIVMSG, umsg, false, argErr},
+		{nil, ALLKINDS, ALLSCOPES, irc.PRIVMSG, umsg, true, ""},
+		{nil, ALLKINDS, ALLSCOPES, irc.PRIVMSG, notcmd, false, errFmtCmdNotFound},
+		{nil, ALLKINDS, ALLSCOPES, irc.PRIVMSG, cnotcmd, false, errFmtCmdNotFound},
+		{nil, ALLKINDS, ALLSCOPES, irc.PRIVMSG, uargmsg, false, errMsgUnexpectedArgument},
+		{arg1opt, ALLKINDS, ALLSCOPES, irc.PRIVMSG, umsg, true, ""},
+		{arg1opt1var, ALLKINDS, ALLSCOPES, irc.PRIVMSG, uargvargs, true, ""},
+		{arg1req, ALLKINDS, ALLSCOPES, irc.PRIVMSG, umsg, false, argErr},
+		{arg1req1opt, ALLKINDS, ALLSCOPES, irc.PRIVMSG, umsg, false, argErr},
 
-		{arg1req, ALL, ALL, irc.PRIVMSG, uargmsg, false, argErr},
-		{arg1opt, ALL, ALL, irc.PRIVMSG, uargmsg, false, argErr},
-		{arg1req1opt, ALL, ALL, irc.PRIVMSG, uargmsg, true, ""},
+		{arg1req, ALLKINDS, ALLSCOPES, irc.PRIVMSG, uargmsg, false, argErr},
+		{arg1opt, ALLKINDS, ALLSCOPES, irc.PRIVMSG, uargmsg, false, argErr},
+		{arg1req1opt, ALLKINDS, ALLSCOPES, irc.PRIVMSG, uargmsg, true, ""},
 
-		{arg1req1var, ALL, ALL, irc.PRIVMSG, umsg, false, argErr},
-		{arg1req1var, ALL, ALL, irc.PRIVMSG, uargvargs, true, ""},
-		{arg1var, ALL, ALL, irc.PRIVMSG, uargvargs, true, ""},
+		{arg1req1var, ALLKINDS, ALLSCOPES, irc.PRIVMSG, umsg, false, argErr},
+		{arg1req1var, ALLKINDS, ALLSCOPES, irc.PRIVMSG, uargvargs, true, ""},
+		{arg1var, ALLKINDS, ALLSCOPES, irc.PRIVMSG, uargvargs, true, ""},
 
 		// Channel Arguments
-		{arg1chan1req, ALL, ALL, irc.PRIVMSG, cmsgarg, true, ""},
-		{arg1chan1req, ALL, ALL, irc.PRIVMSG, cmsgargchan, false, argErr},
-		{arg1chan1req, ALL, ALL, irc.PRIVMSG, cmsg, false, atLeastOneArgErr},
-		{arg1chan1req, ALL, ALL, irc.PRIVMSG, cmsgchanarg, true, ""},
-		{arg1chan1req, ALL, ALL, irc.PRIVMSG, umsgarg, false, chanErr},
-		{arg1chan1req, ALL, ALL, irc.PRIVMSG, umsgargchan, false, chanErr},
-		{arg1chan1req, ALL, ALL, irc.PRIVMSG, umsgchanarg, true, ""},
+		{arg1chan1req, ALLKINDS, ALLSCOPES, irc.PRIVMSG, cmsgarg, true, ""},
+		{arg1chan1req, ALLKINDS, ALLSCOPES, irc.PRIVMSG, cmsgargchan, false, argErr},
+		{arg1chan1req, ALLKINDS, ALLSCOPES, irc.PRIVMSG, cmsg, false, atLeastOneArgErr},
+		{arg1chan1req, ALLKINDS, ALLSCOPES, irc.PRIVMSG, cmsgchanarg, true, ""},
+		{arg1chan1req, ALLKINDS, ALLSCOPES, irc.PRIVMSG, umsgarg, false, chanErr},
+		{arg1chan1req, ALLKINDS, ALLSCOPES, irc.PRIVMSG, umsgargchan, false, chanErr},
+		{arg1chan1req, ALLKINDS, ALLSCOPES, irc.PRIVMSG, umsgchanarg, true, ""},
 
-		{arg1chan1req1opt, ALL, ALL, irc.PRIVMSG, cmsgarg, true, ""},
-		{arg1chan1req1opt, ALL, ALL, irc.PRIVMSG, umsgarg, false, chanErr},
+		{arg1chan1req1opt, ALLKINDS, ALLSCOPES, irc.PRIVMSG, cmsgarg, true, ""},
+		{arg1chan1req1opt, ALLKINDS, ALLSCOPES, irc.PRIVMSG, umsgarg, false, chanErr},
 
 		// Bad message
-		{nil, ALL, ALL, irc.RPL_WHOREPLY, cmsg, false, ""},
+		{nil, ALLKINDS, ALLSCOPES, irc.RPL_WHOREPLY, cmsg, false, ""},
 		// Message to wrong channel
-		{nil, ALL, ALL, irc.PRIVMSG, badcmsg, false, ""},
+		{nil, ALLKINDS, ALLSCOPES, irc.PRIVMSG, badcmsg, false, ""},
 
 		// Msgtype All + Scope
-		{nil, ALL, ALL, irc.PRIVMSG, cmsg, true, ""},
-		{nil, ALL, PRIVATE, irc.PRIVMSG, umsg, true, ""},
-		{nil, ALL, PRIVATE, irc.PRIVMSG, cmsg, false, ""},
-		{nil, ALL, PUBLIC, irc.PRIVMSG, umsg, false, ""},
-		{nil, ALL, PUBLIC, irc.PRIVMSG, cmsg, true, ""},
+		{nil, ALLKINDS, ALLSCOPES, irc.PRIVMSG, cmsg, true, ""},
+		{nil, ALLKINDS, PRIVATE, irc.PRIVMSG, umsg, true, ""},
+		{nil, ALLKINDS, PRIVATE, irc.PRIVMSG, cmsg, false, ""},
+		{nil, ALLKINDS, PUBLIC, irc.PRIVMSG, umsg, false, ""},
+		{nil, ALLKINDS, PUBLIC, irc.PRIVMSG, cmsg, true, ""},
 
 		// Msgtype Privmsg + Scope
-		{nil, PRIVMSG, ALL, irc.PRIVMSG, cmsg, true, ""},
+		{nil, PRIVMSG, ALLSCOPES, irc.PRIVMSG, cmsg, true, ""},
 		{nil, PRIVMSG, PRIVATE, irc.PRIVMSG, umsg, true, ""},
 		{nil, PRIVMSG, PRIVATE, irc.PRIVMSG, cmsg, false, ""},
 		{nil, PRIVMSG, PUBLIC, irc.PRIVMSG, umsg, false, ""},
 		{nil, PRIVMSG, PUBLIC, irc.PRIVMSG, cmsg, true, ""},
-		{nil, PRIVMSG, ALL, irc.NOTICE, cmsg, false, ""},
+		{nil, PRIVMSG, ALLSCOPES, irc.NOTICE, cmsg, false, ""},
 
 		// Msgtype Notice + Scope
-		{nil, NOTICE, ALL, irc.NOTICE, cmsg, true, ""},
+		{nil, NOTICE, ALLSCOPES, irc.NOTICE, cmsg, true, ""},
 		{nil, NOTICE, PRIVATE, irc.NOTICE, umsg, true, ""},
 		{nil, NOTICE, PRIVATE, irc.NOTICE, cmsg, false, ""},
 		{nil, NOTICE, PUBLIC, irc.NOTICE, umsg, false, ""},
 		{nil, NOTICE, PUBLIC, irc.NOTICE, cmsg, true, ""},
-		{nil, NOTICE, ALL, irc.PRIVMSG, cmsg, false, ""},
+		{nil, NOTICE, ALLSCOPES, irc.PRIVMSG, cmsg, false, ""},
 
 		// Uppercase
-		{nil, ALL, ALL, irc.PRIVMSG, []string{"nick", "CMD"}, true, ""},
+		{nil, ALLKINDS, ALLSCOPES, irc.PRIVMSG, []string{"nick", "CMD"}, true, ""},
 	}
 
 	for _, test := range table {
 		buffer.Reset()
 		handler := &commandHandler{}
 		err := c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler,
-			test.MsgType, test.Scope, test.CmdArgs...))
+			test.Kind, test.Scope, test.CmdArgs...))
 		if err != nil {
 			t.Errorf("Failed to register test: [%v]\n(%v)", err, test)
 			continue
@@ -652,7 +652,7 @@ func TestCmds_DispatchAuthed(t *testing.T) {
 		buffer.Reset()
 		handler := &commandHandler{}
 
-		err := c.Register(GLOBAL, MkAuthCmd(ext, dsc, cmd, handler, ALL, ALL,
+		err := c.Register(GLOBAL, MkAuthCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES,
 			test.LevelReq, test.Flags))
 		if err != nil {
 			t.Errorf("Failed to register test: [%v]\n(%v)", err, test)
@@ -745,7 +745,7 @@ func TestCmds_DispatchNils(t *testing.T) {
 	handler := &commandHandler{}
 
 	err := c.Register(GLOBAL,
-		MkAuthCmd(ext, dsc, cmd, handler, ALL, ALL, 100, "a"))
+		MkAuthCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES, 100, "a"))
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
@@ -759,7 +759,7 @@ func TestCmds_DispatchNils(t *testing.T) {
 		t.Error("Unregistration failed.")
 	}
 
-	err = c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALL, ALL))
+	err = c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES))
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
@@ -793,7 +793,7 @@ func TestCmds_DispatchReturns(t *testing.T) {
 
 	handler := &errorHandler{}
 
-	err := c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALL, ALL))
+	err := c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES))
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
@@ -848,7 +848,7 @@ func TestCmds_DispatchChannel(t *testing.T) {
 	handler := &commandHandler{}
 
 	err := c.Register(GLOBAL,
-		MkCmd(ext, dsc, cmd, handler, ALL, ALL, "#channelArg"))
+		MkCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES, "#channelArg"))
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
@@ -950,7 +950,7 @@ func TestCmds_DispatchUsers(t *testing.T) {
 
 	handler := &commandHandler{}
 
-	err := c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALL, ALL,
+	err := c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES,
 		"*user1", "~user2", "[*user3]", "~users..."),
 	)
 	if err != nil {
@@ -1046,7 +1046,7 @@ func TestCmds_DispatchErrors(t *testing.T) {
 	}
 
 	handler := &commandHandler{}
-	err := c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALL, ALL,
+	err := c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES,
 		"*user1", "~user2", "[*user3]", "~users..."),
 	)
 	if err != nil {
@@ -1114,7 +1114,7 @@ func TestCmds_DispatchErrors(t *testing.T) {
 		t.Error("Handler could not be unregistered.")
 	}
 
-	err = c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALL, ALL, "~user1"))
+	err = c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES, "~user1"))
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
@@ -1147,7 +1147,7 @@ func TestCmds_DispatchVariadicUsers(t *testing.T) {
 
 	handler := &commandHandler{}
 	var err error
-	err = c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALL, ALL,
+	err = c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES,
 		"*users..."),
 	)
 	if err != nil {
@@ -1231,7 +1231,7 @@ func TestCmds_DispatchMixUserAndChan(t *testing.T) {
 
 	handler := &commandHandler{}
 	var err error
-	err = c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALL, ALL,
+	err = c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES,
 		"#chan", "~user"),
 	)
 	if err != nil {
@@ -1268,7 +1268,7 @@ func TestCmds_DispatchReflection(t *testing.T) {
 
 	cmds := []string{"reflect", "badargnum", "noreturn", "badargs"}
 	for _, command := range cmds {
-		err = c.Register(GLOBAL, MkCmd(ext, dsc, command, handler, ALL, ALL))
+		err = c.Register(GLOBAL, MkCmd(ext, dsc, command, handler, ALLKINDS, ALLSCOPES))
 		if err != nil {
 			t.Error("Unexpected:", command, err)
 		}
@@ -1350,7 +1350,7 @@ func TestCmds_DispatchOverridePrefix(t *testing.T) {
 		NetworkInfo: netInfo,
 	}
 
-	err = c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALL, ALL))
+	err = c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES))
 	if err != nil {
 		t.Error("Unexpected:", cmd, err)
 	}
@@ -1403,11 +1403,11 @@ func TestCmds_EachCmd(t *testing.T) {
 
 	handler := &errorHandler{}
 
-	err = c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALL, ALL))
+	err = c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES))
 	if err != nil {
 		t.Error("Unexpected:", err)
 	}
-	err = c.Register(GLOBAL, MkCmd(ext, dsc, "other", handler, ALL, ALL))
+	err = c.Register(GLOBAL, MkCmd(ext, dsc, "other", handler, ALLKINDS, ALLSCOPES))
 	if err != nil {
 		t.Error("Unexpected:", err)
 	}
@@ -1460,7 +1460,7 @@ func TestCmds_Panic(t *testing.T) {
 		panicMsg,
 	}
 
-	tmpCmd := MkCmd("panic", "panic desc", "panic", handler, ALL, ALL)
+	tmpCmd := MkCmd("panic", "panic desc", "panic", handler, ALLKINDS, ALLSCOPES)
 	c.Register(GLOBAL, tmpCmd)
 
 	ev := irc.NewEvent("", netInfo, irc.PRIVMSG, host, self, "panic")

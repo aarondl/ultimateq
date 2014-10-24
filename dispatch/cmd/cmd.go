@@ -46,12 +46,12 @@ type Cmd struct {
 	Extension string
 	// Description is a description of the command's function.
 	Description string
-	// Msgtype is the type of messages this command reacts to, may be the
-	// any of the constants: PRIVMSG, NOTICE or ALL.
-	Msgtype int
-	// Msgscope is the scope of the messages this command reacts to. May be
-	// any of the constants: PRIVATE, PUBLIC or ALL.
-	Msgscope int
+	// Kind is the kind of messages this command reacts to, may be the
+	// any of the constants: PRIVMSG, NOTICE or ALLKINDS.
+	Kind MsgKind
+	// Scope is the scope of the messages this command reacts to. May be
+	// any of the constants: PRIVATE, PUBLIC or ALLSCOPES.
+	Scope MsgScope
 	// Args is the arguments for the command. Each argument must be in it's own
 	// element, be named with flags optionally prefixing the name, and have the
 	// form of one of the following:
@@ -100,15 +100,15 @@ type Cmd struct {
 
 // MkCmd is a helper method to easily create a Cmd. See the documentation
 // for Cmd on what each parameter is.
-func MkCmd(ext, desc, cmd string, handler CmdHandler, msgtype, msgscope int,
-	args ...string) *Cmd {
+func MkCmd(ext, desc, cmd string, handler CmdHandler, kind MsgKind,
+	scope MsgScope, args ...string) *Cmd {
 	return &Cmd{
 		Cmd:         cmd,
 		Extension:   ext,
 		Description: desc,
 		Handler:     handler,
-		Msgtype:     msgtype,
-		Msgscope:    msgscope,
+		Kind:        kind,
+		Scope:       scope,
 		Args:        args,
 	}
 }
@@ -116,10 +116,10 @@ func MkCmd(ext, desc, cmd string, handler CmdHandler, msgtype, msgscope int,
 // MkAuthCmd is a helper method to easily create an authenticated Cmd. See
 // the documentation on Cmd for what each parameter is.
 func MkAuthCmd(ext, desc, cmd string, handler CmdHandler,
-	msgtype, msgscope int, reqLevel uint8, reqFlags string,
+	kind MsgKind, scope MsgScope, reqLevel uint8, reqFlags string,
 	args ...string) *Cmd {
 
-	command := MkCmd(ext, desc, cmd, handler, msgtype, msgscope, args...)
+	command := MkCmd(ext, desc, cmd, handler, kind, scope, args...)
 	command.RequireAuth = true
 	command.ReqLevel = reqLevel
 	command.ReqFlags = reqFlags

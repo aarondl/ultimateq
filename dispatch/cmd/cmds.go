@@ -22,23 +22,29 @@ import (
 	"github.com/aarondl/ultimateq/irc"
 )
 
+// MsgKind is the kind of messages to listen to.
+type MsgKind int
+
+// MsgScope is the scope of the messages to listen to.
+type MsgScope int
+
 // Constants used for defining the targets/scope of a command.
 const (
-	// GLOBAL is the bot-global registration "server name".
+	// Global is the bot-global registration "server name".
 	GLOBAL = "GLOBAL"
 	// PRIVMSG only listens to irc.PRIVMSG events.
-	PRIVMSG = 0x1
+	PRIVMSG MsgKind = 0x1
 	// NOTICE only listens to irc.NOTICE events.
-	NOTICE = 0x2
+	NOTICE MsgKind = 0x2
+	// ALLKINDS listens to both irc.PRIVMSG and irc.NOTICE events.
+	ALLKINDS MsgKind = 0x3
+
 	// PRIVATE only listens to PRIVMSG or NOTICE sent directly to the bot.
-	PRIVATE = 0x1
+	PRIVATE MsgScope = 0x1
 	// PUBLIC only listens to PRIVMSG or NOTICE sent to a channel.
-	PUBLIC = 0x2
-	// ALL when passed into the msgtype parameter: listens to both
-	// PRIVMSG and NOTICE events.
-	// When passed into the scope parameter: listens for messages sent both
-	// directly to the bot, and to a channel.
-	ALL = 0x3
+	PUBLIC MsgScope = 0x2
+	// ALLSCOPES listens to events sent to a channel or directly to the bot.
+	ALLSCOPES MsgScope = 0x3
 )
 
 // Error messages.
@@ -229,15 +235,15 @@ func (c *Cmds) Dispatch(networkID string, overridePrefix rune,
 	writer irc.Writer, ev *irc.Event, locker data.Locker) (err error) {
 
 	// Filter non privmsg/notice
-	msgtype := 0
+	var kind MsgKind
 	switch ev.Name {
 	case irc.PRIVMSG:
-		msgtype = PRIVMSG
+		kind = PRIVMSG
 	case irc.NOTICE:
-		msgtype = NOTICE
+		kind = NOTICE
 	}
 
-	if msgtype == 0 {
+	if kind == MsgKind(0) {
 		return nil
 	}
 
@@ -250,7 +256,7 @@ func (c *Cmds) Dispatch(networkID string, overridePrefix rune,
 
 	ch := ""
 	nick := irc.Nick(ev.Sender)
-	msgscope := PRIVATE
+	scope := PRIVATE
 	isChan, hasChan := c.CheckTarget(ev)
 
 	// If it's a channel message, ensure we're active on the channel and
@@ -265,7 +271,7 @@ func (c *Cmds) Dispatch(networkID string, overridePrefix rune,
 
 		cmd = cmd[1:]
 		ch = ev.Target()
-		msgscope = PUBLIC
+		scope = PUBLIC
 	}
 
 	var command *Cmd
@@ -277,7 +283,7 @@ func (c *Cmds) Dispatch(networkID string, overridePrefix rune,
 		return nil
 	}
 
-	if 0 == (msgtype&command.Msgtype) || 0 == (msgscope&command.Msgscope) {
+	if 0 == (kind&command.Kind) || 0 == (scope&command.Scope) {
 		return nil
 	}
 
