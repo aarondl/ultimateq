@@ -1,6 +1,7 @@
 package dispatch
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 
@@ -14,22 +15,13 @@ type EventHandler interface {
 	HandleRaw(w irc.Writer, ev *irc.Event)
 }
 
-type (
-	// eventTable is the storage used to keep id -> interface{} mappings in the
-	// eventIDs map.
-	eventTable map[uint64]interface{}
-	// eventIDs is the map used to hold the event handlers for an event
-	eventIDs map[string]eventTable
-	// channelEvents is the map used to filter based on channels.
-	channelEvents map[string]eventIDs
-	// networkEvents is the map used to filter based on networks.
-	networkEvents map[string]channelEvents
-)
+// eventTable is used to store an event key -> registration id -> handler
+type eventTable map[string]map[uint64]interface{}
 
 // Dispatcher is made for handling dispatching of raw-ish irc events.
 type Dispatcher struct {
 	*DispatchCore
-	events        networkEvents
+	events        eventTable
 	protectEvents sync.RWMutex
 	eventID       uint64
 }
@@ -38,7 +30,7 @@ type Dispatcher struct {
 func NewDispatcher(core *DispatchCore) *Dispatcher {
 	return &Dispatcher{
 		DispatchCore: core,
-		events:       make(networkEvents),
+		events:       make(eventTable),
 	}
 }
 
@@ -59,33 +51,22 @@ func (d *Dispatcher) Register(
 		panic("dispatch: Handler must implement dispatch handler interfaces.")
 	}
 
-	event = strings.ToUpper(event)
-	network = strings.ToLower(network)
-	channel = strings.ToLower(channel)
-
-	var ets eventIDs
-	var et eventTable
-	var ce channelEvents
-	var ok bool
-
 	d.protectEvents.Lock()
 	defer d.protectEvents.Unlock()
 
-	if ce, ok = d.events[network]; !ok {
-		ce = make(channelEvents)
-		d.events[network] = ce
-	}
-	if ets, ok = ce[channel]; !ok {
-		ets = make(eventIDs)
-		ce[channel] = ets
-	}
-	if et, ok = ets[event]; !ok {
-		et = make(eventTable)
-		ets[event] = et
+	network = strings.ToLower(network)
+	channel = strings.ToLower(channel)
+	event = strings.ToLower(event)
+
+	key := mkKey(network, channel, event)
+	idTable, ok := d.events[key]
+	if !ok {
+		idTable = make(map[uint64]interface{})
+		d.events[key] = idTable
 	}
 
 	d.eventID++
-	et[d.eventID] = handler
+	idTable[d.eventID] = handler
 	return d.eventID
 }
 
@@ -96,92 +77,57 @@ func (d *Dispatcher) Unregister(id uint64) bool {
 	d.protectEvents.Lock()
 	defer d.protectEvents.Unlock()
 
-	for _, ce := range d.events {
-		for _, ets := range ce {
-			for _, events := range ets {
-				for eID := range events {
-					if eID == id {
-						delete(events, eID)
-						return true
-					}
-				}
-			}
+	for _, idTable := range d.events {
+		if _, ok := idTable[id]; ok {
+			delete(idTable, id)
+			return true
 		}
 	}
 	return false
 }
 
 // Dispatch an IrcMessage to event handlers handling event also ensures all raw
-// handlers receive all messages. Returns false if no eventtable was found for
-// the primary sent event.
-func (d *Dispatcher) Dispatch(w irc.Writer, ev *irc.Event) bool {
-
+// handlers receive all messages.
+func (d *Dispatcher) Dispatch(w irc.Writer, ev *irc.Event) {
 	d.protectEvents.RLock()
 	defer d.protectEvents.RUnlock()
 
-	handled := d.dispatchHelper(w, ev)
+	var isChan bool
+	network := strings.ToLower(ev.NetworkID)
+	channel := ""
+	event := strings.ToLower(ev.Name)
+	if isChan = len(ev.Args) > 1 && ev.IsTargetChan(); isChan {
+		channel = strings.ToLower(ev.Target())
+	}
 
-	return handled
+	// Try most specific key to most generic keys, ending in the global key.
+	d.tryKey(network, channel, event, w, ev)
+	d.tryKey(network, "", "", w, ev)
+	d.tryKey(network, "", event, w, ev)
+	if isChan {
+		d.tryKey("", channel, "", w, ev)
+		d.tryKey(network, channel, "", w, ev)
+		d.tryKey("", channel, event, w, ev)
+	}
+	d.tryKey("", "", event, w, ev)
+	d.tryKey("", "", "", w, ev)
+
+	// Raw handlers
+	d.tryKey(network, channel, irc.RAW, w, ev)
+	d.tryKey(network, "", irc.RAW, w, ev)
+	d.tryKey("", channel, irc.RAW, w, ev)
 }
 
-// dispatchHelper locates a handler and attempts to resolve it with
-// resolveHandler. It returns true if it was able to find an event table.
-func (d *Dispatcher) dispatchHelper(w irc.Writer, ev *irc.Event) bool {
-	called := false
-
-	networkID := strings.ToLower(ev.NetworkID)
-
-	if ce, ok := d.events[networkID]; ok {
-		called = d.filterChannel(ce, w, ev)
-	}
-
-	if ce, ok := d.events[""]; ok {
-		called = called || d.filterChannel(ce, w, ev)
-	}
-
-	return called
-}
-
-func (d *Dispatcher) filterChannel(
-	ce channelEvents, w irc.Writer, ev *irc.Event) bool {
-	called := false
-
-	if len(ev.Args) > 0 && ev.IsTargetChan() {
-		target := strings.ToLower(ev.Target())
-		if ets, ok := ce[target]; ok {
-			called = d.filterEvent(ets, w, ev)
-		}
-	}
-
-	if ets, ok := ce[""]; ok {
-		called = called || d.filterEvent(ets, w, ev)
-	}
-
-	return called
-}
-
-func (d *Dispatcher) filterEvent(
-	ets eventIDs, w irc.Writer, ev *irc.Event) bool {
-
-	called := false
-
-	if et, ok := ets[ev.Name]; ok {
-		for _, handler := range et {
+// tryKey attempts to use a key to fire off an event.
+func (d *Dispatcher) tryKey(net, ch, e string, w irc.Writer, ev *irc.Event) {
+	key := mkKey(net, ch, e)
+	idTable, ok := d.events[key]
+	if ok {
+		for _, handler := range idTable {
 			d.HandlerStarted()
 			go d.resolveHandler(handler, w, ev)
-			called = true
 		}
 	}
-
-	if et, ok := ets[""]; ok {
-		for _, handler := range et {
-			d.HandlerStarted()
-			go d.resolveHandler(handler, w, ev)
-			called = true
-		}
-	}
-
-	return called
 }
 
 // resolveHandler checks the type of the handler passed in, resolves it to a
@@ -295,4 +241,9 @@ func (d *Dispatcher) dispatchCTCPReply(
 func (d *DispatchCore) shouldDispatch(channelMsg bool, ev *irc.Event) bool {
 	isChan, hasChan := d.CheckTarget(ev)
 	return channelMsg == isChan && (!channelMsg || hasChan)
+}
+
+// mkKey creates a key for event lookups.
+func mkKey(network, channel, event string) string {
+	return fmt.Sprintf("%s:%s:%s", network, channel, event)
 }
