@@ -436,7 +436,7 @@ func TestCmds_Dispatch(t *testing.T) {
 	ccmd := string(c.prefix) + cmd
 	cmsg := []string{channel, ccmd}
 	notcmd := []string{nick, "not a command"}
-	cnotcmd := []string{channel, string(c.prefix) + "not a command"}
+	cnotcmd := []string{channel, string(c.prefix) + "ext.not a command"}
 	badcmsg := []string{"#otherchan", string(c.prefix) + cmd}
 	umsg := []string{nick, cmd}
 	uargmsg := []string{nick, "cmd arg1 arg2"}
@@ -472,74 +472,80 @@ func TestCmds_Dispatch(t *testing.T) {
 		ErrMsg  string
 	}{
 		// Args
-		{nil, ALLKINDS, ALLSCOPES, irc.PRIVMSG, unil, false, ""},
-		{arg1opt, ALLKINDS, ALLSCOPES, irc.PRIVMSG, unil, false, ""},
-		{arg1opt1var, ALLKINDS, ALLSCOPES, irc.PRIVMSG, unil, false, ""},
+		{nil, 0, 0, irc.PRIVMSG, unil, false, ""},
+		{arg1opt, 0, 0, irc.PRIVMSG, unil, false, ""},
+		{arg1opt1var, 0, 0, irc.PRIVMSG, unil, false, ""},
 
-		{nil, ALLKINDS, ALLSCOPES, irc.PRIVMSG, umsg, true, ""},
-		{nil, ALLKINDS, ALLSCOPES, irc.PRIVMSG, notcmd, false, errFmtCmdNotFound},
-		{nil, ALLKINDS, ALLSCOPES, irc.PRIVMSG, cnotcmd, false, errFmtCmdNotFound},
-		{nil, ALLKINDS, ALLSCOPES, irc.PRIVMSG, uargmsg, false, errMsgUnexpectedArgument},
-		{arg1opt, ALLKINDS, ALLSCOPES, irc.PRIVMSG, umsg, true, ""},
-		{arg1opt1var, ALLKINDS, ALLSCOPES, irc.PRIVMSG, uargvargs, true, ""},
-		{arg1req, ALLKINDS, ALLSCOPES, irc.PRIVMSG, umsg, false, argErr},
-		{arg1req1opt, ALLKINDS, ALLSCOPES, irc.PRIVMSG, umsg, false, argErr},
+		{nil, 0, 0, irc.PRIVMSG, umsg, true, ""},
+		{nil, 0, 0, irc.PRIVMSG, notcmd, false, errFmtCmdNotFound},
+		{nil, 0, 0, irc.PRIVMSG, cnotcmd, false, errFmtCmdNotFound},
+		{nil, 0, 0, irc.PRIVMSG, uargmsg, false, errMsgUnexpectedArgument},
+		{arg1opt, 0, 0, irc.PRIVMSG, umsg, true, ""},
+		{arg1opt1var, 0, 0, irc.PRIVMSG, uargvargs, true, ""},
+		{arg1req, 0, 0, irc.PRIVMSG, umsg, false, argErr},
+		{arg1req1opt, 0, 0, irc.PRIVMSG, umsg, false, argErr},
 
-		{arg1req, ALLKINDS, ALLSCOPES, irc.PRIVMSG, uargmsg, false, argErr},
-		{arg1opt, ALLKINDS, ALLSCOPES, irc.PRIVMSG, uargmsg, false, argErr},
-		{arg1req1opt, ALLKINDS, ALLSCOPES, irc.PRIVMSG, uargmsg, true, ""},
+		{arg1req, 0, 0, irc.PRIVMSG, uargmsg, false, argErr},
+		{arg1opt, 0, 0, irc.PRIVMSG, uargmsg, false, argErr},
+		{arg1req1opt, 0, 0, irc.PRIVMSG, uargmsg, true, ""},
 
-		{arg1req1var, ALLKINDS, ALLSCOPES, irc.PRIVMSG, umsg, false, argErr},
-		{arg1req1var, ALLKINDS, ALLSCOPES, irc.PRIVMSG, uargvargs, true, ""},
-		{arg1var, ALLKINDS, ALLSCOPES, irc.PRIVMSG, uargvargs, true, ""},
+		{arg1req1var, 0, 0, irc.PRIVMSG, umsg, false, argErr},
+		{arg1req1var, 0, 0, irc.PRIVMSG, uargvargs, true, ""},
+		{arg1var, 0, 0, irc.PRIVMSG, uargvargs, true, ""},
 
 		// Channel Arguments
-		{arg1chan1req, ALLKINDS, ALLSCOPES, irc.PRIVMSG, cmsgarg, true, ""},
-		{arg1chan1req, ALLKINDS, ALLSCOPES, irc.PRIVMSG, cmsgargchan, false, argErr},
-		{arg1chan1req, ALLKINDS, ALLSCOPES, irc.PRIVMSG, cmsg, false, atLeastOneArgErr},
-		{arg1chan1req, ALLKINDS, ALLSCOPES, irc.PRIVMSG, cmsgchanarg, true, ""},
-		{arg1chan1req, ALLKINDS, ALLSCOPES, irc.PRIVMSG, umsgarg, false, chanErr},
-		{arg1chan1req, ALLKINDS, ALLSCOPES, irc.PRIVMSG, umsgargchan, false, chanErr},
-		{arg1chan1req, ALLKINDS, ALLSCOPES, irc.PRIVMSG, umsgchanarg, true, ""},
+		{arg1chan1req, 0, 0, irc.PRIVMSG, cmsgarg, true, ""},
+		{arg1chan1req, 0, 0, irc.PRIVMSG, cmsgargchan, false, argErr},
+		{arg1chan1req, 0, 0, irc.PRIVMSG, cmsg, false, atLeastOneArgErr},
+		{arg1chan1req, 0, 0, irc.PRIVMSG, cmsgchanarg, true, ""},
+		{arg1chan1req, 0, 0, irc.PRIVMSG, umsgarg, false, chanErr},
+		{arg1chan1req, 0, 0, irc.PRIVMSG, umsgargchan, false, chanErr},
+		{arg1chan1req, 0, 0, irc.PRIVMSG, umsgchanarg, true, ""},
 
-		{arg1chan1req1opt, ALLKINDS, ALLSCOPES, irc.PRIVMSG, cmsgarg, true, ""},
-		{arg1chan1req1opt, ALLKINDS, ALLSCOPES, irc.PRIVMSG, umsgarg, false, chanErr},
+		{arg1chan1req1opt, 0, 0, irc.PRIVMSG, cmsgarg, true, ""},
+		{arg1chan1req1opt, 0, 0, irc.PRIVMSG, umsgarg, false, chanErr},
 
 		// Bad message
-		{nil, ALLKINDS, ALLSCOPES, irc.RPL_WHOREPLY, cmsg, false, ""},
+		{nil, 0, 0, irc.RPL_WHOREPLY, cmsg, false, ""},
 		// Message to wrong channel
-		{nil, ALLKINDS, ALLSCOPES, irc.PRIVMSG, badcmsg, false, ""},
+		{nil, 0, 0, irc.PRIVMSG, badcmsg, false, ""},
 
 		// Msgtype All + Scope
-		{nil, ALLKINDS, ALLSCOPES, irc.PRIVMSG, cmsg, true, ""},
-		{nil, ALLKINDS, PRIVATE, irc.PRIVMSG, umsg, true, ""},
-		{nil, ALLKINDS, PRIVATE, irc.PRIVMSG, cmsg, false, ""},
-		{nil, ALLKINDS, PUBLIC, irc.PRIVMSG, umsg, false, ""},
-		{nil, ALLKINDS, PUBLIC, irc.PRIVMSG, cmsg, true, ""},
+		{nil, 0, 0, irc.PRIVMSG, cmsg, true, ""},
+		{nil, 0, PRIVATE, irc.PRIVMSG, umsg, true, ""},
+		{nil, 0, PRIVATE, irc.PRIVMSG, cmsg, false, ""},
+		{nil, 0, PUBLIC, irc.PRIVMSG, umsg, false, ""},
+		{nil, 0, PUBLIC, irc.PRIVMSG, cmsg, true, ""},
 
 		// Msgtype Privmsg + Scope
-		{nil, PRIVMSG, ALLSCOPES, irc.PRIVMSG, cmsg, true, ""},
+		{nil, PRIVMSG, 0, irc.PRIVMSG, cmsg, true, ""},
 		{nil, PRIVMSG, PRIVATE, irc.PRIVMSG, umsg, true, ""},
 		{nil, PRIVMSG, PRIVATE, irc.PRIVMSG, cmsg, false, ""},
 		{nil, PRIVMSG, PUBLIC, irc.PRIVMSG, umsg, false, ""},
 		{nil, PRIVMSG, PUBLIC, irc.PRIVMSG, cmsg, true, ""},
-		{nil, PRIVMSG, ALLSCOPES, irc.NOTICE, cmsg, false, ""},
+		{nil, PRIVMSG, 0, irc.NOTICE, cmsg, false, ""},
 
 		// Msgtype Notice + Scope
-		{nil, NOTICE, ALLSCOPES, irc.NOTICE, cmsg, true, ""},
+		{nil, NOTICE, 0, irc.NOTICE, cmsg, true, ""},
 		{nil, NOTICE, PRIVATE, irc.NOTICE, umsg, true, ""},
 		{nil, NOTICE, PRIVATE, irc.NOTICE, cmsg, false, ""},
 		{nil, NOTICE, PUBLIC, irc.NOTICE, umsg, false, ""},
 		{nil, NOTICE, PUBLIC, irc.NOTICE, cmsg, true, ""},
-		{nil, NOTICE, ALLSCOPES, irc.PRIVMSG, cmsg, false, ""},
+		{nil, NOTICE, 0, irc.PRIVMSG, cmsg, false, ""},
 
 		// Uppercase
-		{nil, ALLKINDS, ALLSCOPES, irc.PRIVMSG, []string{"nick", "CMD"}, true, ""},
+		{nil, 0, 0, irc.PRIVMSG, []string{"nick", "CMD"}, true, ""},
 	}
 
 	for _, test := range table {
 		buffer.Reset()
 		handler := &commandHandler{}
+		if test.Kind == 0 {
+			test.Kind = ALLKINDS
+		}
+		if test.Scope == 0 {
+			test.Scope = ALLSCOPES
+		}
 		err := c.Register("", "", MkCmd(ext, dsc, cmd, handler,
 			test.Kind, test.Scope, test.CmdArgs...))
 		if err != nil {
@@ -1471,6 +1477,81 @@ func TestCmds_EachCmd(t *testing.T) {
 	success = c.Unregister("", "", "", "other")
 	if !success {
 		t.Error("other handler could not be unregistered.")
+	}
+}
+
+func TestCmds_DispatchAmbiguous(t *testing.T) {
+	t.Parallel()
+
+	dcore := dispatch.NewDispatchCore(nil)
+	c := NewCmds(prefix, dcore)
+	c.AddChannels(channel)
+	if c == nil {
+		t.Error("Cmds should not be nil.")
+	}
+
+	buffer, writer := newWriter()
+	state, store := setup()
+	locker := badLocker{state, store}
+	handler := &commandHandler{}
+
+	c.Register("", "", MkCmd("one", "d", "cmd", handler, ALLKINDS, ALLSCOPES))
+	c.Register("", "", MkCmd("two", "d", "cmd", handler, ALLKINDS, ALLSCOPES))
+
+	ev := &irc.Event{
+		Name: irc.PRIVMSG, Sender: host,
+		Args:        []string{"nick", "cmd"},
+		NetworkID:   netID,
+		NetworkInfo: netInfo,
+	}
+
+	c.Dispatch(0, writer, ev, locker)
+	c.WaitForHandlers()
+
+	if handler.called {
+		t.Error("Handler should not get called.")
+	}
+
+	err := chkStr(buffer.String(), "NOTICE nick :"+errFmtAmbiguousCmd)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestCmds_DispatchSpecific(t *testing.T) {
+	t.Parallel()
+
+	dcore := dispatch.NewDispatchCore(nil)
+	c := NewCmds(prefix, dcore)
+	c.AddChannels(channel)
+	if c == nil {
+		t.Error("Cmds should not be nil.")
+	}
+
+	_, writer := newWriter()
+	state, store := setup()
+	locker := badLocker{state, store}
+	handler1 := &commandHandler{}
+	handler2 := &commandHandler{}
+
+	c.Register("", "", MkCmd("one", "d", "cmd", handler1, ALLKINDS, ALLSCOPES))
+	c.Register("", "", MkCmd("two", "d", "cmd", handler2, ALLKINDS, ALLSCOPES))
+
+	ev := &irc.Event{
+		Name: irc.PRIVMSG, Sender: host,
+		Args:        []string{"#chan", ".two.cmd"},
+		NetworkID:   netID,
+		NetworkInfo: netInfo,
+	}
+
+	c.Dispatch(0, writer, ev, locker)
+	c.WaitForHandlers()
+
+	if handler1.called {
+		t.Error("Handler should not get called.")
+	}
+	if !handler2.called {
+		t.Error("Handler should get called.")
 	}
 }
 

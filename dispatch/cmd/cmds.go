@@ -11,6 +11,7 @@ duplicated.
 package cmd
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"reflect"
@@ -70,7 +71,9 @@ const (
 	errFmtInsuffGlobalFlags  = "Access Denied: (%v) global flag(s) required."
 	errFmtInsuffServerFlags  = "Access Denied: (%v) server flag(s) required."
 	errFmtInsuffChannelFlags = "Access Denied: (%v) channel flag(s) required."
-	errFmtCmdNotFound        = "Error: Command not found (%v), try \"help\"."
+	errFmtCmdNotFound        = `Error: Command not found (%v), try "help".`
+	errFmtAmbiguousCmd       = "Error: Ambiguous command (%v) found matching:" +
+		` [%v], try "help".`
 	errFmtUserNotRegistered  = "Error: User [%v] is not registered."
 	errFmtUserNotAuthed      = "Error: User [%v] is not authenticated."
 	errFmtUserNotFound       = "Error: User [%v] could not be found."
@@ -269,7 +272,7 @@ func (c *Cmds) Dispatch(overridePrefix rune, writer irc.Writer,
 	var command *Cmd
 	if command, err = c.lookupCmd(ev.NetworkID, ch, ext, cmd); err != nil {
 		writer.Notice(nick, err.Error())
-		return nil
+		return err
 	}
 
 	if 0 == (kind&command.Kind) || 0 == (scope&command.Scope) {
@@ -342,12 +345,19 @@ func (c *Cmds) lookupCmd(network, channel, ext, cmd string) (*Cmd, error) {
 	network = strings.ToLower(network)
 	channel = strings.ToLower(channel)
 
-	if cmd == ".nick" {
-		fmt.Println("WHAT")
-	}
-
 	cmdArr, ok := c.lookupCmdArr(network, channel, cmd)
 	if ok && cmdArr != nil {
+		if len(cmdArr) > 1 && len(ext) == 0 {
+			b := &bytes.Buffer{}
+			for i, command := range cmdArr {
+				if i > 0 {
+					b.WriteString(", ")
+				}
+				fmt.Fprintf(b, "%s.%s", command.Extension, command.Cmd)
+			}
+			return nil, fmt.Errorf(errFmtAmbiguousCmd, cmd, b)
+		}
+
 		for _, i := range cmdArr {
 			if i.Cmd == cmd && (len(ext) == 0 || i.Extension == ext) {
 				return i, nil
