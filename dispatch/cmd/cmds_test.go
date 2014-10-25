@@ -185,16 +185,19 @@ func setup() (state *data.State, store *data.Store) {
 	state.Update(&irc.Event{
 		Sender: server, Name: irc.RPL_WELCOME,
 		Args:        []string{"welcome", self},
+		NetworkID:   netID,
 		NetworkInfo: netInfo,
 	})
 	state.Update(&irc.Event{
 		Sender: self, Name: irc.JOIN,
 		Args:        []string{channel},
+		NetworkID:   netID,
 		NetworkInfo: netInfo,
 	})
 	state.Update(&irc.Event{
 		Sender: host, Name: irc.JOIN,
 		Args:        []string{channel},
+		NetworkID:   netID,
 		NetworkInfo: netInfo,
 	})
 	return
@@ -229,6 +232,8 @@ var core = dispatch.NewDispatchCore(nil)
 var prefix = '.'
 
 func TestCmds(t *testing.T) {
+	t.Parallel()
+
 	c := NewCmds(prefix, core)
 	if c == nil {
 		t.Fatal("Cmds should not be nil.")
@@ -261,13 +266,15 @@ func chkStr(msg, pattern string) error {
 }
 
 func TestCmds_Register(t *testing.T) {
+	t.Parallel()
+
 	c := NewCmds(prefix, core)
 
 	var handler = &commandHandler{}
 
 	var success bool
 	var err error
-	err = c.Register(GLOBAL, MkCmd(ext, dsc, cmd, nil, ALLKINDS, ALLSCOPES))
+	err = c.Register("", "", MkCmd(ext, dsc, cmd, nil, ALLKINDS, ALLSCOPES))
 	err = chkErr(err, errMsgHandlerRequired)
 	if err != nil {
 		t.Error(err)
@@ -279,7 +286,7 @@ func TestCmds_Register(t *testing.T) {
 
 	brokenCmd := helper()
 	brokenCmd.Cmd = ""
-	err = c.Register(GLOBAL, brokenCmd)
+	err = c.Register("", "", brokenCmd)
 	err = chkErr(err, errMsgCmdRequired)
 	if err != nil {
 		t.Error(err)
@@ -287,7 +294,7 @@ func TestCmds_Register(t *testing.T) {
 
 	brokenCmd = helper()
 	brokenCmd.Extension = ""
-	err = c.Register(GLOBAL, brokenCmd)
+	err = c.Register("", "", brokenCmd)
 	err = chkErr(err, errMsgExtRequired)
 	if err != nil {
 		t.Error(err)
@@ -295,123 +302,126 @@ func TestCmds_Register(t *testing.T) {
 
 	brokenCmd = helper()
 	brokenCmd.Description = ""
-	err = c.Register(GLOBAL, brokenCmd)
+	err = c.Register("", "", brokenCmd)
 	err = chkErr(err, errMsgDescRequired)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = c.Register(GLOBAL, helper("!!!"))
+	err = c.Register("", "", helper("!!!"))
 	err = chkErr(err, errFmtArgumentForm)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = c.Register(GLOBAL, helper("~#badarg"))
+	err = c.Register("", "", helper("~#badarg"))
 	err = chkErr(err, errFmtArgumentForm)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = c.Register(GLOBAL, helper("#*badarg"))
+	err = c.Register("", "", helper("#*badarg"))
 	err = chkErr(err, errFmtArgumentForm)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = c.Register(GLOBAL, helper("[opt]", "req"))
+	err = c.Register("", "", helper("[opt]", "req"))
 	err = chkErr(err, errFmtArgumentOrderReq)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = c.Register(GLOBAL, helper("req...", "[opt]"))
+	err = c.Register("", "", helper("req...", "[opt]"))
 	err = chkErr(err, errFmtArgumentOrderOpt)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = c.Register(GLOBAL, helper("name", "[name]"))
+	err = c.Register("", "", helper("name", "[name]"))
 	err = chkErr(err, errFmtArgumentDupName)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = c.Register(GLOBAL, helper("vrgs...", "vrgs2..."))
+	err = c.Register("", "", helper("vrgs...", "vrgs2..."))
 	err = chkErr(err, errFmtArgumentDupVargs)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = c.Register(GLOBAL, helper("[opt]", "#chan1"))
+	err = c.Register("", "", helper("[opt]", "#chan1"))
 	err = chkErr(err, errFmtArgumentOrderChan)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = c.Register(GLOBAL, helper("vargs...", "#chan1"))
+	err = c.Register("", "", helper("vargs...", "#chan1"))
 	err = chkErr(err, errFmtArgumentOrderChan)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = c.Register(GLOBAL, helper("req", "#chan1"))
+	err = c.Register("", "", helper("req", "#chan1"))
 	err = chkErr(err, errFmtArgumentOrderChan)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = c.Register(GLOBAL, helper("#chan1", "#chan2"))
+	err = c.Register("", "", helper("#chan1", "#chan2"))
 	err = chkErr(err, errFmtArgumentDupChan)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = c.Register(GLOBAL, helper())
+	err = c.Register("", "", helper())
 	if err != nil {
 		t.Error("Registration failed:", err)
 	}
 
-	err = c.Register(GLOBAL, helper())
+	err = c.Register("", "", helper())
 	err = chkErr(err, errFmtDuplicateCmd)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = c.Register("otherserv", helper())
-	err = chkErr(err, errFmtDuplicateCmd)
+	err = c.Register("network", "#channel", helper())
 	if err != nil {
-		t.Error(err)
+		t.Error("Filtered egistration failed:", err)
 	}
 
-	success = c.Unregister(GLOBAL, cmd)
+	success = c.Unregister("", "", "", cmd)
 	if !success {
 		t.Error("Should have unregistered successfully.")
 	}
-	success = c.Unregister(GLOBAL, cmd)
+	success = c.Unregister("", "", "", cmd)
 	if success {
 		t.Error("Should not be able to double unregister.")
 	}
 }
 
-func TestCmds_RegisterProtected(t *testing.T) {
+func TestCmds_RegisterAuthed(t *testing.T) {
+	t.Parallel()
+
 	c := NewCmds(prefix, core)
 
 	handler := &commandHandler{}
 	var success bool
 	var err error
-	err = c.Register(GLOBAL,
+	err = c.Register("", "",
 		MkAuthCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES, 100, "ab"))
 	if err != nil {
 		t.Error("Unexpected Error:", err)
 	}
-	success = c.Unregister(GLOBAL, cmd)
+	success = c.Unregister("", "", "", cmd)
 	if !success {
 		t.Error("Should have unregistered successfully.")
 	}
 }
 
 func TestCmds_Dispatch(t *testing.T) {
+	t.Parallel()
+
 	dcore := dispatch.NewDispatchCore(nil)
 	c := NewCmds(prefix, dcore)
 	c.AddChannels(channel)
@@ -530,7 +540,7 @@ func TestCmds_Dispatch(t *testing.T) {
 	for _, test := range table {
 		buffer.Reset()
 		handler := &commandHandler{}
-		err := c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler,
+		err := c.Register("", "", MkCmd(ext, dsc, cmd, handler,
 			test.Kind, test.Scope, test.CmdArgs...))
 		if err != nil {
 			t.Errorf("Failed to register test: [%v]\n(%v)", err, test)
@@ -541,9 +551,10 @@ func TestCmds_Dispatch(t *testing.T) {
 			Sender:      host,
 			Name:        test.Name,
 			Args:        test.MsgArgs,
+			NetworkID:   netID,
 			NetworkInfo: netInfo,
 		}
-		err = c.Dispatch(server, 0, writer, ev, locker)
+		err = c.Dispatch(0, writer, ev, locker)
 		c.WaitForHandlers()
 		if handler.called != test.Called {
 			if handler.called {
@@ -618,7 +629,7 @@ func TestCmds_Dispatch(t *testing.T) {
 				test.ErrMsg, test)
 		}
 
-		success := c.Unregister(GLOBAL, cmd)
+		success := c.Unregister("", "", "", cmd)
 		if !success {
 			t.Errorf("Failed to unregister test: %v", test)
 		}
@@ -626,6 +637,8 @@ func TestCmds_Dispatch(t *testing.T) {
 }
 
 func TestCmds_DispatchAuthed(t *testing.T) {
+	t.Parallel()
+
 	c := NewCmds(prefix, core)
 
 	var table = []struct {
@@ -652,7 +665,7 @@ func TestCmds_DispatchAuthed(t *testing.T) {
 		buffer.Reset()
 		handler := &commandHandler{}
 
-		err := c.Register(GLOBAL, MkAuthCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES,
+		err := c.Register("", "", MkAuthCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES,
 			test.LevelReq, test.Flags))
 		if err != nil {
 			t.Errorf("Failed to register test: [%v]\n(%v)", err, test)
@@ -663,10 +676,11 @@ func TestCmds_DispatchAuthed(t *testing.T) {
 			Sender:      test.Sender,
 			Name:        irc.PRIVMSG,
 			Args:        []string{channel, string(prefix) + cmd},
+			NetworkID:   netID,
 			NetworkInfo: netInfo,
 		}
 
-		err = c.Dispatch(server, 0, writer, ev, locker)
+		err = c.Dispatch(0, writer, ev, locker)
 		c.WaitForHandlers()
 		if handler.called != test.Called {
 			if handler.called {
@@ -722,7 +736,7 @@ func TestCmds_DispatchAuthed(t *testing.T) {
 				test.ErrMsg, test)
 		}
 
-		success := c.Unregister(GLOBAL, cmd)
+		success := c.Unregister("", "", "", cmd)
 		if !success {
 			t.Errorf("Failed to unregister test: %v", test)
 		}
@@ -730,6 +744,8 @@ func TestCmds_DispatchAuthed(t *testing.T) {
 }
 
 func TestCmds_DispatchNils(t *testing.T) {
+	t.Parallel()
+
 	c := NewCmds(prefix, core)
 	_, writer := newWriter()
 	locker := badLocker{}
@@ -744,26 +760,26 @@ func TestCmds_DispatchNils(t *testing.T) {
 
 	handler := &commandHandler{}
 
-	err := c.Register(GLOBAL,
+	err := c.Register("", "",
 		MkAuthCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES, 100, "a"))
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
-	err = c.Dispatch(server, 0, writer, ev, locker)
+	err = c.Dispatch(0, writer, ev, locker)
 	c.WaitForHandlers()
 	err = chkErr(err, errMsgStoreDisabled)
 	if err != nil {
 		t.Error(err)
 	}
-	if !c.Unregister(GLOBAL, cmd) {
+	if !c.Unregister("", "", "", cmd) {
 		t.Error("Unregistration failed.")
 	}
 
-	err = c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES))
+	err = c.Register("", "", MkCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES))
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
-	err = c.Dispatch(server, 0, writer, ev, locker)
+	err = c.Dispatch(0, writer, ev, locker)
 	c.WaitForHandlers()
 	if handler.channel != nil {
 		t.Error("Channel should just be nil when state is disabled.")
@@ -774,12 +790,14 @@ func TestCmds_DispatchNils(t *testing.T) {
 	if handler.usrchanmodes != nil {
 		t.Error("User chan modes should just be nil when state is disabled.")
 	}
-	if !c.Unregister(GLOBAL, cmd) {
+	if !c.Unregister("", "", "", cmd) {
 		t.Error("Unregistration failed.")
 	}
 }
 
 func TestCmds_DispatchReturns(t *testing.T) {
+	t.Parallel()
+
 	c := NewCmds(prefix, core)
 	buffer, writer := newWriter()
 	locker := badLocker{}
@@ -793,7 +811,7 @@ func TestCmds_DispatchReturns(t *testing.T) {
 
 	handler := &errorHandler{}
 
-	err := c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES))
+	err := c.Register("", "", MkCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES))
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
@@ -818,7 +836,7 @@ func TestCmds_DispatchReturns(t *testing.T) {
 	for _, test := range errors {
 		buffer.Reset()
 		handler.Error = test.Error
-		err = c.Dispatch(server, 0, writer, ev, locker)
+		err = c.Dispatch(0, writer, ev, locker)
 		c.WaitForHandlers()
 		err = chkStr(string(buffer.Bytes()), `NOTICE nick :`+test.ErrorMsg)
 		if err != nil {
@@ -827,13 +845,15 @@ func TestCmds_DispatchReturns(t *testing.T) {
 		}
 	}
 
-	success := c.Unregister(GLOBAL, cmd)
+	success := c.Unregister("", "", "", cmd)
 	if !success {
 		t.Error("Handler could not be unregistered.")
 	}
 }
 
 func TestCmds_DispatchChannel(t *testing.T) {
+	t.Parallel()
+
 	c := NewCmds(prefix, core)
 
 	_, writer := newWriter()
@@ -847,14 +867,14 @@ func TestCmds_DispatchChannel(t *testing.T) {
 
 	handler := &commandHandler{}
 
-	err := c.Register(GLOBAL,
+	err := c.Register("", "",
 		MkCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES, "#channelArg"))
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
 
 	ev.Args = []string{channel, string(prefix) + cmd}
-	err = c.Dispatch(server, 0, writer, ev, locker)
+	err = c.Dispatch(0, writer, ev, locker)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -869,7 +889,7 @@ func TestCmds_DispatchChannel(t *testing.T) {
 	handler.targChan = nil
 	handler.args = nil
 	ev.Args = []string{channel, string(prefix) + cmd + " " + channel}
-	err = c.Dispatch(server, 0, writer, ev, locker)
+	err = c.Dispatch(0, writer, ev, locker)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -884,7 +904,7 @@ func TestCmds_DispatchChannel(t *testing.T) {
 	handler.targChan = nil
 	handler.args = nil
 	ev.Args = []string{nick, cmd}
-	err = c.Dispatch(server, 0, writer, ev, locker)
+	err = c.Dispatch(0, writer, ev, locker)
 	c.WaitForHandlers()
 	err = chkErr(err, errFmtNArguments)
 	if err != nil {
@@ -892,7 +912,7 @@ func TestCmds_DispatchChannel(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, cmd + " " + channel}
-	err = c.Dispatch(server, 0, writer, ev, badLocker{nil, store})
+	err = c.Dispatch(0, writer, ev, badLocker{nil, store})
 	c.WaitForHandlers()
 	err = chkErr(err, errMsgStateDisabled)
 	if err != nil {
@@ -902,7 +922,7 @@ func TestCmds_DispatchChannel(t *testing.T) {
 	handler.targChan = nil
 	handler.args = nil
 	ev.Args = []string{nick, cmd + " " + channel}
-	err = c.Dispatch(server, 0, writer, ev, locker)
+	err = c.Dispatch(0, writer, ev, locker)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -915,7 +935,7 @@ func TestCmds_DispatchChannel(t *testing.T) {
 	}
 
 	ev.Args = []string{channel, string(prefix) + cmd + " " + channel + " arg"}
-	err = c.Dispatch(server, 0, writer, ev, locker)
+	err = c.Dispatch(0, writer, ev, locker)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtNArguments, errAtMost, 1, "%v"))
 	if err != nil {
@@ -923,20 +943,22 @@ func TestCmds_DispatchChannel(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, cmd}
-	err = c.Dispatch(server, 0, writer, ev, locker)
+	err = c.Dispatch(0, writer, ev, locker)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtNArguments, errAtLeast, 1, "%v"))
 	if err != nil {
 		t.Error(err)
 	}
 
-	success := c.Unregister(GLOBAL, cmd)
+	success := c.Unregister("", "", "", cmd)
 	if !success {
 		t.Error("Handler could not be unregistered.")
 	}
 }
 
 func TestCmds_DispatchUsers(t *testing.T) {
+	t.Parallel()
+
 	c := NewCmds(prefix, core)
 
 	_, writer := newWriter()
@@ -945,12 +967,13 @@ func TestCmds_DispatchUsers(t *testing.T) {
 
 	ev := &irc.Event{
 		Sender: host, Name: irc.PRIVMSG,
+		NetworkID:   netID,
 		NetworkInfo: netInfo,
 	}
 
 	handler := &commandHandler{}
 
-	err := c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES,
+	err := c.Register("", "", MkCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES,
 		"*user1", "~user2", "[*user3]", "~users..."),
 	)
 	if err != nil {
@@ -958,7 +981,7 @@ func TestCmds_DispatchUsers(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, cmd + " nick nick"}
-	err = c.Dispatch(server, 0, writer, ev, locker)
+	err = c.Dispatch(0, writer, ev, locker)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -975,7 +998,7 @@ func TestCmds_DispatchUsers(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, cmd + " *user nick"}
-	err = c.Dispatch(server, 0, writer, ev, locker)
+	err = c.Dispatch(0, writer, ev, locker)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -989,7 +1012,7 @@ func TestCmds_DispatchUsers(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, cmd + " *user nick *user"}
-	err = c.Dispatch(server, 0, writer, ev, locker)
+	err = c.Dispatch(0, writer, ev, locker)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -1006,7 +1029,7 @@ func TestCmds_DispatchUsers(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, cmd + " *user nick *user nick nick"}
-	err = c.Dispatch(server, 0, writer, ev, locker)
+	err = c.Dispatch(0, writer, ev, locker)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -1027,13 +1050,15 @@ func TestCmds_DispatchUsers(t *testing.T) {
 		t.Error("Unexpected number of users:", len(u))
 	}
 
-	success := c.Unregister(GLOBAL, cmd)
+	success := c.Unregister("", "", "", cmd)
 	if !success {
 		t.Error("Handler could not be unregistered.")
 	}
 }
 
 func TestCmds_DispatchErrors(t *testing.T) {
+	t.Parallel()
+
 	c := NewCmds(prefix, core)
 
 	_, writer := newWriter()
@@ -1042,11 +1067,12 @@ func TestCmds_DispatchErrors(t *testing.T) {
 
 	ev := &irc.Event{
 		Sender: host, Name: irc.PRIVMSG,
+		NetworkID:   netID,
 		NetworkInfo: netInfo,
 	}
 
 	handler := &commandHandler{}
-	err := c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES,
+	err := c.Register("", "", MkCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES,
 		"*user1", "~user2", "[*user3]", "~users..."),
 	)
 	if err != nil {
@@ -1054,7 +1080,7 @@ func TestCmds_DispatchErrors(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, cmd + " *baduser nick"}
-	err = c.Dispatch(server, 0, writer, ev, locker)
+	err = c.Dispatch(0, writer, ev, locker)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtUserNotRegistered, "baduser"))
 	if err != nil {
@@ -1062,7 +1088,7 @@ func TestCmds_DispatchErrors(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, cmd + " * nick"}
-	err = c.Dispatch(server, 0, writer, ev, locker)
+	err = c.Dispatch(0, writer, ev, locker)
 	c.WaitForHandlers()
 	err = chkErr(err, errMsgMissingUsername)
 	if err != nil {
@@ -1070,7 +1096,7 @@ func TestCmds_DispatchErrors(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, cmd + " self nick"}
-	err = c.Dispatch(server, 0, writer, ev, locker)
+	err = c.Dispatch(0, writer, ev, locker)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtUserNotAuthed, "self"))
 	if err != nil {
@@ -1078,7 +1104,7 @@ func TestCmds_DispatchErrors(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, cmd + " nick badnick"}
-	err = c.Dispatch(server, 0, writer, ev, locker)
+	err = c.Dispatch(0, writer, ev, locker)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtUserNotFound, "badnick"))
 	if err != nil {
@@ -1086,7 +1112,7 @@ func TestCmds_DispatchErrors(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, cmd + " nick nick nick badnick"}
-	err = c.Dispatch(server, 0, writer, ev, locker)
+	err = c.Dispatch(0, writer, ev, locker)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtUserNotFound, "badnick"))
 	if err != nil {
@@ -1094,7 +1120,7 @@ func TestCmds_DispatchErrors(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, cmd + " *user nick"}
-	err = c.Dispatch(server, 0, writer, ev, badLocker{state, nil})
+	err = c.Dispatch(0, writer, ev, badLocker{state, nil})
 	c.WaitForHandlers()
 	err = chkErr(err, errMsgStoreDisabled)
 	if err != nil {
@@ -1102,38 +1128,40 @@ func TestCmds_DispatchErrors(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, cmd + " nick nick"}
-	err = c.Dispatch(server, 0, writer, ev, badLocker{nil, store})
+	err = c.Dispatch(0, writer, ev, badLocker{nil, store})
 	c.WaitForHandlers()
 	err = chkErr(err, errMsgStateDisabled)
 	if err != nil {
 		t.Error(err)
 	}
 
-	success := c.Unregister(GLOBAL, cmd)
+	success := c.Unregister("", "", "", cmd)
 	if !success {
 		t.Error("Handler could not be unregistered.")
 	}
 
-	err = c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES, "~user1"))
+	err = c.Register("", "", MkCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES, "~user1"))
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
 
 	ev.Args = []string{nick, cmd + " nick"}
-	err = c.Dispatch(server, 0, writer, ev, badLocker{nil, store})
+	err = c.Dispatch(0, writer, ev, badLocker{nil, store})
 	c.WaitForHandlers()
 	err = chkErr(err, errMsgStateDisabled)
 	if err != nil {
 		t.Error(err)
 	}
 
-	success = c.Unregister(GLOBAL, cmd)
+	success = c.Unregister("", "", "", cmd)
 	if !success {
 		t.Error("Handler could not be unregistered.")
 	}
 }
 
 func TestCmds_DispatchVariadicUsers(t *testing.T) {
+	t.Parallel()
+
 	c := NewCmds(prefix, core)
 
 	_, writer := newWriter()
@@ -1142,12 +1170,13 @@ func TestCmds_DispatchVariadicUsers(t *testing.T) {
 
 	ev := &irc.Event{
 		Sender: host, Name: irc.PRIVMSG,
+		NetworkID:   netID,
 		NetworkInfo: netInfo,
 	}
 
 	handler := &commandHandler{}
 	var err error
-	err = c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES,
+	err = c.Register("", "", MkCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES,
 		"*users..."),
 	)
 	if err != nil {
@@ -1155,7 +1184,7 @@ func TestCmds_DispatchVariadicUsers(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, cmd + " *user nick"}
-	err = c.Dispatch(server, 0, writer, ev, locker)
+	err = c.Dispatch(0, writer, ev, locker)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -1188,7 +1217,7 @@ func TestCmds_DispatchVariadicUsers(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, cmd + " nick nick badnick"}
-	err = c.Dispatch(server, 0, writer, ev, locker)
+	err = c.Dispatch(0, writer, ev, locker)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtUserNotFound, "badnick"))
 	if err != nil {
@@ -1196,7 +1225,7 @@ func TestCmds_DispatchVariadicUsers(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, cmd + " nick nick self"}
-	err = c.Dispatch(server, 0, writer, ev, locker)
+	err = c.Dispatch(0, writer, ev, locker)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtUserNotAuthed, "self"))
 	if err != nil {
@@ -1204,20 +1233,22 @@ func TestCmds_DispatchVariadicUsers(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, cmd + " nick nick *badusername"}
-	err = c.Dispatch(server, 0, writer, ev, locker)
+	err = c.Dispatch(0, writer, ev, locker)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtUserNotRegistered, "badusername"))
 	if err != nil {
 		t.Error(err)
 	}
 
-	success := c.Unregister(GLOBAL, cmd)
+	success := c.Unregister("", "", "", cmd)
 	if !success {
 		t.Error("Handler could not be unregistered.")
 	}
 }
 
 func TestCmds_DispatchMixUserAndChan(t *testing.T) {
+	t.Parallel()
+
 	c := NewCmds(prefix, core)
 
 	_, writer := newWriter()
@@ -1226,12 +1257,13 @@ func TestCmds_DispatchMixUserAndChan(t *testing.T) {
 
 	ev := &irc.Event{
 		Sender: host, Name: irc.PRIVMSG,
+		NetworkID:   netID,
 		NetworkInfo: netInfo,
 	}
 
 	handler := &commandHandler{}
 	var err error
-	err = c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES,
+	err = c.Register("", "", MkCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES,
 		"#chan", "~user"),
 	)
 	if err != nil {
@@ -1239,7 +1271,7 @@ func TestCmds_DispatchMixUserAndChan(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, cmd + " " + channel + " nick"}
-	err = c.Dispatch(server, 0, writer, ev, locker)
+	err = c.Dispatch(0, writer, ev, locker)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error(err)
@@ -1249,13 +1281,15 @@ func TestCmds_DispatchMixUserAndChan(t *testing.T) {
 		t.Error("The user argument was nil.")
 	}
 
-	success := c.Unregister(GLOBAL, cmd)
+	success := c.Unregister("", "", "", cmd)
 	if !success {
 		t.Error("Handler could not be unregistered.")
 	}
 }
 
 func TestCmds_DispatchReflection(t *testing.T) {
+	t.Parallel()
+
 	c := NewCmds(prefix, core)
 	var err error
 
@@ -1268,7 +1302,7 @@ func TestCmds_DispatchReflection(t *testing.T) {
 
 	cmds := []string{"reflect", "badargnum", "noreturn", "badargs"}
 	for _, command := range cmds {
-		err = c.Register(GLOBAL, MkCmd(ext, dsc, command, handler, ALLKINDS, ALLSCOPES))
+		err = c.Register("", "", MkCmd(ext, dsc, command, handler, ALLKINDS, ALLSCOPES))
 		if err != nil {
 			t.Error("Unexpected:", command, err)
 		}
@@ -1277,9 +1311,10 @@ func TestCmds_DispatchReflection(t *testing.T) {
 	ev := &irc.Event{
 		Name: irc.PRIVMSG, Sender: host,
 		Args:        []string{"a", "reflect"},
+		NetworkID:   netID,
 		NetworkInfo: netInfo,
 	}
-	err = c.Dispatch(server, 0, writer, ev, locker)
+	err = c.Dispatch(0, writer, ev, locker)
 	c.WaitForHandlers()
 
 	if handler.CalledBad {
@@ -1294,7 +1329,7 @@ func TestCmds_DispatchReflection(t *testing.T) {
 
 	handler.Called, handler.CalledBad = false, false
 	ev.Args = []string{"a", "badargnum"}
-	err = c.Dispatch(server, 0, writer, ev, locker)
+	err = c.Dispatch(0, writer, ev, locker)
 	c.WaitForHandlers()
 
 	if !handler.CalledBad {
@@ -1306,7 +1341,7 @@ func TestCmds_DispatchReflection(t *testing.T) {
 
 	handler.Called, handler.CalledBad = false, false
 	ev.Args = []string{"a", "noreturn"}
-	err = c.Dispatch(server, 0, writer, ev, locker)
+	err = c.Dispatch(0, writer, ev, locker)
 	c.WaitForHandlers()
 
 	if !handler.CalledBad {
@@ -1318,7 +1353,7 @@ func TestCmds_DispatchReflection(t *testing.T) {
 
 	handler.Called, handler.CalledBad = false, false
 	ev.Args = []string{"a", "badargs"}
-	err = c.Dispatch(server, 0, writer, ev, locker)
+	err = c.Dispatch(0, writer, ev, locker)
 	c.WaitForHandlers()
 
 	if !handler.CalledBad {
@@ -1329,7 +1364,7 @@ func TestCmds_DispatchReflection(t *testing.T) {
 	}
 
 	for _, command := range cmds {
-		success := c.Unregister(GLOBAL, command)
+		success := c.Unregister("", "", "", command)
 		if !success {
 			t.Error(command, "handler could not be unregistered.")
 		}
@@ -1337,6 +1372,8 @@ func TestCmds_DispatchReflection(t *testing.T) {
 }
 
 func TestCmds_DispatchOverridePrefix(t *testing.T) {
+	t.Parallel()
+
 	c := NewCmds(prefix, core)
 	var err error
 
@@ -1347,17 +1384,18 @@ func TestCmds_DispatchOverridePrefix(t *testing.T) {
 	handler := &commandHandler{}
 	ev := &irc.Event{
 		Name: irc.PRIVMSG, Sender: host,
+		NetworkID:   netID,
 		NetworkInfo: netInfo,
 	}
 
-	err = c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES))
+	err = c.Register("", "", MkCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES))
 	if err != nil {
 		t.Error("Unexpected:", cmd, err)
 	}
 
 	handler.called = false
 	ev.Args = []string{channel, string(prefix) + cmd}
-	err = c.Dispatch(server, 0, writer, ev, locker)
+	err = c.Dispatch(0, writer, ev, locker)
 	c.WaitForHandlers()
 
 	if !handler.called {
@@ -1366,7 +1404,7 @@ func TestCmds_DispatchOverridePrefix(t *testing.T) {
 
 	handler.called = false
 	ev.Args = []string{channel, string(prefix) + cmd}
-	err = c.Dispatch(server, '!', writer, ev, locker)
+	err = c.Dispatch('!', writer, ev, locker)
 	c.WaitForHandlers()
 
 	if handler.called {
@@ -1375,7 +1413,7 @@ func TestCmds_DispatchOverridePrefix(t *testing.T) {
 
 	handler.called = false
 	ev.Args = []string{channel, "!" + cmd}
-	err = c.Dispatch(server, '!', writer, ev, locker)
+	err = c.Dispatch('!', writer, ev, locker)
 	c.WaitForHandlers()
 
 	if !handler.called {
@@ -1384,36 +1422,40 @@ func TestCmds_DispatchOverridePrefix(t *testing.T) {
 
 	handler.called = false
 	ev.Args = []string{channel, ":" + cmd}
-	err = c.Dispatch(server, '!', writer, ev, locker)
+	err = c.Dispatch('!', writer, ev, locker)
 	c.WaitForHandlers()
 
 	if handler.called {
 		t.Error("Expected no call to Cmd.")
 	}
 
-	success := c.Unregister(GLOBAL, cmd)
+	success := c.Unregister("", "", "", cmd)
 	if !success {
 		t.Error(cmd, "handler could not be unregistered.")
 	}
 }
 
 func TestCmds_EachCmd(t *testing.T) {
+	t.Parallel()
+
 	c := NewCmds(prefix, core)
 	var err error
 
 	handler := &errorHandler{}
 
-	err = c.Register(GLOBAL, MkCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES))
+	err = c.Register("", "", MkCmd(ext, dsc, cmd, handler, ALLKINDS, ALLSCOPES))
 	if err != nil {
 		t.Error("Unexpected:", err)
 	}
-	err = c.Register(GLOBAL, MkCmd(ext, dsc, "other", handler, ALLKINDS, ALLSCOPES))
+	err = c.Register("", "", MkCmd(ext, dsc, "other", handler,
+		ALLKINDS, ALLSCOPES))
+
 	if err != nil {
 		t.Error("Unexpected:", err)
 	}
 
 	visited := 0
-	EachCmd(func(command *Cmd) bool {
+	c.EachCmd("", "", func(command Cmd) bool {
 		visited++
 		return true
 	})
@@ -1422,11 +1464,11 @@ func TestCmds_EachCmd(t *testing.T) {
 		t.Error("Expected to stop after one iteration.")
 	}
 
-	success := c.Unregister(GLOBAL, cmd)
+	success := c.Unregister("", "", "", cmd)
 	if !success {
 		t.Error(cmd, "handler could not be unregistered.")
 	}
-	success = c.Unregister(GLOBAL, "other")
+	success = c.Unregister("", "", "", "other")
 	if !success {
 		t.Error("other handler could not be unregistered.")
 	}
@@ -1444,6 +1486,8 @@ func (l *lockWriter) Write(b []byte) (int, error) {
 }
 
 func TestCmds_Panic(t *testing.T) {
+	t.Parallel()
+
 	ch := make(chan struct{}, 1)
 	lk := &lockWriter{&bytes.Buffer{}, ch}
 	logger := log15.New()
@@ -1461,10 +1505,10 @@ func TestCmds_Panic(t *testing.T) {
 	}
 
 	tmpCmd := MkCmd("panic", "panic desc", "panic", handler, ALLKINDS, ALLSCOPES)
-	c.Register(GLOBAL, tmpCmd)
+	c.Register("", "", tmpCmd)
 
 	ev := irc.NewEvent("", netInfo, irc.PRIVMSG, host, self, "panic")
-	err := c.Dispatch(server, 0, nil, ev, locker)
+	err := c.Dispatch(0, nil, ev, locker)
 	if err != nil {
 		t.Error(err)
 	}

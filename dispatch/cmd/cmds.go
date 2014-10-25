@@ -30,8 +30,6 @@ type MsgScope int
 
 // Constants used for defining the targets/scope of a command.
 const (
-	// Global is the bot-global registration "server name".
-	GLOBAL = "GLOBAL"
 	// PRIVMSG only listens to irc.PRIVMSG events.
 	PRIVMSG MsgKind = 0x1
 	// NOTICE only listens to irc.NOTICE events.
@@ -100,27 +98,6 @@ const (
 		`allowed (given: %v)`
 )
 
-var (
-	// globalCmdRegistry is a singleton throughout the entire bot, and
-	// ensures that a command can only be registered once for each server.
-	globalCmdRegistry = make(map[string]*Cmd)
-	// protectGlobalReg protects the global registry.
-	protectGlobalReg sync.RWMutex
-)
-
-// EachCmd allows safe iteration through each command in the registry. The
-// return value of the callback can be used to stop iteration by returning true.
-func EachCmd(fn func(*Cmd) bool) {
-	protectGlobalReg.RLock()
-	defer protectGlobalReg.RUnlock()
-
-	for _, cmd := range globalCmdRegistry {
-		if fn(cmd) {
-			break
-		}
-	}
-}
-
 // CmdHandler is the interface that Cmds expects structs to implement
 // in order to be able to handle command events. Although this interface must
 // be implemented for fallback, if the type has a method with the same name as
@@ -141,15 +118,15 @@ type CmdHandler interface {
 }
 
 // commandTable is used to store all the string->command assocations.
-type commandTable map[string]*Cmd
+type commandTable map[string][]*Cmd
 
 // Cmds allows for registration of commands that can involve user access,
 // and provides a rich programming interface for command handling.
 type Cmds struct {
 	*dispatch.DispatchCore
-	prefix      rune
-	commands    commandTable
-	protectCmds sync.RWMutex
+	prefix   rune
+	commands commandTable
+	sync.RWMutex
 }
 
 // NewCmds initializes a cmds.
@@ -161,30 +138,12 @@ func NewCmds(prefix rune, core *dispatch.DispatchCore) *Cmds {
 	}
 }
 
-// Register register's a command with the bot. See documentation for
+// Register a command with the bot. See documentation for
 // Cmd for information about how to use this method, as well as see
-// the documentation for CmdHandler for how to respond to commands
-// registered with a cmds.
-//
-// The server parameter should be the name of the server that's registering this
-// command. The special constant GLOBAL should be used for commands that are
-// global to the bot. This ensures that no command can be registered to a single
-// server twice.
-func (c *Cmds) Register(server string, cmd *Cmd) error {
-	regName := makeIdentifier(server, cmd.Cmd)
-	globalRegName := makeIdentifier(GLOBAL, cmd.Cmd)
-
-	protectGlobalReg.RLock()
-	_, hasServer := globalCmdRegistry[regName]
-	_, hasGlobal := globalCmdRegistry[globalRegName]
-	protectGlobalReg.RUnlock()
-	if hasServer {
-		return fmt.Errorf(errFmtDuplicateCmd, regName)
-	}
-	if hasGlobal {
-		return fmt.Errorf(errFmtDuplicateCmd, globalRegName)
-	}
-
+// the documentation for CmdHandler for how to respond to commands issued by
+// users. Network and Channel may be given to restrict which networks/channels
+// this event will fire on.
+func (c *Cmds) Register(network, channel string, cmd *Cmd) error {
 	switch {
 	case len(cmd.Cmd) == 0:
 		return errors.New(errMsgCmdRequired)
@@ -200,39 +159,58 @@ func (c *Cmds) Register(server string, cmd *Cmd) error {
 		return err
 	}
 
-	protectGlobalReg.Lock()
-	c.protectCmds.Lock()
-	defer protectGlobalReg.Unlock()
-	defer c.protectCmds.Unlock()
-	globalCmdRegistry[regName] = cmd
-	c.commands[cmd.Cmd] = cmd
+	key := mkKey(network, channel, cmd.Cmd)
+	c.Lock()
+	defer c.Unlock()
+	if cmdArr, ok := c.commands[key]; ok {
+		for _, command := range cmdArr {
+			if command.Extension == cmd.Extension && command.Cmd == cmd.Cmd {
+				return fmt.Errorf(errFmtDuplicateCmd, cmd.Cmd)
+			}
+		}
+
+		cmdArr = append(cmdArr, cmd)
+		c.commands[key] = cmdArr
+	} else {
+		c.commands[key] = []*Cmd{cmd}
+	}
+
 	return nil
 }
 
-// Unregister unregisters a command from the bot. server should be the name
-// of a server it was registered to, or the GLOBAL constant.
-func (c *Cmds) Unregister(server, cmd string) (found bool) {
-	protectGlobalReg.Lock()
-	c.protectCmds.Lock()
-	defer c.protectCmds.Unlock()
-	defer protectGlobalReg.Unlock()
+// Unregister a command from the bot. If ext is left blank and there are
+// multiple event handlers registered under the name 'cmd' it will unregister
+// all of them, the safe bet is to provide the ext parameter.
+func (c *Cmds) Unregister(network, channel, ext, cmd string) (found bool) {
+	c.Lock()
+	defer c.Unlock()
 
-	globalCmd := makeIdentifier(server, cmd)
+	key := mkKey(network, channel, cmd)
+	cmdArr, ok := c.commands[key]
+	if !ok {
+		return false
+	}
 
-	if _, has := globalCmdRegistry[globalCmd]; has {
-		delete(globalCmdRegistry, globalCmd)
-		found = true
+	if len(ext) == 0 {
+		delete(c.commands, key)
+		return true
 	}
-	if _, has := c.commands[cmd]; has {
-		delete(c.commands, cmd)
-		found = true
+
+	for j, i := range cmdArr {
+		if i.Extension == ext {
+			ln := len(cmdArr) - 1
+			cmdArr[j], cmdArr[ln] = cmdArr[ln], cmdArr[j]
+			c.commands[key] = cmdArr[:ln]
+			return true
+		}
 	}
-	return
+
+	return false
 }
 
 // Dispatch dispatches an IrcEvent into the cmds event handlers.
-func (c *Cmds) Dispatch(networkID string, overridePrefix rune,
-	writer irc.Writer, ev *irc.Event, locker data.Locker) (err error) {
+func (c *Cmds) Dispatch(overridePrefix rune, writer irc.Writer,
+	ev *irc.Event, locker data.Locker) (err error) {
 
 	// Filter non privmsg/notice
 	var kind MsgKind
@@ -274,12 +252,23 @@ func (c *Cmds) Dispatch(networkID string, overridePrefix rune,
 		scope = PUBLIC
 	}
 
+	// Check if they've supplied the more specific ext.cmd form.
+	var ext string
+	if ln, dot := len(cmd), strings.IndexRune(cmd, '.'); ln >= 3 && dot > 0 {
+		if ln-dot-1 == 0 {
+			return nil
+		}
+		ext = cmd[:dot]
+		cmd = cmd[dot+1:]
+	}
+
+	c.RLock()
+	defer c.RUnlock()
+
+	// Find the command in our "db"
 	var command *Cmd
-	var ok bool
-	c.protectCmds.RLock()
-	defer c.protectCmds.RUnlock()
-	if command, ok = c.commands[cmd]; !ok {
-		//writer.Noticef(nick, errFmtCmdNotFound, cmd)
+	if command, err = c.lookupCmd(ev.NetworkID, ch, ext, cmd); err != nil {
+		writer.Notice(nick, err.Error())
 		return nil
 	}
 
@@ -287,6 +276,7 @@ func (c *Cmds) Dispatch(networkID string, overridePrefix rune,
 		return nil
 	}
 
+	// Start building up the event.
 	var cmdEv = &Event{
 		locker: locker,
 		Event:  ev,
@@ -297,13 +287,13 @@ func (c *Cmds) Dispatch(networkID string, overridePrefix rune,
 		args = fields[1:]
 	}
 
-	state := locker.OpenState(networkID)
+	state := locker.OpenState(ev.NetworkID)
 	store := locker.OpenReadStore()
 	cmdEv.State = state
 	cmdEv.Store = store
 
 	if command.RequireAuth {
-		if cmdEv.StoredUser, err = filterAccess(store, command, networkID,
+		if cmdEv.StoredUser, err = filterAccess(store, command, ev.NetworkID,
 			ch, ev); err != nil {
 
 			cmdEv.Close()
@@ -312,7 +302,7 @@ func (c *Cmds) Dispatch(networkID string, overridePrefix rune,
 		}
 	}
 
-	if err = c.filterArgs(networkID, command, ch, isChan, args, cmdEv, ev,
+	if err = c.filterArgs(ev.NetworkID, command, ch, isChan, args, cmdEv, ev,
 		state, store); err != nil {
 
 		cmdEv.Close()
@@ -345,6 +335,52 @@ func (c *Cmds) Dispatch(networkID string, overridePrefix rune,
 	}()
 
 	return nil
+}
+
+// lookupCmd finds the command to execute, returns user-facing errors if not.
+func (c *Cmds) lookupCmd(network, channel, ext, cmd string) (*Cmd, error) {
+	network = strings.ToLower(network)
+	channel = strings.ToLower(channel)
+
+	if cmd == ".nick" {
+		fmt.Println("WHAT")
+	}
+
+	cmdArr, ok := c.lookupCmdArr(network, channel, cmd)
+	if ok && cmdArr != nil {
+		for _, i := range cmdArr {
+			if i.Cmd == cmd && (len(ext) == 0 || i.Extension == ext) {
+				return i, nil
+			}
+		}
+	}
+
+	if len(ext) == 0 {
+		return nil, fmt.Errorf(errFmtCmdNotFound, cmd)
+	} else {
+		return nil, fmt.Errorf(errFmtCmdNotFound, ext+"."+cmd)
+	}
+}
+
+// lookupCmdArr returns the most specific list of commands it can for the given
+// key values.
+func (c *Cmds) lookupCmdArr(network, channel, cmd string) ([]*Cmd, bool) {
+	var cmdArr []*Cmd
+	var ok bool
+	if cmdArr, ok = c.commands[mkKey(network, channel, cmd)]; ok {
+		return cmdArr, ok
+	}
+	if cmdArr, ok = c.commands[mkKey(network, "", cmd)]; ok {
+		return cmdArr, ok
+	}
+	if cmdArr, ok = c.commands[mkKey("", channel, cmd)]; ok {
+		return cmdArr, ok
+	}
+	if cmdArr, ok = c.commands[mkKey("", "", cmd)]; ok {
+		return cmdArr, ok
+	}
+
+	return nil, false
 }
 
 // cmdNameDispatch attempts to dispatch an event to a function named the same
@@ -592,8 +628,36 @@ func (c *Cmds) parseUserArg(ev *Event, state *data.State,
 	return nil
 }
 
-// GetPrefix returns the prefix used by this cmds instance.
-func (c *Cmds) GetPrefix() rune {
+// EachCmd iterates through the commands and passes each one to a callback
+// function for consumption. These should be considered read-only. Optionally
+// the results can be filtered by network and channel.
+// To end iteration prematurely the callback function can return true.
+func (c *Cmds) EachCmd(network, channel string, cb func(Cmd) bool) {
+	c.RLock()
+	defer c.RUnlock()
+
+	for k, cmdArr := range c.commands {
+		if (len(network) != 0 || len(channel) != 0) &&
+			!strings.HasPrefix(k, mkKey(network, channel, "")) {
+
+			continue
+		}
+
+		brk := false
+		for _, cmd := range cmdArr {
+			if brk = cb(*cmd); brk {
+				break
+			}
+		}
+
+		if brk {
+			break
+		}
+	}
+}
+
+// Prefix returns the prefix used by this cmds instance.
+func (c *Cmds) Prefix() rune {
 	return c.prefix
 }
 
@@ -667,4 +731,9 @@ func MakeUserNotFoundError(user string) error {
 // the target user not being registered.
 func MakeUserNotRegisteredError(user string) error {
 	return fmt.Errorf(errFmtUserNotRegistered, user)
+}
+
+// mkKey creates a key for storing and retrieving event handlers.
+func mkKey(network, channel, event string) string {
+	return fmt.Sprintf("%s:%s:%s", network, channel, event)
 }
