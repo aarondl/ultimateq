@@ -115,6 +115,44 @@ func TestConfig_Network_GetSetChannels(t *testing.T) {
 	}
 }
 
+func TestConfig_Network_GetChannelPrefix(t *testing.T) {
+	t.Parallel()
+
+	c := NewConfig()
+	glb := c.Network("")
+	net := c.NewNetwork("net")
+	ch1 := Channel{"a", "b", "1"}
+	ch2 := Channel{"a", "b", "1"}
+
+	if pfx, ok := glb.ChannelPrefix(ch1.Name); ok || pfx != defaultPrefix {
+		t.Error("Expected the prefix to not be set.")
+	}
+	if pfx, ok := net.ChannelPrefix(ch1.Name); ok || pfx != defaultPrefix {
+		t.Error("Expected the prefix to not be set.")
+	}
+
+	glb.SetChannels([]Channel{ch1, ch2})
+	if pfx, ok := glb.ChannelPrefix(ch1.Name); !ok || pfx != '1' {
+		t.Error("Expected the prefix be set.")
+	}
+	if pfx, ok := net.ChannelPrefix(ch1.Name); !ok || pfx != '1' {
+		t.Error("Expected the prefix be set.")
+	}
+
+	ch1.Prefix = "2"
+	net.SetChannels([]Channel{ch1, ch2})
+	if pfx, ok := glb.ChannelPrefix(ch1.Name); !ok || pfx != '1' {
+		t.Error("Expected the prefix be set.")
+	}
+	if pfx, ok := net.ChannelPrefix(ch1.Name); !ok || pfx != '2' {
+		t.Error("Expected the prefix be set.")
+	}
+
+	if pfx, ok := net.ChannelPrefix("nochan"); ok || pfx != defaultPrefix {
+		t.Error("Expected the prefix not be set.")
+	}
+}
+
 func check(
 	name string, defaultVal, afterGlobal, afterNetwork interface{},
 	global, network *NetCTX, t *testing.T) {

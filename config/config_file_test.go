@@ -240,6 +240,14 @@ func verifyFakeConfig(t *testing.T, conf *Config) {
 		t.Errorf("Expected: %v, got: %v", expr, got)
 	}
 
+	if pfx, ok := net1.ChannelPrefix("#channel1"); !ok && pfx != '!' {
+		t.Error("Expected: %c, got: %c", "!", pfx)
+	}
+
+	if pfx, ok := net1.ChannelPrefix("#"); !ok && pfx != '!' {
+		t.Error("Expected: %c, got: %c", "!", pfx)
+	}
+
 	if chans, ok := net1.Channels(); ok {
 		c1, c2 := chans[0], chans[1]
 

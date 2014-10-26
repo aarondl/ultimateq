@@ -223,6 +223,60 @@ func (n *NetCTX) Prefix() (rune, bool) {
 	return defaultPrefix, false
 }
 
+// ChannelPrefix retrieves the prefix with the correct default chain up to
+// network and global space.
+func (n *NetCTX) ChannelPrefix(channel string) (rune, bool) {
+	n.rlock()
+
+	var val interface{}
+	var arr []map[string]interface{}
+	var chArr []Channel
+	var ok bool
+
+	if val, ok = n.network["channels"]; !ok {
+		val, ok = n.parent["channels"]
+	}
+
+	if !ok {
+		n.runlock()
+		return n.Prefix()
+	}
+
+	if arr, ok = val.([]map[string]interface{}); ok {
+		for _, ch := range arr {
+			var name string
+			if val, ok = ch["name"]; !ok {
+				continue
+			}
+
+			if name, ok = val.(string); !ok || name != channel {
+				continue
+			}
+
+			if prefixVal, ok := ch["prefix"]; !ok {
+				continue
+			} else if prefix, ok := prefixVal.(string); ok {
+				n.runlock()
+				return rune(prefix[0]), true
+			}
+		}
+	} else if chArr, ok = val.([]Channel); ok {
+		for _, ch := range chArr {
+			if ch.Name != channel {
+				continue
+			}
+
+			if len(ch.Prefix) > 0 {
+				n.runlock()
+				return rune(ch.Prefix[0]), true
+			}
+		}
+	}
+
+	n.runlock()
+	return n.Prefix()
+}
+
 func (n *NetCTX) SetPrefix(val rune) *NetCTX {
 	setVal(n, "prefix", string(val))
 	return n
