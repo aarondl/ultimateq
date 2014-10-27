@@ -1101,7 +1101,7 @@ func (c *coreCmds) help(w irc.Writer, ev *cmd.Event) (
 	var output = make(map[string][]string)
 	var exactMatches []cmd.Cmd
 
-	c.b.cmds.EachCmd(ev.NetworkID, "", func(command cmd.Cmd) bool {
+	c.b.cmds.EachCmd("", "", func(command cmd.Cmd) bool {
 		write := true
 
 		if len(search) > 0 {

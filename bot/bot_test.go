@@ -391,7 +391,7 @@ func TestBot_RegisterCmd(t *testing.T) {
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
-	success = b.UnregisterFilteredCmd(netID, channel, "ext", command)
+	success = b.UnregisterFilteredCmd(netID, channel, "e", command)
 	if !success {
 		t.Error("It should unregister correctly.")
 	}
