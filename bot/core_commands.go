@@ -206,15 +206,15 @@ func NewCoreCmds(b *Bot) (*coreCmds, error) {
 	for _, command := range commands {
 		privacy := cmd.PRIVATE
 		if command.Public {
-			privacy = cmd.ALL
+			privacy = cmd.ALLSCOPES
 		}
 		err := b.RegisterCmd(&cmd.Cmd{
 			Cmd:         command.Name,
 			Extension:   extension,
 			Description: command.Desc,
 			Handler:     c,
-			Msgtype:     cmd.PRIVMSG,
-			Msgscope:    privacy,
+			Kind:        cmd.PRIVMSG,
+			Scope:       privacy,
 			Args:        command.Args,
 			RequireAuth: command.Authed,
 			ReqLevel:    command.Level,
@@ -231,7 +231,7 @@ func NewCoreCmds(b *Bot) (*coreCmds, error) {
 // unregisterCoreCmds unregisters all core commands. Made for testing.
 func (c *coreCmds) unregisterCoreCmds() {
 	for _, cmd := range commands {
-		c.b.UnregisterCmd(cmd.Name)
+		c.b.UnregisterCmd(extension, cmd.Name)
 	}
 }
 
@@ -1099,16 +1099,16 @@ func (c *coreCmds) help(w irc.Writer, ev *cmd.Event) (
 	nick := ev.User.Nick()
 
 	var output = make(map[string][]string)
-	var exactMatches []*cmd.Cmd
+	var exactMatches []cmd.Cmd
 
-	cmd.EachCmd(func(command *cmd.Cmd) bool {
+	c.b.cmds.EachCmd(ev.NetworkID, "", func(command cmd.Cmd) bool {
 		write := true
 
 		if len(search) > 0 {
 			combined := command.Extension + "." + command.Cmd
 			if perfect := combined == search; command.Cmd == search || perfect {
 				if exactMatches == nil || perfect {
-					exactMatches = []*cmd.Cmd{command}
+					exactMatches = []cmd.Cmd{command}
 				} else {
 					exactMatches = append(exactMatches, command)
 					write = false

@@ -195,7 +195,7 @@ func TestBot_Dispatching(t *testing.T) {
 	}
 	b.Register(irc.PRIVMSG, thandler)
 	if err := b.RegisterCmd(cmd.MkCmd(
-		"a", "b", "cmd", tcommand, cmd.ALL, cmd.ALL)); err != nil {
+		"a", "b", "cmd", tcommand, cmd.ALLKINDS, cmd.ALLSCOPES)); err != nil {
 		t.Error("Should have registered a command successfully.")
 	}
 
@@ -219,7 +219,7 @@ func TestBot_Dispatching(t *testing.T) {
 	for _ = range end {
 	}
 
-	if !b.UnregisterCmd("cmd") {
+	if !b.UnregisterCmd("", "cmd") {
 		t.Error("Should have unregistered a command.")
 	}
 }
@@ -356,70 +356,44 @@ func TestBot_Register(t *testing.T) {
 	t.Parallel()
 	b, _ := createBot(fakeConfig, nil, nil, devNull, false, false)
 	gid := b.Register(irc.PRIVMSG, &coreHandler{})
-	id, err := b.RegisterNetwork(netID, irc.PRIVMSG, &coreHandler{})
+	id := b.RegisterFiltered(netID, "", irc.PRIVMSG, &coreHandler{})
 
-	if b.Unregister(irc.PRIVMSG, id) {
-		t.Error("Unregister should not know about server events.")
-	}
-	if !b.Unregister(irc.PRIVMSG, gid) {
+	if !b.Unregister(id) {
 		t.Error("Should unregister the global registration.")
 	}
-
-	if ok, _ := b.UnregisterNetwork(netID, irc.PRIVMSG, gid); ok {
-		t.Error("Unregister server should not know about global events.")
-	}
-	if ok, _ := b.UnregisterNetwork(netID, irc.PRIVMSG, id); !ok {
-		t.Error("Unregister should unregister events.")
-	}
-
-	_, err = b.RegisterNetwork("", "", &coreHandler{})
-	if err != errUnknownServerID {
-		t.Error("Expecting:", errUnknownServerID, "got:", err)
-	}
-	_, err = b.UnregisterNetwork("", "", 0)
-	if err != errUnknownServerID {
-		t.Error("Expecting:", errUnknownServerID, "got:", err)
+	if !b.Unregister(gid) {
+		t.Error("Should unregister the global registration.")
 	}
 }
 
 func TestBot_RegisterCmd(t *testing.T) {
-	// t.Parallel() Cannot be parallel due to the nature of command registration
 	var err error
 	var success bool
 	b, _ := createBot(fakeConfig, nil, nil, devNull, false, false)
 	command := "cmd"
 	err = b.RegisterCmd(cmd.MkCmd("ext", "desc", command, &testCommand{},
-		cmd.ALL, cmd.ALL))
+		cmd.ALLKINDS, cmd.ALLSCOPES))
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
 
 	err = b.RegisterCmd(cmd.MkCmd("ext", "desc", command, &testCommand{},
-		cmd.ALL, cmd.ALL))
+		cmd.ALLKINDS, cmd.ALLSCOPES))
 	if err == nil {
 		t.Error("Expecting error about duplicates.")
 	}
-	if success = b.UnregisterCmd(command); !success {
+	if success = b.UnregisterCmd("ext", command); !success {
 		t.Error("It should unregister correctly.")
 	}
 
-	err = b.RegisterNetworkCmd(netID, cmd.MkCmd("e", "d", command,
-		&testCommand{}, cmd.ALL, cmd.ALL))
+	err = b.RegisterFilteredCmd(netID, channel, cmd.MkCmd("e", "d", command,
+		&testCommand{}, cmd.ALLKINDS, cmd.ALLSCOPES))
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
-	if success = b.UnregisterNetworkCmd(netID, command); !success {
+	success = b.UnregisterFilteredCmd(netID, channel, "ext", command)
+	if !success {
 		t.Error("It should unregister correctly.")
-	}
-
-	err = b.RegisterNetworkCmd("badServer", cmd.MkCmd("e", "d", command,
-		&testCommand{}, cmd.ALL, cmd.ALL))
-	if err != errUnknownServerID {
-		t.Error("Expecting:", errUnknownServerID, "got:", err)
-	}
-
-	if success = b.UnregisterNetworkCmd("badServer", command); success {
-		t.Error("It should not unregister from non existent servers.")
 	}
 }
 

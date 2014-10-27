@@ -13,8 +13,6 @@ import (
 
 	"github.com/aarondl/ultimateq/config"
 	"github.com/aarondl/ultimateq/data"
-	"github.com/aarondl/ultimateq/dispatch"
-	"github.com/aarondl/ultimateq/dispatch/cmd"
 	"github.com/aarondl/ultimateq/inet"
 	"github.com/aarondl/ultimateq/irc"
 	"github.com/inconshreveable/log15"
@@ -74,12 +72,9 @@ type Server struct {
 	netInfo *irc.NetworkInfo
 
 	// Dispatching
-	dispatchCore *dispatch.DispatchCore
-	dispatcher   *dispatch.Dispatcher
-	cmds         *cmd.Cmds
-	writer       irc.Writer
+	writer irc.Writer
 
-	handlerID int
+	handlerID uint64
 	handler   *coreHandler
 
 	// State and Connection
@@ -112,14 +107,7 @@ func (s *Server) Write(buf []byte) (int, error) {
 	return 0, errNotConnected
 }
 
-// createDispatcher uses the server's current ProtoCaps to create a dispatcher.
-func (s *Server) createDispatching(prefix rune, channels []string) {
-	s.dispatchCore = dispatch.NewDispatchCore(s.Logger, channels...)
-	s.dispatcher = dispatch.NewDispatcher(s.dispatchCore)
-	s.cmds = cmd.NewCmds(prefix, s.dispatchCore)
-}
-
-// createState uses the server's current ProtoCaps to create a state.
+// createState uses the server's current netInfo to create a state.
 func (s *Server) createState() (err error) {
 	s.state, err = data.NewState(s.netInfo)
 	return err

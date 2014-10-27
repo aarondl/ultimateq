@@ -123,20 +123,23 @@ type CmdHandler interface {
 // commandTable is used to store all the string->command assocations.
 type commandTable map[string][]*Cmd
 
+// pfxFetcher is used to look up prefixes for different areas of configuration.
+type pfxFetcher func(network, channel string) rune
+
 // Cmds allows for registration of commands that can involve user access,
 // and provides a rich programming interface for command handling.
 type Cmds struct {
 	*dispatch.DispatchCore
-	prefix   rune
+	fetcher  pfxFetcher
 	commands commandTable
 	sync.RWMutex
 }
 
 // NewCmds initializes a cmds.
-func NewCmds(prefix rune, core *dispatch.DispatchCore) *Cmds {
+func NewCmds(fetcher pfxFetcher, core *dispatch.DispatchCore) *Cmds {
 	return &Cmds{
 		DispatchCore: core,
-		prefix:       prefix,
+		fetcher:      fetcher,
 		commands:     make(commandTable),
 	}
 }
@@ -212,8 +215,8 @@ func (c *Cmds) Unregister(network, channel, ext, cmd string) (found bool) {
 }
 
 // Dispatch dispatches an IrcEvent into the cmds event handlers.
-func (c *Cmds) Dispatch(overridePrefix rune, writer irc.Writer,
-	ev *irc.Event, locker data.Locker) (err error) {
+func (c *Cmds) Dispatch(writer irc.Writer, ev *irc.Event,
+	locker data.Locker) (err error) {
 
 	// Filter non privmsg/notice
 	var kind MsgKind
@@ -243,15 +246,15 @@ func (c *Cmds) Dispatch(overridePrefix rune, writer irc.Writer,
 	// If it's a channel message, ensure we're active on the channel and
 	// that the user has supplied the prefix in his command.
 	if isChan {
+		ch = ev.Target()
+		prefix := c.fetcher(ev.NetworkID, ev.Target())
+
 		firstChar := rune(cmd[0])
-		missingOverride := overridePrefix == 0 || firstChar != overridePrefix
-		missingPrefix := overridePrefix != 0 || firstChar != c.prefix
-		if !hasChan || (missingOverride && missingPrefix) {
+		if !hasChan || firstChar != prefix {
 			return nil
 		}
 
 		cmd = cmd[1:]
-		ch = ev.Target()
 		scope = PUBLIC
 	}
 
@@ -664,11 +667,6 @@ func (c *Cmds) EachCmd(network, channel string, cb func(Cmd) bool) {
 			break
 		}
 	}
-}
-
-// Prefix returns the prefix used by this cmds instance.
-func (c *Cmds) Prefix() rune {
-	return c.prefix
 }
 
 // makeIdentifier creates an identifier from a server and a command for

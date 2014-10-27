@@ -7,6 +7,7 @@ package bot
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"os/signal"
@@ -290,9 +291,7 @@ func (b *Bot) dispatch(srv *Server) (disconnect bool, err error) {
 // dispatch sends a message to both the bot's dispatcher and the given servers
 func (b *Bot) dispatchMessage(s *Server, ev *irc.Event) {
 	b.dispatcher.Dispatch(s.writer, ev)
-	s.dispatcher.Dispatch(s.writer, ev)
-	b.cmds.Dispatch(s.networkID, s.cmds.GetPrefix(), s.writer, ev, b)
-	s.cmds.Dispatch(s.networkID, 0, s.writer, ev, b)
+	b.cmds.Dispatch(s.writer, ev, b)
 }
 
 // Stop shuts down all connections and exits.
@@ -334,63 +333,52 @@ func (b *Bot) Close() error {
 	return nil
 }
 
-// Register adds an event handler to the bot's global dispatcher.
-func (b *Bot) Register(event string, handler interface{}) int {
-	return b.dispatcher.Register(event, handler)
+// Register an event handler to the bot in global space. Returns an identifier
+// that can be used to unregister the event.
+func (b *Bot) Register(event string, handler interface{}) uint64 {
+	return b.RegisterFiltered("", "", event, handler)
 }
 
-// RegisterNetwork adds an event handler to a network specific dispatcher.
-func (b *Bot) RegisterNetwork(
-	networkID string, event string, handler interface{}) (int, error) {
+// RegisterFiltered event handlers to the specified network and channel.
+// Leave either blank to create a filter based on that field alone. Returns
+// an identifier that can be used to unregister the event.
+func (b *Bot) RegisterFiltered(network, channel, event string,
+	handler interface{}) uint64 {
 
-	if s := b.getServer(networkID); s != nil {
-		return s.dispatcher.Register(event, handler), nil
-	}
-	return 0, errUnknownServerID
+	return b.dispatcher.Register(network, channel, event, handler)
 }
 
-// Unregister removes an event handler from the bot's global dispatcher
-func (b *Bot) Unregister(event string, id int) bool {
-	return b.dispatcher.Unregister(event, id)
-}
-
-// UnregisterNetwork removes an event handler from a network specific
-// dispatcher.
-func (b *Bot) UnregisterNetwork(
-	networkID string, event string, id int) (bool, error) {
-
-	if s := b.getServer(networkID); s != nil {
-		return s.dispatcher.Unregister(event, id), nil
-	}
-	return false, errUnknownServerID
+// Unregister an event handler from the bot.
+func (b *Bot) Unregister(id uint64) bool {
+	return b.dispatcher.Unregister(id)
 }
 
 // RegisterCmd registers a command with the bot.
 // See Cmder.Register for in-depth documentation.
 func (b *Bot) RegisterCmd(command *cmd.Cmd) error {
-	return b.cmds.Register(cmd.GLOBAL, command)
+	return b.RegisterFilteredCmd("", "", command)
 }
 
-// RegisterNetworkCmd registers a command with the network.
-// See Cmder.Register for in-depth documentation.
-func (b *Bot) RegisterNetworkCmd(networkID string, command *cmd.Cmd) error {
-	if s := b.getServer(networkID); s != nil {
-		return s.cmds.Register(networkID, command)
-	}
-	return errUnknownServerID
+// RegisterFilteredCmd registers a command with the bot filtered based on the
+// network and channel. Leave either field blank to create a filter based on
+// that field alone.
+func (b *Bot) RegisterFilteredCmd(network, channel string,
+	command *cmd.Cmd) error {
+
+	return b.cmds.Register(network, channel, command)
 }
 
-// UnregisterCmd unregister's a command from the bot.
-func (b *Bot) UnregisterCmd(command string) bool {
-	return b.cmds.Unregister(cmd.GLOBAL, command)
+// UnregisterCmd from the bot. Leaving ext blank will cause all commands with
+// this name from all extensions to be unregistered.
+func (b *Bot) UnregisterCmd(ext, command string) bool {
+	return b.UnregisterFilteredCmd("", "", ext, command)
 }
 
-// UnregisterNetworkCmd unregister's a command from the network.
-func (b *Bot) UnregisterNetworkCmd(networkID, command string) bool {
-	if s := b.getServer(networkID); s != nil {
-		return s.cmds.Unregister(networkID, command)
-	}
-	return false
+// UnregisterFilteredCmd from the bot. All parameters can be blank except for
+// cmd. Leaving ext blank wipes out other extension's commands with the same
+// name.
+func (b *Bot) UnregisterFilteredCmd(network, channel, ext, cmd string) bool {
+	return b.cmds.Unregister(network, channel, ext, cmd)
 }
 
 // ReadState calls a callback if the requested network can present a state db.
@@ -536,8 +524,7 @@ func createBot(conf *config.Config, connProv ConnProvider,
 
 	networks := conf.Networks()
 	cfg := conf.Network("")
-	pfx, _ := cfg.Prefix()
-	b.createDispatching(pfx, nil)
+	b.createDispatching()
 
 	makeStore := false
 	for _, net := range networks {
@@ -585,8 +572,6 @@ func (b *Bot) createServer(netID string, conf *config.Config) (*Server, error) {
 	}
 
 	cfg := conf.Network(netID)
-	pfx, _ := cfg.Prefix()
-	s.createDispatching(pfx, nil)
 
 	nostate, _ := cfg.NoState()
 	if !nostate {
@@ -597,7 +582,7 @@ func (b *Bot) createServer(netID string, conf *config.Config) (*Server, error) {
 
 	if b.attachHandlers {
 		s.handler = &coreHandler{bot: b, untilJoinScale: time.Second}
-		s.handlerID = s.dispatcher.Register(irc.RAW, s.handler)
+		s.handlerID = b.dispatcher.Register("", "", irc.RAW, s.handler)
 	}
 
 	s.writer = &irc.Helper{s}
@@ -606,10 +591,10 @@ func (b *Bot) createServer(netID string, conf *config.Config) (*Server, error) {
 }
 
 // createDispatcher uses the bot's current ProtoCaps to create a dispatcher.
-func (b *Bot) createDispatching(prefix rune, channels []string) {
+func (b *Bot) createDispatching(channels ...string) {
 	b.dispatchCore = dispatch.NewDispatchCore(b.Logger, channels...)
 	b.dispatcher = dispatch.NewDispatcher(b.dispatchCore)
-	b.cmds = cmd.NewCmds(prefix, b.dispatchCore)
+	b.cmds = cmd.NewCmds(b.mkPrefixFetcher(), b.dispatchCore)
 }
 
 // createStore creates a store from a filename.
@@ -631,6 +616,56 @@ func (b *Bot) getServer(networkID string) *Server {
 		return srv
 	}
 	return nil
+}
+
+// mkPrefixFetcher creates a function that can fetch the prefix for a given
+// network or channel (or if both are omitted global).
+func (b *Bot) mkPrefixFetcher() func(network, channel string) rune {
+	prefixii := make(map[string]rune)
+
+	net := b.conf.Network("")
+	prefixii[":"], _ = net.Prefix()
+
+	chans, _ := net.Channels()
+	for _, ch := range chans {
+		if len(ch.Prefix) > 0 {
+			prefixii[":"+ch.Name] = rune(ch.Prefix[0])
+		}
+	}
+
+	nets := b.conf.Networks()
+	for _, netName := range nets {
+		net = b.conf.Network(netName)
+		if pfx, ok := net.Prefix(); ok {
+			prefixii[netName+":"] = pfx
+		}
+
+		chans, _ = net.Channels()
+		for _, ch := range chans {
+			if len(ch.Prefix) > 0 {
+				prefixii[netName+":"+ch.Name] = rune(ch.Prefix[0])
+			}
+		}
+	}
+
+	return func(n, c string) rune {
+		var pfx rune
+		var ok bool
+		key := fmt.Sprintf("%s:%s", n, c)
+		if pfx, ok = prefixii[key]; ok {
+			return pfx
+		}
+		key = fmt.Sprintf(":%s", c)
+		if pfx, ok = prefixii[key]; ok {
+			return pfx
+		}
+		key = fmt.Sprintf("%s:", n)
+		if pfx, ok = prefixii[key]; ok {
+			return pfx
+		}
+		pfx, _ = prefixii[":"]
+		return pfx
+	}
 }
 
 // Run makes a very typical bot. It will call the cb function passed in
