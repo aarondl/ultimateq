@@ -582,7 +582,7 @@ func (b *Bot) createServer(netID string, conf *config.Config) (*Server, error) {
 
 	if b.attachHandlers {
 		s.handler = &coreHandler{bot: b, untilJoinScale: time.Second}
-		s.handlerID = b.dispatcher.Register("", "", irc.RAW, s.handler)
+		s.handlerID = b.dispatcher.Register(netID, "", irc.RAW, s.handler)
 	}
 
 	s.writer = &irc.Helper{s}

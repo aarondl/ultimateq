@@ -56,7 +56,7 @@ func (d *Dispatcher) Register(
 
 	network = strings.ToLower(network)
 	channel = strings.ToLower(channel)
-	event = strings.ToLower(event)
+	event = strings.ToUpper(event)
 
 	key := mkKey(network, channel, event)
 	idTable, ok := d.events[key]
@@ -95,13 +95,15 @@ func (d *Dispatcher) Dispatch(w irc.Writer, ev *irc.Event) {
 	var isChan bool
 	network := strings.ToLower(ev.NetworkID)
 	channel := ""
-	event := strings.ToLower(ev.Name)
+	event := strings.ToUpper(ev.Name)
 	if isChan = len(ev.Args) > 1 && ev.IsTargetChan(); isChan {
 		channel = strings.ToLower(ev.Target())
 	}
 
 	// Try most specific key to most generic keys, ending in the global key.
-	d.tryKey(network, channel, event, w, ev)
+	if len(channel) > 0 {
+		d.tryKey(network, channel, event, w, ev)
+	}
 	d.tryKey(network, "", "", w, ev)
 	d.tryKey(network, "", event, w, ev)
 	if isChan {
@@ -113,9 +115,11 @@ func (d *Dispatcher) Dispatch(w irc.Writer, ev *irc.Event) {
 	d.tryKey("", "", "", w, ev)
 
 	// Raw handlers
-	d.tryKey(network, channel, irc.RAW, w, ev)
 	d.tryKey(network, "", irc.RAW, w, ev)
-	d.tryKey("", channel, irc.RAW, w, ev)
+	if len(channel) > 0 {
+		d.tryKey(network, channel, irc.RAW, w, ev)
+		d.tryKey("", channel, irc.RAW, w, ev)
+	}
 }
 
 // tryKey attempts to use a key to fire off an event.

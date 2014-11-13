@@ -143,7 +143,7 @@ const (
 	usersList           = `%-*v %v`
 
 	helpSuccess      = `Cmds:`
-	helpSuccessUsage = `Usage: `
+	helpSuccessUsage = `Usage: %v %v`
 	helpFailure      = `No help available for (%v), try "help" for a list of ` +
 		`all commands.`
 	helpDesc = `Help with no arguments shows all commands, help with an ` +
@@ -190,7 +190,7 @@ var commands = []struct {
 	{stake, stakeDesc, true, true, 0, `GS`, argv{`*user`, `[allOrFlags]`}},
 	{take, takeDesc, true, true, 0, `GSC`, argv{`#chan`, `*user`,
 		`[allOrFlags]`}},
-	{help, helpDesc, true, true, 0, ``, argv{`[command]`}},
+	{help, helpDesc, false, true, 0, ``, argv{`[command]`}},
 }
 
 // coreCmds is the bot's command handling struct. The bot itself uses
@@ -1098,65 +1098,66 @@ func (c *coreCmds) help(w irc.Writer, ev *cmd.Event) (
 	search := strings.ToLower(ev.GetArg("command"))
 	nick := ev.User.Nick()
 
-	var output = make(map[string][]string)
+	var extSorted = make(map[string][]string)
+	var fqMatches []cmd.Cmd
 	var exactMatches []cmd.Cmd
+	var fuzzyMatches []cmd.Cmd
+	var extMatches []string
 
 	c.b.cmds.EachCmd("", "", func(command cmd.Cmd) bool {
-		write := true
+		full := command.Extension + "." + command.Cmd
 
-		if len(search) > 0 {
-			combined := command.Extension + "." + command.Cmd
-			if perfect := combined == search; command.Cmd == search || perfect {
-				if exactMatches == nil || perfect {
-					exactMatches = []cmd.Cmd{command}
-				} else {
-					exactMatches = append(exactMatches, command)
-					write = false
-				}
-				if perfect {
-					return true
-				}
-			} else if !strings.Contains(combined, search) {
-				write = false
-			}
+		if search == full {
+			fqMatches = append(fqMatches, command)
+			return false
 		}
 
-		if write {
-			if arr, ok := output[command.Extension]; ok {
-				output[command.Extension] = append(arr, command.Cmd)
-			} else {
-				output[command.Extension] = []string{command.Cmd}
-			}
+		shouldOutput := false
+
+		if search == command.Cmd {
+			exactMatches = append(exactMatches, command)
+			shouldOutput = true
+		} else if strings.Contains(command.Cmd, search) {
+			fuzzyMatches = append(fuzzyMatches, command)
+			shouldOutput = true
 		}
+
+		if strings.Contains(command.Extension, search) {
+			extMatches = append(extMatches, command.Extension)
+			shouldOutput = true
+		}
+
+		if shouldOutput {
+			arr := extSorted[command.Extension]
+			extSorted[command.Extension] = append(arr, command.Cmd)
+		}
+
 		return false
 	})
 
-	if len(exactMatches) > 1 {
-		for _, command := range exactMatches {
-			if arr, ok := output[command.Extension]; ok {
-				output[command.Extension] = append(arr, command.Cmd)
-			} else {
-				output[command.Extension] = []string{command.Cmd}
-			}
-		}
-		exactMatches = nil
+	if len(exactMatches) > 0 && len(fqMatches) == 0 &&
+		len(fuzzyMatches) == 0 && len(extMatches) == 0 {
+
+		fqMatches = exactMatches
 	}
 
-	if exactMatches != nil {
-		exactMatch := exactMatches[0]
-		w.Notice(nick, helpSuccess,
-			" ", exactMatch.Extension, ".", exactMatch.Cmd)
-		w.Notice(nick, exactMatch.Description)
-		if len(exactMatch.Args) > 0 {
-			w.Notice(nick, helpSuccessUsage, strings.Join(exactMatch.Args, " "))
+	switch {
+	case len(fqMatches) >= 1:
+		for _, i := range fqMatches {
+			w.Notice(nick, helpSuccess, " ", i.Extension, ".", i.Cmd)
+			w.Notice(nick, i.Description)
+			if len(i.Args) == 0 {
+				continue
+			}
+			w.Noticef(nick, helpSuccessUsage, i.Cmd, strings.Join(i.Args, " "))
 		}
-	} else if len(output) > 0 {
-		for extension, commands := range output {
+	case len(exactMatches) > 0 || len(fuzzyMatches) > 0 || len(extMatches) > 0:
+		for extension, commands := range extSorted {
 			sort.Strings(commands)
 			w.Notice(nick, extension, ":")
 			w.Notice(nick, " ", strings.Join(commands, " "))
 		}
-	} else {
+	default:
 		w.Noticef(nick, helpFailure, search)
 	}
 

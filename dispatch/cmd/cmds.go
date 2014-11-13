@@ -276,6 +276,8 @@ func (c *Cmds) Dispatch(writer irc.Writer, ev *irc.Event,
 	if command, err = c.lookupCmd(ev.NetworkID, ch, ext, cmd); err != nil {
 		writer.Notice(nick, err.Error())
 		return err
+	} else if command == nil {
+		return nil
 	}
 
 	if 0 == (kind&command.Kind) || 0 == (scope&command.Scope) {
@@ -368,11 +370,12 @@ func (c *Cmds) lookupCmd(network, channel, ext, cmd string) (*Cmd, error) {
 		}
 	}
 
-	if len(ext) == 0 {
+	/*if len(ext) == 0 {
 		return nil, fmt.Errorf(errFmtCmdNotFound, cmd)
 	} else {
 		return nil, fmt.Errorf(errFmtCmdNotFound, ext+"."+cmd)
-	}
+	}*/
+	return nil, nil
 }
 
 // lookupCmdArr returns the most specific list of commands it can for the given

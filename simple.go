@@ -457,49 +457,49 @@ func main() {
 			"Retrieves a quote. Randomly selects a quote if no id is provided.",
 			"quote",
 			&quoter,
-			cmd.PRIVMSG, cmd.ALL, "[id]",
+			cmd.PRIVMSG, cmd.ALLSCOPES, "[id]",
 		))
 		b.RegisterCmd(cmd.MkCmd(
 			"quote",
 			"Shows the number of quotes in the database.",
 			"quotes",
 			&quoter,
-			cmd.PRIVMSG, cmd.ALL,
+			cmd.PRIVMSG, cmd.ALLSCOPES,
 		))
 		b.RegisterCmd(cmd.MkCmd(
 			"quote",
 			"Gets the details for a specific quote.",
 			"details",
 			&quoter,
-			cmd.PRIVMSG, cmd.ALL, "id",
+			cmd.PRIVMSG, cmd.ALLSCOPES, "id",
 		))
 		b.RegisterCmd(cmd.MkCmd(
 			"quote",
 			"Adds a quote to the database.",
 			"addquote",
 			&quoter,
-			cmd.PRIVMSG, cmd.ALL, "quote...",
+			cmd.PRIVMSG, cmd.ALLSCOPES, "quote...",
 		))
 		b.RegisterCmd(cmd.MkAuthCmd(
 			"quote",
 			"Removes a quote from the database.",
 			"delquote",
 			&quoter,
-			cmd.PRIVMSG, cmd.ALL, 0, "Q", "id",
+			cmd.PRIVMSG, cmd.ALLSCOPES, 0, "Q", "id",
 		))
 		b.RegisterCmd(cmd.MkAuthCmd(
 			"quote",
 			"Edits an existing quote.",
 			"editquote",
 			&quoter,
-			cmd.PRIVMSG, cmd.ALL, 0, "Q", "id", "quote...",
+			cmd.PRIVMSG, cmd.ALLSCOPES, 0, "Q", "id", "quote...",
 		))
 		b.RegisterCmd(cmd.MkCmd(
 			"quote",
 			"Shows the address for the quote webserver.",
 			"quoteweb",
 			&quoter,
-			cmd.PRIVMSG, cmd.ALL,
+			cmd.PRIVMSG, cmd.ALLSCOPES,
 		))
 
 		// Queryer commands
@@ -509,21 +509,21 @@ func main() {
 			"Submits a query to Google.",
 			"google",
 			&queryer,
-			cmd.PRIVMSG, cmd.ALL, "query...",
+			cmd.PRIVMSG, cmd.ALLSCOPES, "query...",
 		))
 		b.RegisterCmd(cmd.MkCmd(
 			"query",
 			"Submits a query to Wolfram Alpha.",
 			"calc",
 			&queryer,
-			cmd.PRIVMSG, cmd.ALL, "query...",
+			cmd.PRIVMSG, cmd.ALLSCOPES, "query...",
 		))
 		b.RegisterCmd(cmd.MkCmd(
 			"query",
 			"Fetches a weather report from yr.no.",
 			"weather",
 			&queryer,
-			cmd.PRIVMSG, cmd.ALL, "query...",
+			cmd.PRIVMSG, cmd.ALLSCOPES, "query...",
 		))
 
 		// Runnable Commands
@@ -532,14 +532,14 @@ func main() {
 			"Runs a snippet of sandboxed go code.",
 			"go",
 			&runnable,
-			cmd.PRIVMSG, cmd.ALL, "code...",
+			cmd.PRIVMSG, cmd.ALLSCOPES, "code...",
 		))
 		b.RegisterCmd(cmd.MkCmd(
 			"runnable",
 			"Runs a snippet of sandboxed go code inside fmt.Println().",
 			"gop",
 			&runnable,
-			cmd.PRIVMSG, cmd.ALL, "code...",
+			cmd.PRIVMSG, cmd.ALLSCOPES, "code...",
 		))
 
 		// Handler commands
@@ -548,10 +548,10 @@ func main() {
 		b.Register(irc.JOIN, &handler)
 		b.RegisterCmd(cmd.MkAuthCmd(
 			"simple",
-			"Gives the user ops or voice if they have o or v flags respectively.",
+			"Ops or voices a user if they have o or v flags respectively.",
 			"up",
 			&handler,
-			cmd.PRIVMSG, cmd.ALL, 0, "", "#chan",
+			cmd.PRIVMSG, cmd.ALLSCOPES, 0, "", "#chan",
 		))
 	})
 

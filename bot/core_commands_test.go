@@ -869,9 +869,10 @@ func TestCoreCommands_Help(t *testing.T) {
 		t.Error(err)
 	}
 
-	check = helpSuccess + " " + extension + "." + register +
-		`NOTICE .* :` + registerDesc +
-		`NOTICE .* :` + helpSuccessUsage + strings.Join(commands[0].Args, " ")
+	check = fmt.Sprintf("%s %s.%sNOTICE .* :%sNOTICE .* :%s",
+		helpSuccess, extension, register, registerDesc,
+		fmt.Sprintf(helpSuccessUsage, register,
+			strings.Join(commands[0].Args, " ")))
 	err = rspChk(ts, check, u1host, help, register)
 	if err != nil {
 		t.Error(err)
