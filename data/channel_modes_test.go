@@ -1,183 +1,392 @@
 package data
 
 import (
-	. "gopkg.in/check.v1"
+	"regexp"
+	"testing"
 )
 
-func (s *s) TestChannelModes_Create(c *C) {
+func TestChannelModes_Create(t *testing.T) {
+	t.Parallel()
+
 	modes := NewChannelModes(testChannelKinds, testUserKinds)
-	c.Check(modes, NotNil)
-	c.Check(modes.modes, NotNil)
-	c.Check(modes.argModes, NotNil)
-	c.Check(modes.addressModes, NotNil)
-	c.Check(modes.addresses, Equals, 0)
-	c.Check(modes.ChannelModeKinds, NotNil)
-	c.Check(modes.userModeKinds, NotNil)
+	if modes == nil {
+		t.Error("Unexpected nil.")
+	}
+	if modes.modes == nil {
+		t.Error("Unexpected nil.")
+	}
+	if modes.argModes == nil {
+		t.Error("Unexpected nil.")
+	}
+	if modes.addressModes == nil {
+		t.Error("Unexpected nil.")
+	}
+	if exp, got := modes.addresses, 0; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if modes.ChannelModeKinds == nil {
+		t.Error("Unexpected nil.")
+	}
+	if modes.userModeKinds == nil {
+		t.Error("Unexpected nil.")
+	}
 
 	var _ moder = NewChannelModes(testChannelKinds, testUserKinds)
 }
 
-func (s *s) TestChannelModes_Apply(c *C) {
+func TestChannelModes_Apply(t *testing.T) {
+	t.Parallel()
+
 	m := NewChannelModes(testChannelKinds, testUserKinds)
 	pos, neg := m.Apply("abbcd host1 host2 10 arg")
-	c.Check(len(pos), Equals, 0)
-	c.Check(len(neg), Equals, 0)
-	c.Check(m.IsSet("abbcd host1 host2 10 arg"), Equals, true)
+	if exp, got := len(pos), 0; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := len(neg), 0; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.IsSet("abbcd host1 host2 10 arg"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	m = NewChannelModes(testChannelKinds, testUserKinds)
 	pos, neg = m.Apply("+avbbcdo user1 host1 host2 10 arg user2")
-	c.Check(len(pos), Equals, 2)
-	c.Check(len(neg), Equals, 0)
-	c.Check(pos[0].Mode, Equals, 'v')
-	c.Check(pos[0].Arg, Equals, "user1")
-	c.Check(pos[1].Mode, Equals, 'o')
-	c.Check(pos[1].Arg, Equals, "user2")
-	c.Check(m.IsSet("abbcd host1 host2 10 arg"), Equals, true)
+	if exp, got := len(pos), 2; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := len(neg), 0; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := pos[0].Mode, 'v'; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := pos[0].Arg, "user1"; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := pos[1].Mode, 'o'; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := pos[1].Arg, "user2"; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.IsSet("abbcd host1 host2 10 arg"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	m = NewChannelModes(testChannelKinds, testUserKinds)
 	pos, neg = m.Apply(" +ab-c 10")
-	c.Check(m.IsSet("a"), Equals, true)
-	c.Check(m.IsSet("b 10"), Equals, true)
-	c.Check(m.IsSet("c"), Equals, false)
+	if exp, got := m.IsSet("a"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.IsSet("b 10"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.IsSet("c"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	m = NewChannelModes(testChannelKinds, testUserKinds)
 	pos, neg = m.Apply("+oxbvy-ozv user1 ban1 user2 user3 user4")
-	c.Check(len(pos), Equals, 2)
-	c.Check(len(neg), Equals, 2)
-	c.Check(pos[0].Mode, Equals, 'o')
-	c.Check(pos[0].Arg, Equals, "user1")
-	c.Check(pos[1].Mode, Equals, 'v')
-	c.Check(pos[1].Arg, Equals, "user2")
-	c.Check(neg[0].Mode, Equals, 'o')
-	c.Check(neg[0].Arg, Equals, "user3")
-	c.Check(neg[1].Mode, Equals, 'v')
-	c.Check(neg[1].Arg, Equals, "user4")
+	if exp, got := len(pos), 2; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := len(neg), 2; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := pos[0].Mode, 'o'; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := pos[0].Arg, "user1"; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := pos[1].Mode, 'v'; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := pos[1].Arg, "user2"; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := neg[0].Mode, 'o'; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := neg[0].Arg, "user3"; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := neg[1].Mode, 'v'; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := neg[1].Arg, "user4"; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	pos, neg = m.Apply("+o")
-	c.Check(len(pos), Equals, 0)
-	c.Check(len(neg), Equals, 0)
+	if exp, got := len(pos), 0; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := len(neg), 0; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	m = NewChannelModes(testChannelKinds, testUserKinds)
 	m.Apply("b 10")
-	c.Check(m.IsSet("b 10"), Equals, true)
+	if exp, got := m.IsSet("b 10"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 	m.Apply("-b 10 ")
-	c.Check(m.IsSet("b 10"), Equals, false)
+	if exp, got := m.IsSet("b 10"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	m = NewChannelModes(testChannelKinds, testUserKinds)
 	m.Apply("x-y+z")
-	c.Check(m.IsSet("x"), Equals, true)
-	c.Check(m.IsSet("y"), Equals, false)
-	c.Check(m.IsSet("z"), Equals, true)
+	if exp, got := m.IsSet("x"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.IsSet("y"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.IsSet("z"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	m = NewChannelModes(testChannelKinds, testUserKinds)
 	m.Apply("+cdb 10")
-	c.Check(m.IsSet("c"), Equals, true)
-	c.Check(m.IsSet("d"), Equals, false)
-	c.Check(m.IsSet("b"), Equals, false)
+	if exp, got := m.IsSet("c"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.IsSet("d"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.IsSet("b"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 	m.Apply("-c 10")
-	c.Check(m.IsSet("c"), Equals, false)
-	c.Check(m.IsSet("d"), Equals, false)
-	c.Check(m.IsSet("b"), Equals, false)
+	if exp, got := m.IsSet("c"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.IsSet("d"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.IsSet("b"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestChannelModes_ApplyDiff(c *C) {
+func TestChannelModes_ApplyDiff(t *testing.T) {
+	t.Parallel()
+
 	m := NewChannelModes(testChannelKinds, testUserKinds)
 	m.Set("abbcd host1 host2 10 arg")
 
 	d := NewModeDiff(testChannelKinds, testUserKinds)
 	d.Apply("-a-b+z-d+bc host1 host3 15")
 	m.ApplyDiff(d)
-	c.Check(m.IsSet("b host1"), Equals, false)
-	c.Check(m.IsSet("b host3"), Equals, true)
-	c.Check(m.IsSet("z"), Equals, true)
-	c.Check(m.IsSet("c 10"), Equals, false)
-	c.Check(m.IsSet("c 15"), Equals, true)
-	c.Check(m.IsSet("d"), Equals, false)
-	c.Check(m.IsSet("a"), Equals, false)
+	if exp, got := m.IsSet("b host1"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.IsSet("b host3"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.IsSet("z"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.IsSet("c 10"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.IsSet("c 15"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.IsSet("d"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.IsSet("a"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestChannelModes_IsSet(c *C) {
+func TestChannelModes_IsSet(t *testing.T) {
+	t.Parallel()
+
 	modes := NewChannelModes(testChannelKinds, testUserKinds)
 	modes.modes['a'] = true
 	modes.addressModes['b'] = []string{"*!*@host1", "*!*@host2"}
 	modes.argModes['c'] = "10"
 	modes.argModes['d'] = "arg"
 
-	check(modes, c)
+	check(modes, t)
 }
 
-func (s *s) TestChannelModes_GetArgs(c *C) {
+func TestChannelModes_GetArgs(t *testing.T) {
+	t.Parallel()
+
 	modes := NewChannelModes(testChannelKinds, testUserKinds)
 	modes.Set("bbc host1 host2 10")
-	c.Check(modes.GetArg('c'), Equals, "10")
+	if exp, got := modes.GetArg('c'), "10"; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 	addresses := modes.GetAddresses('b')
-	c.Check(addresses[0], Equals, "host1")
-	c.Check(addresses[1], Equals, "host2")
+	if exp, got := addresses[0], "host1"; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := addresses[1], "host2"; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
-	c.Check(modes.GetArg('d'), Equals, "")
-	c.Check(modes.GetAddresses('z'), IsNil)
+	if exp, got := modes.GetArg('d'), ""; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if got := modes.GetAddresses('z'); got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
 }
 
-func check(modes *ChannelModes, c *C) {
+func check(modes *ChannelModes, t *testing.T) {
 	// Blanks
-	c.Check(modes.IsSet(), Equals, false)
-	c.Check(modes.IsSet(""), Equals, false)
-	c.Check(modes.IsSet(" "), Equals, false)
+	if exp, got := modes.IsSet(), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet(""), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet(" "), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	// Spacing
-	c.Check(modes.IsSet("a"), Equals, true)
-	c.Check(modes.IsSet("a "), Equals, true)
-	c.Check(modes.IsSet(" a"), Equals, true)
-	c.Check(modes.IsSet(" a "), Equals, true)
+	if exp, got := modes.IsSet("a"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("a "), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet(" a"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet(" a "), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	// Associative
-	c.Check(modes.IsSet("a", "b"), Equals, true)
-	c.Check(modes.IsSet("b", "z"), Equals, false)
-	c.Check(modes.IsSet("z"), Equals, false)
-	c.Check(modes.IsSet("a", "z"), Equals, false)
-	c.Check(modes.IsSet("z", "a"), Equals, false)
+	if exp, got := modes.IsSet("a", "b"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("b", "z"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("z"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("a", "z"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("z", "a"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	// Simple Args
-	c.Check(modes.IsSet("b *!*@host1"), Equals, true)
-	c.Check(modes.IsSet("b *!*@host2"), Equals, true)
-	c.Check(modes.IsSet("b *!*@host3"), Equals, false)
-	c.Check(modes.IsSet("c 10"), Equals, true)
-	c.Check(modes.IsSet("c 15"), Equals, false)
-	c.Check(modes.IsSet("d arg"), Equals, true)
-	c.Check(modes.IsSet("d noarg"), Equals, false)
-	c.Check(modes.IsSet("z 20"), Equals, false)
-	c.Check(modes.IsSet("c *!*@host1"), Equals, false)
-	c.Check(modes.IsSet("b 10"), Equals, false)
+	if exp, got := modes.IsSet("b *!*@host1"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("b *!*@host2"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("b *!*@host3"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("c 10"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("c 15"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("d arg"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("d noarg"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("z 20"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("c *!*@host1"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("b 10"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	// Multiple args
-	c.Check(modes.IsSet("a", "c 10"), Equals, true)
-	c.Check(modes.IsSet("c 10", "a"), Equals, true)
-	c.Check(modes.IsSet("a", "c 20"), Equals, false)
-	c.Check(modes.IsSet("c 10", "b *!*@host1"), Equals, true)
-	c.Check(modes.IsSet("c 15", "b *!*@not"), Equals, false)
-	c.Check(modes.IsSet("c 10", "b *!*@host1"), Equals, true)
-	c.Check(modes.IsSet("c 15", "b *!*@host1"), Equals, false)
-	c.Check(modes.IsSet("c *!*@host1", "b 10"), Equals, false)
+	if exp, got := modes.IsSet("a", "c 10"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("c 10", "a"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("a", "c 20"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("c 10", "b *!*@host1"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("c 15", "b *!*@not"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("c 10", "b *!*@host1"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("c 15", "b *!*@host1"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("c *!*@host1", "b 10"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	// Combined Args
-	c.Check(modes.IsSet("ac 10"), Equals, true)
-	c.Check(modes.IsSet("ca 10"), Equals, true)
-	c.Check(modes.IsSet("a", "c 20"), Equals, false)
-	c.Check(modes.IsSet("cb 10 *!*@host1"), Equals, true)
-	c.Check(modes.IsSet("cb 15 *!*@not"), Equals, false)
-	c.Check(modes.IsSet("cb 10 *!*@host1"), Equals, true)
-	c.Check(modes.IsSet("cb 15 *!*@host1"), Equals, false)
-	c.Check(modes.IsSet("cb *!*@host 10"), Equals, false)
+	if exp, got := modes.IsSet("ac 10"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("ca 10"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("a", "c 20"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("cb 10 *!*@host1"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("cb 15 *!*@not"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("cb 10 *!*@host1"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("cb 15 *!*@host1"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("cb *!*@host 10"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	// Missing Args
-	c.Check(modes.IsSet("abc"), Equals, true)
-	c.Check(modes.IsSet("acb 10"), Equals, true)
-	c.Check(modes.IsSet("abc 10"), Equals, false)
-	c.Check(modes.IsSet("abc *!*@host1"), Equals, true)
-	c.Check(modes.IsSet("acb *!*@host1"), Equals, false)
+	if exp, got := modes.IsSet("abc"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("acb 10"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("abc 10"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("abc *!*@host1"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("acb *!*@host1"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestChannelModes_Set(c *C) {
+func TestChannelModes_Set(t *testing.T) {
+	t.Parallel()
+
 	modes := NewChannelModes(testChannelKinds, testUserKinds)
 
 	modes.Set()
@@ -188,106 +397,199 @@ func (s *s) TestChannelModes_Set(c *C) {
 	modes.Set("b *!*@host2")
 	modes.Set("c 10")
 	modes.Set("d arg")
-	check(modes, c)
+	check(modes, t)
 
 	modes = NewChannelModes(testChannelKinds, testUserKinds)
 	modes.Set("a", "b *!*@host1", "b *!*@host2", "c 10", "d arg")
-	check(modes, c)
+	check(modes, t)
 
 	modes = NewChannelModes(testChannelKinds, testUserKinds)
 	modes.Set("abbcd *!*@host1 *!*@host2 10 arg")
-	check(modes, c)
+	check(modes, t)
 
 	modes = NewChannelModes(testChannelKinds, testUserKinds)
 	modes.Set("cb")
-	c.Check(modes.IsSet("b"), Equals, false)
-	c.Check(modes.IsSet("c"), Equals, false)
+	if exp, got := modes.IsSet("b"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("c"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestChannelModes_AddressTracking(c *C) {
+func TestChannelModes_AddressTracking(t *testing.T) {
+	t.Parallel()
+
 	modes := NewChannelModes(NewChannelModeKinds("yz", "", "", ""),
 		testUserKinds)
-	c.Check(modes.addresses, Equals, 0)
+	if exp, got := modes.addresses, 0; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 	modes.Set("y *!*@host1", "y *!*@host2", "z *!*@host3")
-	c.Check(modes.addresses, Equals, 3)
+	if exp, got := modes.addresses, 3; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 	modes.Unset("y *!*@host1")
-	c.Check(modes.addresses, Equals, 2)
+	if exp, got := modes.addresses, 2; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 	modes.Unset("yz *!*@host2 *!*@host3")
-	c.Check(modes.addresses, Equals, 0)
-	c.Check(modes.IsSet("yz"), Equals, false)
+	if exp, got := modes.addresses, 0; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("yz"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestChannelModes_Unset(c *C) {
+func TestChannelModes_Unset(t *testing.T) {
+	t.Parallel()
+
 	modes := NewChannelModes(testChannelKinds, testUserKinds)
 	modes.Set("a", "b *!*@host1", "b *!*@host2", "c 10", "d arg")
 	modes.Unset()
 	modes.Unset("")
 	modes.Unset("ab")
-	c.Check(modes.IsSet("a"), Equals, false)
-	c.Check(modes.IsSet("b"), Equals, true)
-	c.Check(modes.IsSet("c"), Equals, true)
-	c.Check(modes.IsSet("d"), Equals, true)
+	if exp, got := modes.IsSet("a"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("b"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("c"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("d"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	modes = NewChannelModes(testChannelKinds, testUserKinds)
 	modes.Set("a", "b *!*@host1", "b *!*@host2", "c 10", "d arg")
 	modes.Unset("a", "b", "d")
-	c.Check(modes.IsSet("a"), Equals, false)
-	c.Check(modes.IsSet("b"), Equals, true)
-	c.Check(modes.IsSet("c"), Equals, true)
-	c.Check(modes.IsSet("d"), Equals, false)
+	if exp, got := modes.IsSet("a"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("b"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("c"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("d"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	modes = NewChannelModes(testChannelKinds, testUserKinds)
 	modes.Set("a", "b *!*@host1", "b *!*@host2", "c 10", "d arg")
 	modes.Unset("b *!*@host1", "c 10")
-	c.Check(modes.IsSet("a"), Equals, true)
-	c.Check(modes.IsSet("b *!*@host1"), Equals, false)
-	c.Check(modes.IsSet("b *!*@host2"), Equals, true)
-	c.Check(modes.IsSet("c"), Equals, false)
-	c.Check(modes.IsSet("d"), Equals, true)
+	if exp, got := modes.IsSet("a"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("b *!*@host1"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("b *!*@host2"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("c"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("d"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	modes = NewChannelModes(testChannelKinds, testUserKinds)
 	modes.Set("a", "b *!*@host1", "b *!*@host2", "c 10", "d arg")
 	modes.Unset("dbb *!*@host1 *!*@host2")
 	modes.Unset("c")
-	c.Check(modes.IsSet("a"), Equals, true)
-	c.Check(modes.IsSet("b"), Equals, false)
-	c.Check(modes.IsSet("c"), Equals, true)
-	c.Check(modes.IsSet("d"), Equals, false)
+	if exp, got := modes.IsSet("a"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("b"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("c"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("d"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	modes = NewChannelModes(testChannelKinds, testUserKinds)
 	modes.Set("a", "b *!*@host1", "b *!*@host2", "c 10", "d arg")
 	modes.Unset("dbc *!*@host1 10")
-	c.Check(modes.IsSet("a"), Equals, true)
-	c.Check(modes.IsSet("b *!*@host1"), Equals, false)
-	c.Check(modes.IsSet("b *!*@host2"), Equals, true)
-	c.Check(modes.IsSet("c"), Equals, false)
-	c.Check(modes.IsSet("d"), Equals, false)
+	if exp, got := modes.IsSet("a"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("b *!*@host1"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("b *!*@host2"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("c"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("d"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	modes = NewChannelModes(testChannelKinds, testUserKinds)
 	modes.Set("a", "b *!*@host1", "b *!*@host2", "c 10", "d arg")
 	modes.Unset("bad *!*@not.host1")
-	c.Check(modes.IsSet("a"), Equals, false)
-	c.Check(modes.IsSet("b"), Equals, true)
-	c.Check(modes.IsSet("c"), Equals, true)
-	c.Check(modes.IsSet("d"), Equals, false)
+	if exp, got := modes.IsSet("a"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("b"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("c"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("d"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	modes = NewChannelModes(testChannelKinds, testUserKinds)
 	modes.Set("a", "b *!*@host1", "b *!*@host2", "c 10", "d arg")
 	modes.Unset("a", "b *!*@not.host1")
-	c.Check(modes.IsSet("a"), Equals, false)
-	c.Check(modes.IsSet("b"), Equals, true)
-	c.Check(modes.IsSet("c"), Equals, true)
-	c.Check(modes.IsSet("d"), Equals, true)
+	if exp, got := modes.IsSet("a"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("b"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("c"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := modes.IsSet("d"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestChannelModes_String(c *C) {
+func TestChannelModes_String(t *testing.T) {
+	t.Parallel()
+
 	modes := NewChannelModes(testChannelKinds, testUserKinds)
 	modes.Set("a", "b host1", "b host2", "c 10", "d arg")
 	str := modes.String()
-	c.Check(str, Matches, `^[abbcd]{5}( arg| 10){2}( host1| host2){2}$`)
+	matched, err := regexp.MatchString(
+		`^[abbcd]{5}( arg| 10){2}( host1| host2){2}$`, str)
+	if err != nil {
+		t.Error("Regexp failed to compile:", err)
+	}
+	if !matched {
+		t.Errorf("Expected: %q to match the pattern.", str)
+	}
 
 	modes = NewChannelModes(testChannelKinds, testUserKinds)
 	modes.Set("xyz")
 	str = modes.String()
-	c.Check(str, Matches, `^[xyz]{3}$`)
+	matched, err = regexp.MatchString(`^[xyz]{3}$`, str)
+	if err != nil {
+		t.Error("Regexp failed to compile:", err)
+	}
+	if !matched {
+		t.Errorf("Expected: %q to match the pattern.", str)
+	}
 }

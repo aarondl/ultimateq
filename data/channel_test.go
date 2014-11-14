@@ -1,99 +1,189 @@
 package data
 
 import (
-	. "gopkg.in/check.v1"
+	"testing"
 )
 
-func (s *s) TestChannel_Create(c *C) {
+func TestChannel_Create(t *testing.T) {
+	t.Parallel()
+
 	ch := NewChannel("", testChannelKinds, testUserKinds)
-	c.Check(ch, IsNil)
+	if got := ch; got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
 
 	name := "#CHAN"
 	ch = NewChannel(name, testChannelKinds, testUserKinds)
-	c.Check(ch, NotNil)
-	c.Check(ch.Name(), Equals, name)
-	c.Check(ch.Topic(), Equals, "")
-	c.Check(ch.ChannelModes, NotNil)
+	if ch == nil {
+		t.Error("Unexpected nil.")
+	}
+	if exp, got := ch.Name(), name; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := ch.Topic(), ""; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if ch.ChannelModes == nil {
+		t.Error("Unexpected nil.")
+	}
 }
 
-func (s *s) TestChannel_GettersSetters(c *C) {
+func TestChannel_GettersSetters(t *testing.T) {
+	t.Parallel()
+
 	name := "#chan"
 	topic := "topic"
 
 	ch := NewChannel(name, testChannelKinds, testUserKinds)
-	c.Check(ch.Name(), Equals, name)
+	if exp, got := ch.Name(), name; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 	ch.SetTopic(topic)
-	c.Check(ch.Topic(), Equals, topic)
+	if exp, got := ch.Topic(), topic; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestChannel_Bans(c *C) {
+func TestChannel_Bans(t *testing.T) {
+	t.Parallel()
+
 	bans := []string{"ban1", "ban2"}
 	ch := NewChannel("name", testChannelKinds, testUserKinds)
 
 	ch.SetBans(bans)
 	got := ch.Bans()
 	for i := 0; i < len(got); i++ {
-		c.Check(got[i], Equals, bans[i])
+		if exp, got := got[i], bans[i]; exp != got {
+			t.Error("Expected: %v, got: %v", exp, got)
+		}
 	}
 	bans[0] = "ban3"
-	c.Check(got[0], Not(Equals), bans[0])
+	if exp, got := got[0], bans[0]; exp == got {
+		t.Error("Did not want: %v, got: %v", exp, got)
+	}
 
-	c.Check(ch.HasBan("ban2"), Equals, true)
+	if exp, got := ch.HasBan("ban2"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 	ch.DeleteBan("ban2")
-	c.Check(ch.HasBan("ban2"), Equals, false)
+	if exp, got := ch.HasBan("ban2"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
-	c.Check(ch.HasBan("ban2"), Equals, false)
+	if exp, got := ch.HasBan("ban2"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 	ch.AddBan("ban2")
-	c.Check(ch.HasBan("ban2"), Equals, true)
+	if exp, got := ch.HasBan("ban2"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestChannel_IsBanned(c *C) {
+func TestChannel_IsBanned(t *testing.T) {
+	t.Parallel()
+
 	bans := []string{"*!*@host.com", "nick!*@*"}
 	ch := NewChannel("name", testChannelKinds, testUserKinds)
 	ch.SetBans(bans)
-	c.Check(ch.IsBanned("nick"), Equals, true)
-	c.Check(ch.IsBanned("notnick"), Equals, false)
-	c.Check(ch.IsBanned("nick!user@host"), Equals, true)
-	c.Check(ch.IsBanned("notnick!user@host"), Equals, false)
-	c.Check(ch.IsBanned("notnick!user@host.com"), Equals, true)
+	if exp, got := ch.IsBanned("nick"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := ch.IsBanned("notnick"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := ch.IsBanned("nick!user@host"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := ch.IsBanned("notnick!user@host"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := ch.IsBanned("notnick!user@host.com"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestChannel_DeleteBanWild(c *C) {
+func TestChannel_DeleteBanWild(t *testing.T) {
+	t.Parallel()
+
 	bans := []string{"*!*@host.com", "nick!*@*", "nick2!*@*"}
 	ch := NewChannel("name", testChannelKinds, testUserKinds)
 	ch.SetBans(bans)
-	c.Check(ch.IsBanned("nick"), Equals, true)
-	c.Check(ch.IsBanned("notnick"), Equals, false)
-	c.Check(ch.IsBanned("nick!user@host"), Equals, true)
-	c.Check(ch.IsBanned("notnick!user@host"), Equals, false)
-	c.Check(ch.IsBanned("notnick!user@host.com"), Equals, true)
-	c.Check(ch.IsBanned("nick2!user@host"), Equals, true)
+	if exp, got := ch.IsBanned("nick"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := ch.IsBanned("notnick"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := ch.IsBanned("nick!user@host"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := ch.IsBanned("notnick!user@host"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := ch.IsBanned("notnick!user@host.com"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := ch.IsBanned("nick2!user@host"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	ch.DeleteBans("")
-	c.Check(len(ch.Bans()), Equals, 3)
+	if exp, got := len(ch.Bans()), 3; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	ch.DeleteBans("nick")
-	c.Check(ch.IsBanned("nick"), Equals, false)
-	c.Check(ch.IsBanned("notnick"), Equals, false)
-	c.Check(ch.IsBanned("nick!user@host"), Equals, false)
-	c.Check(ch.IsBanned("nick2!user@host"), Equals, true)
-	c.Check(ch.IsBanned("notnick!user@host"), Equals, false)
-	c.Check(ch.IsBanned("notnick!user@host.com"), Equals, true)
-	c.Check(ch.IsBanned("nick2!user@host"), Equals, true)
+	if exp, got := ch.IsBanned("nick"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := ch.IsBanned("notnick"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := ch.IsBanned("nick!user@host"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := ch.IsBanned("nick2!user@host"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := ch.IsBanned("notnick!user@host"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := ch.IsBanned("notnick!user@host.com"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := ch.IsBanned("nick2!user@host"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
-	c.Check(len(ch.Bans()), Equals, 2)
+	if exp, got := len(ch.Bans()), 2; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	ch.DeleteBans("nick2!user@host.com")
-	c.Check(ch.IsBanned("nick2!user@host"), Equals, false)
-	c.Check(ch.IsBanned("notnick!user@host.com"), Equals, false)
-	c.Check(ch.IsBanned("nick2!user@host"), Equals, false)
+	if exp, got := ch.IsBanned("nick2!user@host"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := ch.IsBanned("notnick!user@host.com"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := ch.IsBanned("nick2!user@host"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
-	c.Check(len(ch.Bans()), Equals, 0)
+	if exp, got := len(ch.Bans()), 0; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 	ch.DeleteBans("nick2!user@host.com")
-	c.Check(len(ch.Bans()), Equals, 0)
+	if exp, got := len(ch.Bans()), 0; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestChannel_String(c *C) {
+func TestChannel_String(t *testing.T) {
+	t.Parallel()
+
 	ch := NewChannel("name", testChannelKinds, testUserKinds)
-	c.Check(ch.String(), Equals, "name")
+	if exp, got := ch.String(), "name"; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 }

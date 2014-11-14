@@ -1,78 +1,174 @@
 package data
 
 import (
-	. "gopkg.in/check.v1"
+	"regexp"
+	"testing"
 )
 
-func (s *s) TestModeDiff_Create(c *C) {
+func TestModeDiff_Create(t *testing.T) {
+	t.Parallel()
+
 	diff := NewModeDiff(testChannelKinds, testUserKinds)
-	c.Check(diff, NotNil)
-	c.Check(diff.pos, NotNil)
-	c.Check(diff.neg, NotNil)
+	if diff == nil {
+		t.Error("Unexpected nil.")
+	}
+	if diff.pos == nil {
+		t.Error("Unexpected nil.")
+	}
+	if diff.neg == nil {
+		t.Error("Unexpected nil.")
+	}
 
 	var _ moder = NewModeDiff(testChannelKinds, testUserKinds)
 }
 
-func (s *s) TestModeDiff_Apply(c *C) {
+func TestModeDiff_Apply(t *testing.T) {
+	t.Parallel()
+
 	d := NewModeDiff(testChannelKinds, testUserKinds)
 	pos, neg := d.Apply("+ab-c 10 ")
-	c.Check(len(pos), Equals, 0)
-	c.Check(len(neg), Equals, 0)
-	c.Check(d.IsSet("ab 10"), Equals, true)
-	c.Check(d.IsSet("c"), Equals, false)
-	c.Check(d.IsUnset("c"), Equals, false)
+	if exp, got := len(pos), 0; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := len(neg), 0; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := d.IsSet("ab 10"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := d.IsSet("c"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := d.IsUnset("c"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	d = NewModeDiff(testChannelKinds, testUserKinds)
 	pos, neg = d.Apply("+b-b 10 10")
-	c.Check(len(pos), Equals, 0)
-	c.Check(len(neg), Equals, 0)
-	c.Check(d.IsSet("b 10"), Equals, false)
-	c.Check(d.IsUnset("b 10"), Equals, true)
+	if exp, got := len(pos), 0; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := len(neg), 0; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := d.IsSet("b 10"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := d.IsUnset("b 10"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	d = NewModeDiff(testChannelKinds, testUserKinds)
 	pos, neg = d.Apply("-b+b 10 10")
-	c.Check(len(pos), Equals, 0)
-	c.Check(len(neg), Equals, 0)
-	c.Check(d.IsSet("b 10"), Equals, true)
-	c.Check(d.IsUnset("b 10"), Equals, false)
+	if exp, got := len(pos), 0; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := len(neg), 0; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := d.IsSet("b 10"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := d.IsUnset("b 10"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	pos, neg = d.Apply("+x-y+z")
-	c.Check(len(pos), Equals, 0)
-	c.Check(len(neg), Equals, 0)
-	c.Check(d.IsSet("x"), Equals, true)
-	c.Check(d.IsUnset("y"), Equals, true)
-	c.Check(d.IsSet("z"), Equals, true)
-	c.Check(d.IsUnset("x"), Equals, false)
-	c.Check(d.IsSet("y"), Equals, false)
-	c.Check(d.IsUnset("z"), Equals, false)
+	if exp, got := len(pos), 0; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := len(neg), 0; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := d.IsSet("x"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := d.IsUnset("y"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := d.IsSet("z"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := d.IsUnset("x"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := d.IsSet("y"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := d.IsUnset("z"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	pos, neg = d.Apply("+vx-yo+vz user1 user2 user3")
-	c.Check(len(pos), Equals, 2)
-	c.Check(len(neg), Equals, 1)
-	c.Check(pos[0].Mode, Equals, 'v')
-	c.Check(pos[0].Arg, Equals, "user1")
-	c.Check(pos[1].Mode, Equals, 'v')
-	c.Check(pos[1].Arg, Equals, "user3")
-	c.Check(neg[0].Mode, Equals, 'o')
-	c.Check(neg[0].Arg, Equals, "user2")
-	c.Check(d.IsSet("x"), Equals, true)
-	c.Check(d.IsUnset("y"), Equals, true)
-	c.Check(d.IsSet("z"), Equals, true)
-	c.Check(d.IsUnset("x"), Equals, false)
-	c.Check(d.IsSet("y"), Equals, false)
-	c.Check(d.IsUnset("z"), Equals, false)
+	if exp, got := len(pos), 2; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := len(neg), 1; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := pos[0].Mode, 'v'; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := pos[0].Arg, "user1"; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := pos[1].Mode, 'v'; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := pos[1].Arg, "user3"; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := neg[0].Mode, 'o'; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := neg[0].Arg, "user2"; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := d.IsSet("x"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := d.IsUnset("y"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := d.IsSet("z"), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := d.IsUnset("x"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := d.IsSet("y"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := d.IsUnset("z"), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestModeDiff_String(c *C) {
+func TestModeDiff_String(t *testing.T) {
+	t.Parallel()
+
 	diff := NewModeDiff(testChannelKinds, testUserKinds)
 	diff.pos.Set("a", "b host1", "c 1")
 	diff.neg.Set("x", "y", "z", "b host2")
 	str := diff.String()
-	c.Check(str, Matches, `^\+[abc]{3}-[xyzb]{4}( 1| host1){2}( host2){1}$`)
+	matched, err := regexp.MatchString(
+		`^\+[abc]{3}-[xyzb]{4}( 1| host1){2}( host2){1}$`, str)
+	if err != nil {
+		t.Error("Regexp failed to compile:", err)
+	}
+	if !matched {
+		t.Errorf("Expected: %q to match the pattern.", str)
+	}
 
 	diff = NewModeDiff(testChannelKinds, testUserKinds)
 	diff.pos.Set("x", "y", "z")
 	diff.neg.Set("x", "y", "z")
 	str = diff.String()
-	c.Check(str, Matches, `^\+[xyz]{3}-[xyz]{3}$`)
+	matched, err = regexp.MatchString(`^\+[xyz]{3}-[xyz]{3}$`, str)
+	if err != nil {
+		t.Error("Regexp failed to compile:", err)
+	}
+	if !matched {
+		t.Errorf("Expected: %q to match the pattern.", str)
+	}
 }

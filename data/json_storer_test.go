@@ -3,6 +3,8 @@ package data
 import "testing"
 
 func TestJSONStorer(t *testing.T) {
+	t.Parallel()
+
 	js := make(JSONStorer)
 	js.Put("Hello", "world")
 	if got, ok := js.Get("Hello"); !ok || got != "world" {

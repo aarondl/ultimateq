@@ -1,40 +1,80 @@
 package data
 
 import (
-	. "gopkg.in/check.v1"
+	"testing"
 )
 
-func (s *s) TestUserModes(c *C) {
+func TestUserModes(t *testing.T) {
+	t.Parallel()
+
 	m := NewUserModes(testUserKinds)
-	c.Check(m.HasMode('o'), Equals, false)
-	c.Check(m.HasMode('v'), Equals, false)
+	if exp, got := m.HasMode('o'), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.HasMode('v'), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	m.SetMode('o')
-	c.Check(m.HasMode('o'), Equals, true)
-	c.Check(m.HasMode('v'), Equals, false)
+	if exp, got := m.HasMode('o'), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.HasMode('v'), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 	m.SetMode('v')
-	c.Check(m.HasMode('o'), Equals, true)
-	c.Check(m.HasMode('v'), Equals, true)
+	if exp, got := m.HasMode('o'), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.HasMode('v'), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	m.UnsetMode('o')
-	c.Check(m.HasMode('o'), Equals, false)
-	c.Check(m.HasMode('v'), Equals, true)
+	if exp, got := m.HasMode('o'), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.HasMode('v'), true; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 	m.UnsetMode('v')
-	c.Check(m.HasMode('o'), Equals, false)
-	c.Check(m.HasMode('v'), Equals, false)
+	if exp, got := m.HasMode('o'), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.HasMode('v'), false; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestUserModes_String(c *C) {
+func TestUserModes_String(t *testing.T) {
+	t.Parallel()
+
 	m := NewUserModes(testUserKinds)
-	c.Check(m.String(), Equals, "")
-	c.Check(m.StringSymbols(), Equals, "")
+	if exp, got := m.String(), ""; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.StringSymbols(), ""; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 	m.SetMode('o')
-	c.Check(m.String(), Equals, "o")
-	c.Check(m.StringSymbols(), Equals, "@")
+	if exp, got := m.String(), "o"; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.StringSymbols(), "@"; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 	m.SetMode('v')
-	c.Check(m.String(), Equals, "ov")
-	c.Check(m.StringSymbols(), Equals, "@+")
+	if exp, got := m.String(), "ov"; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.StringSymbols(), "@+"; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 	m.UnsetMode('o')
-	c.Check(m.String(), Equals, "v")
-	c.Check(m.StringSymbols(), Equals, "+")
+	if exp, got := m.String(), "v"; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.StringSymbols(), "+"; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 }

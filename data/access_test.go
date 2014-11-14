@@ -26,6 +26,7 @@ func TestAccess(t *testing.T) {
 }
 
 func TestAccess_HasLevel(t *testing.T) {
+	t.Parallel()
 	a := NewAccess(50)
 
 	var table = map[uint8]bool{
@@ -132,6 +133,7 @@ func TestAccess_ClearAllFlags(t *testing.T) {
 }
 
 func TestAccess_IsZero(t *testing.T) {
+	t.Parallel()
 	a := Access{}
 	if !a.IsZero() {
 		t.Error("Should be zero.")

@@ -2,48 +2,82 @@ package data
 
 import (
 	"fmt"
-	. "gopkg.in/check.v1"
+	"testing"
 )
 
-func (s *s) TestUser_Create(c *C) {
+func TestUser_Create(t *testing.T) {
+	t.Parallel()
+
 	u := NewUser("")
-	c.Check(u, IsNil)
+	if got := u; got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
 
 	u = NewUser("nick")
-	c.Check(u, NotNil)
-	c.Check(u.Nick(), Equals, "nick")
-	c.Check(u.Host(), Equals, "nick")
+	if u == nil {
+		t.Error("Unexpected nil.")
+	}
+	if exp, got := u.Nick(), "nick"; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := u.Host(), "nick"; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	u = NewUser("nick!user@host")
-	c.Check(u, NotNil)
-	c.Check(u.Nick(), Equals, "nick")
-	c.Check(u.Username(), Equals, "user")
-	c.Check(u.Hostname(), Equals, "host")
-	c.Check(u.Host(), Equals, "nick!user@host")
+	if u == nil {
+		t.Error("Unexpected nil.")
+	}
+	if exp, got := u.Nick(), "nick"; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := u.Username(), "user"; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := u.Hostname(), "host"; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := u.Host(), "nick!user@host"; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestUser_Realname(c *C) {
+func TestUser_Realname(t *testing.T) {
+	t.Parallel()
+
 	u := NewUser("nick!user@host")
 	u.SetRealname("realname realname")
-	c.Check(u.Realname(), Equals, "realname realname")
+	if exp, got := u.Realname(), "realname realname"; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestUser_String(c *C) {
+func TestUser_String(t *testing.T) {
+	t.Parallel()
+
 	u := NewUser("nick")
 	str := fmt.Sprint(u)
-	c.Check(str, Equals, "nick")
+	if exp, got := str, "nick"; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	u = NewUser("nick!user@host")
 	str = fmt.Sprint(u)
-	c.Check(str, Equals, "nick nick!user@host")
+	if exp, got := str, "nick nick!user@host"; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	u = NewUser("nick")
 	u.SetRealname("realname realname")
 	str = fmt.Sprint(u)
-	c.Check(str, Equals, "nick realname realname")
+	if exp, got := str, "nick realname realname"; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	u = NewUser("nick!user@host")
 	u.SetRealname("realname realname")
 	str = fmt.Sprint(u)
-	c.Check(str, Equals, "nick nick!user@host realname realname")
+	if exp, got := str, "nick nick!user@host realname realname"; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 }

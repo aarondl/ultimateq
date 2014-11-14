@@ -6,13 +6,7 @@ import (
 
 	"code.google.com/p/go.crypto/bcrypt"
 	"github.com/aarondl/ultimateq/irc"
-	. "gopkg.in/check.v1"
 )
-
-func Test(t *testing.T) { TestingT(t) } //Hook into testing package
-type s struct{}
-
-var _ = Suite(&s{})
 
 func init() {
 	// Speed up bcrypt for tests.
@@ -38,14 +32,24 @@ var (
 	netInfo = irc.NewNetworkInfo()
 )
 
-func (s *s) TestState(c *C) {
+func TestState(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
-	c.Check(st, NotNil)
-	c.Check(err, IsNil)
-	c.Check(st.Self.ChannelModes, NotNil)
+	if st == nil {
+		t.Error("Unexpected nil.")
+	}
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
+	if st.Self.ChannelModes == nil {
+		t.Error("Unexpected nil.")
+	}
 
 	st, err = NewState(nil)
-	c.Check(err, Equals, errProtoCapsMissing)
+	if exp, got := err, errProtoCapsMissing; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 
 	// Should die on creating kinds
 	fakeCaps := &irc.NetworkInfo{}
@@ -53,8 +57,12 @@ func (s *s) TestState(c *C) {
 		"NICK", "CHANTYPES=#&", "PREFIX=(ov)@+",
 	}})
 	st, err = NewState(fakeCaps)
-	c.Check(st, IsNil)
-	c.Check(err, NotNil)
+	if got := st; got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
+	if err == nil {
+		t.Error("Unexpected nil.")
+	}
 
 	// Should die on creating user modes
 	fakeCaps = &irc.NetworkInfo{}
@@ -62,13 +70,21 @@ func (s *s) TestState(c *C) {
 		"NICK", "CHANTYPES=#&", "CHANMODES=a,b,c,d",
 	}})
 	st, err = NewState(fakeCaps)
-	c.Check(st, IsNil)
-	c.Check(err, NotNil)
+	if got := st; got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
+	if err == nil {
+		t.Error("Unexpected nil.")
+	}
 }
 
-func (s *s) TestState_UpdateProtoCaps(c *C) {
+func TestState_UpdateProtoCaps(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 
 	fakeNetInfo := &irc.NetworkInfo{}
 	fakeNetInfo.ParseISupport(&irc.Event{Args: []string{
@@ -78,124 +94,240 @@ func (s *s) TestState_UpdateProtoCaps(c *C) {
 		"nick", "irc.test.net", "test-12", "q", "abc",
 	}})
 
-	c.Assert(st.kinds.kinds['q'], Equals, 0)
-	c.Assert(st.umodes.GetModeBit('q'), Equals, byte(0))
+	if exp, got := st.kinds.kinds['q'], 0; exp != got {
+		t.Fatalf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.umodes.GetModeBit('q'), byte(0); exp != got {
+		t.Fatalf("Expected: %v, got: %v", exp, got)
+	}
 	st.SetNetworkInfo(fakeNetInfo)
-	c.Assert(st.kinds.kinds['q'], Not(Equals), 0)
-	c.Assert(st.umodes.GetModeBit('q'), Not(Equals), 0)
+	if exp, got := st.kinds.kinds['q'], 0; exp == got {
+		t.Fatalf("Did not want: %v, got: %v", exp, got)
+	}
+	if exp, got := st.umodes.GetModeBit('q'), byte(0); exp == got {
+		t.Fatalf("Did not want: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestState_GetUser(c *C) {
+func TestState_GetUser(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
-	c.Check(err, IsNil)
-	c.Check(st.GetUser(users[0]), IsNil)
-	c.Check(st.GetUser(users[1]), IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
+	if got := st.GetUser(users[0]); got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
+	if got := st.GetUser(users[1]); got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
 	st.addUser(users[0])
-	c.Check(st.GetUser(users[0]), NotNil)
-	c.Check(st.GetUser(users[1]), IsNil)
+	if st.GetUser(users[0]) == nil {
+		t.Error("Unexpected nil.")
+	}
+	if got := st.GetUser(users[1]); got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
 	st.addUser(users[1])
-	c.Check(st.GetUser(users[0]), NotNil)
-	c.Check(st.GetUser(users[1]), NotNil)
+	if st.GetUser(users[0]) == nil {
+		t.Error("Unexpected nil.")
+	}
+	if st.GetUser(users[1]) == nil {
+		t.Error("Unexpected nil.")
+	}
 
 	st, err = NewState(netInfo)
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 	oldHost := "nick!user@host.com"
 	newHost := "nick!user@host.net"
 	st.addUser(oldHost)
-	c.Check(st.GetUser(oldHost).Host(), Equals, oldHost)
-	c.Check(st.GetUser(newHost).Host(), Not(Equals), newHost)
+	if exp, got := st.GetUser(oldHost).Host(), oldHost; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.GetUser(newHost).Host(), newHost; exp == got {
+		t.Errorf("Did not want: %v, got: %v", exp, got)
+	}
 	st.addUser(newHost)
-	c.Check(st.GetUser(oldHost).Host(), Not(Equals), oldHost)
-	c.Check(st.GetUser(newHost).Host(), Equals, newHost)
+	if exp, got := st.GetUser(oldHost).Host(), oldHost; exp == got {
+		t.Errorf("Did not want: %v, got: %v", exp, got)
+	}
+	if exp, got := st.GetUser(newHost).Host(), newHost; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestState_GetChannel(c *C) {
+func TestState_GetChannel(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
-	c.Check(err, IsNil)
-	c.Check(st.GetChannel(channels[0]), IsNil)
-	c.Check(st.GetChannel(channels[1]), IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
+	if got := st.GetChannel(channels[0]); got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
+	if got := st.GetChannel(channels[1]); got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
 	st.addChannel(channels[0])
-	c.Check(st.GetChannel(channels[0]), NotNil)
-	c.Check(st.GetChannel(channels[1]), IsNil)
+	if st.GetChannel(channels[0]) == nil {
+		t.Error("Unexpected nil.")
+	}
+	if got := st.GetChannel(channels[1]); got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
 	st.addChannel(channels[1])
-	c.Check(st.GetChannel(channels[0]), NotNil)
-	c.Check(st.GetChannel(channels[1]), NotNil)
+	if st.GetChannel(channels[0]) == nil {
+		t.Error("Unexpected nil.")
+	}
+	if st.GetChannel(channels[1]) == nil {
+		t.Error("Unexpected nil.")
+	}
 }
 
-func (s *s) TestState_GetUsersChannelModes(c *C) {
+func TestState_GetUsersChannelModes(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 	st.addUser(users[0])
-	c.Check(st.GetUsersChannelModes(users[0], channels[0]), IsNil)
+	if got := st.GetUsersChannelModes(users[0], channels[0]); got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
 	st.addChannel(channels[0])
-	c.Check(st.GetUsersChannelModes(users[0], channels[0]), IsNil)
+	if got := st.GetUsersChannelModes(users[0], channels[0]); got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
 
 	st.addToChannel(users[0], channels[0])
-	c.Check(st.GetUsersChannelModes(users[0], channels[0]), NotNil)
+	if st.GetUsersChannelModes(users[0], channels[0]) == nil {
+		t.Error("Unexpected nil.")
+	}
 }
 
-func (s *s) TestState_GetNUsers(c *C) {
+func TestState_GetNUsers(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
-	c.Check(err, IsNil)
-	c.Check(st.GetNUsers(), Equals, 0)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
+	if exp, got := st.GetNUsers(), 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	st.addUser(users[0])
 	st.addUser(users[0]) // Test that adding a user twice does nothing.
-	c.Check(st.GetNUsers(), Equals, 1)
+	if exp, got := st.GetNUsers(), 1; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	st.addUser(users[1])
-	c.Check(st.GetNUsers(), Equals, 2)
+	if exp, got := st.GetNUsers(), 2; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestState_GetNChannels(c *C) {
+func TestState_GetNChannels(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
-	c.Check(err, IsNil)
-	c.Check(st.GetNChannels(), Equals, 0)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
+	if exp, got := st.GetNChannels(), 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	st.addChannel(channels[0])
 	st.addChannel(channels[0]) // Test that adding a channel twice does nothing.
-	c.Check(st.GetNChannels(), Equals, 1)
+	if exp, got := st.GetNChannels(), 1; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	st.addChannel(channels[1])
-	c.Check(st.GetNChannels(), Equals, 2)
+	if exp, got := st.GetNChannels(), 2; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestState_GetNUserChans(c *C) {
+func TestState_GetNUserChans(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
-	c.Check(err, IsNil)
-	c.Check(st.GetNUserChans(users[0]), Equals, 0)
-	c.Check(st.GetNUserChans(users[0]), Equals, 0)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
+	if exp, got := st.GetNUserChans(users[0]), 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.GetNUserChans(users[0]), 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	st.addChannel(channels[0])
 	st.addChannel(channels[1])
-	c.Check(st.GetNUserChans(users[0]), Equals, 0)
-	c.Check(st.GetNUserChans(users[0]), Equals, 0)
+	if exp, got := st.GetNUserChans(users[0]), 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.GetNUserChans(users[0]), 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	st.addUser(users[0])
 	st.addUser(users[1])
 	st.addToChannel(users[0], channels[0])
 	st.addToChannel(users[0], channels[0]) // Test no duplicate adds.
 	st.addToChannel(users[0], channels[1])
 	st.addToChannel(users[1], channels[0])
-	c.Check(st.GetNUserChans(users[0]), Equals, 2)
-	c.Check(st.GetNUserChans(users[1]), Equals, 1)
+	if exp, got := st.GetNUserChans(users[0]), 2; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.GetNUserChans(users[1]), 1; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestState_GetNChanUsers(c *C) {
+func TestState_GetNChanUsers(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
-	c.Check(err, IsNil)
-	c.Check(st.GetNChanUsers(channels[0]), Equals, 0)
-	c.Check(st.GetNChanUsers(channels[0]), Equals, 0)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
+	if exp, got := st.GetNChanUsers(channels[0]), 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.GetNChanUsers(channels[0]), 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	st.addChannel(channels[0])
 	st.addChannel(channels[1])
-	c.Check(st.GetNChanUsers(channels[0]), Equals, 0)
-	c.Check(st.GetNChanUsers(channels[0]), Equals, 0)
+	if exp, got := st.GetNChanUsers(channels[0]), 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.GetNChanUsers(channels[0]), 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	st.addUser(users[0])
 	st.addUser(users[1])
 	st.addToChannel(users[0], channels[0])
 	st.addToChannel(users[0], channels[1])
 	st.addToChannel(users[1], channels[0])
-	c.Check(st.GetNChanUsers(channels[0]), Equals, 2)
-	c.Check(st.GetNChanUsers(channels[1]), Equals, 1)
+	if exp, got := st.GetNChanUsers(channels[0]), 2; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.GetNChanUsers(channels[1]), 1; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestState_EachUser(c *C) {
+func TestState_EachUser(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 	st.addUser(users[0])
 	st.addUser(users[1])
 	i := 0
@@ -207,15 +339,23 @@ func (s *s) TestState_EachUser(c *C) {
 				break
 			}
 		}
-		c.Check(has, Equals, true)
+		if exp, got := has, true; exp != got {
+			t.Errorf("Expected: %v, got: %v", exp, got)
+		}
 		i++
 	})
-	c.Check(i, Equals, 2)
+	if exp, got := i, 2; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestState_EachChannel(c *C) {
+func TestState_EachChannel(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 	st.addChannel(channels[0])
 	st.addChannel(channels[1])
 	i := 0
@@ -227,15 +367,23 @@ func (s *s) TestState_EachChannel(c *C) {
 				break
 			}
 		}
-		c.Check(has, Equals, true)
+		if exp, got := has, true; exp != got {
+			t.Errorf("Expected: %v, got: %v", exp, got)
+		}
 		i++
 	})
-	c.Check(i, Equals, 2)
+	if exp, got := i, 2; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestState_EachUserChan(c *C) {
+func TestState_EachUserChan(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 	st.addUser(users[0])
 	st.addChannel(channels[0])
 	st.addChannel(channels[1])
@@ -250,15 +398,23 @@ func (s *s) TestState_EachUserChan(c *C) {
 				break
 			}
 		}
-		c.Check(has, Equals, true)
+		if exp, got := has, true; exp != got {
+			t.Errorf("Expected: %v, got: %v", exp, got)
+		}
 		i++
 	})
-	c.Check(i, Equals, 2)
+	if exp, got := i, 2; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestState_EachChanUser(c *C) {
+func TestState_EachChanUser(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 	st.addUser(users[0])
 	st.addUser(users[1])
 	st.addChannel(channels[0])
@@ -273,18 +429,28 @@ func (s *s) TestState_EachChanUser(c *C) {
 				break
 			}
 		}
-		c.Check(has, Equals, true)
+		if exp, got := has, true; exp != got {
+			t.Errorf("Expected: %v, got: %v", exp, got)
+		}
 		i++
 	})
-	c.Check(i, Equals, 2)
+	if exp, got := i, 2; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestState_GetUsers(c *C) {
+func TestState_GetUsers(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 	st.addUser(users[0])
 	st.addUser(users[1])
-	c.Check(len(st.GetUsers()), Equals, 2)
+	if exp, got := len(st.GetUsers()), 2; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	for _, u := range st.GetUsers() {
 		has := false
 		for _, user := range users {
@@ -293,16 +459,24 @@ func (s *s) TestState_GetUsers(c *C) {
 				break
 			}
 		}
-		c.Check(has, Equals, true)
+		if exp, got := has, true; exp != got {
+			t.Errorf("Expected: %v, got: %v", exp, got)
+		}
 	}
 }
 
-func (s *s) TestState_GetChannels(c *C) {
+func TestState_GetChannels(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 	st.addChannel(channels[0])
 	st.addChannel(channels[1])
-	c.Check(len(st.GetChannels()), Equals, 2)
+	if exp, got := len(st.GetChannels()), 2; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	for _, ch := range st.GetChannels() {
 		has := false
 		for _, channel := range channels {
@@ -311,20 +485,30 @@ func (s *s) TestState_GetChannels(c *C) {
 				break
 			}
 		}
-		c.Check(has, Equals, true)
+		if exp, got := has, true; exp != got {
+			t.Errorf("Expected: %v, got: %v", exp, got)
+		}
 	}
 }
 
-func (s *s) TestState_GetUserChans(c *C) {
+func TestState_GetUserChans(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
-	c.Check(err, IsNil)
-	c.Check(st.GetUserChans(users[0]), IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
+	if got := st.GetUserChans(users[0]); got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
 	st.addUser(users[0])
 	st.addChannel(channels[0])
 	st.addChannel(channels[1])
 	st.addToChannel(users[0], channels[0])
 	st.addToChannel(users[0], channels[1])
-	c.Check(len(st.GetUserChans(users[0])), Equals, 2)
+	if exp, got := len(st.GetUserChans(users[0])), 2; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	for _, uc := range st.GetUserChans(users[0]) {
 		has := false
 		for _, channel := range channels {
@@ -333,20 +517,30 @@ func (s *s) TestState_GetUserChans(c *C) {
 				break
 			}
 		}
-		c.Check(has, Equals, true)
+		if exp, got := has, true; exp != got {
+			t.Errorf("Expected: %v, got: %v", exp, got)
+		}
 	}
 }
 
-func (s *s) TestState_GetChanUsers(c *C) {
+func TestState_GetChanUsers(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
-	c.Check(err, IsNil)
-	c.Check(st.GetChanUsers(channels[0]), IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
+	if got := st.GetChanUsers(channels[0]); got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
 	st.addUser(users[0])
 	st.addUser(users[1])
 	st.addChannel(channels[0])
 	st.addToChannel(users[0], channels[0])
 	st.addToChannel(users[1], channels[0])
-	c.Check(len(st.GetChanUsers(channels[0])), Equals, 2)
+	if exp, got := len(st.GetChanUsers(channels[0])), 2; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	for _, cu := range st.GetChanUsers(channels[0]) {
 		has := false
 		for _, user := range users {
@@ -355,24 +549,40 @@ func (s *s) TestState_GetChanUsers(c *C) {
 				break
 			}
 		}
-		c.Check(has, Equals, true)
+		if exp, got := has, true; exp != got {
+			t.Errorf("Expected: %v, got: %v", exp, got)
+		}
 	}
 }
 
-func (s *s) TestState_IsOn(c *C) {
+func TestState_IsOn(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
-	c.Check(err, IsNil)
-	c.Check(st.IsOn(users[0], channels[0]), Equals, false)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
+	if exp, got := st.IsOn(users[0], channels[0]), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	st.addChannel(channels[0])
-	c.Check(st.IsOn(users[0], channels[0]), Equals, false)
+	if exp, got := st.IsOn(users[0], channels[0]), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	st.addUser(users[0])
 	st.addToChannel(users[0], channels[0])
-	c.Check(st.IsOn(users[0], channels[0]), Equals, true)
+	if exp, got := st.IsOn(users[0], channels[0]), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestState_UpdateNick(c *C) {
+func TestState_UpdateNick(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 	ev := &irc.Event{
 		Name:   irc.NICK,
 		Sender: users[0],
@@ -383,34 +593,62 @@ func (s *s) TestState_UpdateNick(c *C) {
 	st.addChannel(channels[0])
 	st.addToChannel(users[0], channels[0])
 
-	c.Check(st.GetUser(users[0]), NotNil)
-	c.Check(st.GetUser(users[1]), IsNil)
-	c.Check(st.IsOn(users[0], channels[0]), Equals, true)
-	c.Check(st.IsOn(users[1], channels[0]), Equals, false)
+	if st.GetUser(users[0]) == nil {
+		t.Error("Unexpected nil.")
+	}
+	if got := st.GetUser(users[1]); got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
+	if exp, got := st.IsOn(users[0], channels[0]), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.IsOn(users[1], channels[0]), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	for nick := range st.channelUsers[strings.ToLower(channels[0])] {
-		c.Check(nick, Equals, nicks[0])
+		if exp, got := nick, nicks[0]; exp != got {
+			t.Errorf("Expected: %v, got: %v", exp, got)
+		}
 	}
 
 	st.Update(ev)
 
-	c.Check(st.GetUser(users[0]), IsNil)
-	c.Check(st.GetUser(users[1]), NotNil)
-	c.Check(st.IsOn(users[0], channels[0]), Equals, false)
-	c.Check(st.IsOn(users[1], channels[0]), Equals, true)
+	if got := st.GetUser(users[0]); got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
+	if st.GetUser(users[1]) == nil {
+		t.Error("Unexpected nil.")
+	}
+	if exp, got := st.IsOn(users[0], channels[0]), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.IsOn(users[1], channels[0]), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	for nick := range st.channelUsers[strings.ToLower(channels[0])] {
-		c.Check(nick, Equals, nicks[1])
+		if exp, got := nick, nicks[1]; exp != got {
+			t.Errorf("Expected: %v, got: %v", exp, got)
+		}
 	}
 
 	ev.Sender = users[0]
 	ev.Args = []string{"newnick"}
 	st.Update(ev)
-	c.Check(st.GetUser("newnick"), NotNil)
-	c.Check(st.GetUser(nicks[0]), IsNil)
+	if st.GetUser("newnick") == nil {
+		t.Error("Unexpected nil.")
+	}
+	if got := st.GetUser(nicks[0]); got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
 }
 
-func (s *s) TestState_UpdateNickSelfNilMaps(c *C) {
+func TestState_UpdateNickSelfNilMaps(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 	ev := &irc.Event{
 		Name:   irc.NICK,
 		Sender: users[0],
@@ -420,15 +658,23 @@ func (s *s) TestState_UpdateNickSelfNilMaps(c *C) {
 	st.Update(ev)
 
 	_, ok := st.userChannels[nicks[0]]
-	c.Check(ok, Equals, false)
+	if exp, got := ok, false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	_, ok = st.userChannels[nicks[1]]
-	c.Check(ok, Equals, false)
+	if exp, got := ok, false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestState_UpdateJoin(c *C) {
+func TestState_UpdateJoin(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
 	st.Self = self
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 	ev := &irc.Event{
 		Name:   irc.JOIN,
 		Sender: users[0],
@@ -436,40 +682,64 @@ func (s *s) TestState_UpdateJoin(c *C) {
 	}
 
 	st.addChannel(channels[0])
-	c.Check(st.IsOn(users[0], channels[0]), Equals, false)
+	if exp, got := st.IsOn(users[0], channels[0]), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	st.Update(ev)
-	c.Check(st.IsOn(users[0], channels[0]), Equals, true)
+	if exp, got := st.IsOn(users[0], channels[0]), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 
 	st, _ = NewState(netInfo)
 	st.Self = self
 	st.addChannel(channels[0])
 
-	c.Check(st.IsOn(users[0], channels[0]), Equals, false)
+	if exp, got := st.IsOn(users[0], channels[0]), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	st.Update(ev)
-	c.Check(st.IsOn(users[0], channels[0]), Equals, true)
+	if exp, got := st.IsOn(users[0], channels[0]), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestState_UpdateJoinSelf(c *C) {
+func TestState_UpdateJoinSelf(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
 	st.Self = self
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 	ev := &irc.Event{
 		Name:   irc.JOIN,
 		Sender: self.Host(),
 		Args:   []string{channels[0]},
 	}
 
-	c.Check(st.GetChannel(channels[0]), IsNil)
-	c.Check(st.IsOn(st.Self.Nick(), channels[0]), Equals, false)
+	if got := st.GetChannel(channels[0]); got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
+	if exp, got := st.IsOn(st.Self.Nick(), channels[0]), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	st.Update(ev)
-	c.Check(st.GetChannel(channels[0]), NotNil)
-	c.Check(st.IsOn(st.Self.Nick(), channels[0]), Equals, true)
+	if st.GetChannel(channels[0]) == nil {
+		t.Error("Unexpected nil.")
+	}
+	if exp, got := st.IsOn(st.Self.Nick(), channels[0]), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestState_UpdatePart(c *C) {
+func TestState_UpdatePart(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
 	st.Self = self
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 
 	ev := &irc.Event{
 		Name:   irc.PART,
@@ -483,7 +753,9 @@ func (s *s) TestState_UpdatePart(c *C) {
 	// Test coverage, make sure adding to a channel that doesn't exist does
 	// nothing.
 	st.addToChannel(users[0], channels[0])
-	c.Check(st.IsOn(users[0], channels[0]), Equals, false)
+	if exp, got := st.IsOn(users[0], channels[0]), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 
 	st.addChannel(channels[0])
 	st.addChannel(channels[1])
@@ -491,38 +763,74 @@ func (s *s) TestState_UpdatePart(c *C) {
 	st.addToChannel(users[1], channels[0])
 	st.addToChannel(users[0], channels[1])
 
-	c.Check(st.IsOn(users[0], channels[0]), Equals, true)
-	c.Check(st.IsOn(users[1], channels[0]), Equals, true)
-	c.Check(st.IsOn(users[0], channels[1]), Equals, true)
-	c.Check(st.IsOn(users[1], channels[1]), Equals, false)
+	if exp, got := st.IsOn(users[0], channels[0]), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.IsOn(users[1], channels[0]), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.IsOn(users[0], channels[1]), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.IsOn(users[1], channels[1]), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 
 	st.Update(ev)
-	c.Check(st.IsOn(users[0], channels[0]), Equals, false)
-	c.Check(st.IsOn(users[1], channels[0]), Equals, true)
-	c.Check(st.IsOn(users[0], channels[1]), Equals, true)
-	c.Check(st.IsOn(users[1], channels[1]), Equals, false)
+	if exp, got := st.IsOn(users[0], channels[0]), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.IsOn(users[1], channels[0]), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.IsOn(users[0], channels[1]), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.IsOn(users[1], channels[1]), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 
 	ev.Sender = users[1]
 	st.Update(ev)
-	c.Check(st.IsOn(users[0], channels[0]), Equals, false)
-	c.Check(st.IsOn(users[1], channels[0]), Equals, false)
-	c.Check(st.IsOn(users[0], channels[1]), Equals, true)
-	c.Check(st.IsOn(users[1], channels[1]), Equals, false)
+	if exp, got := st.IsOn(users[0], channels[0]), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.IsOn(users[1], channels[0]), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.IsOn(users[0], channels[1]), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.IsOn(users[1], channels[1]), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 
 	ev.Sender = users[0]
 	ev.Args[0] = channels[1]
 	st.Update(ev)
 
-	c.Check(st.IsOn(users[0], channels[0]), Equals, false)
-	c.Check(st.IsOn(users[1], channels[0]), Equals, false)
-	c.Check(st.IsOn(users[0], channels[1]), Equals, false)
-	c.Check(st.IsOn(users[1], channels[1]), Equals, false)
+	if exp, got := st.IsOn(users[0], channels[0]), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.IsOn(users[1], channels[0]), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.IsOn(users[0], channels[1]), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.IsOn(users[1], channels[1]), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestState_UpdatePartSelf(c *C) {
+func TestState_UpdatePartSelf(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
 	st.Self = self
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 	ev := &irc.Event{
 		Name:   irc.PART,
 		Sender: self.Host(),
@@ -537,19 +845,35 @@ func (s *s) TestState_UpdatePartSelf(c *C) {
 	st.addToChannel(users[0], channels[1])
 	st.addToChannel(self.Nick(), channels[0])
 
-	c.Check(st.IsOn(users[0], channels[0]), Equals, true)
-	c.Check(st.IsOn(users[0], channels[1]), Equals, true)
-	c.Check(st.IsOn(self.Nick(), channels[0]), Equals, true)
+	if exp, got := st.IsOn(users[0], channels[0]), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.IsOn(users[0], channels[1]), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.IsOn(self.Nick(), channels[0]), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	st.Update(ev)
-	c.Check(st.IsOn(users[0], channels[0]), Equals, false)
-	c.Check(st.IsOn(users[0], channels[1]), Equals, true)
-	c.Check(st.IsOn(self.Nick(), channels[0]), Equals, false)
+	if exp, got := st.IsOn(users[0], channels[0]), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.IsOn(users[0], channels[1]), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.IsOn(self.Nick(), channels[0]), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestState_UpdateQuit(c *C) {
+func TestState_UpdateQuit(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
 	st.Self = self
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 	ev := &irc.Event{
 		Name:   irc.QUIT,
 		Sender: users[0],
@@ -558,7 +882,9 @@ func (s *s) TestState_UpdateQuit(c *C) {
 
 	// Test Quitting when we don't know the user
 	st.Update(ev)
-	c.Check(st.GetUser(users[0]), IsNil)
+	if got := st.GetUser(users[0]); got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
 
 	st.addUser(users[0])
 	st.addUser(users[1])
@@ -566,29 +892,53 @@ func (s *s) TestState_UpdateQuit(c *C) {
 	st.addToChannel(users[0], channels[0])
 	st.addToChannel(users[1], channels[0])
 
-	c.Check(st.IsOn(users[0], channels[0]), Equals, true)
-	c.Check(st.GetUser(users[0]), NotNil)
-	c.Check(st.IsOn(users[1], channels[0]), Equals, true)
-	c.Check(st.GetUser(users[1]), NotNil)
+	if exp, got := st.IsOn(users[0], channels[0]), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if st.GetUser(users[0]) == nil {
+		t.Error("Unexpected nil.")
+	}
+	if exp, got := st.IsOn(users[1], channels[0]), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if st.GetUser(users[1]) == nil {
+		t.Error("Unexpected nil.")
+	}
 
 	st.Update(ev)
 
-	c.Check(st.IsOn(users[0], channels[0]), Equals, false)
-	c.Check(st.GetUser(users[0]), IsNil)
-	c.Check(st.IsOn(users[1], channels[0]), Equals, true)
-	c.Check(st.GetUser(users[1]), NotNil)
+	if exp, got := st.IsOn(users[0], channels[0]), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if got := st.GetUser(users[0]); got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
+	if exp, got := st.IsOn(users[1], channels[0]), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if st.GetUser(users[1]) == nil {
+		t.Error("Unexpected nil.")
+	}
 
 	ev.Sender = users[1]
 	st.Update(ev)
 
-	c.Check(st.IsOn(users[1], channels[0]), Equals, false)
-	c.Check(st.GetUser(users[1]), IsNil)
+	if exp, got := st.IsOn(users[1], channels[0]), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if got := st.GetUser(users[1]); got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
 }
 
-func (s *s) TestState_UpdateKick(c *C) {
+func TestState_UpdateKick(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
 	st.Self = self
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 	ev := &irc.Event{
 		Name:   irc.KICK,
 		Sender: users[1],
@@ -601,15 +951,23 @@ func (s *s) TestState_UpdateKick(c *C) {
 	st.addChannel(channels[0])
 	st.addToChannel(users[0], channels[0])
 
-	c.Check(st.IsOn(users[0], channels[0]), Equals, true)
+	if exp, got := st.IsOn(users[0], channels[0]), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	st.Update(ev)
-	c.Check(st.IsOn(users[0], channels[0]), Equals, false)
+	if exp, got := st.IsOn(users[0], channels[0]), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestState_UpdateKickSelf(c *C) {
+func TestState_UpdateKickSelf(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
 	st.Self = self
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 	ev := &irc.Event{
 		Name:   irc.KICK,
 		Sender: users[1],
@@ -620,15 +978,23 @@ func (s *s) TestState_UpdateKickSelf(c *C) {
 	st.addChannel(channels[0])
 	st.addToChannel(users[0], channels[0])
 
-	c.Check(st.GetChannel(channels[0]), NotNil)
+	if st.GetChannel(channels[0]) == nil {
+		t.Error("Unexpected nil.")
+	}
 	st.Update(ev)
-	c.Check(st.GetChannel(channels[0]), IsNil)
+	if got := st.GetChannel(channels[0]); got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
 }
 
-func (s *s) TestState_UpdateMode(c *C) {
+func TestState_UpdateMode(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
 	st.Self = self
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 
 	ev := &irc.Event{
 		Name:   irc.MODE,
@@ -640,7 +1006,9 @@ func (s *s) TestState_UpdateMode(c *C) {
 	}
 
 	fail := st.GetUsersChannelModes(users[0], channels[0])
-	c.Check(fail, IsNil)
+	if got := fail; got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
 
 	st.addChannel(channels[0])
 	st.addUser(users[0])
@@ -653,23 +1021,47 @@ func (s *s) TestState_UpdateMode(c *C) {
 	u2modes.SetMode('v')
 	st.GetChannel(channels[0]).Set("n")
 
-	c.Check(st.GetChannel(channels[0]).IsSet("n"), Equals, true)
-	c.Check(st.GetChannel(channels[0]).IsSet("mb"), Equals, false)
-	c.Check(u1modes.HasMode('o'), Equals, false)
-	c.Check(u1modes.HasMode('v'), Equals, false)
-	c.Check(u2modes.HasMode('v'), Equals, true)
+	if exp, got := st.GetChannel(channels[0]).IsSet("n"), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.GetChannel(channels[0]).IsSet("mb"), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := u1modes.HasMode('o'), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := u1modes.HasMode('v'), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := u2modes.HasMode('v'), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	st.Update(ev)
-	c.Check(st.GetChannel(channels[0]).IsSet("n"), Equals, false)
-	c.Check(st.GetChannel(channels[0]).IsSet("mb *!*mask"), Equals, true)
-	c.Check(u1modes.HasMode('o'), Equals, true)
-	c.Check(u1modes.HasMode('v'), Equals, true)
-	c.Check(u2modes.HasMode('v'), Equals, false)
+	if exp, got := st.GetChannel(channels[0]).IsSet("n"), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.GetChannel(channels[0]).IsSet("mb *!*mask"), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := u1modes.HasMode('o'), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := u1modes.HasMode('v'), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := u2modes.HasMode('v'), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestState_UpdateModeSelf(c *C) {
+func TestState_UpdateModeSelf(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
 	st.Self.User = self.User
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 
 	ev := &irc.Event{
 		Name:        irc.MODE,
@@ -680,17 +1072,29 @@ func (s *s) TestState_UpdateModeSelf(c *C) {
 
 	st.Self.Set("o")
 
-	c.Check(st.Self.IsSet("i"), Equals, false)
-	c.Check(st.Self.IsSet("o"), Equals, true)
+	if exp, got := st.Self.IsSet("i"), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.Self.IsSet("o"), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	st.Update(ev)
-	c.Check(st.Self.IsSet("i"), Equals, true)
-	c.Check(st.Self.IsSet("o"), Equals, false)
+	if exp, got := st.Self.IsSet("i"), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.Self.IsSet("o"), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestState_UpdateTopic(c *C) {
+func TestState_UpdateTopic(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
 	st.Self = self
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 
 	ev := &irc.Event{
 		Name:   irc.TOPIC,
@@ -700,15 +1104,23 @@ func (s *s) TestState_UpdateTopic(c *C) {
 
 	st.addChannel(channels[0])
 
-	c.Check(st.GetChannel(channels[0]).Topic(), Equals, "")
+	if exp, got := st.GetChannel(channels[0]).Topic(), ""; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	st.Update(ev)
-	c.Check(st.GetChannel(channels[0]).Topic(), Equals, "topic topic")
+	if exp, got := st.GetChannel(channels[0]).Topic(), "topic topic"; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestState_UpdateRplTopic(c *C) {
+func TestState_UpdateRplTopic(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
 	st.Self = self
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 
 	ev := &irc.Event{
 		Name:   irc.RPL_TOPIC,
@@ -718,15 +1130,23 @@ func (s *s) TestState_UpdateRplTopic(c *C) {
 
 	st.addChannel(channels[0])
 
-	c.Check(st.GetChannel(channels[0]).Topic(), Equals, "")
+	if exp, got := st.GetChannel(channels[0]).Topic(), ""; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	st.Update(ev)
-	c.Check(st.GetChannel(channels[0]).Topic(), Equals, "topic topic")
+	if exp, got := st.GetChannel(channels[0]).Topic(), "topic topic"; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestState_UpdateEmptyTopic(c *C) {
+func TestState_UpdateEmptyTopic(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
 	st.Self = self
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 
 	ev := &irc.Event{
 		Name:   irc.TOPIC,
@@ -737,15 +1157,23 @@ func (s *s) TestState_UpdateEmptyTopic(c *C) {
 	ch := st.addChannel(channels[0])
 	ch.SetTopic("topic topic")
 
-	c.Check(st.GetChannel(channels[0]).Topic(), Equals, "topic topic")
+	if exp, got := st.GetChannel(channels[0]).Topic(), "topic topic"; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	st.Update(ev)
-	c.Check(st.GetChannel(channels[0]).Topic(), Equals, "")
+	if exp, got := st.GetChannel(channels[0]).Topic(), ""; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestState_UpdatePrivmsg(c *C) {
+func TestState_UpdatePrivmsg(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
 	st.Self = self
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 	ev := &irc.Event{
 		Name:        irc.PRIVMSG,
 		Sender:      users[0],
@@ -755,22 +1183,36 @@ func (s *s) TestState_UpdatePrivmsg(c *C) {
 
 	st.addChannel(channels[0])
 
-	c.Check(st.GetUser(users[0]), IsNil)
-	c.Check(st.GetUsersChannelModes(users[0], channels[0]), IsNil)
+	if got := st.GetUser(users[0]); got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
+	if got := st.GetUsersChannelModes(users[0], channels[0]); got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
 	st.Update(ev)
-	c.Check(st.GetUser(users[0]), NotNil)
-	c.Check(st.GetUsersChannelModes(users[0], channels[0]), NotNil)
+	if st.GetUser(users[0]) == nil {
+		t.Error("Unexpected nil.")
+	}
+	if st.GetUsersChannelModes(users[0], channels[0]) == nil {
+		t.Error("Unexpected nil.")
+	}
 
 	ev.Sender = network
 	size := len(st.users)
 	st.Update(ev)
-	c.Check(len(st.users), Equals, size)
+	if exp, got := len(st.users), size; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestState_UpdateNotice(c *C) {
+func TestState_UpdateNotice(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
 	st.Self = self
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 	ev := &irc.Event{
 		Name:        irc.NOTICE,
 		Sender:      users[0],
@@ -780,21 +1222,35 @@ func (s *s) TestState_UpdateNotice(c *C) {
 
 	st.addChannel(channels[0])
 
-	c.Check(st.GetUser(users[0]), IsNil)
-	c.Check(st.GetUsersChannelModes(users[0], channels[0]), IsNil)
+	if got := st.GetUser(users[0]); got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
+	if got := st.GetUsersChannelModes(users[0], channels[0]); got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
 	st.Update(ev)
-	c.Check(st.GetUser(users[0]), NotNil)
-	c.Check(st.GetUsersChannelModes(users[0], channels[0]), NotNil)
+	if st.GetUser(users[0]) == nil {
+		t.Error("Unexpected nil.")
+	}
+	if st.GetUsersChannelModes(users[0], channels[0]) == nil {
+		t.Error("Unexpected nil.")
+	}
 
 	ev.Sender = network
 	size := len(st.users)
 	st.Update(ev)
-	c.Check(len(st.users), Equals, size)
+	if exp, got := len(st.users), size; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestState_UpdateWelcome(c *C) {
+func TestState_UpdateWelcome(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 	ev := &irc.Event{
 		Name:   irc.RPL_WELCOME,
 		Sender: network,
@@ -802,8 +1258,12 @@ func (s *s) TestState_UpdateWelcome(c *C) {
 	}
 
 	st.Update(ev)
-	c.Check(st.Self.Host(), Equals, nicks[1])
-	c.Check(st.users[nicks[1]].Host(), Equals, st.Self.Host())
+	if exp, got := st.Self.Host(), nicks[1]; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.users[nicks[1]].Host(), st.Self.Host(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 
 	ev = &irc.Event{
 		Name:   irc.RPL_WELCOME,
@@ -812,13 +1272,21 @@ func (s *s) TestState_UpdateWelcome(c *C) {
 	}
 
 	st.Update(ev)
-	c.Check(st.Self.Host(), Equals, users[1])
-	c.Check(st.users[nicks[1]].Host(), Equals, st.Self.Host())
+	if exp, got := st.Self.Host(), users[1]; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.users[nicks[1]].Host(), st.Self.Host(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestState_UpdateRplNamereply(c *C) {
+func TestState_UpdateRplNamereply(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 
 	ev := &irc.Event{
 		Name:   irc.RPL_NAMREPLY,
@@ -831,21 +1299,37 @@ func (s *s) TestState_UpdateRplNamereply(c *C) {
 
 	st.addChannel(channels[0])
 
-	c.Check(st.GetUsersChannelModes(users[0], channels[0]), IsNil)
-	c.Check(st.GetUsersChannelModes(users[1], channels[0]), IsNil)
-	c.Check(st.GetUsersChannelModes(self.Nick(), channels[0]), IsNil)
+	if got := st.GetUsersChannelModes(users[0], channels[0]); got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
+	if got := st.GetUsersChannelModes(users[1], channels[0]); got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
+	if got := st.GetUsersChannelModes(self.Nick(), channels[0]); got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
 	st.Update(ev)
-	c.Check(
-		st.GetUsersChannelModes(users[0], channels[0]).String(), Equals, "o")
-	c.Check(
-		st.GetUsersChannelModes(users[1], channels[0]).String(), Equals, "v")
-	c.Check(st.GetUsersChannelModes(
-		self.Nick(), channels[0]).String(), Equals, "")
+	got := st.GetUsersChannelModes(users[0], channels[0]).String()
+	if got != "o" {
+		t.Errorf(`Expected: "o", got: %q`, got)
+	}
+	got = st.GetUsersChannelModes(users[1], channels[0]).String()
+	if got != "v" {
+		t.Errorf(`Expected: "v", got: %q`, got)
+	}
+	got = st.GetUsersChannelModes(self.Nick(), channels[0]).String()
+	if len(got) > 0 {
+		t.Errorf(`Expected: empty string, got: %q`, got)
+	}
 }
 
-func (s *s) TestState_RplWhoReply(c *C) {
+func TestState_RplWhoReply(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 
 	ev := &irc.Event{
 		Name:   irc.RPL_WHOREPLY,
@@ -859,19 +1343,36 @@ func (s *s) TestState_RplWhoReply(c *C) {
 
 	st.addChannel(channels[0])
 
-	c.Check(st.GetUser(users[0]), IsNil)
-	c.Check(st.GetUsersChannelModes(users[0], channels[0]), IsNil)
+	if got := st.GetUser(users[0]); got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
+	if got := st.GetUsersChannelModes(users[0], channels[0]); got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
 	st.Update(ev)
-	c.Check(st.GetUser(users[0]), NotNil)
-	c.Check(st.GetUser(users[0]).Host(), Equals, users[0])
-	c.Check(st.GetUser(users[0]).Realname(), Equals, "real name")
-	c.Check(
-		st.GetUsersChannelModes(users[0], channels[0]).String(), Equals, "o")
+	if st.GetUser(users[0]) == nil {
+		t.Error("Unexpected nil.")
+	}
+	if exp, got := st.GetUser(users[0]).Host(), users[0]; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := st.GetUser(users[0]).Realname(), "real name"; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	got := st.GetUsersChannelModes(users[0], channels[0]).String()
+	if got != "o" {
+		t.Errorf(`Expected: "o", got: %q`, got)
+	}
+
 }
 
-func (s *s) TestState_UpdateRplMode(c *C) {
+func TestState_UpdateRplMode(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 
 	ev := &irc.Event{
 		Name:   irc.RPL_CHANNELMODEIS,
@@ -880,15 +1381,23 @@ func (s *s) TestState_UpdateRplMode(c *C) {
 	}
 
 	st.addChannel(channels[0])
-	c.Check(st.GetChannel(channels[0]).IsSet("ntzl 10"), Equals, false)
+	if exp, got := st.GetChannel(channels[0]).IsSet("ntzl 10"), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	st.Update(ev)
-	c.Check(st.GetChannel(channels[0]).IsSet("ntzl 10"), Equals, true)
+	if exp, got := st.GetChannel(channels[0]).IsSet("ntzl 10"), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestState_UpdateRplBanlist(c *C) {
+func TestState_UpdateRplBanlist(t *testing.T) {
+	t.Parallel()
+
 	st, err := NewState(netInfo)
 	st.Self = self
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 
 	ev := &irc.Event{
 		Name:   irc.RPL_BANLIST,
@@ -898,7 +1407,11 @@ func (s *s) TestState_UpdateRplBanlist(c *C) {
 	}
 
 	st.addChannel(channels[0])
-	c.Check(st.GetChannel(channels[0]).HasBan(nicks[0]+"!*@*"), Equals, false)
+	if exp, got := st.GetChannel(channels[0]).HasBan(nicks[0]+"!*@*"), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	st.Update(ev)
-	c.Check(st.GetChannel(channels[0]).HasBan(nicks[0]+"!*@*"), Equals, true)
+	if exp, got := st.GetChannel(channels[0]).HasBan(nicks[0]+"!*@*"), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }

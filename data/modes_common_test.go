@@ -1,117 +1,243 @@
 package data
 
 import (
-	. "gopkg.in/check.v1"
+	"testing"
 )
 
 var testUserKinds, _ = NewUserModeKinds("(ov)@+")
 var testChannelKinds = NewChannelModeKinds("b", "c", "d", "axyz")
 
-func (s *s) TestChannelModeKinds_Create(c *C) {
+func TestChannelModeKinds_Create(t *testing.T) {
+	t.Parallel()
+
 	m := NewChannelModeKinds("a", "b", "c", "d")
-	c.Check(m.kinds['a'], Equals, ARGS_ADDRESS)
-	c.Check(m.kinds['b'], Equals, ARGS_ALWAYS)
-	c.Check(m.kinds['c'], Equals, ARGS_ONSET)
-	c.Check(m.kinds['d'], Equals, ARGS_NONE)
+	if exp, got := m.kinds['a'], ARGS_ADDRESS; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.kinds['b'], ARGS_ALWAYS; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.kinds['c'], ARGS_ONSET; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.kinds['d'], ARGS_NONE; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	m = NewChannelModeKinds("a", "b", "c", "d")
-	c.Check(m.kinds['a'], Equals, ARGS_ADDRESS)
-	c.Check(m.kinds['b'], Equals, ARGS_ALWAYS)
-	c.Check(m.kinds['c'], Equals, ARGS_ONSET)
-	c.Check(m.kinds['d'], Equals, ARGS_NONE)
+	if exp, got := m.kinds['a'], ARGS_ADDRESS; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.kinds['b'], ARGS_ALWAYS; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.kinds['c'], ARGS_ONSET; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.kinds['d'], ARGS_NONE; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	m.Update("d", "c", "b", "a")
-	c.Check(m.kinds['d'], Equals, ARGS_ADDRESS)
-	c.Check(m.kinds['c'], Equals, ARGS_ALWAYS)
-	c.Check(m.kinds['b'], Equals, ARGS_ONSET)
-	c.Check(m.kinds['a'], Equals, ARGS_NONE)
+	if exp, got := m.kinds['d'], ARGS_ADDRESS; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.kinds['c'], ARGS_ALWAYS; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.kinds['b'], ARGS_ONSET; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.kinds['a'], ARGS_NONE; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestChannelModeKinds_NewCSV(c *C) {
+func TestChannelModeKinds_NewCSV(t *testing.T) {
+	t.Parallel()
+
 	m, err := NewChannelModeKindsCSV("")
-	c.Check(err, NotNil)
+	if err == nil {
+		t.Error("Unexpected nil.")
+	}
 
 	m, err = NewChannelModeKindsCSV(",,,")
-	c.Check(err, IsNil)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
 	m, err = NewChannelModeKindsCSV(",")
-	c.Check(err, NotNil)
+	if err == nil {
+		t.Error("Unexpected nil.")
+	}
 
 	m, err = NewChannelModeKindsCSV("a,b,c,d")
-	c.Check(m.kinds['a'], Equals, ARGS_ADDRESS)
-	c.Check(m.kinds['b'], Equals, ARGS_ALWAYS)
-	c.Check(m.kinds['c'], Equals, ARGS_ONSET)
-	c.Check(m.kinds['d'], Equals, ARGS_NONE)
+	if exp, got := m.kinds['a'], ARGS_ADDRESS; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.kinds['b'], ARGS_ALWAYS; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.kinds['c'], ARGS_ONSET; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.kinds['d'], ARGS_NONE; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestChannelModeKindsUpdate(c *C) {
+func TestChannelModeKindsUpdate(t *testing.T) {
+	t.Parallel()
+
 	m := NewChannelModeKinds("a", "b", "c", "d")
-	c.Check(m.kinds['a'], Equals, ARGS_ADDRESS)
-	c.Check(m.kinds['b'], Equals, ARGS_ALWAYS)
-	c.Check(m.kinds['c'], Equals, ARGS_ONSET)
-	c.Check(m.kinds['d'], Equals, ARGS_NONE)
+	if exp, got := m.kinds['a'], ARGS_ADDRESS; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.kinds['b'], ARGS_ALWAYS; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.kinds['c'], ARGS_ONSET; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.kinds['d'], ARGS_NONE; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	err := m.UpdateCSV("d,c,b,a")
-	c.Check(err, IsNil)
-	c.Check(m.kinds['d'], Equals, ARGS_ADDRESS)
-	c.Check(m.kinds['c'], Equals, ARGS_ALWAYS)
-	c.Check(m.kinds['b'], Equals, ARGS_ONSET)
-	c.Check(m.kinds['a'], Equals, ARGS_NONE)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
+	if exp, got := m.kinds['d'], ARGS_ADDRESS; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.kinds['c'], ARGS_ALWAYS; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.kinds['b'], ARGS_ONSET; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.kinds['a'], ARGS_NONE; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	m.Update("a", "b", "c", "d")
-	c.Check(m.kinds['a'], Equals, ARGS_ADDRESS)
-	c.Check(m.kinds['b'], Equals, ARGS_ALWAYS)
-	c.Check(m.kinds['c'], Equals, ARGS_ONSET)
-	c.Check(m.kinds['d'], Equals, ARGS_NONE)
+	if exp, got := m.kinds['a'], ARGS_ADDRESS; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.kinds['b'], ARGS_ALWAYS; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.kinds['c'], ARGS_ONSET; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := m.kinds['d'], ARGS_NONE; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	err = m.UpdateCSV("")
-	c.Check(err, NotNil)
+	if err == nil {
+		t.Error("Unexpected nil.")
+	}
 }
 
-func (s *s) TestUserModeKinds_Create(c *C) {
+func TestUserModeKinds_Create(t *testing.T) {
+	t.Parallel()
+
 	u, err := NewUserModeKinds("")
-	c.Check(u, IsNil)
-	c.Check(err, NotNil)
+	if got := u; got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
+	if err == nil {
+		t.Error("Unexpected nil.")
+	}
 	u, err = NewUserModeKinds("a")
-	c.Check(u, IsNil)
-	c.Check(err, NotNil)
+	if got := u; got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
+	if err == nil {
+		t.Error("Unexpected nil.")
+	}
 	u, err = NewUserModeKinds("(a")
-	c.Check(u, IsNil)
-	c.Check(err, NotNil)
+	if got := u; got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
+	if err == nil {
+		t.Error("Unexpected nil.")
+	}
 
 	u, err = NewUserModeKinds("(abcdefghi)!@#$%^&*_")
-	c.Check(u, IsNil)
-	c.Check(err, NotNil)
+	if got := u; got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
+	if err == nil {
+		t.Error("Unexpected nil.")
+	}
 
 	u, err = NewUserModeKinds("(ov)@+")
-	c.Check(u, NotNil)
-	c.Check(err, IsNil)
-	c.Check(u.modeInfo[0], Equals, [2]rune{'o', '@'})
-	c.Check(u.modeInfo[1], Equals, [2]rune{'v', '+'})
+	if u == nil {
+		t.Error("Unexpected nil.")
+	}
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
+	if exp, got := u.modeInfo[0], [2]rune{'o', '@'}; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := u.modeInfo[1], [2]rune{'v', '+'}; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestUserModeKinds_GetSymbol(c *C) {
+func TestUserModeKinds_GetSymbol(t *testing.T) {
+	t.Parallel()
+
 	u, err := NewUserModeKinds("(ov)@+")
-	c.Check(err, IsNil)
-	c.Check(u.GetSymbol('o'), Equals, '@')
-	c.Check(u.GetSymbol(' '), Equals, rune(0))
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
+	if exp, got := u.GetSymbol('o'), '@'; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := u.GetSymbol(' '), rune(0); exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestUserModeKinds_GetMode(c *C) {
+func TestUserModeKinds_GetMode(t *testing.T) {
+	t.Parallel()
+
 	u, err := NewUserModeKinds("(ov)@+")
-	c.Check(err, IsNil)
-	c.Check(u.GetMode('@'), Equals, 'o')
-	c.Check(u.GetMode(' '), Equals, rune(0))
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
+	if exp, got := u.GetMode('@'), 'o'; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := u.GetMode(' '), rune(0); exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestUserModeKinds_Update(c *C) {
+func TestUserModeKinds_Update(t *testing.T) {
+	t.Parallel()
+
 	u, err := NewUserModeKinds("(ov)@+")
-	c.Check(err, IsNil)
-	c.Check(u.GetModeBit('o'), Not(Equals), 0)
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
+	if exp, got := u.GetModeBit('o'), byte(0); exp == got {
+		t.Error("Did not want: %v, got: %v", exp, got)
+	}
 	err = u.UpdateModes("(v)+")
-	c.Check(err, IsNil)
-	c.Check(u.GetModeBit('o'), Equals, byte(0))
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
+	if exp, got := u.GetModeBit('o'), byte(0); exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 
 	u, err = NewUserModeKinds("(ov)@+")
 	err = u.UpdateModes("")
-	c.Check(err, NotNil)
+	if err == nil {
+		t.Error("Unexpected nil.")
+	}
 }

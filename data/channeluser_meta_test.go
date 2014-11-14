@@ -1,12 +1,14 @@
 package data
 
 import (
-	. "gopkg.in/check.v1"
+	"testing"
 )
 
 var modes = new(int)
 
-func (s *s) TestChannelUser(c *C) {
+func TestChannelUser(t *testing.T) {
+	t.Parallel()
+
 	user := NewUser("nick")
 	modes := NewUserModes(testUserKinds)
 
@@ -15,12 +17,20 @@ func (s *s) TestChannelUser(c *C) {
 		modes,
 	)
 
-	c.Check(cu, NotNil)
-	c.Check(cu.User, Equals, user)
-	c.Check(cu.UserModes, Equals, modes)
+	if cu == nil {
+		t.Error("Unexpected nil.")
+	}
+	if exp, got := cu.User, user; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := cu.UserModes, modes; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestUserChannel(c *C) {
+func TestUserChannel(t *testing.T) {
+	t.Parallel()
+
 	ch := NewChannel("", testChannelKinds, testUserKinds)
 	modes := NewUserModes(testUserKinds)
 
@@ -29,7 +39,13 @@ func (s *s) TestUserChannel(c *C) {
 		modes,
 	)
 
-	c.Check(uc, NotNil)
-	c.Check(uc.Channel, Equals, ch)
-	c.Check(uc.UserModes, Equals, modes)
+	if uc == nil {
+		t.Error("Unexpected nil.")
+	}
+	if exp, got := uc.Channel, ch; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := uc.UserModes, modes; exp != got {
+		t.Error("Expected: %v, got: %v", exp, got)
+	}
 }
