@@ -10,13 +10,7 @@ import (
 	"time"
 
 	"github.com/aarondl/ultimateq/mocks"
-	. "gopkg.in/check.v1"
 )
-
-func Test(t *testing.T) { TestingT(t) } //Hook into testing package
-type s struct{}
-
-var _ = Suite(&s{})
 
 func init() {
 	f, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
@@ -27,35 +21,51 @@ func init() {
 	}
 }
 
-func (s *s) TestcreateIrcClient(c *C) {
+func TestcreateIrcClient(t *testing.T) {
 	conn := mocks.NewConn()
 	client := createIrcClient(conn, nil)
-	c.Check(client.isShutdown, Equals, false)
-	c.Check(client.conn, Equals, conn)
-	c.Check(client.siphonchan, NotNil)
-	c.Check(client.pumpchan, NotNil)
-	c.Check(client.pumpservice, NotNil)
-	c.Check(client.lastwrite.Before(time.Now()), Equals, true)
+	if exp, got := client.isShutdown, false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := client.conn, conn; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if client.siphonchan == nil {
+		t.Error("Unexpected nil.")
+	}
+	if client.pumpchan == nil {
+		t.Error("Unexpected nil.")
+	}
+	if client.pumpservice == nil {
+		t.Error("Unexpected nil.")
+	}
+	if exp, got := client.lastwrite.Before(time.Now()), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestIrcClient_ImplementsReadWriteCloser(c *C) {
+func TestIrcClient_ImplementsReadWriteCloser(t *testing.T) {
 	client := createIrcClient(nil, nil)
-	c.Check(client, FitsTypeOf, io.ReadWriteCloser(client))
+	var _ io.ReadWriteCloser = client
 }
 
-func (s *s) TestIrcClient_SpawnWorkers(c *C) {
+func TestIrcClient_SpawnWorkers(t *testing.T) {
 	conn := mocks.NewConn()
 
 	client := createIrcClient(conn, nil)
-	c.Check(client.IsClosed(), Equals, false)
+	if exp, got := client.IsClosed(), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	client.SpawnWorkers(true, true)
-	c.Check(client.IsClosed(), Equals, false)
+	if exp, got := client.IsClosed(), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	conn.Send([]byte{}, 0, io.EOF)
 	client.Close()
 	conn.WaitForDeath()
 }
 
-func (s *s) TestIrcClient_Pump(c *C) {
+func TestIrcClient_Pump(t *testing.T) {
 	test1 := []byte("PONG :arg1 arg2\r\n")
 	test2 := []byte("NOTICE :arg1\r\n")
 	split := 2
@@ -74,11 +84,19 @@ func (s *s) TestIrcClient_Pump(c *C) {
 		client.Close()
 	}()
 
-	c.Check(bytes.Compare(conn.Receive(split, nil), test1), Equals, 0)
-	c.Check(bytes.Compare(conn.Receive(len(test1[split:]), nil),
-		test1[split:]), Equals, 0)
+	if exp, got :=
+		bytes.Compare(conn.Receive(split, nil), test1), 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	got := bytes.Compare(conn.Receive(len(test1[split:]), nil), test1[split:])
+	if got != 0 {
+		t.Error("Expected 0, got:", got)
+	}
 
-	c.Check(bytes.Compare(conn.Receive(len(test2), nil), test2), Equals, 0)
+	if exp, got :=
+		bytes.Compare(conn.Receive(len(test2), nil), test2), 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	conn.WaitForDeath()
 	conn.ResetDeath()
 
@@ -86,13 +104,18 @@ func (s *s) TestIrcClient_Pump(c *C) {
 	client = createIrcClient(conn, nil)
 	client.SpawnWorkers(true, false)
 	client.Write(test1)
-	c.Check(bytes.Compare(conn.Receive(0, io.EOF), test1), Equals, 0)
+	if exp, got :=
+		bytes.Compare(conn.Receive(0, io.EOF), test1), 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	client.Close()
 	conn.WaitForDeath()
-	c.Check(client.lastwrite.Equal(fakelast), Equals, false)
+	if exp, got := client.lastwrite.Equal(fakelast), false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestIrcClient_PumpFloodProtect(c *C) {
+func TestIrcClient_PumpFloodProtect(t *testing.T) {
 	test1 := []byte("PRIVMSG :arg1 arg2\r\n")
 
 	conn := mocks.NewConn()
@@ -102,20 +125,28 @@ func (s *s) TestIrcClient_PumpFloodProtect(c *C) {
 	go func() {
 		for i := 0; i < 10; i++ {
 			_, err := client.Write(test1)
-			c.Check(err, IsNil)
+			if got := err; got != nil {
+				t.Error("Expected: %v to be nil.", got)
+			}
 		}
 	}()
 
 	for i := 0; i < 9; i++ {
-		c.Check(bytes.Compare(conn.Receive(len(test1), nil), test1), Equals, 0)
+		if exp, got :=
+			bytes.Compare(conn.Receive(len(test1), nil), test1), 0; exp != got {
+			t.Errorf("Expected: %v, got: %v", exp, got)
+		}
 	}
-	c.Check(bytes.Compare(conn.Receive(len(test1), io.EOF), test1), Equals, 0)
+	if exp, got :=
+		bytes.Compare(conn.Receive(len(test1), io.EOF), test1), 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 
 	client.Close()
 	conn.WaitForDeath()
 }
 
-func (s *s) TestIrcClient_Siphon(c *C) {
+func TestIrcClient_Siphon(t *testing.T) {
 	test1 := []byte("PRIVMSG :msg\r\n")
 	test2 := []byte("NOTICE :msg\r\n")
 	test3 := []byte("PRIV")
@@ -132,11 +163,17 @@ func (s *s) TestIrcClient_Siphon(c *C) {
 	}()
 
 	msg := <-ch
-	c.Check(bytes.Compare(test1[:len(test1)-2], msg), Equals, 0)
+	if exp, got := bytes.Compare(test1[:len(test1)-2], msg), 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	msg = <-ch
-	c.Check(bytes.Compare(test2[:len(test2)-2], msg), Equals, 0)
+	if exp, got := bytes.Compare(test2[:len(test2)-2], msg), 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	_, ok := <-ch
-	c.Check(ok, Equals, false)
+	if exp, got := ok, false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 
 	client.Close()
 	conn.WaitForDeath()
@@ -149,7 +186,7 @@ func (s *s) TestIrcClient_Siphon(c *C) {
 	conn.WaitForDeath()
 }
 
-func (s *s) TestIrcClient_ExtractMessages(c *C) {
+func TestIrcClient_ExtractMessages(t *testing.T) {
 	test1 := []byte("irc message 1\r\n")
 	test2 := []byte("irc message 2\r\n")
 	test3 := []byte("irc mess")
@@ -164,15 +201,25 @@ func (s *s) TestIrcClient_ExtractMessages(c *C) {
 	go func() {
 		var abort bool
 		ret, abort = client.extractMessages(buf)
-		c.Check(ret, Equals, len(test3))
-		c.Check(abort, Equals, false)
-		c.Check(bytes.Compare(buf[:ret], test3), Equals, 0)
+		if exp, got := ret, len(test3); exp != got {
+			t.Errorf("Expected: %v, got: %v", exp, got)
+		}
+		if exp, got := abort, false; exp != got {
+			t.Errorf("Expected: %v, got: %v", exp, got)
+		}
+		if exp, got := bytes.Compare(buf[:ret], test3), 0; exp != got {
+			t.Errorf("Expected: %v, got: %v", exp, got)
+		}
 		waiter.Done()
 	}()
 	msg1 := <-client.siphonchan
-	c.Check(bytes.Compare(msg1, test1[:len(test1)-2]), Equals, 0)
+	if exp, got := bytes.Compare(msg1, test1[:len(test1)-2]), 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	msg2 := <-client.siphonchan
-	c.Check(bytes.Compare(msg2, test2[:len(test2)-2]), Equals, 0)
+	if exp, got := bytes.Compare(msg2, test2[:len(test2)-2]), 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	waiter.Wait()
 
 	buf = append(buf[:ret], []byte{'\r', '\n'}...)
@@ -180,43 +227,59 @@ func (s *s) TestIrcClient_ExtractMessages(c *C) {
 	go func() {
 		var abort bool
 		ret, abort := client.extractMessages(buf)
-		c.Check(ret, Equals, 0)
-		c.Check(abort, Equals, false)
+		if exp, got := ret, 0; exp != got {
+			t.Errorf("Expected: %v, got: %v", exp, got)
+		}
+		if exp, got := abort, false; exp != got {
+			t.Errorf("Expected: %v, got: %v", exp, got)
+		}
 		waiter.Done()
 	}()
 	msg3 := <-client.siphonchan
-	c.Check(bytes.Compare(msg3, test3), Equals, 0)
+	if exp, got := bytes.Compare(msg3, test3), 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	waiter.Wait()
 
 	waiter.Add(1)
 	client.killsiphon = make(chan error)
 	go func() {
 		_, abort := client.extractMessages(test1)
-		c.Check(abort, Equals, true)
+		if exp, got := abort, true; exp != got {
+			t.Errorf("Expected: %v, got: %v", exp, got)
+		}
 		waiter.Done()
 	}()
 	<-client.killsiphon
 	waiter.Wait()
 }
 
-func (s *s) TestIrcClient_Close(c *C) {
+func TestIrcClient_Close(t *testing.T) {
 	conn := mocks.NewConn()
 
 	client := createIrcClient(conn, nil)
 
 	go func() {
 		err := client.Close()
-		c.Check(err, IsNil)
+		if got := err; got != nil {
+			t.Error("Expected: %v to be nil.", got)
+		}
 	}()
 	conn.WaitForDeath()
-	c.Check(client.IsClosed(), Equals, true)
+	if exp, got := client.IsClosed(), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 
 	err := client.Close() // Double closing should do nothing
-	c.Check(err, IsNil)
-	c.Check(client.IsClosed(), Equals, true)
+	if got := err; got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
+	if exp, got := client.IsClosed(), true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestIrcClient_ReadMessage(c *C) {
+func TestIrcClient_ReadMessage(t *testing.T) {
 	client := createIrcClient(nil, nil)
 	read := []byte("PRIVMSG #chan :msg")
 	go func() {
@@ -224,13 +287,19 @@ func (s *s) TestIrcClient_ReadMessage(c *C) {
 		close(client.siphonchan)
 	}()
 	msg, ok := client.ReadMessage()
-	c.Check(ok, Equals, true)
-	c.Check(bytes.Compare(msg, read), Equals, 0)
+	if exp, got := ok, true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := bytes.Compare(msg, read), 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	msg, ok = client.ReadMessage()
-	c.Check(ok, Equals, false)
+	if exp, got := ok, false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestIrcClient_Read(c *C) {
+func TestIrcClient_Read(t *testing.T) {
 	client := createIrcClient(nil, nil)
 	read := []byte("PRIVMSG #chan :msg")
 	go func() {
@@ -241,21 +310,37 @@ func (s *s) TestIrcClient_Read(c *C) {
 	breakat := 2
 
 	n, err := client.Read(buf[:breakat])
-	c.Check(err, IsNil)
-	c.Check(n, Equals, breakat)
-	c.Check(bytes.Compare(buf[:breakat], read[:breakat]), Equals, 0)
+	if got := err; got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
+	if exp, got := n, breakat; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := bytes.Compare(buf[:breakat], read[:breakat]), 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 
 	n, err = client.Read(buf[breakat:])
-	c.Check(err, IsNil)
-	c.Check(n, Equals, len(read)-breakat)
-	c.Check(bytes.Compare(buf, read), Equals, 0)
+	if got := err; got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
+	if exp, got := n, len(read)-breakat; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := bytes.Compare(buf, read), 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 
 	n, err = client.Read(buf)
-	c.Check(n, Equals, 0)
-	c.Check(err, Equals, io.EOF)
+	if exp, got := n, 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := err, io.EOF; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestIrcClient_Write(c *C) {
+func TestIrcClient_Write(t *testing.T) {
 	test1 := []byte("PRIVMSG #chan :msg\r\n")
 	test2 := []byte("PRIVMSG #chan :msg2")
 
@@ -265,25 +350,33 @@ func (s *s) TestIrcClient_Write(c *C) {
 		arg := append(test1, test2...)
 		client.Write(nil) //Should be Consequenceless test cov
 		n, err := client.Write(arg)
-		c.Check(err, IsNil)
-		c.Check(n, Equals, len(arg))
+		if got := err; got != nil {
+			t.Error("Expected: %v to be nil.", got)
+		}
+		if exp, got := n, len(arg); exp != got {
+			t.Errorf("Expected: %v, got: %v", exp, got)
+		}
 	}()
 	client.pumpservice <- ch
 	expectedMsg := append(test1[:len(test1)-2], test2...)
 	expectedMsg = append(expectedMsg, []byte("\r\n")...)
-	c.Check(bytes.Compare(<-ch, expectedMsg), Equals, 0)
+	if exp, got := bytes.Compare(<-ch, expectedMsg), 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 
 	close(client.pumpservice)
 }
 
-func (s *s) TestIrcClient_Keepalive(c *C) {
+func TestIrcClient_Keepalive(t *testing.T) {
 	// Check not throttled
 	conn := mocks.NewConn()
 	client := NewIrcClient(conn, nil, 0, 0, 0, time.Millisecond,
 		time.Millisecond)
 	client.SpawnWorkers(true, false)
 	msg := conn.Receive(len(ping), io.EOF)
-	c.Check(bytes.Compare(msg, ping), Equals, 0)
+	if exp, got := bytes.Compare(msg, ping), 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	client.Close()
 
 	// Check throttled
@@ -305,16 +398,22 @@ func (s *s) TestIrcClient_Keepalive(c *C) {
 	client.SpawnWorkers(true, false)
 
 	msg = conn.Receive(len(test), nil)
-	c.Check(bytes.Compare(msg, test), Equals, 0)
+	if exp, got := bytes.Compare(msg, test), 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	msg = conn.Receive(len(test), nil)
-	c.Check(bytes.Compare(msg, test), Equals, 0)
+	if exp, got := bytes.Compare(msg, test), 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 
 	msg = conn.Receive(len(ping), io.EOF)
-	c.Check(bytes.Compare(msg, ping), Equals, 0)
+	if exp, got := bytes.Compare(msg, ping), 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	client.Close()
 }
 
-func (s *s) TestIrcClient_calcSleepTime(c *C) {
+func TestIrcClient_calcSleepTime(t *testing.T) {
 	var penFact = 120
 	var scale = time.Millisecond
 	var timeout, step, keepalive time.Duration = 10 * time.Millisecond,
@@ -324,28 +423,38 @@ func (s *s) TestIrcClient_calcSleepTime(c *C) {
 	client := createIrcClient(nil, nil)
 
 	sleep = client.calcSleepTime(time.Now(), 0)
-	c.Check(sleep, Equals, time.Duration(0))
+	if exp, got := sleep, time.Duration(0); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 
 	client = NewIrcClient(nil, nil, penFact, timeout, step, keepalive, scale)
 	client.lastwrite = time.Now()
 	for i := 1; i <= 5; i++ {
 		sleep = client.calcSleepTime(time.Now(), 0)
-		c.Check(sleep, Equals, time.Duration(0))
+		if exp, got := sleep, time.Duration(0); exp != got {
+			t.Errorf("Expected: %v, got: %v", exp, got)
+		}
 	}
 
 	sleep = client.calcSleepTime(time.Now(), 0)
-	c.Check(sleep, Not(Equals), time.Duration(0))
+	if exp, got := sleep, time.Duration(0); exp == got {
+		t.Errorf("Did not want: %v, got: %v", exp, got)
+	}
 
 	// Check no-sleep and negative cases
 	client = NewIrcClient(nil, nil, penFact, timeout, step, keepalive, scale)
 	client.lastwrite = time.Now()
 	sleep = client.calcSleepTime(time.Time{}, 0)
-	c.Check(sleep, Equals, time.Duration(0))
+	if exp, got := sleep, time.Duration(0); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	sleep = client.calcSleepTime(time.Now().Add(5*time.Hour), 0)
-	c.Check(sleep, Equals, time.Duration(0))
+	if exp, got := sleep, time.Duration(0); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestfindChunks(c *C) {
+func TestfindChunks(t *testing.T) {
 	test1 := []byte("PRIVMSG #chan :msg\r\n")
 	test2 := []byte("NOTICE #chan :msg2\r\n")
 	test3 := []byte("PRIV")
@@ -353,42 +462,69 @@ func (s *s) TestfindChunks(c *C) {
 	args := append(append(test1, test2...), test3...)
 	expected := [][]byte{test1, test2, test3}
 	start, remaining, abort := findChunks(args, func(result []byte) bool {
-		c.Check(bytes.Compare(result, expected[0]), Equals, 0)
+		if exp, got := bytes.Compare(result, expected[0]), 0; exp != got {
+			t.Errorf("Expected: %v, got: %v", exp, got)
+		}
 		expected = expected[1:]
 		return false
 	})
-	c.Check(abort, Equals, false)
-	c.Check(bytes.Compare(args[start:], test3), Equals, 0)
+	if exp, got := abort, false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := bytes.Compare(args[start:], test3), 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 
 	start, remaining, abort = findChunks(test1, func(result []byte) bool {
-		c.Check(bytes.Compare(test1, result), Equals, 0)
+		if exp, got := bytes.Compare(test1, result), 0; exp != got {
+			t.Errorf("Expected: %v, got: %v", exp, got)
+		}
 		return false
 	})
-	c.Check(start, Equals, 0)
-	c.Check(abort, Equals, false)
-	c.Check(remaining, Equals, false)
+	if exp, got := start, 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := abort, false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if exp, got := remaining, false; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 
 	_, _, abort = findChunks(args, func(result []byte) bool {
 		return true
 	})
-	c.Check(abort, Equals, true)
+	if exp, got := abort, true; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
-func (s *s) TestIrcClient_ClientError(c *C) {
+func TestIrcClient_ClientError(t *testing.T) {
 	var _ error = ClientError{} // Should compile
 	e := ClientError{}
-	c.Check(len(e.Error()), Equals, 0)
-	c.Check(e.CheckNeeded(), IsNil)
+	if exp, got := len(e.Error()), 0; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if got := e.CheckNeeded(); got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
 	e.Siphon = io.EOF
-	c.Check(e.Error(), Equals, "Siphon: "+io.EOF.Error())
+	if exp, got := e.Error(), "Siphon: "+io.EOF.Error(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	e.Pump = io.EOF
-	c.Check(e.Error(), Equals,
-		"Pump: "+io.EOF.Error()+
-			" || Siphon: "+io.EOF.Error())
+
+	exp := "Pump: " + io.EOF.Error() + " || Siphon: " + io.EOF.Error()
+	if got := e.Error(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 	e.Socket = io.EOF
-	c.Check(e.Error(), Equals,
-		"Socket: "+io.EOF.Error()+
-			" || Pump: "+io.EOF.Error()+
-			" || Siphon: "+io.EOF.Error())
-	c.Check(e.CheckNeeded(), NotNil)
+	exp = "Socket: " + io.EOF.Error() + " || Pump: " + io.EOF.Error() +
+		" || Siphon: " + io.EOF.Error()
+	if got := e.Error(); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if e.CheckNeeded() == nil {
+		t.Error("Unexpected nil.")
+	}
 }

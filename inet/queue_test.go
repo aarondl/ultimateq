@@ -2,17 +2,23 @@ package inet
 
 import (
 	"bytes"
-	. "gopkg.in/check.v1"
+	"testing"
 )
 
-func (s *s) TestQueue(c *C) {
+func TestQueue(t *testing.T) {
 	q := Queue{}
-	c.Check(q.length, Equals, 0)
-	c.Check(q.front, IsNil)
-	c.Check(q.back, IsNil)
+	if exp, got := q.length, 0; exp != got {
+ t.Errorf("Expected: %v, got: %v", exp, got)
+}
+	if got := q.front; got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
+	if got := q.back; got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
 }
 
-func (s *s) TestQueue_Queuing(c *C) {
+func TestQueue_Queuing(t *testing.T) {
 	test1 := []byte{1, 2, 3}
 	test2 := []byte{4, 5, 6}
 
@@ -22,44 +28,74 @@ func (s *s) TestQueue_Queuing(c *C) {
 	q.Enqueue(test2)
 
 	dq1 := q.Dequeue()
-	c.Check(bytes.Compare(test1, dq1), Equals, 0)
+	if exp, got := bytes.Compare(test1, dq1), 0; exp != got {
+ t.Errorf("Expected: %v, got: %v", exp, got)
+}
 	dq2 := q.Dequeue()
-	c.Check(bytes.Compare(test2, dq2), Equals, 0)
+	if exp, got := bytes.Compare(test2, dq2), 0; exp != got {
+ t.Errorf("Expected: %v, got: %v", exp, got)
+}
 }
 
-func (s *s) TestQueue_queue(c *C) {
+func TestQueue_queue(t *testing.T) {
 	test1 := []byte{1, 2, 3}
 	test2 := []byte{4, 5, 6}
 
 	q := Queue{}
 	q.Enqueue(nil) // Should be consequenceless test cov
 	q.Enqueue(test1)
-	c.Check(q.length, Equals, 1)
-	c.Check(q.front, Equals, q.back)
+	if exp, got := q.length, 1; exp != got {
+ t.Errorf("Expected: %v, got: %v", exp, got)
+}
+	if exp, got := q.front, q.back; exp != got {
+ t.Errorf("Expected: %v, got: %v", exp, got)
+}
 	q.Enqueue(test2)
-	c.Check(q.length, Equals, 2)
-	c.Check(q.front, Not(Equals), q.back)
+	if exp, got := q.length, 2; exp != got {
+ t.Errorf("Expected: %v, got: %v", exp, got)
+}
+	if exp, got := q.front, q.back; exp == got {
+		t.Errorf("Did not want: %v, got: %v", exp, got)
+	}
 
-	c.Check(bytes.Compare(*q.front.data, test1), Equals, 0)
-	c.Check(bytes.Compare(*q.front.next.data, test2), Equals, 0)
+	if exp, got := bytes.Compare(*q.front.data, test1), 0; exp != got {
+ t.Errorf("Expected: %v, got: %v", exp, got)
+}
+	if exp, got := bytes.Compare(*q.front.next.data, test2), 0; exp != got {
+ t.Errorf("Expected: %v, got: %v", exp, got)
+}
 }
 
-func (s *s) TestQueue_dequeue(c *C) {
+func TestQueue_dequeue(t *testing.T) {
 	test1 := []byte{1, 2, 3}
 	test2 := []byte{4, 5, 6}
 
 	q := Queue{}
-	c.Check(q.Dequeue(), IsNil)
+	if got := q.Dequeue(); got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
 
 	q.Enqueue(test1)
 	q.Enqueue(test2)
 
-	c.Check(q.front, Not(Equals), q.back)
+	if exp, got := q.front, q.back; exp == got {
+		t.Errorf("Did not want: %v, got: %v", exp, got)
+	}
 	dq1 := q.Dequeue()
-	c.Check(bytes.Compare(test1, dq1), Equals, 0)
-	c.Check(q.front, Equals, q.back)
+	if exp, got := bytes.Compare(test1, dq1), 0; exp != got {
+ t.Errorf("Expected: %v, got: %v", exp, got)
+}
+	if exp, got := q.front, q.back; exp != got {
+ t.Errorf("Expected: %v, got: %v", exp, got)
+}
 	dq2 := q.Dequeue()
-	c.Check(bytes.Compare(test2, dq2), Equals, 0)
-	c.Check(q.front, IsNil)
-	c.Check(q.back, IsNil)
+	if exp, got := bytes.Compare(test2, dq2), 0; exp != got {
+ t.Errorf("Expected: %v, got: %v", exp, got)
+}
+	if got := q.front; got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
+	if got := q.back; got != nil {
+		t.Error("Expected: %v to be nil.", got)
+	}
 }
