@@ -47,7 +47,7 @@ func TestState(t *testing.T) {
 	}
 
 	st, err = NewState(nil)
-	if exp, got := err, errProtoCapsMissing; exp != got {
+	if exp, got := err, errNetInfoMissing; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 
@@ -693,8 +693,8 @@ func TestState_UpdateJoin(t *testing.T) {
 		t.Errorf("Expected %v to not be on %v", users[0], channels[0])
 	}
 	u := st.Update(ev)
-	if u.Seen != users[0] {
-		t.Error("Expected %v to be seen.", users[0])
+	if len(u.Seen) != 1 || u.Seen[0] != users[0] {
+		t.Errorf("Expected %v to be seen, got: %v", users[0], u.Seen)
 	}
 	if !st.IsOn(users[0], channels[0]) {
 		t.Errorf("Expected %v to be on %v", users[0], channels[0])
@@ -707,7 +707,10 @@ func TestState_UpdateJoin(t *testing.T) {
 	if st.IsOn(users[0], channels[0]) {
 		t.Errorf("Expected %v to not be on %v", users[0], channels[0])
 	}
-	st.Update(ev)
+	u = st.Update(ev)
+	if len(u.Seen) != 1 || u.Seen[0] != users[0] {
+		t.Errorf("Expected %v to be seen, got: %v", users[0], u.Seen)
+	}
 	if !st.IsOn(users[0], channels[0]) {
 		t.Errorf("Expected %v to be on %v", users[0], channels[0])
 	}
@@ -807,9 +810,9 @@ func TestState_UpdatePart(t *testing.T) {
 	}
 
 	ev.Sender = users[1]
-	st.Update(ev)
-	if u.Unseen != users[1] {
-		t.Errorf("Expected %v to be unseen.", users[1])
+	u = st.Update(ev)
+	if len(u.Unseen) != 1 || u.Unseen[0] != users[1] {
+		t.Errorf("Expected %v to be unseen, got: %v", users[1], u.Unseen)
 	}
 	if st.IsOn(users[0], channels[0]) {
 		t.Errorf("Expected %v to not be on %v.", users[0], channels[0])
@@ -826,9 +829,9 @@ func TestState_UpdatePart(t *testing.T) {
 
 	ev.Sender = users[0]
 	ev.Args[0] = channels[1]
-	st.Update(ev)
-	if u.Unseen != users[0] {
-		t.Errorf("Expected %v to be unseen.", users[0])
+	u = st.Update(ev)
+	if len(u.Unseen) != 1 || u.Unseen[0] != users[0] {
+		t.Errorf("Expected %v to be unseen, got: %v", users[0], u.Unseen)
 	}
 
 	if st.IsOn(users[0], channels[0]) {
@@ -860,12 +863,15 @@ func TestState_UpdatePartSelf(t *testing.T) {
 	}
 
 	st.addUser(users[0])
+	st.addUser(users[1])
 	st.addUser(self.Host())
 	st.addChannel(channels[0])
 	st.addChannel(channels[1])
 	st.addToChannel(users[0], channels[0])
+	st.addToChannel(users[1], channels[0])
 	st.addToChannel(users[0], channels[1])
 	st.addToChannel(self.Nick(), channels[0])
+	st.addToChannel(self.Nick(), channels[1])
 
 	if !st.IsOn(users[0], channels[0]) {
 		t.Errorf("Expected %v to be on %v.", users[0], channels[0])
@@ -873,18 +879,35 @@ func TestState_UpdatePartSelf(t *testing.T) {
 	if !st.IsOn(users[0], channels[1]) {
 		t.Errorf("Expected %v to be on %v.", users[0], channels[1])
 	}
+	if !st.IsOn(users[1], channels[0]) {
+		t.Errorf("Expected %v to be on %v.", users[1], channels[0])
+	}
 	if !st.IsOn(self.Nick(), channels[0]) {
 		t.Errorf("Expected %v to be on %v.", self.Nick(), channels[0])
 	}
-	st.Update(ev)
+	if !st.IsOn(self.Nick(), channels[1]) {
+		t.Errorf("Expected %v to be on %v.", self.Nick(), channels[1])
+	}
+
+	u := st.Update(ev)
+	if len(u.Unseen) != 1 || users[1] != u.Unseen[0] {
+		t.Errorf("Expected to unsee: %v, got: %v", users[1], u.Unseen)
+	}
+
 	if st.IsOn(users[0], channels[0]) {
 		t.Errorf("Expected %v to not be on %v.", users[0], channels[0])
 	}
 	if !st.IsOn(users[0], channels[1]) {
 		t.Errorf("Expected %v to be on %v.", users[0], channels[1])
 	}
+	if st.IsOn(users[1], channels[0]) {
+		t.Errorf("Expected %v to not be on %v.", users[1], channels[0])
+	}
 	if st.IsOn(self.Nick(), channels[0]) {
 		t.Errorf("Expected %v to not be on %v.", self.Nick(), channels[0])
+	}
+	if !st.IsOn(self.Nick(), channels[1]) {
+		t.Errorf("Expected %v to be on %v.", self.Nick(), channels[1])
 	}
 }
 
@@ -950,6 +973,26 @@ func TestState_UpdateQuit(t *testing.T) {
 	}
 	if got := st.GetUser(users[1]); got != nil {
 		t.Error("Expected: %v to be nil.", got)
+	}
+}
+
+func TestState_UpdateQuitSelf(t *testing.T) {
+	t.Parallel()
+
+	st, err := NewState(netInfo)
+	st.Self = self
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
+	ev := &irc.Event{
+		Name:   irc.QUIT,
+		Sender: self.Host(),
+		Args:   []string{"quit message"},
+	}
+
+	u := st.Update(ev)
+	if len(u.Quit) > 0 {
+		t.Error("Expected us not to quit, got:", u.Quit)
 	}
 }
 
@@ -1133,6 +1176,12 @@ func TestState_UpdateTopic(t *testing.T) {
 	if exp, got := st.GetChannel(channels[0]).Topic(), "topic topic"; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
+
+	ev.Args = []string{channels[0]}
+	st.Update(ev)
+	if exp, got := st.GetChannel(channels[0]).Topic(), ""; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
 }
 
 func TestState_UpdateRplTopic(t *testing.T) {
@@ -1263,6 +1312,27 @@ func TestState_UpdateNotice(t *testing.T) {
 	st.Update(ev)
 	if exp, got := len(st.users), size; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+}
+
+func TestState_UpdatePrivmsgSelf(t *testing.T) {
+	t.Parallel()
+
+	st, err := NewState(netInfo)
+	st.Self = self
+	if err != nil {
+		t.Error("Unexpected Error:", err)
+	}
+	ev := &irc.Event{
+		Name:        irc.PRIVMSG,
+		Sender:      users[0],
+		Args:        []string{self.Nick(), "msg"},
+		NetworkInfo: netInfo,
+	}
+
+	u := st.Update(ev)
+	if len(u.Seen) > 0 {
+		t.Error("Expected no one to be seen, got:", u.Seen)
 	}
 }
 

@@ -121,7 +121,7 @@ import (
 )
 
 var (
-	errProtoCapsMissing = errors.New("data: Protocaps missing")
+	errNetInfoMissing = errors.New("data: NetworkInfo missing")
 )
 
 // Self is the client's user, a special case since user modes must be stored.
@@ -147,7 +147,7 @@ type State struct {
 	umodes UserModeKinds
 }
 
-// NewState creates a state from an irc protocaps instance.
+// NewState creates a state from an irc.NetworkInfo instance.
 func NewState(netInfo *irc.NetworkInfo) (*State, error) {
 	state := &State{}
 	if err := state.SetNetworkInfo(netInfo); err != nil {
@@ -166,7 +166,7 @@ func NewState(netInfo *irc.NetworkInfo) (*State, error) {
 // SetNetworkInfo updates the network information of the state.
 func (s *State) SetNetworkInfo(ni *irc.NetworkInfo) error {
 	if ni == nil {
-		return errProtoCapsMissing
+		return errNetInfoMissing
 	}
 	kinds, err := NewChannelModeKindsCSV(ni.Chanmodes())
 	if err != nil {
@@ -224,7 +224,7 @@ func (s *State) GetNUserChans(nickorhost string) (n int) {
 	if ucs, ok := s.userChannels[nick]; ok {
 		n = len(ucs)
 	}
-	return
+	return n
 }
 
 // GetNChanUsers returns the number of users for a channel in the database.
@@ -233,7 +233,7 @@ func (s *State) GetNChanUsers(channel string) (n int) {
 	if cus, ok := s.channelUsers[channel]; ok {
 		n = len(cus)
 	}
-	return
+	return n
 }
 
 // EachUser iterates through the users.
@@ -258,7 +258,6 @@ func (s *State) EachUserChan(nickorhost string, fn func(*UserChannel)) {
 			fn(uc)
 		}
 	}
-	return
 }
 
 // EachChanUser iterates through the users on a channel.
@@ -269,7 +268,6 @@ func (s *State) EachChanUser(channel string, fn func(*ChannelUser)) {
 			fn(cu)
 		}
 	}
-	return
 }
 
 // GetUsers returns a string array of all the users.
@@ -384,14 +382,25 @@ func (s *State) addChannel(channel string) *Channel {
 }
 
 // removeChannel deletes a channel from the database.
-func (s *State) removeChannel(channel string) {
+func (s *State) removeChannel(channel string) (unseen []string) {
 	channel = strings.ToLower(channel)
 	for _, cus := range s.userChannels {
 		delete(cus, channel)
 	}
 
+	for _, cu := range s.channelUsers[channel] {
+		if cu.User.Nick() == s.Self.User.Nick() {
+			continue
+		}
+		if nick := cu.User.Nick(); s.GetNUserChans(nick) == 0 {
+			unseen = append(unseen, string(cu.User.host))
+			delete(s.users, strings.ToLower(nick))
+		}
+	}
 	delete(s.channelUsers, channel)
 	delete(s.channels, channel)
+
+	return unseen
 }
 
 // addToChannel adds a user by nick or fullhost to the channel
@@ -449,35 +458,50 @@ func (s *State) removeFromChannel(nickorhost, channel string) {
 		delete(cu, nick)
 	}
 
+	shouldRemove := false
 	if uc, ok = s.userChannels[nick]; ok {
 		delete(uc, channel)
+
+		shouldRemove = len(uc) == 0
+	}
+
+	if shouldRemove {
+		s.removeUser(nick)
 	}
 }
 
+// StateUpdate is produced by the Update method to summarize the updates made to
+// the database. Although anything can use this information it's created so it
+// can in turn be passed into the store for processing users who have
+// been renamed or disappeared.
+type StateUpdate struct {
+	Nick   []string
+	Unseen []string
+	Seen   []string
+	Quit   string
+}
+
 // Update uses the irc.IrcMessage to modify the database accordingly.
-func (s *State) Update(ev *irc.Event) {
-	if len(ev.Sender) > 0 {
-		s.addUser(ev.Sender)
-	}
+func (s *State) Update(ev *irc.Event) (update StateUpdate) {
 	switch ev.Name {
 	case irc.NICK:
-		s.nick(ev)
+		update.Nick = s.nick(ev)
 	case irc.JOIN:
-		s.join(ev)
+		update.Seen = s.join(ev)
 	case irc.PART:
-		s.part(ev)
+		update.Unseen = s.part(ev)
 	case irc.QUIT:
-		s.quit(ev)
+		update.Quit = s.quit(ev)
 	case irc.KICK:
-		s.kick(ev)
+		update.Seen, update.Unseen = s.kick(ev)
 	case irc.MODE:
-		s.mode(ev)
+		update.Seen = s.mode(ev)
 	case irc.TOPIC:
-		s.topic(ev)
+		update.Seen = s.topic(ev)
 	case irc.RPL_TOPIC:
 		s.rplTopic(ev)
 	case irc.PRIVMSG, irc.NOTICE:
-		s.msg(ev)
+		update.Seen = s.msg(ev)
 	case irc.RPL_WELCOME:
 		s.rplWelcome(ev)
 	case irc.RPL_NAMREPLY:
@@ -491,10 +515,13 @@ func (s *State) Update(ev *irc.Event) {
 
 		// TODO: Handle Whois
 	}
+
+	return update
 }
 
 // nick alters the state of the database when a NICK message is received.
-func (s *State) nick(ev *irc.Event) {
+func (s *State) nick(ev *irc.Event) []string {
+	s.addUser(ev.Sender)
 	nick, username, host := ev.SplitHost()
 	newnick := ev.Args[0]
 	newuser := irc.Host(newnick + "!" + username + "@" + host)
@@ -517,45 +544,73 @@ func (s *State) nick(ev *irc.Event) {
 		s.users[newnick] = s.users[nick]
 		delete(s.users, nick)
 	}
+
+	return []string{ev.Sender, string(newuser)}
 }
 
 // join alters the state of the database when a JOIN message is received.
-func (s *State) join(ev *irc.Event) {
+func (s *State) join(ev *irc.Event) []string {
+	var seen []string
 	if ev.Sender == s.Self.Host() {
 		s.addChannel(ev.Args[0])
+	} else {
+		seen = []string{ev.Sender}
 	}
+	s.addUser(ev.Sender)
 	s.addToChannel(ev.Sender, ev.Args[0])
+	return seen
 }
 
 // part alters the state of the database when a PART message is received.
-func (s *State) part(ev *irc.Event) {
+func (s *State) part(ev *irc.Event) []string {
 	if ev.Sender == s.Self.Host() {
-		s.removeChannel(ev.Args[0])
+		return s.removeChannel(ev.Args[0])
 	} else {
 		s.removeFromChannel(ev.Sender, ev.Args[0])
+		if s.GetUser(ev.Sender) == nil {
+			return []string{ev.Sender}
+		}
 	}
+	return nil
 }
 
 // quit alters the state of the database when a QUIT message is received.
-func (s *State) quit(ev *irc.Event) {
+func (s *State) quit(ev *irc.Event) string {
 	if ev.Sender != s.Self.Host() {
 		s.removeUser(ev.Sender)
+		return ev.Sender
 	}
+
+	return ""
 }
 
 // kick alters the state of the database when a KICK message is received.
-func (s *State) kick(ev *irc.Event) {
+func (s *State) kick(ev *irc.Event) (seen []string, unseen []string) {
 	if ev.Args[1] == s.Self.Nick() {
 		s.removeChannel(ev.Args[0])
 	} else {
+		s.addUser(ev.Sender)
+		oldUser := s.GetUser(ev.Args[1])
+		var oldHost string
+		if oldUser != nil {
+			oldHost = oldUser.Host()
+		}
+
 		s.removeFromChannel(ev.Args[1], ev.Args[0])
+
+		if len(oldHost) > 0 && s.GetUser(ev.Args[1]) == nil {
+			return []string{ev.Sender}, []string{oldHost}
+		}
 	}
+
+	return []string{ev.Sender}, nil
 }
 
 // mode alters the state of the database when a MODE message is received.
-func (s *State) mode(ev *irc.Event) {
+func (s *State) mode(ev *irc.Event) []string {
 	target := strings.ToLower(ev.Args[0])
 	if ev.IsTargetChan() {
+		s.addUser(ev.Sender)
 		if ch, ok := s.channels[target]; ok {
 			pos, neg := ch.Apply(strings.Join(ev.Args[1:], " "))
 			for i := 0; i < len(pos); i++ {
@@ -567,21 +622,25 @@ func (s *State) mode(ev *irc.Event) {
 				s.channelUsers[target][nick].UnsetMode(neg[i].Mode)
 			}
 		}
+		return []string{ev.Sender}
 	} else if target == s.Self.Nick() {
 		s.Self.Apply(ev.Args[1])
 	}
+	return nil
 }
 
 // topic alters the state of the database when a TOPIC message is received.
-func (s *State) topic(ev *irc.Event) {
+func (s *State) topic(ev *irc.Event) []string {
 	chname := strings.ToLower(ev.Args[0])
 	if ch, ok := s.channels[chname]; ok {
+		s.addUser(ev.Sender)
 		if len(ev.Args) >= 2 {
 			ch.SetTopic(ev.Args[1])
 		} else {
 			ch.SetTopic("")
 		}
 	}
+	return []string{ev.Sender}
 }
 
 // rplTopic alters the state of the database when a RPL_TOPIC message is
@@ -595,10 +654,13 @@ func (s *State) rplTopic(ev *irc.Event) {
 
 // msg alters the state of the database when a PRIVMSG or NOTICE message is
 // received.
-func (s *State) msg(ev *irc.Event) {
+func (s *State) msg(ev *irc.Event) []string {
 	if ev.IsTargetChan() {
+		s.addUser(ev.Sender)
 		s.addToChannel(ev.Sender, ev.Args[0])
+		return []string{ev.Sender}
 	}
+	return nil
 }
 
 // rplWelcome alters the state of the database when a RPL_WELCOME message is

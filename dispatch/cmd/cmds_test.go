@@ -224,7 +224,7 @@ func setupForAuth() (state *data.State, store *data.Store,
 	if err != nil {
 		panic(err)
 	}
-	_, err = store.AuthUser(server, "nick!user@host", "user", "pass")
+	_, err = store.AuthUserPerma(server, "nick!user@host", "user", "pass")
 	if err != nil {
 		panic(err)
 	}

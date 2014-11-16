@@ -187,8 +187,8 @@ func TestCoreCommands_Register(t *testing.T) {
 		}
 	}
 
-	ts.store.Logout(netID, u2host)
-	err = rspChk(ts, errMsgAuthed, u1host, register, passwd, u1user)
+	ts.store.Logout(netID, u1host)
+	err = rspChk(ts, registerFailure, u1host, register, passwd, u1user)
 	if err != nil {
 		t.Error(err)
 	}
@@ -271,7 +271,6 @@ func TestCoreCommands_Logout(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-
 }
 
 func TestCoreCommands_Access(t *testing.T) {

@@ -6,13 +6,21 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/cznic/kv"
 )
 
-// These errors are in the AuthError.FailureType field.
+// defaultTimeout is the default amount of time after being "unseen" that
+// a person will be auto de-authed after.
+var defaultTimeout = time.Minute * 5
+
+// AuthFailure is inside AuthErrors to describe why authentication failed.
+type AuthFailure int
+
+// These errors are in the AuthError. FailureType field.
 const (
-	AuthErrBadPassword = iota + 1
+	AuthErrBadPassword AuthFailure = iota + 1
 	AuthErrHostNotFound
 	AuthErrUserNotFound
 )
@@ -35,7 +43,7 @@ const (
 type AuthError struct {
 	str         string
 	fmtArgs     []interface{}
-	FailureType int
+	FailureType AuthFailure
 }
 
 // Error builds the error string for an AuthError.
@@ -63,6 +71,7 @@ type Store struct {
 	cache        map[string]*StoredUser
 	protectCache sync.Mutex
 	authed       map[string]*StoredUser
+	timeouts     map[string]time.Time
 	checkedFirst bool
 }
 
@@ -74,9 +83,10 @@ func NewStore(prov DbProvider) (*Store, error) {
 	}
 
 	s := &Store{
-		db:     db,
-		cache:  make(map[string]*StoredUser),
-		authed: make(map[string]*StoredUser),
+		db:       db,
+		cache:    make(map[string]*StoredUser),
+		authed:   make(map[string]*StoredUser),
+		timeouts: make(map[string]time.Time),
 	}
 
 	return s, nil
@@ -171,10 +181,26 @@ func (s *Store) RemoveUser(username string) (removed bool, err error) {
 	return
 }
 
+// AuthUserTmp temporarily authenticates a user. StoredUser will be not nil iff
+// the user is found and authenticates successfully.
+func (s *Store) AuthUserTmp(
+	network, host, username, password string) (*StoredUser, error) {
+
+	return s.authUser(network, host, username, password, true)
+}
+
+// AuthUserPerma permanently authenticates a user. StoredUser will be not nil
+// iff the user is found and authenticates successfully.
+func (s *Store) AuthUserPerma(
+	network, host, username, password string) (*StoredUser, error) {
+
+	return s.authUser(network, host, username, password, false)
+}
+
 // AuthUser authenticates a user. StoredUser will be not nil iff the user
 // is found and authenticates successfully.
-func (s *Store) AuthUser(
-	network, host, username, password string) (*StoredUser, error) {
+func (s *Store) authUser(
+	network, host, username, password string, temp bool) (*StoredUser, error) {
 
 	username = strings.ToLower(username)
 	var user *StoredUser
@@ -214,6 +240,9 @@ func (s *Store) AuthUser(
 		}
 	}
 
+	if temp {
+		s.timeouts[network+host] = time.Now().UTC().Add(defaultTimeout)
+	}
 	s.authed[network+host] = user
 	return user, nil
 }
@@ -240,6 +269,40 @@ func (s *Store) LogoutByUsername(username string) {
 
 	for i := range hosts {
 		delete(s.authed, hosts[i])
+	}
+}
+
+// Update sets timeouts for seen and unseen users and invokes a reap on users
+// who have expired their auth timeouts.
+func (s *Store) Update(network string, update StateUpdate) {
+	for _, seen := range update.Seen {
+		delete(s.timeouts, network+seen)
+	}
+	for _, unseen := range update.Unseen {
+		if _, ok := s.timeouts[network+unseen]; !ok {
+			s.timeouts[network+unseen] = time.Now().UTC().Add(defaultTimeout)
+		}
+	}
+	if len(update.Nick) > 0 {
+		s.authed[network+update.Nick[1]] = s.authed[network+update.Nick[0]]
+		delete(s.timeouts, network+update.Nick[0])
+		delete(s.authed, network+update.Nick[0])
+	}
+	if len(update.Quit) > 0 {
+		delete(s.timeouts, network+update.Quit)
+		delete(s.authed, network+update.Quit)
+	}
+
+	s.Reap()
+}
+
+// Reap removes users who have exceeded their temporary auths.
+func (s *Store) Reap() {
+	for key, date := range s.timeouts {
+		if time.Now().UTC().After(date) {
+			delete(s.authed, key)
+			delete(s.timeouts, key)
+		}
 	}
 }
 

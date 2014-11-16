@@ -1,7 +1,11 @@
 package data
 
 import (
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/aarondl/ultimateq/irc"
 )
 
 func TestStore(t *testing.T) {
@@ -9,6 +13,14 @@ func TestStore(t *testing.T) {
 	s, err := NewStore(MemStoreProvider)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	if s.authed == nil {
+		t.Error("Auth list not instantiated.")
+	}
+
+	if s.timeouts == nil {
+		t.Error("Timeouts not instantiated.")
 	}
 
 	if s.cache == nil {
@@ -135,7 +147,7 @@ func TestStore_AuthUser(t *testing.T) {
 		t.Fatal("Error adding user:", err)
 	}
 
-	user, err := s.AuthUser(network, host, uname+uname, password)
+	user, err := s.AuthUserPerma(network, host, uname+uname, password)
 	if user != nil || err == nil {
 		t.Error("Failed to reject bad authentication.")
 	}
@@ -147,7 +159,7 @@ func TestStore_AuthUser(t *testing.T) {
 		t.Error("Error was not an AuthError:", err)
 	}
 
-	user, err = s.AuthUser(network, `nick!user@host.com`, uname, password)
+	user, err = s.AuthUserPerma(network, `nick!user@host.com`, uname, password)
 	if user != nil || err == nil {
 		t.Error("Failed to reject bad authentication.")
 	}
@@ -159,7 +171,7 @@ func TestStore_AuthUser(t *testing.T) {
 		t.Error("Error was not an AuthError:", err)
 	}
 
-	user, err = s.AuthUser(network, host, uname, password+password)
+	user, err = s.AuthUserPerma(network, host, uname, password+password)
 	if user != nil {
 		t.Error("Failed to reject bad authentication.")
 	}
@@ -171,7 +183,7 @@ func TestStore_AuthUser(t *testing.T) {
 		t.Error("Error was not an AuthError:", err)
 	}
 
-	user, err = s.AuthUser(network, host, uname, password)
+	user, err = s.AuthUserPerma(network, host, uname, password)
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
@@ -184,7 +196,7 @@ func TestStore_AuthUser(t *testing.T) {
 	}
 
 	// Testing previously authenticated look up.
-	user, err = s.AuthUser(network, host, uname, password)
+	user, err = s.AuthUserPerma(network, host, uname, password)
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
@@ -212,7 +224,7 @@ func TestStore_AuthLogout(t *testing.T) {
 
 	s.cache = make(map[string]*StoredUser)
 
-	user, err := s.AuthUser(network, host, uname, password)
+	user, err := s.AuthUserPerma(network, host, uname, password)
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
@@ -233,7 +245,7 @@ func TestStore_AuthLogout(t *testing.T) {
 		t.Error("User is still authenticated.")
 	}
 
-	user, err = s.AuthUser(network, host, uname, password)
+	user, err = s.AuthUserPerma(network, host, uname, password)
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
@@ -245,6 +257,169 @@ func TestStore_AuthLogout(t *testing.T) {
 
 	if s.authed[network+host] != nil {
 		t.Error("User is still authenticated.")
+	}
+}
+
+func setupUpdateTest(t *testing.T) (s *Store) {
+	var err error
+	s, err = NewStore(MemStoreProvider)
+	defer s.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ua1, err := NewStoredUser(uname, password)
+	if err != nil {
+		t.Fatal("Could not create user:", err)
+	}
+	err = s.SaveUser(ua1)
+	if err != nil {
+		t.Fatal("Error adding user:", err)
+	}
+
+	return s
+}
+
+func TestStore_UpdateSeen(t *testing.T) {
+	t.Parallel()
+	s := setupUpdateTest(t)
+
+	_, err := s.AuthUserTmp(network, host, uname, password)
+	if err != nil {
+		t.Error("Could not auth user:", err)
+	}
+
+	if timeout, ok := s.timeouts[network+host]; !ok {
+		t.Error("Expected there to be a timeout for the user.")
+	} else if timeout.Before(time.Now().UTC()) {
+		t.Error("Timeout must be set in the future.")
+	}
+
+	s.Update(network, StateUpdate{
+		Seen: []string{host},
+	})
+
+	if _, ok := s.timeouts[network+host]; ok {
+		t.Error("Expected there to be no timeout for the user.")
+	}
+}
+
+func TestStore_UpdateUnseen(t *testing.T) {
+	t.Parallel()
+	s := setupUpdateTest(t)
+
+	_, err := s.AuthUserPerma(network, host, uname, password)
+	if err != nil {
+		t.Error("Could not auth user:", err)
+	}
+
+	if _, ok := s.timeouts[network+host]; ok {
+		t.Error("Expected there to be no timeout for the user.")
+	}
+
+	s.Update(network, StateUpdate{
+		Unseen: []string{host},
+	})
+
+	if timeout, ok := s.timeouts[network+host]; !ok {
+		t.Error("Expected there to be a timeout for the user.")
+	} else if timeout.Before(time.Now().UTC()) {
+		t.Error("Timeout must be set in the future.")
+	}
+}
+
+func TestStore_UpdateNick(t *testing.T) {
+	t.Parallel()
+	s := setupUpdateTest(t)
+
+	_, err := s.AuthUserPerma(network, host, uname, password)
+	if err != nil {
+		t.Error("Could not auth user:", err)
+	}
+
+	newNick := "helloworld"
+	oldNick := irc.Nick(host)
+	newHost := strings.Replace(host, oldNick, newNick, 1)
+
+	if _, ok := s.authed[network+host]; !ok {
+		t.Error("Not authenticated somehow?")
+	}
+
+	s.Update(network, StateUpdate{
+		Nick: []string{host, newHost},
+	})
+
+	if _, ok := s.authed[network+host]; ok {
+		t.Error("This authentication record should have been removed.")
+	}
+
+	if _, ok := s.authed[network+newHost]; !ok {
+		t.Error("This authentication record should have been created.")
+	}
+}
+
+func TestStore_UpdateQuit(t *testing.T) {
+	t.Parallel()
+	s := setupUpdateTest(t)
+
+	_, err := s.AuthUserTmp(network, host, uname, password)
+	if err != nil {
+		t.Error("Could not auth user:", err)
+	}
+
+	if timeout, ok := s.timeouts[network+host]; !ok {
+		t.Error("Expected there to be a timeout for the user.")
+	} else if timeout.Before(time.Now().UTC()) {
+		t.Error("Timeout must be set in the future.")
+	}
+	if _, ok := s.authed[network+host]; !ok {
+		t.Error("This authentication record should exist.")
+	}
+
+	s.Update(network, StateUpdate{Quit: host})
+
+	if _, ok := s.authed[network+host]; ok {
+		t.Error("This authentication record should not exist.")
+	}
+	if _, ok := s.timeouts[network+host]; ok {
+		t.Error("Expected there to be no timeout for the user.")
+	}
+}
+
+func TestStore_Reap(t *testing.T) {
+	t.Parallel()
+	s := setupUpdateTest(t)
+
+	_, err := s.AuthUserTmp(network, host, uname, password)
+	if err != nil {
+		t.Error("Could not auth user:", err)
+	}
+	_, err = s.AuthUserTmp("net2", host, uname, password)
+	if err != nil {
+		t.Error("Could not auth user:", err)
+	}
+
+	if len(s.authed) != 2 || len(s.timeouts) != 2 {
+		t.Error("There should be 2 temporary authentications.")
+	}
+
+	s.timeouts[network+host] = time.Now().UTC().AddDate(0, 0, -1)
+
+	s.Reap()
+
+	if _, ok := s.authed[network+host]; ok {
+		t.Error("This authentication record should not exist.")
+	}
+	if _, ok := s.timeouts[network+host]; ok {
+		t.Error("Expected there to be no timeout for the user.")
+	}
+	if timeout, ok := s.timeouts["net2"+host]; !ok {
+		t.Error("Expected there to be a timeout for the user.")
+	} else if timeout.Before(time.Now().UTC()) {
+		t.Error("Timeout must be set in the future.")
+	}
+	if _, ok := s.authed["net2"+host]; !ok {
+		t.Error("This authentication record should exist.")
 	}
 }
 
