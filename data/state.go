@@ -1,38 +1,8 @@
 /*
 Package data is used to store and fetch data about the irc environment.
 
-It comes in three major pieces; State, Store, Locker. These are the main types
+It comes in two major pieces; State and Store. These are the main types
 that provide access to all others.
-
-Locker
-
-We have to start with a discussion on how before we get to what. The data
-package assumes that the world is pleasant and provides no protections for
-concurrent access via multiple goroutines. The solution to this problem for
-clients that wish to use the data package in a concurrent world is to implement
-the data.Locker interface.
-
-ultimateq/bot.Bot is one such implementing client. The following example uses
-the locker interface on the bot.Bot type to safely access the state database
-for the testnetwork.
-
-	// Where b is a *bot.Bot from the ultimateq/bot package.
-	b.ReadState("testnetwork", func(state *data.State) {
-		// Do what we have to with state. For the duration of this function
-		// it is safe to read from.
-	})
-
-If you find the lambda syntax burdensome, then you may use the alternative
-syntax:
-
-	store := b.OpenWriteStore()
-	defer b.CloseWriteStore()
-
-Keep in mind that since there is locking, that means that users consuming the
-interface must be mindful to keep locks for as short a duration as possible.
-The locks are read-writer locks so multiple readers can access in parallel but
-it's not possible to update during this time and something bad could happen
-if a reader doesn't allow the writer to update for an extended period of time.
 
 State
 
@@ -41,13 +11,13 @@ modes are on the channel or user, what topic is set. All of this information
 is readable (not writeable) using State. This is per-network data, so each
 network has it's own State database.
 
-When using state the important types are: User, Channel, ChannelUser and
-UserChannel. These types provide you with the information, and the many
-state.Get* methods can retrieve instances of these types to query.
+When using state the important types are: User and Channel. These types provide
+you with the information about the entities themselves. Relationships like
+the modes a user has on a channel are retrieved by special helpers.
 Examples follow.
 
 	// The client's personal information is stored in the Self instance.
-	mynick := state.Self.Nick()
+	mynick := state.selfUser.Nick()
 
 	state.EachChannel(func (ch *Channel) {
 		fmt.Println(ch.Name)
@@ -94,7 +64,7 @@ section below.
 	su := store.FindUser("username")
 
 	// Check some permissions
-	hasGoodEnougLevel := su.HasChannelLevel(networkID, "#channelname", 100)
+	hasGoodEnoughLevel := su.HasChannelLevel(networkID, "#channelname", 100)
 	global := su.GetGlobal()
 	fmt.Println(global.HasFlags("abc"))
 
@@ -116,6 +86,7 @@ package data
 import (
 	"errors"
 	"strings"
+	"sync"
 
 	"github.com/aarondl/ultimateq/irc"
 )
@@ -128,23 +99,25 @@ var (
 // Despite using the ChannelModes type, these are actually irc user modes that
 // have nothing to do with channels. For example +i or +x on some networks.
 type Self struct {
-	*User
-	*ChannelModes
+	User
+	ChannelModes
 }
 
 // State is the main data container. It represents the state on a network
 // including all channels, users, and the client's self.
 type State struct {
-	Self Self
+	selfUser  *User
+	selfModes ChannelModes
 
 	channels map[string]*Channel
 	users    map[string]*User
 
-	channelUsers map[string]map[string]*ChannelUser
-	userChannels map[string]map[string]*UserChannel
+	channelUsers map[string]map[string]channelUser
+	userChannels map[string]map[string]userChannel
 
-	kinds  ChannelModeKinds
-	umodes UserModeKinds
+	kinds *modeKinds
+
+	protect sync.RWMutex
 }
 
 // NewState creates a state from an irc.NetworkInfo instance.
@@ -153,125 +126,162 @@ func NewState(netInfo *irc.NetworkInfo) (*State, error) {
 	if err := state.SetNetworkInfo(netInfo); err != nil {
 		return nil, err
 	}
-	state.Self.ChannelModes = NewChannelModes(&ChannelModeKinds{}, nil)
+	state.selfModes = NewChannelModes(&modeKinds{})
 
 	state.channels = make(map[string]*Channel)
 	state.users = make(map[string]*User)
-	state.channelUsers = make(map[string]map[string]*ChannelUser)
-	state.userChannels = make(map[string]map[string]*UserChannel)
+	state.channelUsers = make(map[string]map[string]channelUser)
+	state.userChannels = make(map[string]map[string]userChannel)
 
 	return state, nil
 }
 
 // SetNetworkInfo updates the network information of the state.
 func (s *State) SetNetworkInfo(ni *irc.NetworkInfo) error {
+	s.protect.Lock()
+	defer s.protect.Unlock()
+
 	if ni == nil {
 		return errNetInfoMissing
 	}
-	kinds, err := NewChannelModeKindsCSV(ni.Chanmodes())
+
+	if s.kinds != nil {
+		return s.kinds.update(ni.Prefix(), ni.Chanmodes())
+	}
+
+	kinds, err := newModeKinds(ni.Prefix(), ni.Chanmodes())
 	if err != nil {
 		return err
 	}
-	modes, err := NewUserModeKinds(ni.Prefix())
-	if err != nil {
-		return err
-	}
-
-	s.kinds = *kinds
-	s.umodes = *modes
+	s.kinds = kinds
 	return nil
 }
 
-// GetUser returns the user if he exists.
-func (s *State) GetUser(nickorhost string) *User {
-	nick := strings.ToLower(irc.Nick(nickorhost))
-	return s.users[nick]
+// Self retrieves the user that the state identifies itself with. Usually the
+// client that is using the data package.
+func (s *State) Self() Self {
+	return Self{*s.selfUser, s.selfModes.Clone()}
 }
 
-// GetChannel returns the channel if it exists.
-func (s *State) GetChannel(channel string) *Channel {
-	return s.channels[strings.ToLower(channel)]
+// User fetches a user by nickname or host if he exists. The bool returned
+// is false if the user does not exist.
+func (s *State) User(nickorhost string) (User, bool) {
+	s.protect.RLock()
+	defer s.protect.RUnlock()
+
+	nick := strings.ToLower(irc.Nick(nickorhost))
+	var user User
+	u, ok := s.users[nick]
+	if ok {
+		user = *u
+	}
+	return user, ok
 }
 
-// GetUsersChannelModes gets the user modes for the channel or nil if they could
-// not be found.
-func (s *State) GetUsersChannelModes(nickorhost, channel string) *UserModes {
-	nick := strings.ToLower(irc.Nick(nickorhost))
-	channel = strings.ToLower(channel)
+// Channel returns a channel by name if it exists. The bool returned is false
+// if the channel does not exist.
+func (s *State) Channel(channel string) (Channel, bool) {
+	s.protect.RLock()
+	defer s.protect.RUnlock()
 
-	if nicks, ok := s.channelUsers[channel]; ok {
-		if cu, ok := nicks[nick]; ok {
-			return cu.UserModes
-		}
+	var ch Channel
+	c, ok := s.channels[strings.ToLower(channel)]
+	if ok {
+		ch = *c
+	}
+	return ch, ok
+}
+
+// UserModes gets the channel modes of a nick or host for the given channel.
+// The bool returned is false if the user or the channel does not exist.
+func (s *State) UserModes(nickorhost, channel string) (UserModes, bool) {
+	s.protect.RLock()
+	defer s.protect.RUnlock()
+
+	var modes UserModes
+	if channelModes := s.userModes(nickorhost, channel); channelModes != nil {
+		modes = *channelModes
+		return modes, true
 	}
 
-	return nil
+	return modes, false
 }
 
-// GetNUsers returns the number of users in the database.
-func (s *State) GetNUsers() int {
+// NUsers returns the number of users in the database.
+func (s *State) NUsers() int {
+	s.protect.RLock()
+	defer s.protect.RUnlock()
+
 	return len(s.users)
 }
 
-// GetNChannels returns the number of channels in the database.
-func (s *State) GetNChannels() int {
+// NChannels returns the number of channels in the database.
+func (s *State) NChannels() int {
+	s.protect.RLock()
+	defer s.protect.RUnlock()
+
 	return len(s.channels)
 }
 
-// GetNUserChans returns the number of channels for a user in the database.
-func (s *State) GetNUserChans(nickorhost string) (n int) {
+// NChannelsByUser returns the number of channels for a user in the database.
+// The returned bool is false if the user doesn't exist.
+func (s *State) NChannelsByUser(nickorhost string) (n int, ok bool) {
+	s.protect.RLock()
+	defer s.protect.RUnlock()
+
+	var ucs map[string]userChannel
 	nick := strings.ToLower(irc.Nick(nickorhost))
-	if ucs, ok := s.userChannels[nick]; ok {
+	if ucs, ok = s.userChannels[nick]; ok {
 		n = len(ucs)
 	}
-	return n
+	return n, ok
 }
 
-// GetNChanUsers returns the number of users for a channel in the database.
-func (s *State) GetNChanUsers(channel string) (n int) {
+// NUsersByChannel returns the number of users for a channel in the database.
+// The returned bool is false if the channel doesn't exist.
+func (s *State) NUsersByChannel(channel string) (n int, ok bool) {
+	s.protect.RLock()
+	defer s.protect.RUnlock()
+
+	var cus map[string]channelUser
 	channel = strings.ToLower(channel)
-	if cus, ok := s.channelUsers[channel]; ok {
+	if cus, ok = s.channelUsers[channel]; ok {
 		n = len(cus)
 	}
-	return n
+	return n, ok
 }
 
 // EachUser iterates through the users.
-func (s *State) EachUser(fn func(*User)) {
+// To stop iteration early return true from the fn function parameter.
+func (s *State) EachUser(fn func(User) bool) {
+	s.protect.RLock()
+	defer s.protect.RUnlock()
+
 	for _, u := range s.users {
-		fn(u)
+		if fn(*u) {
+			break
+		}
 	}
 }
 
 // EachChannel iterates through the channels.
-func (s *State) EachChannel(fn func(*Channel)) {
+// To stop iteration early return true from the fn function parameter.
+func (s *State) EachChannel(fn func(Channel) bool) {
+	s.protect.RLock()
+	defer s.protect.RUnlock()
+
 	for _, c := range s.channels {
-		fn(c)
-	}
-}
-
-// EachUserChan iterates through the channels a user is on.
-func (s *State) EachUserChan(nickorhost string, fn func(*UserChannel)) {
-	nick := strings.ToLower(irc.Nick(nickorhost))
-	if ucs, ok := s.userChannels[nick]; ok {
-		for _, uc := range ucs {
-			fn(uc)
+		if fn(*c) {
+			break
 		}
 	}
 }
 
-// EachChanUser iterates through the users on a channel.
-func (s *State) EachChanUser(channel string, fn func(*ChannelUser)) {
-	channel = strings.ToLower(channel)
-	if cus, ok := s.channelUsers[channel]; ok {
-		for _, cu := range cus {
-			fn(cu)
-		}
-	}
-}
+// Users returns a string array of all the users.
+func (s *State) Users() []string {
+	s.protect.RLock()
+	defer s.protect.RUnlock()
 
-// GetUsers returns a string array of all the users.
-func (s *State) GetUsers() []string {
 	ret := make([]string, 0, len(s.users))
 	for _, u := range s.users {
 		ret = append(ret, u.Host())
@@ -279,8 +289,11 @@ func (s *State) GetUsers() []string {
 	return ret
 }
 
-// GetChannels returns a string array of all the channels.
-func (s *State) GetChannels() []string {
+// Channels returns a string array of all the channels.
+func (s *State) Channels() []string {
+	s.protect.RLock()
+	defer s.protect.RUnlock()
+
 	ret := make([]string, 0, len(s.channels))
 	for _, c := range s.channels {
 		ret = append(ret, c.Name())
@@ -288,8 +301,11 @@ func (s *State) GetChannels() []string {
 	return ret
 }
 
-// GetUserChans returns a string array of the channels a user is on.
-func (s *State) GetUserChans(nickorhost string) []string {
+// ChannelsByUser returns a string array of the channels a user is on.
+func (s *State) ChannelsByUser(nickorhost string) []string {
+	s.protect.RLock()
+	defer s.protect.RUnlock()
+
 	nick := strings.ToLower(irc.Nick(nickorhost))
 	if ucs, ok := s.userChannels[nick]; ok {
 		ret := make([]string, 0, len(ucs))
@@ -301,8 +317,11 @@ func (s *State) GetUserChans(nickorhost string) []string {
 	return nil
 }
 
-// GetChanUsers returns a string array of the users on a channel.
-func (s *State) GetChanUsers(channel string) []string {
+// UsersByChannel returns a string array of the users on a channel.
+func (s *State) UsersByChannel(channel string) []string {
+	s.protect.RLock()
+	defer s.protect.RUnlock()
+
 	channel = strings.ToLower(channel)
 	if cus, ok := s.channelUsers[channel]; ok {
 		ret := make([]string, 0, len(cus))
@@ -316,6 +335,9 @@ func (s *State) GetChanUsers(channel string) []string {
 
 // IsOn checks if a user is on a specific channel.
 func (s *State) IsOn(nickorhost, channel string) bool {
+	s.protect.RLock()
+	defer s.protect.RUnlock()
+
 	nick := strings.ToLower(irc.Nick(nickorhost))
 	channel = strings.ToLower(channel)
 
@@ -326,8 +348,32 @@ func (s *State) IsOn(nickorhost, channel string) bool {
 	return false
 }
 
+// user looks up a user without locking.
+func (s *State) user(nickorhost string) *User {
+	return s.users[strings.ToLower(irc.Nick(nickorhost))]
+}
+
+// channel looks up a channel without locking.
+func (s *State) channel(name string) *Channel {
+	return s.channels[strings.ToLower(irc.Nick(name))]
+}
+
+// userModes does the same thing as UserModes without locks.
+func (s *State) userModes(nickorhost, channel string) *UserModes {
+	nick := strings.ToLower(irc.Nick(nickorhost))
+	channel = strings.ToLower(channel)
+
+	if nicks, ok := s.channelUsers[channel]; ok {
+		if cu, ok := nicks[nick]; ok {
+			return cu.UserModes
+		}
+	}
+
+	return nil
+}
+
 // addUser adds a user to the database.
-func (s *State) addUser(nickorhost string) *User {
+func (s *State) addUser(nickorhost string) bool {
 	excl, at, per := false, false, false
 	for i := 0; i < len(nickorhost); i++ {
 		switch nickorhost[i] {
@@ -341,7 +387,7 @@ func (s *State) addUser(nickorhost string) *User {
 	}
 
 	if per && !(excl && at) {
-		return nil
+		return false
 	}
 
 	nick := strings.ToLower(irc.Nick(nickorhost))
@@ -354,8 +400,9 @@ func (s *State) addUser(nickorhost string) *User {
 	} else {
 		user = NewUser(nickorhost)
 		s.users[nick] = user
+		return true
 	}
-	return user
+	return false
 }
 
 // removeUser deletes a user from the database.
@@ -375,7 +422,7 @@ func (s *State) addChannel(channel string) *Channel {
 	var ch *Channel
 	var ok bool
 	if ch, ok = s.channels[chankey]; !ok {
-		ch = NewChannel(channel, &s.kinds, &s.umodes)
+		ch = NewChannel(channel, s.kinds)
 		s.channels[chankey] = ch
 	}
 	return ch
@@ -389,12 +436,15 @@ func (s *State) removeChannel(channel string) (unseen []string) {
 	}
 
 	for _, cu := range s.channelUsers[channel] {
-		if cu.User.Nick() == s.Self.User.Nick() {
+		nick := strings.ToLower(cu.User.Nick())
+		if nick == s.selfUser.Nick() {
 			continue
 		}
-		if nick := cu.User.Nick(); s.GetNUserChans(nick) == 0 {
-			unseen = append(unseen, string(cu.User.host))
-			delete(s.users, strings.ToLower(nick))
+		if ucs, ok := s.userChannels[nick]; ok {
+			if len(ucs) == 0 {
+				unseen = append(unseen, string(cu.User.host))
+				delete(s.users, strings.ToLower(nick))
+			}
 		}
 	}
 	delete(s.channelUsers, channel)
@@ -407,8 +457,8 @@ func (s *State) removeChannel(channel string) (unseen []string) {
 func (s *State) addToChannel(nickorhost, channel string) {
 	var user *User
 	var ch *Channel
-	var cu map[string]*ChannelUser
-	var uc map[string]*UserChannel
+	var cu map[string]channelUser
+	var uc map[string]userChannel
 	var ok, cuhas, uchas bool
 
 	nick := strings.ToLower(irc.Nick(nickorhost))
@@ -423,13 +473,13 @@ func (s *State) addToChannel(nickorhost, channel string) {
 	}
 
 	if cu, ok = s.channelUsers[channel]; !ok {
-		cu = make(map[string]*ChannelUser, 1)
+		cu = make(map[string]channelUser, 1)
 	} else {
 		_, cuhas = s.channelUsers[channel][nick]
 	}
 
 	if uc, ok = s.userChannels[nick]; !ok {
-		uc = make(map[string]*UserChannel, 1)
+		uc = make(map[string]userChannel, 1)
 	} else {
 		_, uchas = s.userChannels[nick][channel]
 	}
@@ -438,17 +488,17 @@ func (s *State) addToChannel(nickorhost, channel string) {
 		return
 	}
 
-	modes := NewUserModes(&s.umodes)
-	cu[nick] = NewChannelUser(user, modes)
-	uc[channel] = NewUserChannel(ch, modes)
+	modes := NewUserModes(s.kinds)
+	cu[nick] = newChannelUser(user, &modes)
+	uc[channel] = newUserChannel(ch, &modes)
 	s.channelUsers[channel] = cu
 	s.userChannels[nick] = uc
 }
 
 // removeFromChannel removes a user by nick or fullhost from the channel
 func (s *State) removeFromChannel(nickorhost, channel string) {
-	var cu map[string]*ChannelUser
-	var uc map[string]*UserChannel
+	var cu map[string]channelUser
+	var uc map[string]userChannel
 	var ok bool
 
 	nick := strings.ToLower(irc.Nick(nickorhost))
@@ -483,6 +533,9 @@ type StateUpdate struct {
 
 // Update uses the irc.IrcMessage to modify the database accordingly.
 func (s *State) Update(ev *irc.Event) (update StateUpdate) {
+	s.protect.Lock()
+	defer s.protect.Unlock()
+
 	switch ev.Name {
 	case irc.NICK:
 		update.Nick = s.nick(ev)
@@ -551,7 +604,7 @@ func (s *State) nick(ev *irc.Event) []string {
 // join alters the state of the database when a JOIN message is received.
 func (s *State) join(ev *irc.Event) []string {
 	var seen []string
-	if ev.Sender == s.Self.Host() {
+	if ev.Sender == s.selfUser.Host() {
 		s.addChannel(ev.Args[0])
 	} else {
 		seen = []string{ev.Sender}
@@ -563,11 +616,11 @@ func (s *State) join(ev *irc.Event) []string {
 
 // part alters the state of the database when a PART message is received.
 func (s *State) part(ev *irc.Event) []string {
-	if ev.Sender == s.Self.Host() {
+	if ev.Sender == s.selfUser.Host() {
 		return s.removeChannel(ev.Args[0])
 	} else {
 		s.removeFromChannel(ev.Sender, ev.Args[0])
-		if s.GetUser(ev.Sender) == nil {
+		if s.user(ev.Sender) == nil {
 			return []string{ev.Sender}
 		}
 	}
@@ -576,7 +629,7 @@ func (s *State) part(ev *irc.Event) []string {
 
 // quit alters the state of the database when a QUIT message is received.
 func (s *State) quit(ev *irc.Event) string {
-	if ev.Sender != s.Self.Host() {
+	if ev.Sender != s.selfUser.Host() {
 		s.removeUser(ev.Sender)
 		return ev.Sender
 	}
@@ -586,11 +639,11 @@ func (s *State) quit(ev *irc.Event) string {
 
 // kick alters the state of the database when a KICK message is received.
 func (s *State) kick(ev *irc.Event) (seen []string, unseen []string) {
-	if ev.Args[1] == s.Self.Nick() {
+	if ev.Args[1] == s.selfUser.Nick() {
 		s.removeChannel(ev.Args[0])
 	} else {
 		s.addUser(ev.Sender)
-		oldUser := s.GetUser(ev.Args[1])
+		oldUser := s.user(ev.Args[1])
 		var oldHost string
 		if oldUser != nil {
 			oldHost = oldUser.Host()
@@ -598,7 +651,7 @@ func (s *State) kick(ev *irc.Event) (seen []string, unseen []string) {
 
 		s.removeFromChannel(ev.Args[1], ev.Args[0])
 
-		if len(oldHost) > 0 && s.GetUser(ev.Args[1]) == nil {
+		if len(oldHost) > 0 && s.user(ev.Args[1]) == nil {
 			return []string{ev.Sender}, []string{oldHost}
 		}
 	}
@@ -623,8 +676,8 @@ func (s *State) mode(ev *irc.Event) []string {
 			}
 		}
 		return []string{ev.Sender}
-	} else if target == s.Self.Nick() {
-		s.Self.Apply(ev.Args[1])
+	} else if target == s.selfUser.Nick() {
+		s.selfModes.Apply(ev.Args[1])
 	}
 	return nil
 }
@@ -673,7 +726,7 @@ func (s *State) rplWelcome(ev *irc.Event) {
 		host = ev.Args[0]
 	}
 	user := NewUser(host)
-	s.Self.User = user
+	s.selfUser = user
 	s.users[strings.ToLower(user.Nick())] = user
 }
 
@@ -685,17 +738,17 @@ func (s *State) rplNameReply(ev *irc.Event) {
 	for i := 0; i < len(users); i++ {
 		j := 0
 		mode := rune(0)
-		for ; j < len(s.umodes.modeInfo); j++ {
-			if s.umodes.modeInfo[j][1] == rune(users[i][0]) {
-				mode = s.umodes.modeInfo[j][0]
+		for ; j < len(s.kinds.userPrefixes); j++ {
+			if s.kinds.userPrefixes[j][1] == rune(users[i][0]) {
+				mode = s.kinds.userPrefixes[j][0]
 				break
 			}
 		}
-		if j < len(s.umodes.modeInfo) {
+		if j < len(s.kinds.userPrefixes) {
 			nick := users[i][1:]
 			s.addUser(nick)
 			s.addToChannel(nick, channel)
-			s.GetUsersChannelModes(nick, channel).SetMode(mode)
+			s.userModes(nick, channel).SetMode(mode)
 		} else {
 			s.addUser(users[i])
 			s.addToChannel(users[i], channel)
@@ -713,10 +766,10 @@ func (s *State) rplWhoReply(ev *irc.Event) {
 
 	s.addUser(fullhost)
 	s.addToChannel(fullhost, channel)
-	s.GetUser(fullhost).SetRealname(realname)
+	s.user(fullhost).SetRealname(realname)
 	for _, modechar := range modes {
-		if mode := s.umodes.GetMode(modechar); mode != 0 {
-			if uc := s.GetUsersChannelModes(fullhost, channel); uc != nil {
+		if mode := s.kinds.Mode(modechar); mode != 0 {
+			if uc := s.userModes(fullhost, channel); uc != nil {
 				uc.SetMode(mode)
 			}
 		}
@@ -728,7 +781,7 @@ func (s *State) rplWhoReply(ev *irc.Event) {
 func (s *State) rplChannelModeIs(ev *irc.Event) {
 	channel := ev.Args[1]
 	modes := strings.Join(ev.Args[2:], " ")
-	if ch := s.GetChannel(channel); ch != nil {
+	if ch := s.channel(channel); ch != nil {
 		ch.Apply(modes)
 	}
 }
@@ -737,7 +790,7 @@ func (s *State) rplChannelModeIs(ev *irc.Event) {
 // received.
 func (s *State) rplBanList(ev *irc.Event) {
 	channel := ev.Args[1]
-	if ch := s.GetChannel(channel); ch != nil {
+	if ch := s.channel(channel); ch != nil {
 		ch.AddBan(ev.Args[2])
 	}
 }

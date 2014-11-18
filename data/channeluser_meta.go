@@ -1,30 +1,30 @@
 package data
 
-// ChannelUser represents a user that's on a channel.
-type ChannelUser struct {
+// channelUser represents a user that's on a channel.
+type channelUser struct {
 	User *User
 	*UserModes
 }
 
-// NewChannelUser creates a channel user that represents a channel that
+// newChannelUser creates a channel user that represents a channel that
 // contains a user.
-func NewChannelUser(u *User, m *UserModes) *ChannelUser {
-	return &ChannelUser{
+func newChannelUser(u *User, m *UserModes) channelUser {
+	return channelUser{
 		User:      u,
 		UserModes: m,
 	}
 }
 
-// UserChannel represents a user that's on a channel.
-type UserChannel struct {
+// userChannel represents a user that's on a channel.
+type userChannel struct {
 	Channel *Channel
 	*UserModes
 }
 
-// NewUserChannel creates a user channel that represents a user that is
+// newUserChannel creates a user channel that represents a user that is
 // on a channel.
-func NewUserChannel(c *Channel, m *UserModes) *UserChannel {
-	return &UserChannel{
+func newUserChannel(c *Channel, m *UserModes) userChannel {
+	return userChannel{
 		Channel:   c,
 		UserModes: m,
 	}

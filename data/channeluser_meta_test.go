@@ -10,20 +10,14 @@ func TestChannelUser(t *testing.T) {
 	t.Parallel()
 
 	user := NewUser("nick")
-	modes := NewUserModes(testUserKinds)
+	modes := NewUserModes(testKinds)
 
-	cu := NewChannelUser(
-		user,
-		modes,
-	)
+	cu := newChannelUser(user, &modes)
 
-	if cu == nil {
-		t.Error("Unexpected nil.")
-	}
-	if exp, got := cu.User, user; exp != got {
+	if got, exp := cu.User, user; exp != got {
 		t.Error("Expected: %v, got: %v", exp, got)
 	}
-	if exp, got := cu.UserModes, modes; exp != got {
+	if got, exp := cu.UserModes, &modes; exp != got {
 		t.Error("Expected: %v, got: %v", exp, got)
 	}
 }
@@ -31,21 +25,15 @@ func TestChannelUser(t *testing.T) {
 func TestUserChannel(t *testing.T) {
 	t.Parallel()
 
-	ch := NewChannel("", testChannelKinds, testUserKinds)
-	modes := NewUserModes(testUserKinds)
+	ch := NewChannel("", testKinds)
+	modes := NewUserModes(testKinds)
 
-	uc := NewUserChannel(
-		ch,
-		modes,
-	)
+	uc := newUserChannel(ch, &modes)
 
-	if uc == nil {
-		t.Error("Unexpected nil.")
-	}
-	if exp, got := uc.Channel, ch; exp != got {
+	if got, exp := uc.Channel, ch; exp != got {
 		t.Error("Expected: %v, got: %v", exp, got)
 	}
-	if exp, got := uc.UserModes, modes; exp != got {
+	if got, exp := uc.UserModes, &modes; exp != got {
 		t.Error("Expected: %v, got: %v", exp, got)
 	}
 }

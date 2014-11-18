@@ -14,31 +14,48 @@ type ChannelModes struct {
 	argModes     map[rune]string
 	addressModes map[rune][]string
 
-	*ChannelModeKinds
-	userModeKinds *UserModeKinds
-
 	addresses int
+
+	*modeKinds
 }
 
 // NewChannelModes creates an empty ChannelModes.
-func NewChannelModes(
-	kinds *ChannelModeKinds, userKinds *UserModeKinds) *ChannelModes {
-
-	return &ChannelModes{
+func NewChannelModes(m *modeKinds) ChannelModes {
+	return ChannelModes{
 		modes:        make(map[rune]bool),
 		argModes:     make(map[rune]string),
 		addressModes: make(map[rune][]string),
-
-		ChannelModeKinds: kinds,
-		userModeKinds:    userKinds,
+		modeKinds:    m,
 	}
+}
+
+// Clone clones a channel mode into new memory.
+func (m *ChannelModes) Clone() ChannelModes {
+	cm := ChannelModes{
+		modes:        make(map[rune]bool, len(m.modes)),
+		argModes:     make(map[rune]string, len(m.argModes)),
+		addressModes: make(map[rune][]string, len(m.addressModes)),
+		modeKinds:    m.modeKinds,
+	}
+
+	for k, v := range m.modes {
+		cm.modes[k] = v
+	}
+	for k, v := range m.argModes {
+		cm.argModes[k] = v
+	}
+	for k, v := range m.addressModes {
+		cm.addressModes[k] = v
+	}
+
+	return cm
 }
 
 // Apply takes a complex modestring and applies it to a an existing modeset.
 // Assumes any modes not declared as part of ChannelModeKinds were not intended
 // for channel and are user-targeted (therefore taking an argument)
 // and returns them in two arrays, positive and negative modes respectively.
-func (m *ChannelModes) Apply(modestring string) ([]UserMode, []UserMode) {
+func (m *ChannelModes) Apply(modestring string) ([]userMode, []userMode) {
 	return apply(m, modestring)
 }
 
@@ -114,7 +131,7 @@ func (m *ChannelModes) IsSet(modestrs ...string) bool {
 	used := 0
 
 	for _, mode := range modes {
-		kind := m.getKind(mode)
+		kind := m.kind(mode)
 		switch kind {
 		case ARGS_ALWAYS, ARGS_ONSET, ARGS_ADDRESS:
 			arg, found := "", false
@@ -150,7 +167,7 @@ func (m *ChannelModes) Set(modestrs ...string) {
 	used := 0
 
 	for _, mode := range modes {
-		switch m.getKind(mode) {
+		switch m.kind(mode) {
 		case ARGS_ALWAYS, ARGS_ONSET:
 			if used >= len(args) {
 				break
@@ -180,7 +197,7 @@ func (m *ChannelModes) Unset(modestrs ...string) {
 
 	for _, mode := range modes {
 
-		switch m.getKind(mode) {
+		switch m.kind(mode) {
 		case ARGS_ALWAYS:
 			if used >= len(args) {
 				break
@@ -201,15 +218,15 @@ func (m *ChannelModes) Unset(modestrs ...string) {
 	}
 }
 
-// GetArg returns the argument for the current mode. Empty string if the mode
+// Arg returns the argument for the current mode. Empty string if the mode
 // is not set.
-func (m *ChannelModes) GetArg(mode rune) string {
+func (m *ChannelModes) Arg(mode rune) string {
 	return m.argModes[mode]
 }
 
-// GetAddresses returns the addresses for the current mode.
+// Addresses returns the addresses for the current mode.
 // Nil if the mode is not set.
-func (m *ChannelModes) GetAddresses(mode rune) []string {
+func (m *ChannelModes) Addresses(mode rune) []string {
 	return m.addressModes[mode]
 }
 
@@ -310,9 +327,9 @@ func (m *ChannelModes) unsetAddress(mode rune, address string) {
 }
 
 // isUserMode checks if the given mode belongs to the user mode kinds.
-func (m *ChannelModes) isUserMode(mode rune) (is bool) {
-	if m.userModeKinds != nil {
-		is = m.userModeKinds.GetModeBit(mode) > 0
+func (m ChannelModes) isUserMode(mode rune) (is bool) {
+	if m.userPrefixes != nil {
+		is = m.modeBit(mode) > 0
 	}
-	return
+	return is
 }

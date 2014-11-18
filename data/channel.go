@@ -15,21 +15,24 @@ const (
 type Channel struct {
 	name  string
 	topic string
-	*ChannelModes
+	ChannelModes
 }
 
 // NewChannel instantiates a channel object.
-func NewChannel(name string,
-	kinds *ChannelModeKinds, userKinds *UserModeKinds) *Channel {
-
+func NewChannel(name string, m *modeKinds) *Channel {
 	if len(name) == 0 {
 		return nil
 	}
 
 	return &Channel{
 		name:         name,
-		ChannelModes: NewChannelModes(kinds, userKinds),
+		ChannelModes: NewChannelModes(m),
 	}
+}
+
+// Clone copies the channel into new memory.
+func (c *Channel) Clone() *Channel {
+	return &Channel{c.name, c.topic, c.ChannelModes.Clone()}
 }
 
 // Name gets the name of the channel.
@@ -52,7 +55,7 @@ func (c *Channel) IsBanned(host irc.Host) bool {
 	if !strings.ContainsAny(string(host), "!@") {
 		host += "!@"
 	}
-	bans := c.GetAddresses(banMode)
+	bans := c.Addresses(banMode)
 	for i := 0; i < len(bans); i++ {
 		if irc.Mask(bans[i]).Match(host) {
 			return true
@@ -77,7 +80,7 @@ func (c *Channel) AddBan(ban string) {
 
 // Bans gets the bans of the channel.
 func (c *Channel) Bans() []string {
-	getBans := c.GetAddresses(banMode)
+	getBans := c.Addresses(banMode)
 	if getBans == nil {
 		return nil
 	}
@@ -103,7 +106,7 @@ func (c *Channel) String() string {
 
 // DeleteBans deletes all bans that match a mask.
 func (c *Channel) DeleteBans(mask irc.Host) {
-	bans := c.GetAddresses(banMode)
+	bans := c.Addresses(banMode)
 	if 0 == len(bans) {
 		return
 	}

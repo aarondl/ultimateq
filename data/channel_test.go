@@ -7,13 +7,13 @@ import (
 func TestChannel_Create(t *testing.T) {
 	t.Parallel()
 
-	ch := NewChannel("", testChannelKinds, testUserKinds)
+	ch := NewChannel("", testKinds)
 	if got := ch; got != nil {
 		t.Error("Expected: %v to be nil.", got)
 	}
 
 	name := "#CHAN"
-	ch = NewChannel(name, testChannelKinds, testUserKinds)
+	ch = NewChannel(name, testKinds)
 	if ch == nil {
 		t.Error("Unexpected nil.")
 	}
@@ -23,9 +23,6 @@ func TestChannel_Create(t *testing.T) {
 	if exp, got := ch.Topic(), ""; exp != got {
 		t.Error("Expected: %v, got: %v", exp, got)
 	}
-	if ch.ChannelModes == nil {
-		t.Error("Unexpected nil.")
-	}
 }
 
 func TestChannel_GettersSetters(t *testing.T) {
@@ -34,7 +31,7 @@ func TestChannel_GettersSetters(t *testing.T) {
 	name := "#chan"
 	topic := "topic"
 
-	ch := NewChannel(name, testChannelKinds, testUserKinds)
+	ch := NewChannel(name, testKinds)
 	if exp, got := ch.Name(), name; exp != got {
 		t.Error("Expected: %v, got: %v", exp, got)
 	}
@@ -48,7 +45,7 @@ func TestChannel_Bans(t *testing.T) {
 	t.Parallel()
 
 	bans := []string{"ban1", "ban2"}
-	ch := NewChannel("name", testChannelKinds, testUserKinds)
+	ch := NewChannel("name", testKinds)
 
 	ch.SetBans(bans)
 	got := ch.Bans()
@@ -83,7 +80,7 @@ func TestChannel_IsBanned(t *testing.T) {
 	t.Parallel()
 
 	bans := []string{"*!*@host.com", "nick!*@*"}
-	ch := NewChannel("name", testChannelKinds, testUserKinds)
+	ch := NewChannel("name", testKinds)
 	ch.SetBans(bans)
 	if exp, got := ch.IsBanned("nick"), true; exp != got {
 		t.Error("Expected: %v, got: %v", exp, got)
@@ -106,7 +103,7 @@ func TestChannel_DeleteBanWild(t *testing.T) {
 	t.Parallel()
 
 	bans := []string{"*!*@host.com", "nick!*@*", "nick2!*@*"}
-	ch := NewChannel("name", testChannelKinds, testUserKinds)
+	ch := NewChannel("name", testKinds)
 	ch.SetBans(bans)
 	if exp, got := ch.IsBanned("nick"), true; exp != got {
 		t.Error("Expected: %v, got: %v", exp, got)
@@ -182,7 +179,7 @@ func TestChannel_DeleteBanWild(t *testing.T) {
 func TestChannel_String(t *testing.T) {
 	t.Parallel()
 
-	ch := NewChannel("name", testChannelKinds, testUserKinds)
+	ch := NewChannel("name", testKinds)
 	if exp, got := ch.String(), "name"; exp != got {
 		t.Error("Expected: %v, got: %v", exp, got)
 	}

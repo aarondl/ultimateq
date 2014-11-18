@@ -4,240 +4,193 @@ import (
 	"testing"
 )
 
-var testUserKinds, _ = NewUserModeKinds("(ov)@+")
-var testChannelKinds = NewChannelModeKinds("b", "c", "d", "axyz")
+var testUserKindStr = `(ov)@+`
+var testChannelKindStr = `b,c,d,axyz`
+var testKinds, _ = newModeKinds(testUserKindStr, testChannelKindStr)
 
-func TestChannelModeKinds_Create(t *testing.T) {
+func TestModeKinds_Create(t *testing.T) {
 	t.Parallel()
 
-	m := NewChannelModeKinds("a", "b", "c", "d")
-	if exp, got := m.kinds['a'], ARGS_ADDRESS; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+	m, err := newModeKinds(testUserKindStr, "a,b,c,d")
+	if err != nil {
+		t.Errorf("Unexpected error:", err)
 	}
-	if exp, got := m.kinds['b'], ARGS_ALWAYS; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+	if got, exp := m.channelModes['a'], ARGS_ADDRESS; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
-	if exp, got := m.kinds['c'], ARGS_ONSET; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+	if got, exp := m.channelModes['b'], ARGS_ALWAYS; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
-	if exp, got := m.kinds['d'], ARGS_NONE; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+	if got, exp := m.channelModes['c'], ARGS_ONSET; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
-
-	m = NewChannelModeKinds("a", "b", "c", "d")
-	if exp, got := m.kinds['a'], ARGS_ADDRESS; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
-	}
-	if exp, got := m.kinds['b'], ARGS_ALWAYS; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
-	}
-	if exp, got := m.kinds['c'], ARGS_ONSET; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
-	}
-	if exp, got := m.kinds['d'], ARGS_NONE; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+	if got, exp := m.channelModes['d'], ARGS_NONE; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 
-	m.Update("d", "c", "b", "a")
-	if exp, got := m.kinds['d'], ARGS_ADDRESS; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+	m, err = newModeKinds("(o)@", "a, b, c, d")
+	if err != nil {
+		t.Errorf("Unexpected error:", err)
 	}
-	if exp, got := m.kinds['c'], ARGS_ALWAYS; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+	if got, exp := m.channelModes['a'], ARGS_ADDRESS; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
-	if exp, got := m.kinds['b'], ARGS_ONSET; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+	if got, exp := m.channelModes['b'], ARGS_ALWAYS; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
-	if exp, got := m.kinds['a'], ARGS_NONE; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+	if got, exp := m.channelModes['c'], ARGS_ONSET; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if got, exp := m.channelModes['d'], ARGS_NONE; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+
+	err = m.update("(o)@", "d, c, b, a")
+	if err != nil {
+		t.Errorf("Unexpected error:", err)
+	}
+	if got, exp := m.channelModes['d'], ARGS_ADDRESS; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if got, exp := m.channelModes['c'], ARGS_ALWAYS; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if got, exp := m.channelModes['b'], ARGS_ONSET; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if got, exp := m.channelModes['a'], ARGS_NONE; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 }
 
-func TestChannelModeKinds_NewCSV(t *testing.T) {
+func TestModeKindsUpdate(t *testing.T) {
 	t.Parallel()
 
-	m, err := NewChannelModeKindsCSV("")
-	if err == nil {
-		t.Error("Unexpected nil.")
+	m, err := newModeKinds(testUserKindStr, "a,b,c,d")
+	if got, exp := m.channelModes['a'], ARGS_ADDRESS; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if got, exp := m.channelModes['b'], ARGS_ALWAYS; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if got, exp := m.channelModes['c'], ARGS_ONSET; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
+	}
+	if got, exp := m.channelModes['d'], ARGS_NONE; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 
-	m, err = NewChannelModeKindsCSV(",,,")
+	err = m.update(testUserKindStr, "d,c,b,a")
 	if err != nil {
-		t.Error("Unexpected Error:", err)
+		t.Errorf("Unexpected Errorf:", err)
 	}
-	m, err = NewChannelModeKindsCSV(",")
-	if err == nil {
-		t.Error("Unexpected nil.")
+	if got, exp := m.channelModes['d'], ARGS_ADDRESS; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
-
-	m, err = NewChannelModeKindsCSV("a,b,c,d")
-	if exp, got := m.kinds['a'], ARGS_ADDRESS; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+	if got, exp := m.channelModes['c'], ARGS_ALWAYS; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
-	if exp, got := m.kinds['b'], ARGS_ALWAYS; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+	if got, exp := m.channelModes['b'], ARGS_ONSET; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
-	if exp, got := m.kinds['c'], ARGS_ONSET; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
-	}
-	if exp, got := m.kinds['d'], ARGS_NONE; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
-	}
-}
-
-func TestChannelModeKindsUpdate(t *testing.T) {
-	t.Parallel()
-
-	m := NewChannelModeKinds("a", "b", "c", "d")
-	if exp, got := m.kinds['a'], ARGS_ADDRESS; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
-	}
-	if exp, got := m.kinds['b'], ARGS_ALWAYS; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
-	}
-	if exp, got := m.kinds['c'], ARGS_ONSET; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
-	}
-	if exp, got := m.kinds['d'], ARGS_NONE; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
-	}
-
-	err := m.UpdateCSV("d,c,b,a")
-	if err != nil {
-		t.Error("Unexpected Error:", err)
-	}
-	if exp, got := m.kinds['d'], ARGS_ADDRESS; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
-	}
-	if exp, got := m.kinds['c'], ARGS_ALWAYS; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
-	}
-	if exp, got := m.kinds['b'], ARGS_ONSET; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
-	}
-	if exp, got := m.kinds['a'], ARGS_NONE; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
-	}
-
-	m.Update("a", "b", "c", "d")
-	if exp, got := m.kinds['a'], ARGS_ADDRESS; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
-	}
-	if exp, got := m.kinds['b'], ARGS_ALWAYS; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
-	}
-	if exp, got := m.kinds['c'], ARGS_ONSET; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
-	}
-	if exp, got := m.kinds['d'], ARGS_NONE; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
-	}
-
-	err = m.UpdateCSV("")
-	if err == nil {
-		t.Error("Unexpected nil.")
+	if got, exp := m.channelModes['a'], ARGS_NONE; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 }
 
 func TestUserModeKinds_Create(t *testing.T) {
 	t.Parallel()
 
-	u, err := NewUserModeKinds("")
+	u, err := newModeKinds("", testChannelKindStr)
 	if got := u; got != nil {
-		t.Error("Expected: %v to be nil.", got)
+		t.Errorf("Expected: %v to be nil.", got)
 	}
 	if err == nil {
-		t.Error("Unexpected nil.")
+		t.Errorf("Unexpected nil.")
 	}
-	u, err = NewUserModeKinds("a")
+	u, err = newModeKinds("a", testChannelKindStr)
 	if got := u; got != nil {
-		t.Error("Expected: %v to be nil.", got)
+		t.Errorf("Expected: %v to be nil.", got)
 	}
 	if err == nil {
-		t.Error("Unexpected nil.")
+		t.Errorf("Unexpected nil.")
 	}
-	u, err = NewUserModeKinds("(a")
+	u, err = newModeKinds("(a", testChannelKindStr)
 	if got := u; got != nil {
-		t.Error("Expected: %v to be nil.", got)
+		t.Errorf("Expected: %v to be nil.", got)
 	}
 	if err == nil {
-		t.Error("Unexpected nil.")
+		t.Errorf("Unexpected nil.")
 	}
 
-	u, err = NewUserModeKinds("(abcdefghi)!@#$%^&*_")
+	u, err = newModeKinds("(abcdefghi)!@#$%^&*_", testChannelKindStr)
 	if got := u; got != nil {
-		t.Error("Expected: %v to be nil.", got)
+		t.Errorf("Expected: %v to be nil.", got)
 	}
 	if err == nil {
-		t.Error("Unexpected nil.")
+		t.Errorf("Unexpected nil.")
 	}
 
-	u, err = NewUserModeKinds("(ov)@+")
+	u, err = newModeKinds("(ov)@+", testChannelKindStr)
 	if u == nil {
-		t.Error("Unexpected nil.")
+		t.Errorf("Unexpected nil.")
 	}
 	if err != nil {
-		t.Error("Unexpected Error:", err)
+		t.Errorf("Unexpected Errorf:", err)
 	}
-	if exp, got := u.modeInfo[0], [2]rune{'o', '@'}; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+	if got, exp := u.userPrefixes[0], [2]rune{'o', '@'}; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
-	if exp, got := u.modeInfo[1], [2]rune{'v', '+'}; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+	if got, exp := u.userPrefixes[1], [2]rune{'v', '+'}; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 }
 
-func TestUserModeKinds_GetSymbol(t *testing.T) {
+func TestUserModeKinds_Symbol(t *testing.T) {
 	t.Parallel()
 
-	u, err := NewUserModeKinds("(ov)@+")
+	u, err := newModeKinds("(ov)@+", testChannelKindStr)
 	if err != nil {
-		t.Error("Unexpected Error:", err)
+		t.Errorf("Unexpected Errorf:", err)
 	}
-	if exp, got := u.GetSymbol('o'), '@'; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+	if got, exp := u.Symbol('o'), '@'; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
-	if exp, got := u.GetSymbol(' '), rune(0); exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+	if got, exp := u.Symbol(' '), rune(0); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 }
 
-func TestUserModeKinds_GetMode(t *testing.T) {
+func TestUserModeKinds_Mode(t *testing.T) {
 	t.Parallel()
 
-	u, err := NewUserModeKinds("(ov)@+")
+	u, err := newModeKinds("(ov)@+", testChannelKindStr)
 	if err != nil {
-		t.Error("Unexpected Error:", err)
+		t.Errorf("Unexpected Errorf:", err)
 	}
-	if exp, got := u.GetMode('@'), 'o'; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+	if got, exp := u.Mode('@'), 'o'; exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
-	if exp, got := u.GetMode(' '), rune(0); exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+	if got, exp := u.Mode(' '), rune(0); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 }
 
 func TestUserModeKinds_Update(t *testing.T) {
 	t.Parallel()
 
-	u, err := NewUserModeKinds("(ov)@+")
+	u, err := newModeKinds("(ov)@+", testChannelKindStr)
 	if err != nil {
-		t.Error("Unexpected Error:", err)
+		t.Errorf("Unexpected Errorf:", err)
 	}
-	if exp, got := u.GetModeBit('o'), byte(0); exp == got {
-		t.Error("Did not want: %v, got: %v", exp, got)
+	if got, exp := u.modeBit('o'), byte(0); exp == got {
+		t.Errorf("Did not want: %v, got: %v", exp, got)
 	}
-	err = u.UpdateModes("(v)+")
+	err = u.update("(v)+", "")
 	if err != nil {
-		t.Error("Unexpected Error:", err)
+		t.Errorf("Unexpected Errorf:", err)
 	}
-	if exp, got := u.GetModeBit('o'), byte(0); exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
-	}
-
-	u, err = NewUserModeKinds("(ov)@+")
-	err = u.UpdateModes("")
-	if err == nil {
-		t.Error("Unexpected nil.")
+	if got, exp := u.modeBit('o'), byte(0); exp != got {
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 }

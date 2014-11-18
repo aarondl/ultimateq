@@ -7,21 +7,27 @@ import (
 // ModeDiff encapsulates a difference of modes, a combination of both positive
 // change modes, and negative change modes.
 type ModeDiff struct {
-	*ChannelModeKinds
-	userModeKinds *UserModeKinds
-	pos           *ChannelModes
-	neg           *ChannelModes
+	pos ChannelModes
+	neg ChannelModes
+
+	*modeKinds
 }
 
 // NewModeDiff creates an empty ModeDiff.
-func NewModeDiff(
-	kinds *ChannelModeKinds, userKinds *UserModeKinds) *ModeDiff {
-
+func NewModeDiff(m *modeKinds) *ModeDiff {
 	return &ModeDiff{
-		ChannelModeKinds: kinds,
-		userModeKinds:    userKinds,
-		pos:              NewChannelModes(kinds, userKinds),
-		neg:              NewChannelModes(kinds, userKinds),
+		modeKinds: m,
+		pos:       NewChannelModes(m),
+		neg:       NewChannelModes(m),
+	}
+}
+
+// Clone creates a modediff from the current with new memory.
+func (d *ModeDiff) Clone() ModeDiff {
+	return ModeDiff{
+		modeKinds: d.modeKinds,
+		pos:       d.pos.Clone(),
+		neg:       d.neg.Clone(),
 	}
 }
 
@@ -39,7 +45,7 @@ func (d *ModeDiff) IsUnset(modestrs ...string) bool {
 // Assumes any modes not declared as part of ChannelModeKinds were not intended
 // for channel and are user-targeted (therefore taking an argument)
 // and returns them in two arrays, positive and negative modes respectively.
-func (d *ModeDiff) Apply(modestring string) ([]UserMode, []UserMode) {
+func (d *ModeDiff) Apply(modestring string) ([]userMode, []userMode) {
 	return apply(d, modestring)
 }
 
@@ -114,8 +120,8 @@ func (d *ModeDiff) unsetAddress(mode rune, address string) {
 
 // isUserMode checks if the given mode belongs to the user mode kinds.
 func (d *ModeDiff) isUserMode(mode rune) (is bool) {
-	if d.userModeKinds != nil {
-		is = d.userModeKinds.GetModeBit(mode) > 0
+	if d.userPrefixes != nil {
+		is = d.modeBit(mode) > 0
 	}
 	return
 }
