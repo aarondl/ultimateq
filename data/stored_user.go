@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"errors"
+	"fmt"
 	"math/rand"
 	"strings"
 	"time"
@@ -37,13 +38,14 @@ const (
 
 // StoredUser provides access for a user to the bot, networks, and channels.
 // This information is protected by a username and crypted password combo.
+// Most of StoredUser's access-related methods require a network and a channel,
+// but passing in blank strings to these methods allow us to set global,
+// channel, and/or network specific access levels.
 type StoredUser struct {
 	Username string
 	Password []byte
 	Masks    []string
-	Global   *Access
-	Network  map[string]*Access
-	Channel  map[string]map[string]*Access
+	Access   map[string]Access
 	JSONStorer
 }
 
@@ -51,114 +53,79 @@ type StoredUser struct {
 // unless the reasoning is good and the consequences are known.
 var StoredUserPwdCost = bcrypt.DefaultCost
 
-// NewStoredUser initializes an access user. Requires username and password,
-// but masks are optional.
-func NewStoredUser(un, pw string,
-	masks ...string) (*StoredUser, error) {
+// NewStoredUser requires username and password but masks are optional.
+func NewStoredUser(un, pw string, masks ...string) (*StoredUser, error) {
 
 	if len(un) == 0 || len(pw) == 0 {
 		return nil, errMissingUnameOrPwd
 	}
 
-	a := &StoredUser{
+	s := &StoredUser{
 		Username:   strings.ToLower(un),
 		JSONStorer: make(JSONStorer),
+		Access:     make(map[string]Access),
 	}
 
-	err := a.SetPassword(pw)
+	err := s.SetPassword(pw)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, mask := range masks {
-		if !a.AddMask(mask) {
+		if !s.AddMask(mask) {
 			return nil, errDuplicateMask
 		}
 	}
 
-	return a, nil
+	return s, nil
+}
+
+func (s *StoredUser) Clone() *StoredUser {
+	newStoredUser := &StoredUser{
+		Username:   s.Username,
+		Password:   make([]byte, len(s.Password)),
+		Masks:      make([]string, len(s.Masks)),
+		JSONStorer: s.JSONStorer.Clone(),
+		Access:     make(map[string]Access, len(s.Access)),
+	}
+
+	copy(newStoredUser.Password, s.Password)
+	copy(newStoredUser.Masks, s.Masks)
+
+	for k, v := range s.Access {
+		newStoredUser.Access[k] = v
+	}
+
+	return newStoredUser
 }
 
 // createStoredUser creates a useraccess that doesn't care about security.
 // Mostly for testing. Will return nil if duplicate masks are given.
 func createStoredUser(masks ...string) *StoredUser {
-	a := &StoredUser{}
+	s := &StoredUser{}
 	for _, mask := range masks {
-		if !a.AddMask(mask) {
+		if !s.AddMask(mask) {
 			return nil
 		}
 	}
 
-	return a
-}
-
-// ensureNetwork that the network access object is created.
-func (a *StoredUser) ensureNetwork(network string) (access *Access) {
-	network = strings.ToLower(network)
-	if a.Network == nil {
-		a.Network = make(map[string]*Access)
-	}
-	if access = a.Network[network]; access == nil {
-		access = NewAccess(0)
-		a.Network[network] = access
-	}
-	return
-}
-
-// ensureChannel ensures that the network access object is created.
-func (a *StoredUser) ensureChannel(network, channel string) (access *Access) {
-	network = strings.ToLower(network)
-	channel = strings.ToLower(channel)
-	var chans map[string]*Access
-	if a.Channel == nil {
-		a.Channel = make(map[string]map[string]*Access)
-	}
-	if chans = a.Channel[network]; chans == nil {
-		a.Channel[network] = make(map[string]*Access)
-		chans = a.Channel[network]
-	}
-	if access = chans[channel]; access == nil {
-		access = NewAccess(0)
-		chans[channel] = access
-	}
-	return
-}
-
-// doNetwork get's the network access, calls a callback if the network exists.
-func (a *StoredUser) doNetwork(network string, do func(string, *Access)) {
-	network = strings.ToLower(network)
-	if access, ok := a.Network[network]; ok {
-		do(network, access)
-	}
-}
-
-// doChannel get's the network access, calls a callback if the channel exists.
-func (a *StoredUser) doChannel(network, channel string,
-	do func(string, string, *Access)) {
-
-	network = strings.ToLower(network)
-	channel = strings.ToLower(channel)
-	if chanMap, ok := a.Channel[network]; ok {
-		if access, ok := chanMap[channel]; ok {
-			do(network, channel, access)
-		}
-	}
+	return s
 }
 
 // SetPassword encrypts the password string, and sets the Password property.
-func (a *StoredUser) SetPassword(password string) (err error) {
+func (s *StoredUser) SetPassword(password string) (err error) {
 	var pwd []byte
 	pwd, err = bcrypt.GenerateFromPassword([]byte(password), StoredUserPwdCost)
 	if err != nil {
 		return
 	}
-	a.Password = pwd
+	s.Password = pwd
 	return
 }
 
 // ResetPassword generates a new random password, and sets the user's password
 // to that.
-func (a *StoredUser) ResetPassword() (newpasswd string, err error) {
+func (s *StoredUser) ResetPassword() (newpasswd string, err error) {
 	b := make([]byte, nNewPasswordLen)
 	for i := 0; i < nNewPasswordLen; i++ {
 		r := newPasswordStart + rand.Intn(newPasswordEnd-newPasswordStart)
@@ -170,21 +137,21 @@ func (a *StoredUser) ResetPassword() (newpasswd string, err error) {
 		b[i] = byte(r)
 	}
 	newpasswd = string(b)
-	err = a.SetPassword(newpasswd)
+	err = s.SetPassword(newpasswd)
 	return
 }
 
 // VerifyPassword checks to see if the given password matches the stored
 // password.
-func (a *StoredUser) VerifyPassword(password string) bool {
-	return nil == bcrypt.CompareHashAndPassword(a.Password, []byte(password))
+func (s *StoredUser) VerifyPassword(password string) bool {
+	return nil == bcrypt.CompareHashAndPassword(s.Password, []byte(password))
 }
 
 // serialize turns the useraccess into bytes for storage.
-func (a *StoredUser) serialize() ([]byte, error) {
+func (s *StoredUser) serialize() ([]byte, error) {
 	buffer := &bytes.Buffer{}
 	encoder := gob.NewEncoder(buffer)
-	err := encoder.Encode(a)
+	err := encoder.Encode(s)
 	if err != nil {
 		return nil, err
 	}
@@ -207,26 +174,26 @@ func deserializeUser(serialized []byte) (*StoredUser, error) {
 
 // AddMask adds a mask to this users list of wildcard masks. If a duplicate is
 // given it returns false.
-func (a *StoredUser) AddMask(mask string) bool {
+func (s *StoredUser) AddMask(mask string) bool {
 	mask = strings.ToLower(mask)
-	for i := 0; i < len(a.Masks); i++ {
-		if mask == a.Masks[i] {
+	for i := 0; i < len(s.Masks); i++ {
+		if mask == s.Masks[i] {
 			return false
 		}
 	}
-	a.Masks = append(a.Masks, mask)
+	s.Masks = append(s.Masks, mask)
 	return true
 }
 
-// DelMask deletes a mask from this users list of wildcard masks. Returns true
+// RemoveMask deletes a mask from this users list of wildcard masks. Returns true
 // if the mask was found and deleted.
-func (a *StoredUser) DelMask(mask string) (deleted bool) {
+func (s *StoredUser) RemoveMask(mask string) (deleted bool) {
 	mask = strings.ToLower(mask)
-	length := len(a.Masks)
+	length := len(s.Masks)
 	for i := 0; i < length; i++ {
-		if mask == a.Masks[i] {
-			a.Masks[i], a.Masks[length-1] = a.Masks[length-1], a.Masks[i]
-			a.Masks = a.Masks[:length-1]
+		if mask == s.Masks[i] {
+			s.Masks[i], s.Masks[length-1] = s.Masks[length-1], s.Masks[i]
+			s.Masks = s.Masks[:length-1]
 			deleted = true
 			break
 		}
@@ -234,13 +201,13 @@ func (a *StoredUser) DelMask(mask string) (deleted bool) {
 	return
 }
 
-// ValidateMask checks to see if this user has the given masks.
-func (a *StoredUser) ValidateMask(mask string) (has bool) {
-	if len(a.Masks) == 0 {
+// HasMask checks to see if this user has the given masks.
+func (s *StoredUser) HasMask(mask string) (has bool) {
+	if len(s.Masks) == 0 {
 		return true
 	}
 	mask = strings.ToLower(mask)
-	for _, ourMask := range a.Masks {
+	for _, ourMask := range s.Masks {
 		if irc.Host(mask).Match(irc.Mask(ourMask)) {
 			has = true
 			break
@@ -250,32 +217,34 @@ func (a *StoredUser) ValidateMask(mask string) (has bool) {
 }
 
 // Has checks if a user has the given level and flags. Where his access is
-// overridden thusly: Global > Network > Channel
-func (a *StoredUser) Has(network, channel string,
+// prioritized thusly: Global > Network > Channel
+func (s *StoredUser) Has(network, channel string,
 	level uint8, flags ...string) bool {
-
-	network = strings.ToLower(network)
-	channel = strings.ToLower(channel)
 
 	var searchBits = getFlagBits(flags...)
 	var hasFlags, hasLevel bool
 
-	var check = func(access *Access) bool {
-		if access != nil {
-			hasLevel = hasLevel || access.HasLevel(level)
-			hasFlags = hasFlags || ((searchBits & access.Flags) != 0)
-		}
+	var check = func(access Access) bool {
+		hasLevel = hasLevel || access.HasLevel(level)
+		hasFlags = hasFlags || ((searchBits & access.Flags) != 0)
 		return hasLevel && hasFlags
 	}
 
-	if check(a.Global) {
+	if a, ok := s.Access[mkKey("", "")]; ok && check(a) {
 		return true
 	}
-	if check(a.Network[network]) {
-		return true
+	if len(network) > 0 {
+		if a, ok := s.Access[mkKey(network, "")]; ok && check(a) {
+			return true
+		}
 	}
-	if chans, ok := a.Channel[network]; ok {
-		if check(chans[channel]) {
+	if len(channel) > 0 {
+		if a, ok := s.Access[mkKey("", channel)]; ok && check(a) {
+			return true
+		}
+	}
+	if len(network) > 0 && len(channel) > 0 {
+		if a, ok := s.Access[mkKey(network, channel)]; ok && check(a) {
 			return true
 		}
 	}
@@ -284,43 +253,56 @@ func (a *StoredUser) Has(network, channel string,
 }
 
 // HasLevel checks if a user has a given level of access. Where his access is
-// overridden thusly: Global > Network > Channel
-func (a *StoredUser) HasLevel(network, channel string, level uint8) bool {
-	if a.HasGlobalLevel(level) {
+// prioritized thusly: Global > Network > Channel
+func (s *StoredUser) HasLevel(network, channel string, level uint8) bool {
+	if a, ok := s.Access[mkKey("", "")]; ok && a.Level >= level {
 		return true
 	}
-	if a.HasNetworkLevel(network, level) {
-		return true
+	if len(network) > 0 {
+		if a, ok := s.Access[mkKey(network, "")]; ok && a.Level >= level {
+			return true
+		}
 	}
-	if a.HasChannelLevel(network, channel, level) {
-		return true
+	if len(channel) > 0 {
+		if a, ok := s.Access[mkKey("", channel)]; a.Level >= level {
+			return true
+		}
+	}
+	if len(network) > 0 && len(channel) > 0 {
+		if a, ok := s.Access[mkKey(network, channel)]; a.Level >= level {
+			return true
+		}
 	}
 	return false
 }
 
 // HasFlags checks if a user has a given level of access. Where his access is
-// overridden thusly: Global > Network > Channel
-func (a *StoredUser) HasFlags(network, channel string, flags ...string) bool {
+// prioritized thusly: Global > Network > Channel
+func (s *StoredUser) HasFlags(network, channel string, flags ...string) bool {
 	var searchBits = getFlagBits(flags...)
 
 	network = strings.ToLower(network)
 	channel = strings.ToLower(channel)
 
-	var check = func(access *Access) (had bool) {
-		if access != nil {
-			had = (searchBits & access.Flags) != 0
-		}
-		return
+	var check = func(access Access) (had bool) {
+		return (searchBits & access.Flags) != 0
 	}
 
-	if check(a.Global) {
+	if a, ok := s.Access[mkKey("", "")]; ok && check(a) {
 		return true
 	}
-	if check(a.Network[network]) {
-		return true
+	if len(network) > 0 {
+		if a, ok := s.Access[mkKey(network, "")]; ok && check(a) {
+			return true
+		}
 	}
-	if chans, ok := a.Channel[network]; ok {
-		if check(chans[channel]) {
+	if len(channel) > 0 {
+		if a, ok := s.Access[mkKey("", channel)]; ok && check(a) {
+			return true
+		}
+	}
+	if len(network) > 0 && len(channel) > 0 {
+		if a, ok := s.Access[mkKey(network, channel)]; ok && check(a) {
 			return true
 		}
 	}
@@ -329,294 +311,161 @@ func (a *StoredUser) HasFlags(network, channel string, flags ...string) bool {
 }
 
 // HasFlag checks if a user has a given flag. Where his access is
-// overridden thusly: Global > Network > Channel
-func (a *StoredUser) HasFlag(network, channel string, flag rune) bool {
-	if a.HasGlobalFlag(flag) {
+// prioritized thusly: Global > Network > Channel
+func (s *StoredUser) HasFlag(network, channel string, flag rune) bool {
+	if a, ok := s.Access[mkKey("", "")]; ok && a.HasFlag(flag) {
 		return true
 	}
-	if a.HasNetworkFlag(network, flag) {
-		return true
+	if len(network) > 0 {
+		if a, ok := s.Access[mkKey(network, "")]; ok && a.HasFlag(flag) {
+			return true
+		}
 	}
-	if a.HasChannelFlag(network, channel, flag) {
-		return true
+	if len(channel) > 0 {
+		if a, ok := s.Access[mkKey("", channel)]; ok && a.HasFlag(flag) {
+			return true
+		}
+	}
+	if len(network) > 0 && len(channel) > 0 {
+		if a, ok := s.Access[mkKey(network, channel)]; ok && a.HasFlag(flag) {
+			return true
+		}
 	}
 	return false
 }
 
-// GrantGlobal sets both Level and Flags at the same time.
-func (a *StoredUser) GrantGlobal(level uint8, flags ...string) {
-	a.GrantGlobalLevel(level)
-	a.GrantGlobalFlags(flags...)
+// GetAccess returns access using the network and channel provided. The bool
+// returns false if the user has no explicit permissions for the level
+// requested.
+func (s *StoredUser) GetAccess(network, channel string) (Access, bool) {
+	a, ok := s.Access[mkKey(network, channel)]
+	return a, ok
 }
 
-// GrantGlobalFlags sets global flags.
-func (a *StoredUser) GrantGlobalFlags(flags ...string) {
-	if a.Global == nil {
-		a.Global = &Access{}
+// Grant sets level and flags for a user. To set more specific access
+// provide network and channel names.
+// A level of 0 will not set anything. Use revoke to remove the level.
+// Empty flags will not set anything. Use revoke to remove the flags.
+func (s *StoredUser) Grant(
+	network, channel string, level uint8, flags ...string) {
+
+	key := mkKey(network, channel)
+	access := s.Access[key]
+	changed := false
+	if len(flags) > 0 {
+		access.SetFlags(flags...)
+		changed = true
 	}
-	a.Global.SetFlags(flags...)
-}
-
-// GrantGlobalLevel sets global level.
-func (a *StoredUser) GrantGlobalLevel(level uint8) {
-	if a.Global == nil {
-		a.Global = &Access{}
+	if level > 0 {
+		access.Level = level
+		changed = true
 	}
-	a.Global.Level = level
-}
-
-// RevokeGlobal removes a user's global access.
-func (a *StoredUser) RevokeGlobal() {
-	a.Global = nil
-}
-
-// RevokeGlobalLevel removes global access.
-func (a *StoredUser) RevokeGlobalLevel() {
-	if a.Global != nil {
-		a.Global.Level = 0
+	if changed {
+		s.Access[key] = access
 	}
 }
 
-// RevokeGlobalFlags removes flags from the global level.
-func (a *StoredUser) RevokeGlobalFlags(flags ...string) {
-	if a.Global != nil {
-		a.Global.ClearFlags(flags...)
-	}
+// Revoke removes a user's access. To revoke more specific access
+// provide network and channel names.
+func (s *StoredUser) Revoke(network, channel string) {
+	key := mkKey(network, channel)
+	delete(s.Access, key)
 }
 
-// GetGlobal returns the global access.
-func (a *StoredUser) GetGlobal() *Access {
-	return a.Global
-}
-
-// HasGlobalLevel checks a user to see if their global level access is equal
-// or above the specified access.
-func (a *StoredUser) HasGlobalLevel(level uint8) (has bool) {
-	if a.Global != nil {
-		has = a.Global.HasLevel(level)
-	}
-	return
-}
-
-// HasGlobalFlags checks a user to see if their global level flags contain the
-// given flags.
-func (a *StoredUser) HasGlobalFlags(flags ...string) (has bool) {
-	if a.Global != nil {
-		has = a.Global.HasFlags(flags...)
-	}
-	return
-}
-
-// HasGlobalFlag checks a user to see if their global level flags contain the
-// given flag.
-func (a *StoredUser) HasGlobalFlag(flag rune) (has bool) {
-	if a.Global != nil {
-		has = a.Global.HasFlag(flag)
-	}
-	return
-}
-
-// GrantNetwork sets both Level and Flags at the same time.
-func (a *StoredUser) GrantNetwork(network string, level uint8,
-	flags ...string) {
-
-	a.ensureNetwork(network).SetAccess(level, flags...)
-}
-
-// GrantNetworkFlags sets network flags.
-func (a *StoredUser) GrantNetworkFlags(network string, flags ...string) {
-	a.ensureNetwork(network).SetFlags(flags...)
-}
-
-// GrantNetworkLevel sets network level.
-func (a *StoredUser) GrantNetworkLevel(network string, level uint8) {
-	a.ensureNetwork(network).Level = level
-}
-
-// RevokeNetwork removes a user's network access.
-func (a *StoredUser) RevokeNetwork(network string) {
-	a.doNetwork(network, func(srv string, _ *Access) {
-		delete(a.Network, srv)
-	})
-}
-
-// RevokeNetworkLevel removes network access.
-func (a *StoredUser) RevokeNetworkLevel(network string) {
-	a.doNetwork(network, func(_ string, access *Access) {
+// RevokeLevel removes level access.
+func (s *StoredUser) RevokeLevel(network, channel string) {
+	key := mkKey(network, channel)
+	access, ok := s.Access[key]
+	changed := false
+	if ok && access.Level > 0 {
 		access.Level = 0
-	})
-}
-
-// RevokeNetworkFlags removes flags from the network level.
-func (a *StoredUser) RevokeNetworkFlags(network string, flags ...string) {
-	a.doNetwork(network, func(_ string, access *Access) {
-		access.ClearFlags(flags...)
-	})
-}
-
-// GetNetwork gets the network access for the given network.
-func (a *StoredUser) GetNetwork(network string) (access *Access) {
-	a.doNetwork(network, func(_ string, acc *Access) {
-		access = acc
-	})
-	return
-}
-
-// HasNetworkLevel checks a user to see if their network level access is equal
-// or above the specified access.
-func (a *StoredUser) HasNetworkLevel(network string, level uint8) (has bool) {
-	a.doNetwork(network, func(_ string, access *Access) {
-		has = access.HasLevel(level)
-	})
-	return
-}
-
-// HasNetworkFlags checks a user to see if their network level flags contain the
-// given flags.
-func (a *StoredUser) HasNetworkFlags(network string,
-	flags ...string) (has bool) {
-
-	a.doNetwork(network, func(_ string, access *Access) {
-		has = access.HasFlags(flags...)
-	})
-	return
-}
-
-// HasNetworkFlag checks a user to see if their network level flags contain the
-// given flag.
-func (a *StoredUser) HasNetworkFlag(network string, flag rune) (has bool) {
-	a.doNetwork(network, func(_ string, access *Access) {
-		has = access.HasFlag(flag)
-	})
-	return
-}
-
-// GrantChannel sets both Level and Flags at the same time.
-func (a *StoredUser) GrantChannel(network, channel string, level uint8,
-	flags ...string) {
-
-	a.ensureChannel(network, channel).SetAccess(level, flags...)
-}
-
-// GrantChannelFlags sets channel flags.
-func (a *StoredUser) GrantChannelFlags(network, channel string,
-	flags ...string) {
-
-	a.ensureChannel(network, channel).SetFlags(flags...)
-}
-
-// GrantChannelLevel sets channel level.
-func (a *StoredUser) GrantChannelLevel(network, channel string, level uint8) {
-	a.ensureChannel(network, channel).Level = level
-}
-
-// RevokeChannel removes a user's channel access.
-func (a *StoredUser) RevokeChannel(network, channel string) {
-	a.doChannel(network, channel, func(srv, ch string, _ *Access) {
-		delete(a.Channel[srv], ch)
-	})
-}
-
-// RevokeChannelLevel removes channel access.
-func (a *StoredUser) RevokeChannelLevel(network, channel string) {
-	a.doChannel(network, channel, func(_, _ string, access *Access) {
-		access.Level = 0
-	})
-}
-
-// RevokeChannelFlags removes flags from the channel level.
-func (a *StoredUser) RevokeChannelFlags(network, channel string,
-	flags ...string) {
-	a.doChannel(network, channel, func(_, _ string, access *Access) {
-		access.ClearFlags(flags...)
-	})
-}
-
-// GetChannel gets the network access for the given channel.
-func (a *StoredUser) GetChannel(network, channel string) (access *Access) {
-	a.doChannel(network, channel, func(_, _ string, acc *Access) {
-		access = acc
-	})
-	return
-}
-
-// HasChannelLevel checks a user to see if their channel level access is equal
-// or above the specified access.
-func (a *StoredUser) HasChannelLevel(network, channel string,
-	level uint8) (has bool) {
-
-	a.doChannel(network, channel, func(_, _ string, access *Access) {
-		has = access.HasLevel(level)
-	})
-	return
-}
-
-// HasChannelFlags checks a user to see if their channel level flags contain the
-// given flags.
-func (a *StoredUser) HasChannelFlags(network, channel string,
-	flags ...string) (has bool) {
-
-	a.doChannel(network, channel, func(_, _ string, access *Access) {
-		has = access.HasFlags(flags...)
-	})
-	return
-}
-
-// HasChannelFlag checks a user to see if their channel level flags contain the
-// given flag.
-func (a *StoredUser) HasChannelFlag(network, channel string,
-	flag rune) (has bool) {
-
-	a.doChannel(network, channel, func(_, _ string, access *Access) {
-		has = access.HasFlag(flag)
-	})
-	return
-}
-
-// String turns StoredUser into a user consumable format.
-func (a *StoredUser) String(network, channel string) (str string) {
-	var wrote bool
-
-	if a.Global != nil && (a.Global.Level > 0 || a.Global.Flags > 0) {
-		str += "G(" + a.Global.String() + ")"
-		wrote = true
+		changed = true
 	}
+	if changed {
+		s.Access[key] = access
+	}
+}
 
-	a.doNetwork(network, func(_ string, srv *Access) {
-		if wrote {
-			str += " "
-		}
-		str += "S(" + srv.String() + ")"
-		wrote = true
-	})
-
-	network = strings.ToLower(network)
-	channel = strings.ToLower(channel)
-	if chsrv, ok := a.Channel[network]; ok {
-		if len(channel) != 0 {
-			if ch, ok := chsrv[channel]; ok && (ch.Level > 0 || ch.Flags > 0) {
-				if wrote {
-					str += " "
-				}
-				str += channel + "(" + ch.String() + ")"
-				wrote = true
-			}
+// RevokeFlags removes flags from the user.
+// Leaving flags empty removes ALL flags.
+func (s *StoredUser) RevokeFlags(flags ...string) {
+	key := mkKey(network, channel)
+	access, ok := s.Access[key]
+	changed := false
+	if ok && access.Flags > 0 {
+		if len(flags) == 0 {
+			access.Flags = 0
 		} else {
-			for channel, ch := range chsrv {
-				if ch.Level == 0 && ch.Flags == 0 {
-					continue
-				}
-				if wrote {
-					str += " "
-				}
-				str += channel + "(" + ch.String() + ")"
-				wrote = true
+			access.ClearFlags(flags...)
+		}
+		changed = true
+	}
+	if changed {
+		s.Access[key] = access
+	}
+}
+
+// RevokeAll removes all access from the user.
+func (s *StoredUser) RevokeAll() {
+	s.Access = make(map[string]Access)
+}
+
+// String turns StoredUser's access into a user consumable format.
+func (s *StoredUser) String(network, channel string) string {
+	var wrote bool
+	var b = &bytes.Buffer{}
+
+	if len(s.Access) == 0 {
+		return none
+	}
+
+	if glb, ok := s.Access[mkKey("", "")]; ok &&
+		(glb.Level > 0 || glb.Flags > 0) {
+
+		fmt.Fprintf(b, "G(%v)", glb)
+		wrote = true
+	}
+	if len(network) > 0 {
+		if net, ok := s.Access[mkKey(network, "")]; ok &&
+			(net.Level > 0 || net.Flags > 0) {
+
+			if wrote {
+				b.WriteByte(' ')
 			}
+			fmt.Fprintf(b, "%s(%v)", network, net)
+			wrote = true
+		}
+	}
+	if len(channel) > 0 {
+		if ch, ok := s.Access[mkKey("", channel)]; ok &&
+			(ch.Level > 0 || ch.Flags > 0) {
+
+			if wrote {
+				b.WriteByte(' ')
+			}
+			fmt.Fprintf(b, "%s(%v)", channel, ch)
+			wrote = true
+		}
+	}
+	if len(network) > 0 && len(channel) > 0 {
+		if ch, ok := s.Access[mkKey(network, channel)]; ok &&
+			(ch.Level > 0 || ch.Flags > 0) {
+
+			if wrote {
+				b.WriteByte(' ')
+			}
+			fmt.Fprintf(b, "%s:%s(%v)", network, channel, ch)
+			wrote = true
 		}
 	}
 
 	if !wrote {
 		return none
 	}
-	return
+	return b.String()
+}
+
+// mkKey gets a key for accessing the Access map.
+func mkKey(network, channel string) string {
+	return strings.ToLower(network) + ":" + strings.ToLower(channel)
 }

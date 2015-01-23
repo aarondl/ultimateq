@@ -5,6 +5,15 @@ import "encoding/json"
 // JSONStorer allows storage of normal strings and json values into a map.
 type JSONStorer map[string]string
 
+// Clone does a deep copy of the JSONStorer.
+func (js JSONStorer) Clone() JSONStorer {
+	j := make(JSONStorer, len(js))
+	for k, v := range js {
+		j[k] = v
+	}
+	return j
+}
+
 // Put puts a regular string into the map.
 func (js JSONStorer) Put(key, value string) {
 	js[key] = value

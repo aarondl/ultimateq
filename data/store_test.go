@@ -1,6 +1,7 @@
 package data
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -537,10 +538,10 @@ func TestStore_GlobalUsers(t *testing.T) {
 	}
 
 	ua1 := &StoredUser{Username: uname}
-	ua1.GrantGlobalLevel(5)
+	ua1.Grant("", "", 5)
 	ua2 := &StoredUser{Username: uname + uname}
-	ua2.GrantNetworkLevel(network, 5)
-	ua2.GrantChannelLevel(network, channel, 5)
+	ua2.Grant(network, "", 5)
+	ua2.Grant(network, channel, 5)
 
 	err = s.SaveUser(ua1)
 	if err != nil {
@@ -574,10 +575,10 @@ func TestStore_NetworkUsers(t *testing.T) {
 	}
 
 	ua1 := &StoredUser{Username: uname}
-	ua1.GrantNetworkLevel(network, 5)
+	ua1.Grant(network, "", 5)
 	ua2 := &StoredUser{Username: uname + uname}
-	ua2.GrantGlobalLevel(5)
-	ua2.GrantChannelLevel(network, channel, 5)
+	ua2.Grant("", "", 5)
+	ua2.Grant(network, channel, 5)
 
 	err = s.SaveUser(ua1)
 	if err != nil {
@@ -611,10 +612,10 @@ func TestStore_ChanUsers(t *testing.T) {
 	}
 
 	ua1 := &StoredUser{Username: uname}
-	ua1.GrantChannelLevel(network, channel, 5)
+	ua1.Grant(network, channel, 5)
 	ua2 := &StoredUser{Username: uname + uname}
-	ua2.GrantGlobalLevel(5)
-	ua2.GrantNetworkLevel(network, 5)
+	ua2.Grant("", "", 5)
+	ua2.Grant(network, "", 5)
 
 	err = s.SaveUser(ua1)
 	if err != nil {
@@ -637,8 +638,7 @@ func TestStore_ChanUsers(t *testing.T) {
 func TestStore_AuthError(t *testing.T) {
 	t.Parallel()
 	var err1 error = AuthError{
-		errFmtBadHost,
-		[]interface{}{"h", "u"},
+		fmt.Sprintf(errFmtBadHost, "h", "u"),
 		AuthErrHostNotFound,
 	}
 	if err1.Error() != "Host [h] does not match stored hosts for user [u]." {
@@ -647,7 +647,6 @@ func TestStore_AuthError(t *testing.T) {
 
 	var err2 error = AuthError{
 		"msg",
-		nil,
 		AuthErrHostNotFound,
 	}
 	if err2.Error() != "msg" {

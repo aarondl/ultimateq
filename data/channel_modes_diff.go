@@ -14,15 +14,15 @@ type ModeDiff struct {
 }
 
 // NewModeDiff creates an empty ModeDiff.
-func NewModeDiff(m *modeKinds) *ModeDiff {
-	return &ModeDiff{
+func NewModeDiff(m *modeKinds) ModeDiff {
+	return ModeDiff{
 		modeKinds: m,
 		pos:       NewChannelModes(m),
 		neg:       NewChannelModes(m),
 	}
 }
 
-// Clone creates a modediff from the current with new memory.
+// Clone deep copies the ModeDiff.
 func (d *ModeDiff) Clone() ModeDiff {
 	return ModeDiff{
 		modeKinds: d.modeKinds,
@@ -119,7 +119,7 @@ func (d *ModeDiff) unsetAddress(mode rune, address string) {
 }
 
 // isUserMode checks if the given mode belongs to the user mode kinds.
-func (d *ModeDiff) isUserMode(mode rune) (is bool) {
+func (d ModeDiff) isUserMode(mode rune) (is bool) {
 	if d.userPrefixes != nil {
 		is = d.modeBit(mode) > 0
 	}

@@ -30,7 +30,7 @@ func NewChannel(name string, m *modeKinds) *Channel {
 	}
 }
 
-// Clone copies the channel into new memory.
+// Clone deep copies this Channel.
 func (c *Channel) Clone() *Channel {
 	return &Channel{c.name, c.topic, c.ChannelModes.Clone()}
 }

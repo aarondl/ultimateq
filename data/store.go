@@ -42,15 +42,11 @@ const (
 // authentication.
 type AuthError struct {
 	str         string
-	fmtArgs     []interface{}
 	FailureType AuthFailure
 }
 
 // Error builds the error string for an AuthError.
 func (a AuthError) Error() string {
-	if len(a.fmtArgs) > 0 {
-		return fmt.Sprintf(a.str, a.fmtArgs...)
-	}
 	return a.str
 }
 
@@ -100,24 +96,24 @@ func (s *Store) Close() error {
 // GlobalUsers gets users with global access
 func (s *Store) GlobalUsers() ([]*StoredUser, error) {
 	return iterate(s.db, func(ua *StoredUser) bool {
-		a := ua.GetGlobal()
-		return a != nil && !a.IsZero()
+		a, ok := ua.GetAccess("", "")
+		return ok && !a.IsZero()
 	})
 }
 
 // NetworkUsers gets users with Network access
 func (s *Store) NetworkUsers(network string) ([]*StoredUser, error) {
 	return iterate(s.db, func(ua *StoredUser) bool {
-		a := ua.GetNetwork(network)
-		return a != nil && !a.IsZero()
+		a, ok := ua.GetAccess(network, "")
+		return ok && !a.IsZero()
 	})
 }
 
 // ChanUsers gets users with access to a channel
 func (s *Store) ChanUsers(network, channel string) ([]*StoredUser, error) {
 	return iterate(s.db, func(ua *StoredUser) bool {
-		a := ua.GetChannel(network, channel)
-		return a != nil && !a.IsZero()
+		a, ok := ua.GetAccess(network, channel)
+		return ok && !a.IsZero()
 	})
 }
 
@@ -218,24 +214,21 @@ func (s *Store) authUser(
 
 	if user == nil {
 		return nil, AuthError{
-			errFmtUserNotFound,
-			[]interface{}{username},
+			fmt.Sprintf(errFmtUserNotFound, username),
 			AuthErrUserNotFound,
 		}
 	}
 
-	if !user.ValidateMask(host) {
+	if !user.HasMask(host) {
 		return nil, AuthError{
-			errFmtBadHost,
-			[]interface{}{host, username},
+			fmt.Sprintf(errFmtBadHost, host, username),
 			AuthErrHostNotFound,
 		}
 	}
 
 	if !user.VerifyPassword(password) {
 		return nil, AuthError{
-			errFmtBadPassword,
-			[]interface{}{username},
+			fmt.Sprintf(errFmtBadPassword, username),
 			AuthErrBadPassword,
 		}
 	}

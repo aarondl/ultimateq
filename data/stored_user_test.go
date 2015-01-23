@@ -43,6 +43,34 @@ func TestStoredUser(t *testing.T) {
 	}
 }
 
+func TestStoredUser(t *testing.T) {
+	t.Parallel()
+
+	var masks = []string{`*!*@host`, `*!user@*`}
+
+	s, err := NewStoredUser(uname, password, masks...)
+	s.Grant("", "", 15)
+	s.Put("hello", "there")
+
+	clone := s.Clone()
+
+	if clone.Username != s.Username {
+		t.Error("Expected username to be cloned, got:", clone.Username)
+	}
+	if 0 != bytes.Compare(clone.Password, s.Password) {
+		t.Errorf("Expected password to be cloned, got: %s", clone.Password)
+	}
+	if clone.Masks[0] != masks[0] || clone.Masks[1] != masks[1] {
+		t.Error("Expected masks to be cloned.")
+	}
+	if val, _ := clone.Get("hello"); val != "there" {
+		t.Error("Expected JSON storage to be copied.")
+	}
+	if !clone.HasLevel("", "", 15) {
+		t.Error("Expected access to be cloned.")
+	}
+}
+
 func TestStoredUser_VerifyPassword(t *testing.T) {
 	t.Parallel()
 	s, err := NewStoredUser(uname, password)
@@ -65,9 +93,9 @@ func TestStoredUser_SerializeDeserialize(t *testing.T) {
 		t.Fatal("Unexpected error:", err)
 	}
 
-	s.GrantGlobal(100, "a")
-	s.GrantNetwork(network, 100, "a")
-	s.GrantChannel(network, channel, 100, "a")
+	s.Grant("", "", 100, "a")
+	s.Grant(network, "", 100, "a")
+	s.Grant(network, channel, 100, "a")
 
 	serialized, err := s.serialize()
 	if err != nil {
@@ -126,17 +154,17 @@ func TestStoredUser_AddMasks(t *testing.T) {
 	}
 }
 
-func TestStoredUser_DelMasks(t *testing.T) {
+func TestStoredUser_RemoveMasks(t *testing.T) {
 	t.Parallel()
 	masks := []string{`*!*@host`, `*!user@*`, `nick!*@*`}
 	s := createStoredUser(masks...)
 	if len(s.Masks) != 3 {
 		t.Error("User should have the masks:", masks)
 	}
-	if !s.DelMask(masks[1]) || s.ValidateMask(masks[1]) {
+	if !s.RemoveMask(masks[1]) || s.HasMask(masks[1]) {
 		t.Error("The mask should have been deleted.")
 	}
-	if !s.DelMask(masks[2]) || s.ValidateMask(masks[2]) {
+	if !s.RemoveMask(masks[2]) || s.HasMask(masks[2]) {
 		t.Error("The mask should have been deleted.")
 	}
 	if len(s.Masks) != 1 {
@@ -144,20 +172,20 @@ func TestStoredUser_DelMasks(t *testing.T) {
 	}
 }
 
-func TestStoredUser_ValidateMasks(t *testing.T) {
+func TestStoredUser_HasMasks(t *testing.T) {
 	t.Parallel()
 	masks := []string{`*!*@host`, `*!user@*`}
 	s := createStoredUser(masks[1:]...)
 
-	if s.ValidateMask(masks[0]) {
+	if s.HasMask(masks[0]) {
 		t.Error("Should not have validated this mask.")
 	}
-	if !s.ValidateMask(masks[1]) {
+	if !s.HasMask(masks[1]) {
 		t.Error("Should have validated this mask.")
 	}
 
 	s = createStoredUser(masks[1:]...)
-	if !s.ValidateMask(masks[1]) {
+	if !s.HasMask(masks[1]) {
 		t.Error("When masks are empty should validate any mask.")
 	}
 }
@@ -193,29 +221,29 @@ func TestStoredUser_Has(t *testing.T) {
 	if str = check(1, "a", false, false, false); len(str) != 0 {
 		t.Error(s)
 	}
-	s.GrantChannelFlags(network, channel, "a")
+	s.Grant(network, channel, 0, "a")
 	if str = check(1, "a", false, false, true); len(str) != 0 {
 		t.Error(s)
 	}
-	s.GrantChannelLevel(network, channel, 1)
+	s.Grant(network, channel, 1)
 	if str = check(1, "a", true, true, true); len(str) != 0 {
 		t.Error(s)
 	}
 
-	s.GrantNetworkFlags(network, "b")
+	s.Grant(network, "", 0)
 	if str = check(2, "ab", false, false, true); len(str) != 0 {
 		t.Error(s)
 	}
-	s.GrantNetworkLevel(network, 2)
+	s.Grant(network, "", 2)
 	if str = check(2, "ab", true, true, true); len(str) != 0 {
 		t.Error(s)
 	}
 
-	s.GrantGlobalFlags("c")
+	s.Grant("", "", 0, "c")
 	if str = check(3, "abc", false, false, true); len(str) != 0 {
 		t.Error(s)
 	}
-	s.GrantGlobalLevel(3)
+	s.Grant("", "", 3)
 	if str = check(3, "abc", true, true, true); len(str) != 0 {
 		t.Error(s)
 	}
@@ -228,21 +256,21 @@ func TestStoredUser_Has(t *testing.T) {
 func TestStoredUser_GrantGlobal(t *testing.T) {
 	t.Parallel()
 	s := createStoredUser()
-	s.GrantGlobalLevel(100)
+	s.Grant("", "", 100)
 	a := s.GetGlobal()
 	if a.Level != 100 {
 		t.Error("Level not set.")
 	}
 
 	s = createStoredUser()
-	s.GrantGlobalFlags("aB")
+	s.Grant("", "", 0, "aB")
 	a = s.GetGlobal()
 	if !a.HasFlag('a') || !a.HasFlag('a') {
 		t.Error("Flags not set.")
 	}
 
 	s = createStoredUser()
-	s.GrantGlobal(100, "aB")
+	s.Grant("", "", 100, "aB")
 	a = s.GetGlobal()
 	if a.Level != 100 {
 		t.Error("Level not set.")
@@ -255,7 +283,7 @@ func TestStoredUser_GrantGlobal(t *testing.T) {
 func TestStoredUser_RevokeGlobal(t *testing.T) {
 	t.Parallel()
 	s := createStoredUser()
-	s.GrantGlobal(100, "aB")
+	s.Grant("", "", 100, "aB")
 	s.RevokeGlobalLevel()
 	if s.Global.Level != 0 {
 		t.Error("Level not revoked.")
@@ -276,7 +304,7 @@ func TestStoredUser_HasGlobalLevel(t *testing.T) {
 	if s.HasGlobalLevel(50) {
 		t.Error("Should not have any access.")
 	}
-	s.GrantGlobalLevel(50)
+	s.Grant("", "", 50)
 	if !s.HasGlobalLevel(50) {
 		t.Error("Should have access.")
 	}
@@ -291,7 +319,7 @@ func TestStoredUser_HasGlobalFlags(t *testing.T) {
 	if s.HasGlobalFlags("ab") {
 		t.Error("Should not have any flags.")
 	}
-	s.GrantGlobalFlags("ab")
+	s.Grant("", "", 0, "ab")
 	if !s.HasGlobalFlag('a') || !s.HasGlobalFlag('b') {
 		t.Error("Should have ab flags.")
 	}
@@ -312,7 +340,7 @@ func TestStoredUser_GrantNetwork(t *testing.T) {
 	}
 
 	s = createStoredUser()
-	s.GrantNetwork(network, 100, "aB")
+	s.Grant(network, "", 100, "aB")
 	a = s.GetNetwork(network)
 	if a == nil {
 		t.Error("There should be network access.")
@@ -326,7 +354,7 @@ func TestStoredUser_GrantNetwork(t *testing.T) {
 	}
 
 	s = createStoredUser()
-	s.GrantNetworkLevel(network, 100)
+	s.Grant(network, "", 100)
 	a = s.GetNetwork(network)
 	if s == nil {
 		t.Error("There should be network access.")
@@ -334,7 +362,7 @@ func TestStoredUser_GrantNetwork(t *testing.T) {
 		t.Error("Level not set.")
 	}
 	s = createStoredUser()
-	s.GrantNetworkFlags(network, "aB")
+	s.Grant(network, "", 0)
 	a = s.GetNetwork(network)
 	if a == nil {
 		t.Error("There should be network access.")
@@ -346,7 +374,7 @@ func TestStoredUser_GrantNetwork(t *testing.T) {
 func TestStoredUser_RevokeNetwork(t *testing.T) {
 	t.Parallel()
 	s := createStoredUser()
-	s.GrantNetwork(network, 100, "abc")
+	s.Grant(network, "", 100, "abc")
 	if s.GetNetwork(network) == nil {
 		t.Error("Network permissions not granted.")
 	}
@@ -355,7 +383,7 @@ func TestStoredUser_RevokeNetwork(t *testing.T) {
 		t.Error("Network permissions not revoked.")
 	}
 
-	s.GrantNetwork(network, 100, "abc")
+	s.Grant(network, "", 100, "abc")
 	s.RevokeNetworkLevel(network)
 	if s.GetNetwork(network).Level > 0 {
 		t.Error("Network level not revoked.")
@@ -373,7 +401,7 @@ func TestStoredUser_HasNetworkLevel(t *testing.T) {
 	if s.HasNetworkLevel(network, 50) {
 		t.Error("Should not have any access.")
 	}
-	s.GrantNetworkLevel(network, 50)
+	s.Grant(network, "", 50)
 	if !s.HasNetworkLevel(network, 50) {
 		t.Error("Should have access.")
 	}
@@ -388,7 +416,7 @@ func TestStoredUser_HasNetworkFlags(t *testing.T) {
 	if s.HasNetworkFlags(network, "ab") {
 		t.Error("Should not have any flags.")
 	}
-	s.GrantNetworkFlags(network, "ab")
+	s.Grant(network, "", 0)
 	if !s.HasNetworkFlag(network, 'a') || !s.HasNetworkFlag(network, 'b') {
 		t.Error("Should have ab flags.")
 	}
@@ -409,7 +437,7 @@ func TestStoredUser_GrantChannel(t *testing.T) {
 	}
 
 	s = createStoredUser()
-	s.GrantChannel(network, channel, 100, "aB")
+	s.Grant(network, channel, 100, "aB")
 	a = s.GetChannel(network, channel)
 	if a == nil {
 		t.Error("There should be global access.")
@@ -423,7 +451,7 @@ func TestStoredUser_GrantChannel(t *testing.T) {
 	}
 
 	s = createStoredUser()
-	s.GrantChannelLevel(network, channel, 100)
+	s.Grant(network, channel, 100)
 	a = s.GetChannel(network, channel)
 	if a == nil {
 		t.Error("There should be global access.")
@@ -431,7 +459,7 @@ func TestStoredUser_GrantChannel(t *testing.T) {
 		t.Error("Level not set.")
 	}
 	s = createStoredUser()
-	s.GrantChannelFlags(network, channel, "aB")
+	s.Grant(network, channel, 0, "aB")
 	a = s.GetChannel(network, channel)
 	if a == nil {
 		t.Error("There should be global access.")
@@ -443,7 +471,7 @@ func TestStoredUser_GrantChannel(t *testing.T) {
 func TestStoredUser_RevokeChannel(t *testing.T) {
 	t.Parallel()
 	s := createStoredUser()
-	s.GrantChannel(network, channel, 100, "abc")
+	s.Grant(network, channel, 100, "abc")
 	if s.GetChannel(network, channel) == nil {
 		t.Error("Channel permissions not granted.")
 	}
@@ -452,7 +480,7 @@ func TestStoredUser_RevokeChannel(t *testing.T) {
 		t.Error("Channel permissions not revoked.")
 	}
 
-	s.GrantChannel(network, channel, 100, "abc")
+	s.Grant(network, channel, 100, "abc")
 	s.RevokeChannelLevel(network, channel)
 	if s.GetChannel(network, channel).Level > 0 {
 		t.Error("Channel level not revoked.")
@@ -470,7 +498,7 @@ func TestStoredUser_HasChannelLevel(t *testing.T) {
 	if s.HasChannelLevel(network, channel, 50) {
 		t.Error("Should not have any access.")
 	}
-	s.GrantChannelLevel(network, channel, 50)
+	s.Grant(network, channel, 50)
 	if !s.HasChannelLevel(network, channel, 50) {
 		t.Error("Should have access.")
 	}
@@ -485,7 +513,7 @@ func TestStoredUser_HasChannelFlags(t *testing.T) {
 	if s.HasChannelFlags(network, channel, "ab") {
 		t.Error("Should not have any flags.")
 	}
-	s.GrantChannelFlags(network, channel, "ab")
+	s.Grant(network, channel, 0, "ab")
 	if !s.HasChannelFlag(network, channel, 'a') ||
 		!s.HasChannelFlag(network, channel, 'b') {
 		t.Error("Should have ab flags.")
@@ -530,11 +558,11 @@ func TestStoredUser_String(t *testing.T) {
 	for _, test := range table {
 		s := createStoredUser()
 		if test.HasGlobal {
-			s.GrantGlobal(test.GlobalLevel, test.GlobalFlags)
+			s.Grant("", "", test.GlobalLevel, test.GlobalFlags)
 		}
 		if test.HasNetwork {
-			s.GrantNetwork(network, test.NetworkLevel, test.NetworkFlags)
-			s.GrantNetwork("other", test.NetworkLevel, test.NetworkFlags)
+			s.Grant(network, "", test.NetworkLevel, test.NetworkFlags)
+			s.Grant("other", "", test.NetworkLevel, test.NetworkFlags)
 		}
 		if test.HasChannel {
 			s.GrantChannel(network, "#chan1",

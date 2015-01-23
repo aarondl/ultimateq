@@ -7,8 +7,8 @@ import (
 
 func TestModeDiff_Create(t *testing.T) {
 	t.Parallel()
-
-	var _ moder = NewModeDiff(testKinds)
+	m := NewModeDiff(testKinds)
+	var _ moder = &m
 }
 
 func TestModeDiff_Clone(t *testing.T) {

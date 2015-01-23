@@ -185,7 +185,7 @@ func TestChannelModes_ApplyDiff(t *testing.T) {
 
 	d := NewModeDiff(testKinds)
 	d.Apply("-a-b+z-d+bc host1 host3 15")
-	m.ApplyDiff(d)
+	m.ApplyDiff(&d)
 	if got, exp := m.IsSet("b host1"), false; exp != got {
 		t.Error("Expected: %v, got: %v", exp, got)
 	}

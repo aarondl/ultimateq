@@ -29,7 +29,7 @@ func NewChannelModes(m *modeKinds) ChannelModes {
 	}
 }
 
-// Clone clones a channel mode into new memory.
+// Clone deep copies the ChannelModes.
 func (m *ChannelModes) Clone() ChannelModes {
 	cm := ChannelModes{
 		modes:        make(map[rune]bool, len(m.modes)),

@@ -19,6 +19,11 @@ func NewStoredChannel(netID, name string) *StoredChannel {
 	return &StoredChannel{netID, name, make(JSONStorer)}
 }
 
+// Clone deep copies this StoredChannel.
+func (s *StoredChannel) Clone() *StoredChannel {
+	return &StoredChannel{s.NetID, s.Name, s.JSONStorer.Clone()}
+}
+
 // makeID is used to create a key to store this instance by.
 func (s *StoredChannel) makeID() string {
 	return strings.ToLower(fmt.Sprintf("%s.%s", s.Name, s.NetID))
