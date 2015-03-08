@@ -165,11 +165,6 @@ func TestAccess_String(t *testing.T) {
 			t.Errorf("Expected: %s, was: %s", test.Expect, was)
 		}
 	}
-
-	var a *Access
-	if a.String() != none {
-		t.Error("Even if access is nil we should be able to string it to none.")
-	}
 }
 
 func Test_getFlagBits(t *testing.T) {

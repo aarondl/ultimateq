@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"sort"
 	"strings"
 	"time"
 
@@ -414,59 +415,73 @@ func (s *StoredUser) RevokeAll() {
 
 // String turns StoredUser's access into a user consumable format.
 func (s *StoredUser) String(network, channel string) string {
-	var wrote bool
 	var b = &bytes.Buffer{}
+	//spew.Dump(s.Access)
 
 	if len(s.Access) == 0 {
 		return none
 	}
 
-	if glb, ok := s.Access[mkKey("", "")]; ok &&
-		(glb.Level > 0 || glb.Flags > 0) {
+	s.writeIt(b, ":") // Always write global
 
-		fmt.Fprintf(b, "G(%v)", glb)
-		wrote = true
-	}
-	if len(network) > 0 {
-		if net, ok := s.Access[mkKey(network, "")]; ok &&
-			(net.Level > 0 || net.Flags > 0) {
-
-			if wrote {
-				b.WriteByte(' ')
-			}
-			fmt.Fprintf(b, "%s(%v)", network, net)
-			wrote = true
+	var keys []string
+	for k, _ := range s.Access {
+		if k == ":" {
+			continue
 		}
-	}
-	if len(channel) > 0 {
-		if ch, ok := s.Access[mkKey("", channel)]; ok &&
-			(ch.Level > 0 || ch.Flags > 0) {
 
-			if wrote {
-				b.WriteByte(' ')
-			}
-			fmt.Fprintf(b, "%s(%v)", channel, ch)
-			wrote = true
+		if len(network) != 0 && !strings.HasPrefix(k, network) {
+			continue
 		}
+		if len(channel) != 0 && !strings.HasSuffix(k, channel) {
+			continue
+		}
+		keys = append(keys, k)
 	}
-	if len(network) > 0 && len(channel) > 0 {
-		fmt.Println("printing:", network, channel)
-		if ch, ok := s.Access[mkKey(network, channel)]; ok &&
-			(ch.Level > 0 || ch.Flags > 0) {
-			fmt.Println("Ultra Print:")
-			if wrote {
-				b.WriteByte(' ')
+	sort.Strings(keys)
+
+	for out := 0; out <= 2; out++ {
+		for _, k := range keys {
+			switch f, l := k[0], k[len(k)-1]; {
+			case out == 0 && f != ':' && l == ':':
+				s.writeIt(b, k)
+			case out == 1 && f == ':' && l != ':':
+				s.writeIt(b, k)
+			case out == 2 && f != ':' && l != ':':
+				s.writeIt(b, k)
 			}
-			fmt.Fprintf(b, "%s:%s(%v)", network, channel, ch)
-			wrote = true
 		}
 	}
 
-	if !wrote {
+	if b.Len() == 0 {
 		return none
 	}
-	fmt.Println(b.String())
 	return b.String()
+}
+
+func (s *StoredUser) writeIt(b *bytes.Buffer, key string) {
+	spl := strings.Split(key, ":")
+	network, channel := spl[0], spl[1]
+
+	access, ok := s.Access[key]
+	if !ok || (access.Level == 0 && access.Flags == 0) {
+		return
+	}
+
+	if b.Len() > 0 {
+		b.WriteByte(' ')
+	}
+	n, c := len(network) > 0, len(channel) > 0
+	switch {
+	case n && c:
+		fmt.Fprintf(b, "%s:%s(%v)", network, channel, access)
+	case n:
+		fmt.Fprintf(b, "%s(%v)", network, access)
+	case c:
+		fmt.Fprintf(b, "%s(%v)", channel, access)
+	default:
+		fmt.Fprintf(b, "G(%v)", access)
+	}
 }
 
 // mkKey gets a key for accessing the Access map.

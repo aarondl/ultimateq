@@ -6,8 +6,6 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-
-	"github.com/davecgh/go-spew/spew"
 )
 
 func TestStoredUser(t *testing.T) {
@@ -496,68 +494,30 @@ func TestStoredUser_HasChannelFlags(t *testing.T) {
 }
 
 func TestStoredUser_String(t *testing.T) {
-	t.Parallel()
+	u := createStoredUser()
+	u.Grant("", "", 100, "a")
+	u.Grant("net", "", 150, "b")
+	u.Grant("other", "", 150, "b")
+	u.Grant("", "#chan", 200, "c")
+	u.Grant("net", "#chan", 250, "d")
+	u.Grant("net", "#chan2", 255, "d")
 
-	var table = []struct {
-		HasGlobal       bool
-		GlobalLevel     uint8
-		GlobalFlags     string
-		HasNetwork      bool
-		NetworkLevel    uint8
-		NetworkFlags    string
-		HasChannel      bool
-		ChannelLevel    uint8
-		ChannelFlags    string
-		ExpectChannel   string
-		ExpectNoChannel string
+	tests := []struct {
+		Net, Chan string
+		Out       string
 	}{
-		{true, 100, "abc", true, 150, "abc", true, 200, "abc",
-			"G(100 abc),irc.network.net(150 abc),irc.network.net:#chan1(200 abc)",
-			"G(100 abc),irc.network.net(150 abc),irc.network.net:#chan1(200 abc),irc.network.net:#chan2(200 abc)"},
-		{false, 100, "abc", true, 150, "abc", true, 200, "abc",
-			"irc.network.net(150 abc),irc.network.net:#chan1(200 abc)",
-			"irc.network.net(150 abc),irc.network.net:#chan1(200 abc),irc.network.net:#chan2(200 abc)"},
-		{false, 0, "", false, 0, "", true, 200, "abc",
-			"irc.network.net:#chan1(200 abc)",
-			"irc.network.net:#chan1(200 abc),irc.network.net:#chan2(200 abc)"},
-		{false, 0, "", false, 0, "", false, 0, "", "none", "none"},
-		{false, 0, "", false, 0, "", true, 0, "", "none", "none"},
+		{"", "", `G(100 a) net(150 b) other(150 b) #chan(200 c) net:#chan(250 d) net:#chan2(255 d)`},
+		{"net", "", `G(100 a) net(150 b) net:#chan(250 d) net:#chan2(255 d)`},
+		{"", "#chan", `G(100 a) #chan(200 c) net:#chan(250 d)`},
+		{"", "#chan2", `G(100 a) net:#chan2(255 d)`},
+		{"net", "#chan", `G(100 a) net:#chan(250 d)`},
+		{"net", "#chan2", `G(100 a) net:#chan2(255 d)`},
 	}
 
-	for i, test := range table {
-		s := createStoredUser()
-		if test.HasGlobal {
-			s.Grant("", "", test.GlobalLevel, test.GlobalFlags)
-		}
-		if test.HasNetwork {
-			s.Grant(network, "", test.NetworkLevel, test.NetworkFlags)
-			s.Grant("other", "", test.NetworkLevel, test.NetworkFlags)
-		}
-		if test.HasChannel {
-			s.Grant(network, "#chan1",
-				test.ChannelLevel, test.ChannelFlags)
-			s.Grant(network, "#chan2",
-				test.ChannelLevel, test.ChannelFlags)
-		}
-		spew.Dump(s.Access)
-
-		var was string
-		var expList []string
-
-		was = s.String(network, "#chan1")
-		expList = strings.Split(test.ExpectChannel, ",")
-		for _, exp := range expList {
-			if !strings.Contains(was, exp) {
-				t.Errorf("1.%d) Expected: '%s' to contain access: '%s'", i, was, exp)
-			}
-		}
-
-		was = s.String(network, "")
-		expList = strings.Split(test.ExpectChannel, ",")
-		for _, exp := range expList {
-			if !strings.Contains(was, exp) {
-				t.Errorf("2.%d) Expected: '%s' to contain access: '%s'", i, was, exp)
-			}
+	for i, test := range tests {
+		got := u.String(test.Net, test.Chan)
+		if got != test.Out {
+			t.Errorf("%d) Expected: %q got: %q", i, test.Out, got)
 		}
 	}
 }
