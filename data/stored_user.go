@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"code.google.com/p/go.crypto/bcrypt"
 	"github.com/aarondl/ultimateq/irc"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func init() {
@@ -102,7 +102,10 @@ func (s *StoredUser) Clone() *StoredUser {
 // createStoredUser creates a useraccess that doesn't care about security.
 // Mostly for testing. Will return nil if duplicate masks are given.
 func createStoredUser(masks ...string) *StoredUser {
-	s := &StoredUser{}
+	s := &StoredUser{
+		JSONStorer: make(JSONStorer),
+		Access:     make(map[string]Access),
+	}
 	for _, mask := range masks {
 		if !s.AddMask(mask) {
 			return nil
@@ -264,12 +267,12 @@ func (s *StoredUser) HasLevel(network, channel string, level uint8) bool {
 		}
 	}
 	if len(channel) > 0 {
-		if a, ok := s.Access[mkKey("", channel)]; a.Level >= level {
+		if a, ok := s.Access[mkKey("", channel)]; ok && a.Level >= level {
 			return true
 		}
 	}
 	if len(network) > 0 && len(channel) > 0 {
-		if a, ok := s.Access[mkKey(network, channel)]; a.Level >= level {
+		if a, ok := s.Access[mkKey(network, channel)]; ok && a.Level >= level {
 			return true
 		}
 	}
@@ -280,12 +283,11 @@ func (s *StoredUser) HasLevel(network, channel string, level uint8) bool {
 // prioritized thusly: Global > Network > Channel
 func (s *StoredUser) HasFlags(network, channel string, flags ...string) bool {
 	var searchBits = getFlagBits(flags...)
-
-	network = strings.ToLower(network)
-	channel = strings.ToLower(channel)
+	var haveBits uint64
 
 	var check = func(access Access) (had bool) {
-		return (searchBits & access.Flags) != 0
+		haveBits |= access.Flags
+		return (searchBits & haveBits) == searchBits
 	}
 
 	if a, ok := s.Access[mkKey("", "")]; ok && check(a) {
@@ -312,27 +314,27 @@ func (s *StoredUser) HasFlags(network, channel string, flags ...string) bool {
 
 // HasFlag checks if a user has a given flag. Where his access is
 // prioritized thusly: Global > Network > Channel
-func (s *StoredUser) HasFlag(network, channel string, flag rune) bool {
-	if a, ok := s.Access[mkKey("", "")]; ok && a.HasFlag(flag) {
-		return true
-	}
-	if len(network) > 0 {
-		if a, ok := s.Access[mkKey(network, "")]; ok && a.HasFlag(flag) {
-			return true
-		}
-	}
-	if len(channel) > 0 {
-		if a, ok := s.Access[mkKey("", channel)]; ok && a.HasFlag(flag) {
-			return true
-		}
-	}
-	if len(network) > 0 && len(channel) > 0 {
-		if a, ok := s.Access[mkKey(network, channel)]; ok && a.HasFlag(flag) {
-			return true
-		}
-	}
-	return false
-}
+// func (s *StoredUser) HasFlag(network, channel string, flag rune) bool {
+// 	if a, ok := s.Access[mkKey("", "")]; ok && a.HasFlag(flag) {
+// 		return true
+// 	}
+// 	if len(network) > 0 {
+// 		if a, ok := s.Access[mkKey(network, "")]; ok && a.HasFlag(flag) {
+// 			return true
+// 		}
+// 	}
+// 	if len(channel) > 0 {
+// 		if a, ok := s.Access[mkKey("", channel)]; ok && a.HasFlag(flag) {
+// 			return true
+// 		}
+// 	}
+// 	if len(network) > 0 && len(channel) > 0 {
+// 		if a, ok := s.Access[mkKey(network, channel)]; ok && a.HasFlag(flag) {
+// 			return true
+// 		}
+// 	}
+// 	return false
+// }
 
 // GetAccess returns access using the network and channel provided. The bool
 // returns false if the user has no explicit permissions for the level
@@ -388,7 +390,7 @@ func (s *StoredUser) RevokeLevel(network, channel string) {
 
 // RevokeFlags removes flags from the user.
 // Leaving flags empty removes ALL flags.
-func (s *StoredUser) RevokeFlags(flags ...string) {
+func (s *StoredUser) RevokeFlags(network, channel string, flags ...string) {
 	key := mkKey(network, channel)
 	access, ok := s.Access[key]
 	changed := false
@@ -448,9 +450,10 @@ func (s *StoredUser) String(network, channel string) string {
 		}
 	}
 	if len(network) > 0 && len(channel) > 0 {
+		fmt.Println("printing:", network, channel)
 		if ch, ok := s.Access[mkKey(network, channel)]; ok &&
 			(ch.Level > 0 || ch.Flags > 0) {
-
+			fmt.Println("Ultra Print:")
 			if wrote {
 				b.WriteByte(' ')
 			}
@@ -462,10 +465,12 @@ func (s *StoredUser) String(network, channel string) string {
 	if !wrote {
 		return none
 	}
+	fmt.Println(b.String())
 	return b.String()
 }
 
 // mkKey gets a key for accessing the Access map.
 func mkKey(network, channel string) string {
-	return strings.ToLower(network) + ":" + strings.ToLower(channel)
+	return fmt.Sprintf("%s:%s",
+		strings.ToLower(network), strings.ToLower(channel))
 }

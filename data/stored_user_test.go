@@ -6,42 +6,9 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
 )
-
-func TestStoredUser(t *testing.T) {
-	t.Parallel()
-	var s *StoredUser
-	var err error
-	var masks = []string{`*!*@host`, `*!user@*`}
-
-	s = &StoredUser{}
-	s, err = NewStoredUser(uname, password, masks...)
-	if err != nil {
-		t.Fatal("Unexpected error:", err)
-	}
-	if s.Username != uname {
-		t.Errorf("Username is %v not %v", s.Username, uname)
-	}
-	if len(s.Password) == 0 {
-		t.Error("Password not set properly:", err)
-	}
-	if len(s.Masks) != len(masks) {
-		t.Errorf("Masks are %#v not %#v", s.Masks, masks)
-	}
-
-	s, err = NewStoredUser("", password, masks...)
-	if s != nil || err != errMissingUnameOrPwd {
-		t.Error("Empty username should fail creation.")
-	}
-	s, err = NewStoredUser(uname, "", masks...)
-	if s != nil || err != errMissingUnameOrPwd {
-		t.Error("Empty password should fail creation.")
-	}
-	s, err = NewStoredUser(uname, password, "a", "a")
-	if s != nil || err != errDuplicateMask {
-		t.Error("Duplicate masks should generate an error.")
-	}
-}
 
 func TestStoredUser(t *testing.T) {
 	t.Parallel()
@@ -49,6 +16,9 @@ func TestStoredUser(t *testing.T) {
 	var masks = []string{`*!*@host`, `*!user@*`}
 
 	s, err := NewStoredUser(uname, password, masks...)
+	if err != nil {
+		t.Error(err)
+	}
 	s.Grant("", "", 15)
 	s.Put("hello", "there")
 
@@ -122,14 +92,14 @@ func TestStoredUser_SerializeDeserialize(t *testing.T) {
 		}
 	}
 
-	if !b.HasGlobalLevel(100) || !b.HasGlobalFlag('a') {
+	if !b.HasLevel("", "", 100) || !b.HasFlags("", "", "a") {
 		t.Error("Lost global permissions in serialization.")
 	}
-	if !b.HasNetworkLevel(network, 100) || !b.HasNetworkFlag(network, 'a') {
+	if !b.HasLevel(network, "", 100) || !b.HasFlags(network, "", "a") {
 		t.Error("Lost network permissions in serialization.")
 	}
-	if !b.HasChannelLevel(network, channel, 100) ||
-		!b.HasChannelFlag(network, channel, 'a') {
+	if !b.HasLevel(network, channel, 100) ||
+		!b.HasFlags(network, channel, "a") {
 
 		t.Error("Lost channel permissions in serialization.")
 	}
@@ -209,47 +179,40 @@ func TestStoredUser_Has(t *testing.T) {
 			return fmt.Sprintf("Expected flags (%v) to be: %v but got %v",
 				flags, hasFlags, ret)
 		}
-		for _, f := range flags {
-			if ret := s.HasFlag(network, channel, f); ret != hasFlags {
-				return fmt.Sprintf("Expected flag (%v) to be: %v but got %v")
-			}
-		}
 		return ""
 	}
 
 	var str string
 	if str = check(1, "a", false, false, false); len(str) != 0 {
-		t.Error(s)
+		t.Error(str)
 	}
 	s.Grant(network, channel, 0, "a")
 	if str = check(1, "a", false, false, true); len(str) != 0 {
-		t.Error(s)
+		t.Error(str)
 	}
 	s.Grant(network, channel, 1)
 	if str = check(1, "a", true, true, true); len(str) != 0 {
-		t.Error(s)
+		t.Error(str)
 	}
-
-	s.Grant(network, "", 0)
+	s.Grant(network, "", 0, "b")
 	if str = check(2, "ab", false, false, true); len(str) != 0 {
-		t.Error(s)
+		t.Error(str)
 	}
 	s.Grant(network, "", 2)
 	if str = check(2, "ab", true, true, true); len(str) != 0 {
-		t.Error(s)
+		t.Error(str)
 	}
-
 	s.Grant("", "", 0, "c")
 	if str = check(3, "abc", false, false, true); len(str) != 0 {
-		t.Error(s)
+		t.Error(str)
 	}
 	s.Grant("", "", 3)
 	if str = check(3, "abc", true, true, true); len(str) != 0 {
-		t.Error(s)
+		t.Error(str)
 	}
 
-	if s.HasFlags(network, channel, "ad") == false {
-		t.Error("Should have had flag s.")
+	if s.HasFlags(network, channel, "ad") {
+		t.Error("Should not have had flag d.")
 	}
 }
 
@@ -257,25 +220,25 @@ func TestStoredUser_GrantGlobal(t *testing.T) {
 	t.Parallel()
 	s := createStoredUser()
 	s.Grant("", "", 100)
-	a := s.GetGlobal()
-	if a.Level != 100 {
+	a, ok := s.GetAccess("", "")
+	if !ok || a.Level != 100 {
 		t.Error("Level not set.")
 	}
 
 	s = createStoredUser()
 	s.Grant("", "", 0, "aB")
-	a = s.GetGlobal()
-	if !a.HasFlag('a') || !a.HasFlag('a') {
+	a, ok = s.GetAccess("", "")
+	if !ok || !a.HasFlag('a') || !a.HasFlag('a') {
 		t.Error("Flags not set.")
 	}
 
 	s = createStoredUser()
 	s.Grant("", "", 100, "aB")
-	a = s.GetGlobal()
-	if a.Level != 100 {
+	a, ok = s.GetAccess("", "")
+	if !ok || a.Level != 100 {
 		t.Error("Level not set.")
 	}
-	if !a.HasFlag('a') || !a.HasFlag('a') {
+	if !ok || !a.HasFlag('a') || !a.HasFlag('a') {
 		t.Error("Flags not set.")
 	}
 }
@@ -284,16 +247,19 @@ func TestStoredUser_RevokeGlobal(t *testing.T) {
 	t.Parallel()
 	s := createStoredUser()
 	s.Grant("", "", 100, "aB")
-	s.RevokeGlobalLevel()
-	if s.Global.Level != 0 {
+	s.RevokeLevel("", "")
+	a, _ := s.GetAccess("", "")
+	if a.Level != 0 {
 		t.Error("Level not revoked.")
 	}
-	s.RevokeGlobalFlags("a")
-	if s.Global.HasFlag('a') || !s.Global.HasFlag('B') {
+	s.RevokeFlags("", "", "a")
+	a, _ = s.GetAccess("", "")
+	if a.HasFlag('a') || !a.HasFlag('B') {
 		t.Error("Flags not revoked.")
 	}
-	s.RevokeGlobal()
-	if s.Global != nil {
+	s.Revoke("", "")
+	_, ok := s.GetAccess("", "")
+	if ok {
 		t.Error("Global should be nil.")
 	}
 }
@@ -301,14 +267,14 @@ func TestStoredUser_RevokeGlobal(t *testing.T) {
 func TestStoredUser_HasGlobalLevel(t *testing.T) {
 	t.Parallel()
 	s := createStoredUser()
-	if s.HasGlobalLevel(50) {
+	if s.HasLevel("", "", 50) {
 		t.Error("Should not have any access.")
 	}
 	s.Grant("", "", 50)
-	if !s.HasGlobalLevel(50) {
+	if !s.HasLevel("", "", 50) {
 		t.Error("Should have access.")
 	}
-	if s.HasGlobalLevel(51) {
+	if s.HasLevel("", "", 51) {
 		t.Error("Should not have that high access.")
 	}
 }
@@ -316,17 +282,17 @@ func TestStoredUser_HasGlobalLevel(t *testing.T) {
 func TestStoredUser_HasGlobalFlags(t *testing.T) {
 	t.Parallel()
 	s := createStoredUser()
-	if s.HasGlobalFlags("ab") {
+	if s.HasFlags("", "", "ab") {
 		t.Error("Should not have any flags.")
 	}
 	s.Grant("", "", 0, "ab")
-	if !s.HasGlobalFlag('a') || !s.HasGlobalFlag('b') {
+	if !s.HasFlags("", "", "a") || !s.HasFlags("", "", "b") {
 		t.Error("Should have ab flags.")
 	}
-	if !s.HasGlobalFlags("abc") {
-		t.Error("Should have s or b flags.")
+	if s.HasFlags("", "", "abc") {
+		t.Error("Should not have c flag.")
 	}
-	if s.HasGlobalFlag('c') {
+	if s.HasFlags("", "", "c") {
 		t.Error("Should not have c flag.")
 	}
 }
@@ -334,15 +300,15 @@ func TestStoredUser_HasGlobalFlags(t *testing.T) {
 func TestStoredUser_GrantNetwork(t *testing.T) {
 	t.Parallel()
 	s := createStoredUser()
-	a := s.GetNetwork(network)
-	if a != nil {
+	a, ok := s.GetAccess(network, "")
+	if ok {
 		t.Error("There should be no network access.")
 	}
 
 	s = createStoredUser()
 	s.Grant(network, "", 100, "aB")
-	a = s.GetNetwork(network)
-	if a == nil {
+	a, ok = s.GetAccess(network, "")
+	if !ok {
 		t.Error("There should be network access.")
 	} else {
 		if a.Level != 100 {
@@ -355,16 +321,16 @@ func TestStoredUser_GrantNetwork(t *testing.T) {
 
 	s = createStoredUser()
 	s.Grant(network, "", 100)
-	a = s.GetNetwork(network)
-	if s == nil {
+	a, ok = s.GetAccess(network, "")
+	if !ok {
 		t.Error("There should be network access.")
 	} else if a.Level != 100 {
 		t.Error("Level not set.")
 	}
 	s = createStoredUser()
-	s.Grant(network, "", 0)
-	a = s.GetNetwork(network)
-	if a == nil {
+	s.Grant(network, "", 0, "aB")
+	a, ok = s.GetAccess(network, "")
+	if !ok {
 		t.Error("There should be network access.")
 	} else if !a.HasFlag('a') || !a.HasFlag('B') {
 		t.Error("Flags not added.")
@@ -375,22 +341,22 @@ func TestStoredUser_RevokeNetwork(t *testing.T) {
 	t.Parallel()
 	s := createStoredUser()
 	s.Grant(network, "", 100, "abc")
-	if s.GetNetwork(network) == nil {
+	if _, ok := s.GetAccess(network, ""); !ok {
 		t.Error("Network permissions not granted.")
 	}
-	s.RevokeNetwork(network)
-	if s.GetNetwork(network) != nil {
+	s.Revoke(network, "")
+	if _, ok := s.GetAccess(network, ""); ok {
 		t.Error("Network permissions not revoked.")
 	}
 
 	s.Grant(network, "", 100, "abc")
-	s.RevokeNetworkLevel(network)
-	if s.GetNetwork(network).Level > 0 {
+	s.RevokeLevel(network, "")
+	if a, ok := s.GetAccess(network, ""); !ok || a.Level > 0 {
 		t.Error("Network level not revoked.")
 	}
 
-	s.RevokeNetworkFlags(network, "ab")
-	if s.GetNetwork(network).HasFlags("ab") {
+	s.RevokeFlags(network, "", "ab")
+	if a, ok := s.GetAccess(network, ""); !ok || a.HasFlags("ab") {
 		t.Error("Network flags not revoked.")
 	}
 }
@@ -398,14 +364,14 @@ func TestStoredUser_RevokeNetwork(t *testing.T) {
 func TestStoredUser_HasNetworkLevel(t *testing.T) {
 	t.Parallel()
 	s := createStoredUser()
-	if s.HasNetworkLevel(network, 50) {
+	if s.HasLevel(network, "", 50) {
 		t.Error("Should not have any access.")
 	}
 	s.Grant(network, "", 50)
-	if !s.HasNetworkLevel(network, 50) {
+	if !s.HasLevel(network, "", 50) {
 		t.Error("Should have access.")
 	}
-	if s.HasNetworkLevel(network, 51) {
+	if s.HasLevel(network, "", 51) {
 		t.Error("Should not have that high access.")
 	}
 }
@@ -413,17 +379,20 @@ func TestStoredUser_HasNetworkLevel(t *testing.T) {
 func TestStoredUser_HasNetworkFlags(t *testing.T) {
 	t.Parallel()
 	s := createStoredUser()
-	if s.HasNetworkFlags(network, "ab") {
+	if s.HasFlags(network, "", "ab") {
 		t.Error("Should not have any flags.")
 	}
-	s.Grant(network, "", 0)
-	if !s.HasNetworkFlag(network, 'a') || !s.HasNetworkFlag(network, 'b') {
+	s.Grant(network, "", 0, "ab")
+	if !s.HasFlags(network, "", "a") || !s.HasFlags(network, "", "b") {
 		t.Error("Should have ab flags.")
 	}
-	if !s.HasNetworkFlags(network, "abc") {
-		t.Error("Should have s or b flags.")
+	if !s.HasFlags(network, "", "ab") {
+		t.Error("Should have ab flags.")
 	}
-	if s.HasNetworkFlag(network, 'c') {
+	if s.HasFlags(network, "", "abc") {
+		t.Error("Should not have c flag.")
+	}
+	if s.HasFlags(network, "", "c") {
 		t.Error("Should not have c flag.")
 	}
 }
@@ -431,16 +400,16 @@ func TestStoredUser_HasNetworkFlags(t *testing.T) {
 func TestStoredUser_GrantChannel(t *testing.T) {
 	t.Parallel()
 	s := createStoredUser()
-	a := s.GetChannel(network, channel)
-	if a != nil {
-		t.Error("There should be no global access.")
+	a, ok := s.GetAccess(network, channel)
+	if ok {
+		t.Error("There should be no channel access.")
 	}
 
 	s = createStoredUser()
 	s.Grant(network, channel, 100, "aB")
-	a = s.GetChannel(network, channel)
-	if a == nil {
-		t.Error("There should be global access.")
+	a, ok = s.GetAccess(network, channel)
+	if !ok {
+		t.Error("There should be channel access.")
 	} else {
 		if a.Level != 100 {
 			t.Error("Level not set.")
@@ -452,17 +421,17 @@ func TestStoredUser_GrantChannel(t *testing.T) {
 
 	s = createStoredUser()
 	s.Grant(network, channel, 100)
-	a = s.GetChannel(network, channel)
-	if a == nil {
-		t.Error("There should be global access.")
+	a, ok = s.GetAccess(network, channel)
+	if !ok {
+		t.Error("There should be channel access.")
 	} else if a.Level != 100 {
 		t.Error("Level not set.")
 	}
 	s = createStoredUser()
 	s.Grant(network, channel, 0, "aB")
-	a = s.GetChannel(network, channel)
-	if a == nil {
-		t.Error("There should be global access.")
+	a, ok = s.GetAccess(network, channel)
+	if !ok {
+		t.Error("There should be channel access.")
 	} else if !a.HasFlag('a') || !a.HasFlag('B') {
 		t.Error("Flags not added.")
 	}
@@ -472,22 +441,22 @@ func TestStoredUser_RevokeChannel(t *testing.T) {
 	t.Parallel()
 	s := createStoredUser()
 	s.Grant(network, channel, 100, "abc")
-	if s.GetChannel(network, channel) == nil {
+	if _, ok := s.GetAccess(network, channel); !ok {
 		t.Error("Channel permissions not granted.")
 	}
-	s.RevokeChannel(network, channel)
-	if s.GetChannel(network, channel) != nil {
+	s.Revoke(network, channel)
+	if _, ok := s.GetAccess(network, channel); ok {
 		t.Error("Channel permissions not revoked.")
 	}
 
 	s.Grant(network, channel, 100, "abc")
-	s.RevokeChannelLevel(network, channel)
-	if s.GetChannel(network, channel).Level > 0 {
+	s.RevokeLevel(network, channel)
+	if a, ok := s.GetAccess(network, channel); !ok || a.Level > 0 {
 		t.Error("Channel level not revoked.")
 	}
 
-	s.RevokeChannelFlags(network, channel, "ab")
-	if s.GetChannel(network, channel).HasFlags("ab") {
+	s.RevokeFlags(network, channel, "ab")
+	if a, ok := s.GetAccess(network, channel); !ok || a.HasFlags("ab") {
 		t.Error("Channel flags not revoked.")
 	}
 }
@@ -495,14 +464,14 @@ func TestStoredUser_RevokeChannel(t *testing.T) {
 func TestStoredUser_HasChannelLevel(t *testing.T) {
 	t.Parallel()
 	s := createStoredUser()
-	if s.HasChannelLevel(network, channel, 50) {
+	if s.HasLevel(network, channel, 50) {
 		t.Error("Should not have any access.")
 	}
 	s.Grant(network, channel, 50)
-	if !s.HasChannelLevel(network, channel, 50) {
+	if !s.HasLevel(network, channel, 50) {
 		t.Error("Should have access.")
 	}
-	if s.HasChannelLevel(network, channel, 51) {
+	if s.HasLevel(network, channel, 51) {
 		t.Error("Should not have that high access.")
 	}
 }
@@ -510,18 +479,18 @@ func TestStoredUser_HasChannelLevel(t *testing.T) {
 func TestStoredUser_HasChannelFlags(t *testing.T) {
 	t.Parallel()
 	s := createStoredUser()
-	if s.HasChannelFlags(network, channel, "ab") {
+	if s.HasFlags(network, channel, "ab") {
 		t.Error("Should not have any flags.")
 	}
 	s.Grant(network, channel, 0, "ab")
-	if !s.HasChannelFlag(network, channel, 'a') ||
-		!s.HasChannelFlag(network, channel, 'b') {
+	if !s.HasFlags(network, channel, "a") ||
+		!s.HasFlags(network, channel, "b") {
 		t.Error("Should have ab flags.")
 	}
-	if !s.HasChannelFlags(network, channel, "abc") {
-		t.Error("Should have s or b flags.")
+	if s.HasFlags(network, channel, "abc") {
+		t.Error("Should not have c flag.")
 	}
-	if s.HasChannelFlag(network, channel, 'c') {
+	if s.HasFlags(network, channel, "c") {
 		t.Error("Should not have c flag.")
 	}
 }
@@ -543,19 +512,19 @@ func TestStoredUser_String(t *testing.T) {
 		ExpectNoChannel string
 	}{
 		{true, 100, "abc", true, 150, "abc", true, 200, "abc",
-			"G(100 abc),S(150 abc),#chan1(200 abc)",
-			"G(100 abc),S(150 abc),#chan1(200 abc),#chan2(200 abc)"},
+			"G(100 abc),irc.network.net(150 abc),irc.network.net:#chan1(200 abc)",
+			"G(100 abc),irc.network.net(150 abc),irc.network.net:#chan1(200 abc),irc.network.net:#chan2(200 abc)"},
 		{false, 100, "abc", true, 150, "abc", true, 200, "abc",
-			"S(150 abc),#chan1(200 abc)",
-			"S(150 abc),#chan1(200 abc),#chan2(200 abc)"},
+			"irc.network.net(150 abc),irc.network.net:#chan1(200 abc)",
+			"irc.network.net(150 abc),irc.network.net:#chan1(200 abc),irc.network.net:#chan2(200 abc)"},
 		{false, 0, "", false, 0, "", true, 200, "abc",
-			"#chan1(200 abc)",
-			"#chan1(200 abc),#chan2(200 abc)"},
+			"irc.network.net:#chan1(200 abc)",
+			"irc.network.net:#chan1(200 abc),irc.network.net:#chan2(200 abc)"},
 		{false, 0, "", false, 0, "", false, 0, "", "none", "none"},
 		{false, 0, "", false, 0, "", true, 0, "", "none", "none"},
 	}
 
-	for _, test := range table {
+	for i, test := range table {
 		s := createStoredUser()
 		if test.HasGlobal {
 			s.Grant("", "", test.GlobalLevel, test.GlobalFlags)
@@ -565,11 +534,12 @@ func TestStoredUser_String(t *testing.T) {
 			s.Grant("other", "", test.NetworkLevel, test.NetworkFlags)
 		}
 		if test.HasChannel {
-			s.GrantChannel(network, "#chan1",
+			s.Grant(network, "#chan1",
 				test.ChannelLevel, test.ChannelFlags)
-			s.GrantChannel(network, "#chan2",
+			s.Grant(network, "#chan2",
 				test.ChannelLevel, test.ChannelFlags)
 		}
+		spew.Dump(s.Access)
 
 		var was string
 		var expList []string
@@ -578,7 +548,7 @@ func TestStoredUser_String(t *testing.T) {
 		expList = strings.Split(test.ExpectChannel, ",")
 		for _, exp := range expList {
 			if !strings.Contains(was, exp) {
-				t.Errorf("Expected: '%s' to contain access: '%s'", was, exp)
+				t.Errorf("1.%d) Expected: '%s' to contain access: '%s'", i, was, exp)
 			}
 		}
 
@@ -586,7 +556,7 @@ func TestStoredUser_String(t *testing.T) {
 		expList = strings.Split(test.ExpectChannel, ",")
 		for _, exp := range expList {
 			if !strings.Contains(was, exp) {
-				t.Errorf("Expected: '%s' to contain access: '%s'", was, exp)
+				t.Errorf("2.%d) Expected: '%s' to contain access: '%s'", i, was, exp)
 			}
 		}
 	}

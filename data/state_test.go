@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"code.google.com/p/go.crypto/bcrypt"
 	"github.com/aarondl/ultimateq/irc"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func init() {

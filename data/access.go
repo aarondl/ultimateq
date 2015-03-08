@@ -94,10 +94,7 @@ func (a *Access) IsZero() bool {
 }
 
 // String transforms the Access into a human-readable format.
-func (a *Access) String() (str string) {
-	if a == nil {
-		return none
-	}
+func (a Access) String() (str string) {
 	hasLevel := a.Level != 0
 	hasFlags := a.Flags != 0
 	if !hasLevel && !hasFlags {
