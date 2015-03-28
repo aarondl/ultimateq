@@ -537,9 +537,11 @@ func TestStore_GlobalUsers(t *testing.T) {
 		t.Error("When db is empty both return params should be nil.")
 	}
 
-	ua1 := &StoredUser{Username: uname}
+	ua1 := createStoredUser()
+	ua1.Username = uname
 	ua1.Grant("", "", 5)
-	ua2 := &StoredUser{Username: uname + uname}
+	ua2 := createStoredUser()
+	ua2.Username = uname + uname
 	ua2.Grant(network, "", 5)
 	ua2.Grant(network, channel, 5)
 
@@ -574,10 +576,11 @@ func TestStore_NetworkUsers(t *testing.T) {
 		t.Error("When db is empty both return params should be nil.")
 	}
 
-	ua1 := &StoredUser{Username: uname}
+	ua1 := createStoredUser()
+	ua1.Username = uname
 	ua1.Grant(network, "", 5)
-	ua2 := &StoredUser{Username: uname + uname}
-	ua2.Grant("", "", 5)
+	ua2 := createStoredUser()
+	ua2.Username = uname + uname
 	ua2.Grant(network, channel, 5)
 
 	err = s.SaveUser(ua1)
@@ -611,10 +614,11 @@ func TestStore_ChanUsers(t *testing.T) {
 		t.Error("When db is empty both return params should be nil.")
 	}
 
-	ua1 := &StoredUser{Username: uname}
+	ua1 := createStoredUser()
+	ua1.Username = uname
 	ua1.Grant(network, channel, 5)
-	ua2 := &StoredUser{Username: uname + uname}
-	ua2.Grant("", "", 5)
+	ua2 := createStoredUser()
+	ua2.Username = uname + uname
 	ua2.Grant(network, "", 5)
 
 	err = s.SaveUser(ua1)

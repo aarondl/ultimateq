@@ -968,10 +968,10 @@ func TestState_UpdateMode(t *testing.T) {
 	u1modes, _ := st.UserModes(users[0], channels[0])
 	u2modes, _ := st.UserModes(users[1], channels[0])
 	u2modes.SetMode('v')
-	ch, _ := st.Channel(channels[0])
-	ch.Set("n")
+	realCh := st.channel(channels[0])
+	realCh.Set("n")
 
-	ch, _ = st.Channel(channels[0])
+	ch, _ := st.Channel(channels[0])
 	if got, exp := ch.IsSet("n"), true; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
@@ -990,6 +990,7 @@ func TestState_UpdateMode(t *testing.T) {
 	st.Update(ev)
 	u1modes, _ = st.UserModes(users[0], channels[0])
 	u2modes, _ = st.UserModes(users[1], channels[0])
+	ch, _ = st.Channel(channels[0])
 	if got, exp := ch.IsSet("n"), false; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
 	}

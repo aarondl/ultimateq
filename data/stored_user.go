@@ -56,7 +56,6 @@ var StoredUserPwdCost = bcrypt.DefaultCost
 
 // NewStoredUser requires username and password but masks are optional.
 func NewStoredUser(un, pw string, masks ...string) (*StoredUser, error) {
-
 	if len(un) == 0 || len(pw) == 0 {
 		return nil, errMissingUnameOrPwd
 	}

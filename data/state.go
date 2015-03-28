@@ -187,7 +187,7 @@ func (s *State) Channel(channel string) (Channel, bool) {
 	var ch Channel
 	c, ok := s.channels[strings.ToLower(channel)]
 	if ok {
-		ch = *c
+		ch = *c.Clone()
 	}
 	return ch, ok
 }
@@ -271,7 +271,7 @@ func (s *State) EachChannel(fn func(Channel) bool) {
 	defer s.protect.RUnlock()
 
 	for _, c := range s.channels {
-		if fn(*c) {
+		if fn(*c.Clone()) {
 			break
 		}
 	}
