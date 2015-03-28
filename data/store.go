@@ -63,12 +63,12 @@ type DbProvider func() (*kv.DB, error)
 
 // Store is used to store StoredUser objects, and cache their lookup.
 type Store struct {
-	db           *kv.DB
-	cache        map[string]*StoredUser
-	protectCache sync.Mutex
-	authed       map[string]*StoredUser
-	timeouts     map[string]time.Time
-	checkedFirst bool
+	db *kv.DB
+
+	protect  sync.Mutex
+	cache    map[string]*StoredUser
+	authed   map[string]*StoredUser
+	timeouts map[string]time.Time
 }
 
 // NewStore initializes a store type.
@@ -154,8 +154,10 @@ func (s *Store) SaveUser(ua *StoredUser) error {
 		return err
 	}
 
+	s.protect.Lock()
 	s.checkCacheLimits()
-	s.cache[ua.Username] = ua
+	s.cache[ua.Username] = ua.Clone()
+	s.protect.Unlock()
 	return nil
 }
 
@@ -163,12 +165,17 @@ func (s *Store) SaveUser(ua *StoredUser) error {
 func (s *Store) RemoveUser(username string) (removed bool, err error) {
 	username = strings.ToLower(username)
 	var exists *StoredUser
-	exists, err = s.FindUser(username)
+
+	s.protect.Lock()
+	defer s.protect.Unlock()
+
+	exists, err = s.findUser(username)
 	if err != nil || exists == nil {
 		return
 	}
 
 	delete(s.cache, username)
+
 	err = s.db.Delete([]byte(username))
 	if err != nil {
 		return
@@ -203,11 +210,14 @@ func (s *Store) authUser(
 	var ok bool
 	var err error
 
+	s.protect.Lock()
+	defer s.protect.Unlock()
+
 	if user, ok = s.authed[network+host]; ok {
-		return user, nil
+		return user.Clone(), nil
 	}
 
-	user, err = s.FindUser(username)
+	user, err = s.findUser(username)
 	if err != nil {
 		return nil, err
 	}
@@ -237,37 +247,47 @@ func (s *Store) authUser(
 		s.timeouts[network+host] = time.Now().UTC().Add(defaultTimeout)
 	}
 	s.authed[network+host] = user
-	return user, nil
+	return user.Clone(), nil
 }
 
 // GetAuthedUser looks up a user that was authenticated previously.
 func (s *Store) GetAuthedUser(network, host string) *StoredUser {
+	s.protect.Lock()
+	defer s.protect.Unlock()
 	return s.authed[network+host]
 }
 
 // Logout logs an authenticated host out.
 func (s *Store) Logout(network, host string) {
+	s.protect.Lock()
+	defer s.protect.Unlock()
 	delete(s.authed, network+host)
 }
 
 // LogoutByUsername logs an authenticated username out.
 func (s *Store) LogoutByUsername(username string) {
+	s.protect.Lock()
+	defer s.protect.Unlock()
+
 	username = strings.ToLower(username)
-	hosts := make([]string, 0, 1)
+	var hosts []string
 	for host, user := range s.authed {
 		if user.Username == username {
 			hosts = append(hosts, host)
 		}
 	}
 
-	for i := range hosts {
-		delete(s.authed, hosts[i])
+	for _, h := range hosts {
+		delete(s.authed, h)
 	}
 }
 
 // Update sets timeouts for seen and unseen users and invokes a reap on users
 // who have expired their auth timeouts.
 func (s *Store) Update(network string, update StateUpdate) {
+	s.protect.Lock()
+	defer s.protect.Unlock()
+
 	for _, seen := range update.Seen {
 		delete(s.timeouts, network+seen)
 	}
@@ -286,11 +306,11 @@ func (s *Store) Update(network string, update StateUpdate) {
 		delete(s.authed, network+update.Quit)
 	}
 
-	s.Reap()
+	s.reap()
 }
 
-// Reap removes users who have exceeded their temporary auths.
-func (s *Store) Reap() {
+// reap removes users who have exceeded their temporary auths.
+func (s *Store) reap() {
 	for key, date := range s.timeouts {
 		if time.Now().UTC().After(date) {
 			delete(s.authed, key)
@@ -301,24 +321,29 @@ func (s *Store) Reap() {
 
 // FindUser looks up a user based on username. It caches the result if found.
 func (s *Store) FindUser(username string) (user *StoredUser, err error) {
+	s.protect.Lock()
+	defer s.protect.Unlock()
+
+	return s.findUser(username)
+}
+
+// findUser gets a user from the database or the cache, caches if found.
+// warning: Assumes the cache is locked
+func (s *Store) findUser(username string) (user *StoredUser, err error) {
 	username = strings.ToLower(username)
-	// We're writing to cache in a method that should be considered safe by
-	// read-only locked friends, so we have to protect the cache.
-	s.protectCache.Lock()
-	defer s.protectCache.Unlock()
 
 	if cached, ok := s.cache[username]; ok {
-		user = cached
-		return
+		user = cached.Clone()
+		return user, nil
 	}
 
 	user, err = s.fetchUser(username)
-	if err != nil {
-		return
+	if user == nil || err != nil {
+		return user, err
 	}
 
 	s.checkCacheLimits()
-	s.cache[username] = user
+	s.cache[username] = user.Clone()
 	return
 }
 
@@ -372,7 +397,7 @@ func (s *Store) RemoveChannel(netID, name string) (removed bool, err error) {
 	return
 }
 
-// FindChannel looks up a channel based on name. It caches the result if found.
+// FindChannel looks up a channel based on name.
 func (s *Store) FindChannel(netID, name string) (channel *StoredChannel,
 	err error) {
 
@@ -420,26 +445,11 @@ func (s *Store) checkCacheLimits() {
 	}
 }
 
-// IsFirst checks to see if the user is the first one in. Returns true if
-// so, false if not. Note that this also sets the value immediately, so all
-// subsequent calls to IsFirst will return false.
-func (s *Store) IsFirst() (isFirst bool, err error) {
-	if s.checkedFirst {
-		return
-	}
-
-	_, isFirst, err = s.db.Put(nil, isInitialized,
-		func(key, old []byte) (upd []byte, write bool, err error) {
-			if old == nil {
-				upd = isInitialized
-				write = true
-			}
-			return
-		},
-	)
-
-	s.checkedFirst = true
-	return
+// HasAny checks to see if there are any users in the database.
+func (s *Store) HasAny() (has bool, err error) {
+	var k, v []byte
+	k, v, err = s.db.First()
+	return k != nil || v != nil, err
 }
 
 // MakeFileStoreProvider is the default way to create a store by using the

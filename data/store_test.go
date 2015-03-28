@@ -406,7 +406,7 @@ func TestStore_Reap(t *testing.T) {
 
 	s.timeouts[network+host] = time.Now().UTC().AddDate(0, 0, -1)
 
-	s.Reap()
+	s.reap()
 
 	if _, ok := s.authed[network+host]; ok {
 		t.Error("This authentication record should not exist.")
@@ -497,7 +497,7 @@ func TestStore_Finding(t *testing.T) {
 	}
 }
 
-func TestStore_IsFirst(t *testing.T) {
+func TestStore_HasAny(t *testing.T) {
 	t.Parallel()
 	s, err := NewStore(MemStoreProvider)
 	defer s.Close()
@@ -505,22 +505,25 @@ func TestStore_IsFirst(t *testing.T) {
 		t.Error("Unexpected error:", err)
 	}
 
-	var isFirst bool
+	var has bool
 
-	isFirst, err = s.IsFirst()
+	has, err = s.HasAny()
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
-	if isFirst != true {
-		t.Error("The first call to isFirst should return true.")
+	if has {
+		t.Error("We initially should have none")
 	}
 
-	isFirst, err = s.IsFirst()
+	su := StoredUser{Username: "hi"}
+	s.SaveUser(&su)
+
+	has, err = s.HasAny()
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
-	if isFirst != false {
-		t.Error("The subsequent calls to IsFirst should return false.")
+	if !has {
+		t.Error("It should be true after someone's been added")
 	}
 }
 
