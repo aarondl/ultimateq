@@ -655,7 +655,7 @@ func TestCmds_DispatchAuthed(t *testing.T) {
 	buffer, writer := newWriter()
 	state, store, user := setupForAuth()
 	provider := testProvider{state, store}
-	user.Grant("", "", 100, "a")
+	user.Grant("", "", 100, "ab")
 	if err := store.SaveUser(user); err != nil {
 		t.Fatal(err)
 	}
