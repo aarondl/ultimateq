@@ -67,7 +67,7 @@ type Store struct {
 
 	protect  sync.Mutex
 	cache    map[string]*StoredUser
-	authed   map[string]*StoredUser
+	authed   map[string]string
 	timeouts map[string]time.Time
 }
 
@@ -81,7 +81,7 @@ func NewStore(prov DbProvider) (*Store, error) {
 	s := &Store{
 		db:       db,
 		cache:    make(map[string]*StoredUser),
-		authed:   make(map[string]*StoredUser),
+		authed:   make(map[string]string),
 		timeouts: make(map[string]time.Time),
 	}
 
@@ -207,14 +207,13 @@ func (s *Store) authUser(
 
 	username = strings.ToLower(username)
 	var user *StoredUser
-	var ok bool
 	var err error
 
 	s.protect.Lock()
 	defer s.protect.Unlock()
 
-	if user, ok = s.authed[network+host]; ok {
-		return user.Clone(), nil
+	if uname, ok := s.authed[network+host]; ok {
+		return s.findUser(uname)
 	}
 
 	user, err = s.findUser(username)
@@ -246,7 +245,7 @@ func (s *Store) authUser(
 	if temp {
 		s.timeouts[network+host] = time.Now().UTC().Add(defaultTimeout)
 	}
-	s.authed[network+host] = user
+	s.authed[network+host] = username
 	return user.Clone(), nil
 }
 
@@ -254,7 +253,11 @@ func (s *Store) authUser(
 func (s *Store) AuthedUser(network, host string) *StoredUser {
 	s.protect.Lock()
 	defer s.protect.Unlock()
-	return s.authed[network+host]
+	if username, ok := s.authed[network+host]; ok {
+		user, _ := s.findUser(username)
+		return user
+	}
+	return nil
 }
 
 // Logout logs an authenticated host out.
@@ -271,8 +274,8 @@ func (s *Store) LogoutByUsername(username string) {
 
 	username = strings.ToLower(username)
 	var hosts []string
-	for host, user := range s.authed {
-		if user.Username == username {
+	for host, uname := range s.authed {
+		if uname == username {
 			hosts = append(hosts, host)
 		}
 	}

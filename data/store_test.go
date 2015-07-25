@@ -192,7 +192,7 @@ func TestStore_AuthUser(t *testing.T) {
 		t.Error("Rejected good authentication.")
 	}
 
-	if s.authed[network+host] == nil {
+	if _, ok := s.authed[network+host]; !ok {
 		t.Error("User is not authenticated.")
 	}
 
@@ -242,7 +242,7 @@ func TestStore_AuthLogout(t *testing.T) {
 
 	s.Logout(network, host)
 
-	if s.authed[network+host] != nil {
+	if _, ok := s.authed[network+host]; ok {
 		t.Error("User is still authenticated.")
 	}
 
@@ -256,7 +256,7 @@ func TestStore_AuthLogout(t *testing.T) {
 
 	s.LogoutByUsername(uname)
 
-	if s.authed[network+host] != nil {
+	if _, ok := s.authed[network+host]; ok {
 		t.Error("User is still authenticated.")
 	}
 }
