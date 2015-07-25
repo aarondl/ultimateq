@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"sync"
 
 	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/irc"
@@ -14,26 +13,14 @@ import (
 // fills the Event structure with information about the user and channel
 // involved. It also embeds the State and Store for easy access.
 //
-// Event comes with the implication that the State and Store
-// have been locked for reading, A typical event handler that quickly does some
-// work and returns does not need to worry about calling Close() since it is
-// guaranteed to automatically be closed when the
-// handler returns. But a call to Close() must be given in a
-// command handler that will do some long running processes. Note that all data
-// in the Event struct becomes volatile and not thread-safe after a call
-// to Close() has been made, so the values in the Event struct are set to
-// nil but extra caution should be made when copying data from this struct and
-// calling Close() afterwards since this data is shared between other parts of
-// the bot.
-//
 // Some parts of Event will be nil under certain circumstances so elements
 // within must be checked for nil, see each element's documentation
 // for further information.
 type Event struct {
 	*irc.Event
-	locker data.Locker
 	*data.State
 	*data.Store
+
 	// User can be nil if the bot's State is disabled.
 	User *data.User
 	// StoredUser will be nil when there is no required access.
@@ -62,12 +49,11 @@ type Event struct {
 	TargetVarStoredUser []*data.StoredUser
 
 	args map[string]string
-	once sync.Once
 }
 
-// GetArg gets an argument that was passed in to the command by the user. The
+// Arg gets an argument that was passed in to the command by the user. The
 // name of the argument passed into Register() is required to get the argument.
-func (ev *Event) GetArg(arg string) string {
+func (ev *Event) Arg(arg string) string {
 	return ev.args[arg]
 }
 
@@ -87,12 +73,11 @@ func (ev *Event) FindUserByNick(nick string) (*data.User, error) {
 		return nil, errors.New(errMsgStateDisabled)
 	}
 
-	user := ev.State.GetUser(nick)
-	if user == nil {
-		return nil, fmt.Errorf(errFmtUserNotFound, nick)
+	if user, ok := ev.State.User(nick); ok {
+		return &user, nil
 	}
 
-	return user, nil
+	return nil, fmt.Errorf(errFmtUserNotFound, nick)
 }
 
 // FindAccessByUser locates a user's access based on their nick or
@@ -125,12 +110,14 @@ func (ev *Event) FindAccessByUser(server, nickOrUser string) (
 			return
 		}
 
-		user = ev.State.GetUser(nickOrUser)
-		if user == nil {
+		if u, ok := ev.State.User(nickOrUser); !ok {
 			err = fmt.Errorf(errFmtUserNotFound, nickOrUser)
 			return
+		} else {
+			user = &u
 		}
-		access = ev.Store.GetAuthedUser(server, user.Host())
+
+		access = ev.Store.AuthedUser(server, user.Host())
 		if access == nil {
 			err = fmt.Errorf(errFmtUserNotAuthed, nickOrUser)
 			return
@@ -141,22 +128,4 @@ func (ev *Event) FindAccessByUser(server, nickOrUser string) (
 		err = fmt.Errorf(errFmtInternal, err)
 	}
 	return
-}
-
-// Close closes the handles to the internal structures. Calling Close is not
-// required. See Event's documentation for when to call this method.
-// All Event's methods and fields become invalid after a call to Close.
-// Close will never return an error so it can be safely ignored.
-func (ev *Event) Close() error {
-	ev.once.Do(func() {
-		ev.User = nil
-		ev.StoredUser = nil
-		ev.UserChannelModes = nil
-		ev.Channel = nil
-		ev.State = nil
-		ev.Store = nil
-		ev.locker.CloseState(ev.NetworkID)
-		ev.locker.CloseReadStore()
-	})
-	return nil
 }

@@ -250,8 +250,8 @@ func (s *Store) authUser(
 	return user.Clone(), nil
 }
 
-// GetAuthedUser looks up a user that was authenticated previously.
-func (s *Store) GetAuthedUser(network, host string) *StoredUser {
+// AuthedUser looks up a user that was authenticated previously.
+func (s *Store) AuthedUser(network, host string) *StoredUser {
 	s.protect.Lock()
 	defer s.protect.Unlock()
 	return s.authed[network+host]

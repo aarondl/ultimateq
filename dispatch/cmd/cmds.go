@@ -216,7 +216,7 @@ func (c *Cmds) Unregister(network, channel, ext, cmd string) (found bool) {
 
 // Dispatch dispatches an IrcEvent into the cmds event handlers.
 func (c *Cmds) Dispatch(writer irc.Writer, ev *irc.Event,
-	locker data.Locker) (err error) {
+	provider data.Provider) (err error) {
 
 	// Filter non privmsg/notice
 	var kind MsgKind
@@ -286,8 +286,7 @@ func (c *Cmds) Dispatch(writer irc.Writer, ev *irc.Event,
 
 	// Start building up the event.
 	var cmdEv = &Event{
-		locker: locker,
-		Event:  ev,
+		Event: ev,
 	}
 
 	var args []string
@@ -295,8 +294,8 @@ func (c *Cmds) Dispatch(writer irc.Writer, ev *irc.Event,
 		args = fields[1:]
 	}
 
-	state := locker.OpenState(ev.NetworkID)
-	store := locker.OpenReadStore()
+	state := provider.State(ev.NetworkID)
+	store := provider.Store()
 	cmdEv.State = state
 	cmdEv.Store = store
 
@@ -304,7 +303,6 @@ func (c *Cmds) Dispatch(writer irc.Writer, ev *irc.Event,
 		if cmdEv.StoredUser, err = filterAccess(store, command, ev.NetworkID,
 			ch, ev); err != nil {
 
-			cmdEv.Close()
 			writer.Notice(nick, err.Error())
 			return err
 		}
@@ -313,18 +311,21 @@ func (c *Cmds) Dispatch(writer irc.Writer, ev *irc.Event,
 	if err = c.filterArgs(ev.NetworkID, command, ch, isChan, args, cmdEv, ev,
 		state, store); err != nil {
 
-		cmdEv.Close()
 		writer.Notice(nick, err.Error())
 		return err
 	}
 
 	if state != nil {
-		cmdEv.User = state.GetUser(ev.Sender)
+		if user, ok := state.User(ev.Sender); ok {
+			cmdEv.User = &user
+		}
 		if isChan {
-			if cmdEv.Channel == nil {
-				cmdEv.Channel = state.GetChannel(ch)
+			if channel, ok := state.Channel(ch); ok {
+				cmdEv.Channel = &channel
 			}
-			cmdEv.UserChannelModes = state.GetUsersChannelModes(ev.Sender, ch)
+			if modes, ok := state.UserModes(ev.Sender, ch); ok {
+				cmdEv.UserChannelModes = &modes
+			}
 		}
 	}
 
@@ -332,7 +333,6 @@ func (c *Cmds) Dispatch(writer irc.Writer, ev *irc.Event,
 	go func() {
 		defer c.PanicHandler()
 		defer c.HandlerFinished()
-		defer cmdEv.Close()
 		ok, err := cmdNameDispatch(command.Handler, cmd, writer, cmdEv)
 		if !ok {
 			err = command.Handler.Cmd(cmd, writer, cmdEv)
@@ -449,7 +449,7 @@ func filterAccess(store *data.Store, command *Cmd, server, channel string,
 		return nil, errors.New(errMsgStoreDisabled)
 	}
 
-	var access = store.GetAuthedUser(server, ev.Sender)
+	var access = store.AuthedUser(server, ev.Sender)
 	if access == nil {
 		return nil, errors.New(errMsgNotAuthed)
 	}
@@ -562,16 +562,22 @@ func (c *Cmds) parseChanArg(command *Cmd, ev *Event,
 	if isChan {
 		if !isFirstChan {
 			ev.args[name] = channel
-			ev.Channel = state.GetChannel(channel)
-			ev.TargetChannel = ev.Channel
+			if ch, ok := state.Channel(channel); ok {
+				ev.Channel = &ch
+				ev.TargetChannel = &ch
+			}
 			return false, nil
 		}
 		ev.args[name] = msgArgs[index]
-		ev.TargetChannel = state.GetChannel(msgArgs[index])
+		if ch, ok := state.Channel(msgArgs[index]); ok {
+			ev.TargetChannel = &ch
+		}
 		return true, nil
 	} else if isFirstChan {
 		ev.args[name] = msgArgs[index]
-		ev.TargetChannel = state.GetChannel(msgArgs[index])
+		if ch, ok := state.Channel(msgArgs[index]); ok {
+			ev.TargetChannel = &ch
+		}
 		return true, nil
 	}
 
