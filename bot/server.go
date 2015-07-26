@@ -64,6 +64,7 @@ type Server struct {
 	log15.Logger
 
 	// Status
+	protectStatus   sync.RWMutex
 	status          Status
 	statusListeners [][]chan Status
 
@@ -77,19 +78,16 @@ type Server struct {
 	handlerID uint64
 	handler   *coreHandler
 
-	// State and Connection
-	client      *inet.IrcClient
+	// Network connection
+	protectClient sync.RWMutex
+	client        *inet.IrcClient
+
+	// State DB and connection state
 	state       *data.State
 	started     bool
 	serverIndex int
 	reconnScale time.Duration
 	killable    chan int
-
-	// protects client reading/writing
-	protect sync.RWMutex
-
-	// protects the state from reading and writing.
-	protectState sync.RWMutex
 }
 
 // Write writes to the server's IrcClient.
@@ -97,8 +95,8 @@ func (s *Server) Write(buf []byte) (int, error) {
 	if len(buf) == 0 {
 		return 0, nil
 	}
-	s.protect.RLock()
-	defer s.protect.RUnlock()
+	s.protectStatus.RLock()
+	defer s.protectStatus.RUnlock()
 
 	if s.GetStatus() != STATUS_STOPPED {
 		return s.client.Write(buf)
@@ -143,7 +141,7 @@ func (s *Server) createIrcClient() (error, bool) {
 	floodStep, _ := cfg.FloodStep()
 	keepAlive, _ := cfg.KeepAlive()
 
-	s.protect.Lock()
+	s.protectClient.Lock()
 	s.client = inet.NewIrcClient(
 		result.conn,
 		s.Logger,
@@ -153,7 +151,7 @@ func (s *Server) createIrcClient() (error, bool) {
 		time.Duration(keepAlive)*time.Second,
 		time.Second,
 	)
-	s.protect.Unlock()
+	s.protectClient.Unlock()
 	return nil, false
 }
 
@@ -223,8 +221,8 @@ func (s *Server) createTlsConfig(cr certReader) (conf *tls.Config, err error) {
 
 // Close shuts down the connection and returns.
 func (s *Server) Close() (err error) {
-	s.protect.Lock()
-	defer s.protect.Unlock()
+	s.protectClient.Lock()
+	defer s.protectClient.Unlock()
 
 	if s.client != nil {
 		err = s.client.Close()
@@ -237,8 +235,6 @@ func (s *Server) Close() (err error) {
 // may need it.
 func (s *Server) rehashNetworkInfo() error {
 	var err error
-	s.protectState.Lock()
-	defer s.protectState.Unlock()
 	if s.state != nil {
 		err = s.state.SetNetworkInfo(s.netInfo)
 		if err != nil {
@@ -250,8 +246,8 @@ func (s *Server) rehashNetworkInfo() error {
 
 // setStatus safely sets the status of the server and notifies any listeners.
 func (s *Server) setStatus(newstatus Status) {
-	s.protect.Lock()
-	defer s.protect.Unlock()
+	s.protectStatus.Lock()
+	defer s.protectStatus.Unlock()
 
 	s.status = newstatus
 	if s.statusListeners == nil {
@@ -268,8 +264,8 @@ func (s *Server) setStatus(newstatus Status) {
 
 // addStatusListener adds a listener for status changes.
 func (s *Server) addStatusListener(listener chan Status, listen ...Status) {
-	s.protect.Lock()
-	defer s.protect.Unlock()
+	s.protectStatus.Lock()
+	defer s.protectStatus.Unlock()
 
 	if s.statusListeners == nil {
 		s.statusListeners = [][]chan Status{
@@ -293,8 +289,8 @@ func (s *Server) addStatusListener(listener chan Status, listen ...Status) {
 
 // GetStatus safely gets the status of the server.
 func (s *Server) GetStatus() Status {
-	s.protect.RLock()
-	defer s.protect.RUnlock()
+	s.protectStatus.RLock()
+	defer s.protectStatus.RUnlock()
 
 	return s.status
 }

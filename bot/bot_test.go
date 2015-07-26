@@ -481,6 +481,7 @@ func TestBot_Locker(t *testing.T) {
 	goodStoreProv := func(s string) (*data.Store, error) {
 		return data.NewStore(data.MemStoreProvider)
 	}
+
 	conf := fakeConfig.Clone()
 	conf.Network("").SetNoStore(false)
 	b, err := createBot(conf, nil, goodStoreProv, devNull, false, false)
@@ -488,49 +489,16 @@ func TestBot_Locker(t *testing.T) {
 	if err != nil {
 		t.Error("Unexpected err:", err)
 	}
-	var _ data.Locker = b // Check conformity
+	var provider data.Provider = b // Check conformity
 
-	var called, reallyCalled bool
-	called = b.ReadState(netID, func(_ *data.State) {
-		reallyCalled = true
-	})
-	if !called || !reallyCalled {
-		t.Error("The state callback was not called:", called, reallyCalled)
+	state := provider.State(netID)
+	if state == nil {
+		t.Error("State should not be nil.")
 	}
-
-	reallyCalled = false
-	called = b.ReadStore(func(_ *data.Store) {
-		reallyCalled = true
-	})
-	if !called || !reallyCalled {
-		t.Error("The store callback was not called:", called, reallyCalled)
+	store := provider.Store()
+	if store == nil {
+		t.Error("Store should not be nil.")
 	}
-
-	reallyCalled = false
-	called = b.WriteStore(func(_ *data.Store) {
-		reallyCalled = true
-	})
-	if !called || !reallyCalled {
-		t.Error("The store callback was not called:", called, reallyCalled)
-	}
-
-	ostate := b.OpenState(netID)
-	if ostate != b.servers[netID].state {
-		t.Error("Wrong object came back:", ostate)
-	}
-	b.CloseState(netID)
-
-	ostore := b.OpenReadStore()
-	if ostore != b.store {
-		t.Error("Wrong object came back:", ostore)
-	}
-	b.CloseReadStore()
-
-	ostore = b.OpenWriteStore()
-	if ostore != b.store {
-		t.Error("Wrong object came back:", ostore)
-	}
-	b.CloseWriteStore()
 }
 
 func TestBot_GetEndpoint(t *testing.T) {

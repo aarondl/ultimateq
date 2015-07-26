@@ -105,7 +105,6 @@ type Bot struct {
 
 	// Synchronization
 	msgDispatchers sync.WaitGroup
-	protectStore   sync.RWMutex
 	protectServers sync.RWMutex
 }
 
@@ -271,11 +270,9 @@ func (b *Bot) dispatch(srv *Server) (disconnect bool, err error) {
 			ircMsg.NetworkID = srv.networkID
 			ircMsg.NetworkInfo = srv.netInfo
 
-			srv.protectState.Lock()
 			if srv.state != nil {
 				srv.state.Update(ircMsg)
 			}
-			srv.protectState.Unlock()
 			b.dispatchMessage(srv, ircMsg)
 		case srv.killable <- 0:
 			err = errServerKilled
@@ -323,8 +320,6 @@ func (b *Bot) stopServer(srv *Server) (stopped bool) {
 
 // Close closes the store database.
 func (b *Bot) Close() error {
-	b.protectStore.Lock()
-	defer b.protectStore.Unlock()
 	if b.store != nil {
 		err := b.store.Close()
 		b.store = nil
@@ -381,92 +376,20 @@ func (b *Bot) UnregisterFilteredCmd(network, channel, ext, cmd string) bool {
 	return b.cmds.Unregister(network, channel, ext, cmd)
 }
 
-// ReadState calls a callback if the requested network can present a state db.
-// The returned boolean is whether or not the function was called.
-func (b *Bot) ReadState(networkID string, fn func(*data.State)) (called bool) {
-	s := b.getServer(networkID)
-	if s == nil {
-		return false
-	}
-
-	s.protectState.RLock()
-	defer s.protectState.RUnlock()
-	if s.state != nil {
-		fn(s.state)
-		called = true
-	}
-	return
-}
-
-// OpenState locks the state db, and returns it. CloseState must be called or
-// the lock will never be released and the bot will sieze up. The state must
-// be checked for nil in case the state is disabled.
-func (b *Bot) OpenState(networkID string) *data.State {
+// State returns the state db for that network id. If the server doesn't exist
+// or state is disabled, returns nil.
+func (b *Bot) State(networkID string) *data.State {
 	s := b.getServer(networkID)
 	if s == nil {
 		return nil
 	}
 
-	s.protectState.RLock()
 	return s.state
 }
 
-// CloseState unlocks the data state after use by OpenState.
-func (b *Bot) CloseState(networkID string) {
-	s := b.getServer(networkID)
-	if s != nil {
-		s.protectState.RUnlock()
-	}
-}
-
-// ReadStore calls a callback if the bot can present a store db.
-// The returned boolean is whether or not the function was called.
-func (b *Bot) ReadStore(fn func(*data.Store)) (called bool) {
-	b.protectStore.RLock()
-	defer b.protectStore.RUnlock()
-	if b.store != nil {
-		fn(b.store)
-		called = true
-	}
-	return
-}
-
-// OpenReadStore locks the store db, and returns it. CloseStore must be called
-// or the lock will never be released and the bot will sieze up. The store must
-// be checked for nil.
-func (b *Bot) OpenReadStore() *data.Store {
-	b.protectStore.RLock()
+// Store returns the store for the bot. Returns nil if store is disabled.
+func (b *Bot) Store() *data.Store {
 	return b.store
-}
-
-// CloseReadStore unlocks the data store after use by OpenState.
-func (b *Bot) CloseReadStore() {
-	b.protectStore.RUnlock()
-}
-
-// WriteStore calls a callback if the bot can present a store db.
-// The returned boolean is whether or not the function was called.
-func (b *Bot) WriteStore(fn func(*data.Store)) (called bool) {
-	b.protectStore.Lock()
-	defer b.protectStore.Unlock()
-	if b.store != nil {
-		fn(b.store)
-		called = true
-	}
-	return
-}
-
-// OpenWriteStore locks the store db, and returns it. CloseStore must be called
-// or the lock will never be released and the bot will sieze up. The store must
-// be checked for nil.
-func (b *Bot) OpenWriteStore() *data.Store {
-	b.protectStore.Lock()
-	return b.store
-}
-
-// CloseWriteStore unlocks the data store after use by OpenWriteStore.
-func (b *Bot) CloseWriteStore() {
-	b.protectStore.Unlock()
 }
 
 // NetworkWriter retrieves a network's writer. Will be nil if the network does
