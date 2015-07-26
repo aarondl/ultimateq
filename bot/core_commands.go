@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -408,6 +409,9 @@ func (c *coreCmds) Cmd(cmd string, w irc.Writer,
 	defer func() {
 		if r := recover(); r != nil {
 			c.b.Error(errInternalPanic, "cmd", cmd, "panic", r)
+			var buf [4096]byte
+			n := runtime.Stack(buf[:], false)
+			c.b.Error(fmt.Sprintf("%s", buf[:n]))
 		}
 	}()
 
@@ -690,12 +694,10 @@ func (c *coreCmds) users(w irc.Writer, ev *cmd.Event) (
 
 	if ev.Arg("chan") != `` {
 		ch = ev.Arg("chan")
+	} else if ev.Channel != nil && ev.Channel.Name() != `` {
+		ch = ev.Channel.Name()
 	} else {
-		if ev.Channel.Name() != `` {
-			ch = ev.Channel.Name()
-		} else {
-			return
-		}
+		return
 	}
 
 	nick := ev.Nick()
