@@ -415,7 +415,6 @@ func (s *StoredUser) RevokeAll() {
 // String turns StoredUser's access into a user consumable format.
 func (s *StoredUser) String(network, channel string) string {
 	var b = &bytes.Buffer{}
-	//spew.Dump(s.Access)
 
 	if len(s.Access) == 0 {
 		return none
@@ -439,6 +438,10 @@ func (s *StoredUser) String(network, channel string) string {
 	}
 	sort.Strings(keys)
 
+	// write keys out in 3 waves:
+	// things that don't start with : and end with : (network:)
+	// things that start with : and don't end with : (:channel)
+	// things that don't start with : and don't end with : (network:channel)
 	for out := 0; out <= 2; out++ {
 		for _, k := range keys {
 			switch f, l := k[0], k[len(k)-1]; {

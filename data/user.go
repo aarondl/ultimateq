@@ -22,22 +22,22 @@ func NewUser(nickorhost string) *User {
 }
 
 // Nick returns the nick of this user.
-func (u *User) Nick() string {
+func (u User) Nick() string {
 	return u.host.Nick()
 }
 
 // Username returns the username of this user.
-func (u *User) Username() string {
+func (u User) Username() string {
 	return u.host.Username()
 }
 
 // Hostname returns the hostname of this user.
-func (u *User) Hostname() string {
+func (u User) Hostname() string {
 	return u.host.Hostname()
 }
 
 // Host returns the string version of the user's host.
-func (u *User) Host() string {
+func (u User) Host() string {
 	return u.host.String()
 }
 
