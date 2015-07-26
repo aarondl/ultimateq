@@ -1,8 +1,6 @@
 package data
 
-import (
-	"strconv"
-)
+import "strconv"
 
 const (
 	ascA               = 65
@@ -43,9 +41,9 @@ func (a *Access) SetFlags(flags ...string) {
 
 // ClearFlags clears many flags at once.
 func (a *Access) ClearFlags(flags ...string) {
-	for i := 0; i < len(flags); i++ {
-		for _, f := range flags[i] {
-			a.ClearFlag(f)
+	for _, flagset := range flags {
+		for _, flag := range flagset {
+			a.ClearFlag(flag)
 		}
 	}
 }
@@ -57,9 +55,9 @@ func (a *Access) HasLevel(level uint8) bool {
 
 // HasFlags checks many flags at once. Flags are or'd together.
 func (a *Access) HasFlags(flags ...string) bool {
-	for i := 0; i < len(flags); i++ {
-		for _, f := range flags[i] {
-			if a.HasFlag(f) {
+	for _, flagset := range flags {
+		for _, flag := range flagset {
+			if a.HasFlag(flag) {
 				return true
 			}
 		}
@@ -115,9 +113,9 @@ func (a Access) String() (str string) {
 
 // getFlagBits creates a mask containing all the modes.
 func getFlagBits(flags ...string) (bits uint64) {
-	for i := 0; i < len(flags); i++ {
-		for _, f := range flags[i] {
-			bits |= getFlagBit(f)
+	for _, flagset := range flags {
+		for _, flag := range flagset {
+			bits |= getFlagBit(flag)
 		}
 	}
 	return
