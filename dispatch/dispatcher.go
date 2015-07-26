@@ -126,11 +126,13 @@ func (d *Dispatcher) Dispatch(w irc.Writer, ev *irc.Event) {
 func (d *Dispatcher) tryKey(net, ch, e string, w irc.Writer, ev *irc.Event) {
 	key := mkKey(net, ch, e)
 	idTable, ok := d.events[key]
-	if ok {
-		for _, handler := range idTable {
-			d.HandlerStarted()
-			go d.resolveHandler(handler, w, ev)
-		}
+	if !ok {
+		return
+	}
+
+	for _, handler := range idTable {
+		d.HandlerStarted()
+		go d.resolveHandler(handler, w, ev)
 	}
 }
 
@@ -140,8 +142,8 @@ func (d *Dispatcher) tryKey(net, ch, e string, w irc.Writer, ev *irc.Event) {
 func (d *Dispatcher) resolveHandler(
 	handler interface{}, w irc.Writer, ev *irc.Event) {
 
-	defer d.PanicHandler()
 	defer d.HandlerFinished()
+	defer d.PanicHandler()
 
 	var handled bool
 	switch ev.Name {
@@ -161,10 +163,12 @@ func (d *Dispatcher) resolveHandler(
 		}
 	}
 
-	if !handled {
-		if evHandler, ok := handler.(EventHandler); ok {
-			evHandler.HandleRaw(w, ev)
-		}
+	if handled {
+		return
+	}
+
+	if evHandler, ok := handler.(EventHandler); ok {
+		evHandler.HandleRaw(w, ev)
 	}
 }
 

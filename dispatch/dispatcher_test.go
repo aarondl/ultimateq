@@ -8,8 +8,6 @@ import (
 	"github.com/inconshreveable/log15"
 )
 
-var core = NewDispatchCore(nil)
-
 //===========================================================
 // Set up a type that can be used to mock irc.Writer
 //===========================================================
@@ -37,7 +35,7 @@ func (handler testHandler) HandleRaw(w irc.Writer, ev *irc.Event) {
 //===========================================================
 func TestDispatcher(t *testing.T) {
 	t.Parallel()
-	d := NewDispatcher(core)
+	d := NewDispatcher(NewDispatchCore(nil))
 	if d == nil || d.events == nil {
 		t.Error("Initialization failed.")
 	}
@@ -45,7 +43,7 @@ func TestDispatcher(t *testing.T) {
 
 func TestDispatcher_Registration(t *testing.T) {
 	t.Parallel()
-	d := NewDispatcher(core)
+	d := NewDispatcher(NewDispatchCore(nil))
 	handler := testHandler{}
 
 	id := d.Register("", "", irc.PRIVMSG, handler)
@@ -73,7 +71,7 @@ func TestDispatcher_RegistrationBadHandler(t *testing.T) {
 		}
 	}()
 
-	d := NewDispatcher(core)
+	d := NewDispatcher(NewDispatchCore(nil))
 	d.Register("", "", irc.PRIVMSG, 5)
 }
 
@@ -93,15 +91,15 @@ func TestDispatcher_Dispatching(t *testing.T) {
 		msg3 = ev
 	}}
 
-	d := NewDispatcher(core)
+	d := NewDispatcher(NewDispatchCore(nil))
 	send := testPoint{irc.Helper{}}
 
 	d.Register("", "", irc.PRIVMSG, h1)
 	d.Register("", "", irc.PRIVMSG, h2)
 	d.Register("", "", irc.QUIT, h3)
 
-	privmsg := &irc.Event{Name: irc.PRIVMSG}
-	quitmsg := &irc.Event{Name: irc.QUIT}
+	privmsg := &irc.Event{NetworkID: "net", Name: irc.PRIVMSG}
+	quitmsg := &irc.Event{NetworkID: "net", Name: irc.QUIT}
 	d.Dispatch(send, privmsg)
 	d.WaitForHandlers()
 
@@ -134,7 +132,7 @@ func TestDispatcher_Dispatching(t *testing.T) {
 func TestDispatcher_Filtering(t *testing.T) {
 	t.Parallel()
 
-	d := NewDispatcher(core)
+	d := NewDispatcher(NewDispatchCore(nil))
 
 	var called bool
 	h := testHandler{func(w irc.Writer, ev *irc.Event) {
@@ -223,12 +221,12 @@ func TestDispatcher_RawDispatch(t *testing.T) {
 		msg2 = ev
 	}}
 
-	d := NewDispatcher(core)
+	d := NewDispatcher(NewDispatchCore(nil))
 	send := testPoint{irc.Helper{}}
 	d.Register("", "", irc.PRIVMSG, h1)
 	d.Register("", "", "", h2)
 
-	privmsg := &irc.Event{Name: irc.PRIVMSG}
+	privmsg := &irc.Event{NetworkID: "net", Name: irc.PRIVMSG}
 	d.Dispatch(send, privmsg)
 	d.WaitForHandlers()
 	if msg1 != privmsg {
@@ -370,12 +368,14 @@ var privChanmsg = &irc.Event{
 	Args:        []string{"#chan", "ev"},
 	Sender:      "nick!user@host.com",
 	NetworkInfo: netInfo,
+	NetworkID:   "net",
 }
 var privUsermsg = &irc.Event{
 	Name:        irc.PRIVMSG,
 	Args:        []string{"user", "ev"},
 	Sender:      "nick!user@host.com",
 	NetworkInfo: netInfo,
+	NetworkID:   "net",
 }
 
 func TestDispatcher_Privmsg(t *testing.T) {
@@ -391,7 +391,7 @@ func TestDispatcher_Privmsg(t *testing.T) {
 		pc = ev
 	}}
 
-	d := NewDispatcher(core)
+	d := NewDispatcher(NewDispatchCore(nil))
 	d.Register("", "", irc.PRIVMSG, ph)
 	d.Register("", "", irc.PRIVMSG, puh)
 	d.Register("", "", irc.PRIVMSG, pch)
@@ -437,7 +437,7 @@ func TestDispatcher_PrivmsgMultiple(t *testing.T) {
 		},
 	}
 
-	d := NewDispatcher(core)
+	d := NewDispatcher(NewDispatchCore(nil))
 	d.Register("", "", irc.PRIVMSG, pall)
 
 	p, pu, pc = nil, nil, nil
@@ -472,12 +472,14 @@ var noticeChanmsg = &irc.Event{
 	Args:        []string{"#chan", "ev"},
 	Sender:      "nick!user@host.com",
 	NetworkInfo: netInfo,
+	NetworkID:   "net",
 }
 var noticeUsermsg = &irc.Event{
 	Name:        irc.NOTICE,
 	Args:        []string{"user", "ev"},
 	Sender:      "nick!user@host.com",
 	NetworkInfo: netInfo,
+	NetworkID:   "net",
 }
 
 func TestDispatcher_Notice(t *testing.T) {
@@ -493,7 +495,7 @@ func TestDispatcher_Notice(t *testing.T) {
 		nc = ev
 	}}
 
-	d := NewDispatcher(core)
+	d := NewDispatcher(NewDispatchCore(nil))
 	d.Register("", "", irc.NOTICE, nh)
 	d.Register("", "", irc.NOTICE, nuh)
 	d.Register("", "", irc.NOTICE, nch)
@@ -539,7 +541,7 @@ func TestDispatcher_NoticeMultiple(t *testing.T) {
 		},
 	}
 
-	d := NewDispatcher(core)
+	d := NewDispatcher(NewDispatchCore(nil))
 	d.Register("", "", irc.NOTICE, nall)
 
 	n, nu, nc = nil, nil, nil
@@ -574,12 +576,14 @@ var ctcpChanmsg = &irc.Event{
 	Args:        []string{"#chan", "\x01msg args\x01"},
 	Sender:      "nick!user@host.com",
 	NetworkInfo: netInfo,
+	NetworkID:   "net",
 }
 var ctcpMsg = &irc.Event{
 	Name:        irc.CTCP,
 	Args:        []string{"user", "\x01msg args\x01"},
 	Sender:      "nick!user@host.com",
 	NetworkInfo: netInfo,
+	NetworkID:   "net",
 }
 
 func TestDispatcher_CTCP(t *testing.T) {
@@ -594,7 +598,7 @@ func TestDispatcher_CTCP(t *testing.T) {
 		cc = ev
 	}}
 
-	d := NewDispatcher(core)
+	d := NewDispatcher(NewDispatchCore(nil))
 	d.Register("", "", irc.CTCP, ch)
 	d.Register("", "", irc.CTCP, cch)
 
@@ -630,7 +634,7 @@ func TestDispatcher_CTCPMultiple(t *testing.T) {
 		},
 	}
 
-	d := NewDispatcher(core)
+	d := NewDispatcher(NewDispatchCore(nil))
 	d.Register("", "", irc.CTCP, call)
 
 	c, cc = nil, nil
@@ -659,6 +663,7 @@ var ctcpReplyMsg = &irc.Event{
 	Args:        []string{"user", "\x01msg args\x01"},
 	Sender:      "nick!user@host.com",
 	NetworkInfo: netInfo,
+	NetworkID:   "net",
 }
 
 func TestDispatcher_CTCPReply(t *testing.T) {
@@ -670,7 +675,7 @@ func TestDispatcher_CTCPReply(t *testing.T) {
 		c = ev
 	}}
 
-	d := NewDispatcher(core)
+	d := NewDispatcher(NewDispatchCore(nil))
 	d.Register("", "", irc.CTCPReply, ch)
 
 	d.Dispatch(nil, ctcpReplyMsg)
@@ -686,6 +691,7 @@ func TestDispatcher_FilterPrivmsgChannels(t *testing.T) {
 		Args:        []string{"#chan2", "ev"},
 		Sender:      "nick!user@host.com",
 		NetworkInfo: netInfo,
+		NetworkID:   "net",
 	}
 
 	var p, pc *irc.Event
@@ -728,6 +734,7 @@ func TestDispatcher_FilterNoticeChannels(t *testing.T) {
 		Args:        []string{"#chan2", "ev"},
 		Sender:      "nick!user@host.com",
 		NetworkInfo: netInfo,
+		NetworkID:   "network",
 	}
 
 	var u, uc *irc.Event
@@ -765,7 +772,7 @@ func TestDispatcher_FilterNoticeChannels(t *testing.T) {
 
 func TestDispatchCore_ShouldDispatch(t *testing.T) {
 	t.Parallel()
-	d := NewDispatcher(core)
+	d := NewDispatcher(NewDispatchCore(nil))
 
 	var tests = []struct {
 		IsChan bool
@@ -788,27 +795,15 @@ func TestDispatchCore_ShouldDispatch(t *testing.T) {
 	}
 }
 
-type lockWriter struct {
-	*bytes.Buffer
-	write chan struct{}
-}
-
-func (l *lockWriter) Write(b []byte) (int, error) {
-	n, err := l.Buffer.Write(b)
-	l.write <- struct{}{}
-	return n, err
-}
-
 func TestDispatch_Panic(t *testing.T) {
-	ch := make(chan struct{}, 1)
-	lk := &lockWriter{&bytes.Buffer{}, ch}
-
+	buf := &bytes.Buffer{}
 	logger := log15.New()
-	logger.SetHandler(log15.StreamHandler(lk, log15.LogfmtFormat()))
+	logger.SetHandler(log15.StreamHandler(buf, log15.LogfmtFormat()))
+
 	logCore := NewDispatchCore(logger)
 	d := NewDispatcher(logCore)
-	panicMsg := "dispatch panic"
 
+	panicMsg := "dispatch panic"
 	handler := testHandler{
 		func(w irc.Writer, ev *irc.Event) {
 			panic(panicMsg)
@@ -816,18 +811,17 @@ func TestDispatch_Panic(t *testing.T) {
 	}
 
 	d.Register("", "", "", handler)
-	ev := irc.NewEvent("", netInfo, "dispatcher", irc.PRIVMSG, "panic test")
+	ev := irc.NewEvent("network", netInfo, "dispatcher", irc.PRIVMSG, "panic test")
 	d.Dispatch(testPoint{irc.Helper{}}, ev)
 	d.WaitForHandlers()
 
-	<-ch
-	logStr := lk.String()
+	logStr := buf.String()
 
 	if logStr == "" {
 		t.Error("Expected not empty log.")
 	}
 
-	logBytes := lk.Bytes()
+	logBytes := buf.Bytes()
 	if !bytes.Contains(logBytes, []byte(panicMsg)) {
 		t.Errorf("Log does not contain: %s\n%s", panicMsg, logBytes)
 	}
