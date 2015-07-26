@@ -523,6 +523,7 @@ func (c *coreCmds) register(w irc.Writer,
 		return
 	}
 
+	uname = strings.ToLower(uname)
 	if !hasAny {
 		w.Noticef(nick, registerSuccessFirst, uname)
 	} else {
@@ -1012,13 +1013,16 @@ func (c *coreCmds) giveHelper(w irc.Writer, ev *cmd.Event,
 
 	store := c.b.store
 
-	var a *data.StoredUser
-	if a, internal = store.FindUser(uname); internal != nil {
+	var access *data.StoredUser
+	if access, internal = store.FindUser(uname); internal != nil {
 		return
-	} else if a == nil {
+	} else if access == nil {
 		internal = fmt.Errorf(errFmtExpired, uname)
 		return
 	}
+
+	username := access.Username
+	a := ignoreOK(access.GetAccess(network, channel))
 
 	var level uint8
 	var flags, filtered string
@@ -1041,10 +1045,10 @@ func (c *coreCmds) giveHelper(w irc.Writer, ev *cmd.Event,
 	}
 
 	if level > 0 {
-		if a.HasLevel(network, channel, level) {
+		if a.HasLevel(level) {
 			hasLevel = true
 		} else {
-			a.Grant(network, channel, level)
+			access.Grant(network, channel, level)
 		}
 	}
 
@@ -1053,21 +1057,21 @@ func (c *coreCmds) giveHelper(w irc.Writer, ev *cmd.Event,
 		if len(filtered) == 0 {
 			hasFlags = true
 		} else {
-			a.Grant(network, channel, 0, filtered)
+			access.Grant(network, channel, 0, filtered)
 		}
 	}
 
 	if (!hasFlags && len(flags) > 0) || (!hasLevel && level > 0) {
-		if internal = store.SaveUser(a); internal == nil {
+		if internal = store.SaveUser(access); internal == nil {
 			var msg string
-			var newAccess = ignoreOK(a.GetAccess(network, channel))
+			var newAccess = ignoreOK(access.GetAccess(network, channel))
 			switch {
 			case len(network) != 0 && len(channel) != 0:
-				msg = fmt.Sprintf(giveSuccess, a.Username, newAccess, channel)
+				msg = fmt.Sprintf(giveSuccess, username, newAccess, channel)
 			case len(network) != 0:
-				msg = fmt.Sprintf(sgiveSuccess, a.Username, newAccess)
+				msg = fmt.Sprintf(sgiveSuccess, username, newAccess)
 			default:
-				msg = fmt.Sprintf(ggiveSuccess, a.Username, newAccess)
+				msg = fmt.Sprintf(ggiveSuccess, username, newAccess)
 			}
 			w.Noticef(nick, msg)
 		}
@@ -1084,7 +1088,7 @@ func (c *coreCmds) giveHelper(w irc.Writer, ev *cmd.Event,
 		}
 		alreadyHas = flags
 	}
-	w.Noticef(nick, giveFailureHas, a.Username, a.String(network, channel), alreadyHas)
+	w.Noticef(nick, giveFailureHas, access.Username, access.String(network, channel), alreadyHas)
 
 	return
 }
@@ -1099,13 +1103,16 @@ func (c *coreCmds) takeHelper(w irc.Writer, ev *cmd.Event,
 
 	store := c.b.store
 
-	var a *data.StoredUser
-	if a, internal = store.FindUser(uname); internal != nil {
+	var access *data.StoredUser
+	if access, internal = store.FindUser(uname); internal != nil {
 		return
-	} else if a == nil {
+	} else if access == nil {
 		internal = fmt.Errorf(errFmtExpired, uname)
 		return
 	}
+
+	username := access.Username
+	a := ignoreOK(access.GetAccess(network, channel))
 
 	var all, level bool
 	var flags string
@@ -1121,35 +1128,35 @@ func (c *coreCmds) takeHelper(w irc.Writer, ev *cmd.Event,
 	}
 
 	var save = true
-	if all && (a.HasLevel(network, channel, 1) || len(flags) != 0) {
-		a.RevokeLevel(network, channel)
-		a.RevokeFlags(network, channel)
-	} else if level && a.HasLevel(network, channel, 1) {
-		a.RevokeLevel(network, channel)
+	if all && (a.HasLevel(1) || len(flags) != 0) {
+		access.RevokeLevel(network, channel)
+		access.RevokeFlags(network, channel)
+	} else if level && a.HasLevel(1) {
+		access.RevokeLevel(network, channel)
 	} else if len(flags) != 0 {
-		a.RevokeFlags(network, channel, flags)
+		access.RevokeFlags(network, channel, flags)
 	} else {
 		save = false
 	}
 
 	if save {
-		if internal = store.SaveUser(a); internal == nil {
+		if internal = store.SaveUser(access); internal == nil {
 			var msg string
-			var newAccess = ignoreOK(a.GetAccess(network, channel))
+			var newAccess = ignoreOK(access.GetAccess(network, channel))
 			switch {
 			case len(network) != 0 && len(channel) != 0:
-				msg = fmt.Sprintf(giveSuccess, a.Username, newAccess, channel)
+				msg = fmt.Sprintf(giveSuccess, username, newAccess, channel)
 			case len(network) != 0:
-				msg = fmt.Sprintf(sgiveSuccess, a.Username, newAccess)
+				msg = fmt.Sprintf(sgiveSuccess, username, newAccess)
 			default:
-				msg = fmt.Sprintf(ggiveSuccess, a.Username, newAccess)
+				msg = fmt.Sprintf(ggiveSuccess, username, newAccess)
 			}
 			w.Notice(nick, msg)
 		}
 		return
 	}
 
-	w.Noticef(nick, takeFailureNo, a.Username)
+	w.Noticef(nick, takeFailureNo, username, access.String(network, channel))
 	return
 }
 
@@ -1227,7 +1234,7 @@ func (c *coreCmds) help(w irc.Writer, ev *cmd.Event) (
 }
 
 // filterFlags removes flags that the user already has
-func filterFlags(network, channel, flags string, access *data.StoredUser) string {
+func filterFlags(network, channel, flags string, access data.Access) string {
 	var buf []rune
 	for _, flag := range flags {
 		if !access.HasFlags(network, channel, string(flag)) {
@@ -1238,7 +1245,7 @@ func filterFlags(network, channel, flags string, access *data.StoredUser) string
 }
 
 // filterMissingFlags removes flags that the user does not have
-func filterMissingFlags(network, channel, flags string, access *data.StoredUser) string {
+func filterMissingFlags(network, channel, flags string, access data.Access) string {
 	var buf []rune
 	for _, flag := range flags {
 		if access.HasFlags(network, channel, string(flag)) {
