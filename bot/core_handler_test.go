@@ -22,7 +22,7 @@ type testPoint struct {
 
 func makeTestPoint(srv *Server) *testPoint {
 	buf := &bytes.Buffer{}
-	t := &testPoint{irc.Helper{buf}, buf, srv}
+	t := &testPoint{irc.Helper{Writer: buf}, buf, srv}
 	return t
 }
 

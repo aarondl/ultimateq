@@ -508,7 +508,7 @@ func (b *Bot) createServer(netID string, conf *config.Config) (*Server, error) {
 		s.handlerID = b.dispatcher.Register(netID, "", irc.RAW, s.handler)
 	}
 
-	s.writer = &irc.Helper{s}
+	s.writer = &irc.Helper{Writer: s}
 
 	return s, nil
 }
