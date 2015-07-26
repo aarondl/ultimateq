@@ -79,7 +79,7 @@ ssl = true
 //==================================
 func TestBot_Create(t *testing.T) {
 	t.Parallel()
-	bot, err := NewBot(fakeConfig)
+	bot, err := New(fakeConfig)
 	if bot == nil {
 		t.Error("Bot should be created.")
 	}
@@ -88,7 +88,7 @@ func TestBot_Create(t *testing.T) {
 	}
 
 	log15.Root().SetHandler(log15.DiscardHandler())
-	_, err = NewBot(config.NewConfig())
+	_, err = New(config.NewConfig())
 	if err != errInvalidConfig {
 		t.Error("Expected error:", errInvalidConfig, "got", err)
 	}
@@ -98,7 +98,7 @@ func TestBot_CreateLogger(t *testing.T) {
 	t.Parallel()
 
 	loglvlCfg := fakeConfig.Clone().SetLogLevel("crit")
-	bot, err := NewBot(loglvlCfg)
+	bot, err := New(loglvlCfg)
 	if bot == nil || err != nil {
 		t.Error("Bot should be created.")
 	}

@@ -46,7 +46,7 @@ var (
 	errParsingIrcMessage = "Failed to parse irc message"
 	// errLogFile is when the bot can't open the log file.
 	errLogFile = errors.New("bot: Could not open log file")
-	// errInvalidConfig is when NewBot was given an invalid configuration.
+	// errInvalidConfig is when New was given an invalid configuration.
 	errInvalidConfig = errors.New("bot: Invalid Configuration")
 	// errInvalidServerId occurs when the user passes in an unknown
 	// network id to a method requiring a network id.
@@ -117,9 +117,9 @@ func CheckConfig(c *config.Config) bool {
 	return true
 }
 
-// NewBot simplifies the call to createBotFull by using default
+// New simplifies the call to createBotFull by using default
 // caps and conn provider functions.
-func NewBot(conf *config.Config) (*Bot, error) {
+func New(conf *config.Config) (*Bot, error) {
 	if !CheckConfig(conf) {
 		return nil, errInvalidConfig
 	}
@@ -600,7 +600,7 @@ func (b *Bot) mkPrefixFetcher() func(network, channel string) rune {
 // Pauses after death to allow all goroutines to come to a graceful shutdown.
 func Run(cb func(b *Bot)) error {
 	cfg := config.NewConfig().FromFile("config.toml")
-	b, err := NewBot(cfg)
+	b, err := New(cfg)
 	if err != nil {
 		return err
 	}
