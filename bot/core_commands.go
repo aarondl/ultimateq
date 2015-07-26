@@ -44,11 +44,10 @@ const (
 
 	help = `help`
 
-	errFmtRegister = `bot: A core command registration failed: %v`
-	errMsgInternal = `There was an internal error, try again later.`
-	errFmtInternal = `commander: Error processing command %v (%v)`
-	errFmtExpired  = `commander: Data expired between locks. ` +
-		`Could not find user [%v]`
+	errFmtRegister   = `bot: A core command registration failed: %v`
+	errMsgInternal   = `There was an internal error, try again later.`
+	errFmtInternal   = `commander: Error processing command %v (%v)`
+	errFmtExpired    = `commander: Could not find user [%v]`
 	cmdExec          = "bot: Core command executed"
 	errInternalError = "bot: Core command error"
 	errInternalPanic = "bot: Core command error"
@@ -166,31 +165,195 @@ var commands = []struct {
 	Flags  string
 	Args   []string
 }{
-	{register, registerDesc, false, false, 0, ``,
-		argv{`password`, `[username]`}},
-	{auth, authDesc, false, false, 0, ``, argv{`password`, `[username]`}},
-	{logout, logoutDesc, true, true, 0, ``, argv{`[*user]`}},
-	{access, accessDesc, true, true, 0, ``, argv{`[*user]`}},
-	{gusers, gusersDesc, false, true, 0, ``, nil},
-	{susers, susersDesc, false, true, 0, ``, nil},
-	{users, usersDesc, false, true, 0, ``, argv{`[chan]`}},
-	{deluser, deluserDesc, true, true, 0, ``, argv{`*user`}},
-	{delme, delmeDesc, true, true, 0, ``, nil},
-	{passwd, passwdDesc, true, false, 0, ``,
-		argv{`oldpassword`, `newpassword`}},
-	{masks, masksDesc, true, false, 0, ``, argv{`[*user]`}},
-	{addmask, addmaskDesc, true, false, 0, ``, argv{`mask`, `[*user]`}},
-	{delmask, delmaskDesc, true, false, 0, ``, argv{`mask`, `[*user]`}},
-	{resetpasswd, resetpasswdDesc, true, false, 0, ``, argv{`~nick`, `*user`}},
-	{ggive, ggiveDesc, true, true, 0, `G`, argv{`*user`, `levelOrFlags...`}},
-	{sgive, sgiveDesc, true, true, 0, `GS`, argv{`*user`, `levelOrFlags...`}},
-	{give, giveDesc, true, true, 0, `GSC`, argv{`#chan`, `*user`,
-		`levelOrFlags...`}},
-	{gtake, gtakeDesc, true, true, 0, `G`, argv{`*user`, `[allOrFlags]`}},
-	{stake, stakeDesc, true, true, 0, `GS`, argv{`*user`, `[allOrFlags]`}},
-	{take, takeDesc, true, true, 0, `GSC`, argv{`#chan`, `*user`,
-		`[allOrFlags]`}},
-	{help, helpDesc, false, true, 0, ``, argv{`[command]`}},
+	{
+		Name:   register,
+		Desc:   registerDesc,
+		Authed: false,
+		Public: false,
+		Level:  0,
+		Flags:  ``,
+		Args:   argv{`password`, `[username]`},
+	},
+	{
+		Name:   auth,
+		Desc:   authDesc,
+		Authed: false,
+		Public: false,
+		Level:  0,
+		Flags:  ``,
+		Args:   argv{`password`, `[username]`},
+	},
+	{
+		Name:   logout,
+		Desc:   logoutDesc,
+		Authed: true,
+		Public: true,
+		Level:  0,
+		Flags:  ``,
+		Args:   argv{`[*user]`},
+	},
+	{
+		Name:   access,
+		Desc:   accessDesc,
+		Authed: true,
+		Public: true,
+		Level:  0,
+		Flags:  ``,
+		Args:   argv{`[*user]`},
+	},
+	{
+		Name:   gusers,
+		Desc:   gusersDesc,
+		Authed: false,
+		Public: true,
+		Level:  0,
+		Flags:  ``,
+		Args:   nil,
+	},
+	{
+		Name:   susers,
+		Desc:   susersDesc,
+		Authed: false,
+		Public: true,
+		Level:  0,
+		Flags:  ``,
+		Args:   nil,
+	},
+	{
+		Name:   users,
+		Desc:   usersDesc,
+		Authed: false,
+		Public: true,
+		Level:  0,
+		Flags:  ``,
+		Args:   argv{`[chan]`},
+	},
+	{
+		Name:   deluser,
+		Desc:   deluserDesc,
+		Authed: true,
+		Public: true,
+		Level:  0,
+		Flags:  ``,
+		Args:   argv{`*user`},
+	},
+	{
+		Name:   delme,
+		Desc:   delmeDesc,
+		Authed: true,
+		Public: true,
+		Level:  0,
+		Flags:  ``,
+		Args:   nil,
+	},
+	{
+		Name:   passwd,
+		Desc:   passwdDesc,
+		Authed: true,
+		Public: false,
+		Level:  0,
+		Flags:  ``,
+		Args:   argv{`oldpassword`, `newpassword`},
+	},
+	{
+		Name:   masks,
+		Desc:   masksDesc,
+		Authed: true,
+		Public: false,
+		Level:  0,
+		Flags:  ``,
+		Args:   argv{`[*user]`},
+	},
+	{
+		Name:   addmask,
+		Desc:   addmaskDesc,
+		Authed: true,
+		Public: false,
+		Level:  0,
+		Flags:  ``,
+		Args:   argv{`mask`, `[*user]`},
+	},
+	{
+		Name:   delmask,
+		Desc:   delmaskDesc,
+		Authed: true,
+		Public: false,
+		Level:  0,
+		Flags:  ``,
+		Args:   argv{`mask`, `[*user]`},
+	},
+	{
+		Name:   resetpasswd,
+		Desc:   resetpasswdDesc,
+		Authed: true,
+		Public: false,
+		Level:  0,
+		Flags:  ``,
+		Args:   argv{`~nick`, `*user`},
+	},
+	{
+		Name:   ggive,
+		Desc:   ggiveDesc,
+		Authed: true,
+		Public: true,
+		Level:  0,
+		Flags:  `G`,
+		Args:   argv{`*user`, `levelOrFlags...`},
+	},
+	{
+		Name:   sgive,
+		Desc:   sgiveDesc,
+		Authed: true,
+		Public: true,
+		Level:  0,
+		Flags:  `GS`,
+		Args:   argv{`*user`, `levelOrFlags...`},
+	},
+	{
+		Name:   give,
+		Desc:   giveDesc,
+		Authed: true,
+		Public: true,
+		Level:  0,
+		Flags:  `GSC`,
+		Args:   argv{`#chan`, `*user`, `levelOrFlags...`},
+	},
+	{
+		Name:   gtake,
+		Desc:   gtakeDesc,
+		Authed: true,
+		Public: true,
+		Level:  0,
+		Flags:  `G`,
+		Args:   argv{`*user`, `[allOrFlags]`},
+	},
+	{
+		Name:   stake,
+		Desc:   stakeDesc,
+		Authed: true,
+		Public: true,
+		Level:  0,
+		Flags:  `GS`,
+		Args:   argv{`*user`, `[allOrFlags]`},
+	},
+	{
+		Name:   take,
+		Desc:   takeDesc,
+		Authed: true,
+		Public: true,
+		Level:  0,
+		Flags:  `GSC`,
+		Args:   argv{`#chan`, `*user`, `[allOrFlags]`},
+	},
+	{
+		Name:   help,
+		Desc:   helpDesc,
+		Authed: false,
+		Public: true,
+		Level:  0,
+		Flags:  ``,
+		Args:   argv{`[command]`},
+	},
 }
 
 // coreCmds is the bot's command handling struct. The bot itself uses
@@ -307,8 +470,8 @@ func (c *coreCmds) register(w irc.Writer,
 
 	var access *data.StoredUser
 
-	pwd := ev.GetArg("password")
-	uname := ev.GetArg("username")
+	pwd := ev.Arg("password")
+	uname := ev.Arg("username")
 	if len(uname) == 0 {
 		uname = strings.TrimLeft(ev.Username(), "~")
 	}
@@ -329,19 +492,19 @@ func (c *coreCmds) register(w irc.Writer,
 		return
 	}
 
-	nChans := ev.GetNUserChans(nick)
+	nChans, _ := ev.NChannelsByUser(nick)
 
 	ev.Close()
-	c.b.protectStore.Lock()
-	defer c.b.protectStore.Unlock()
 	store := c.b.store
 
-	isFirst, internal := store.IsFirst()
+	var hasAny bool
+	hasAny, internal = store.HasAny()
 	if internal != nil {
 		return
 	}
-	if isFirst {
-		access.Global = &data.Access{^uint8(0), ^uint64(0)}
+	if !hasAny {
+		// Secret from the Access map specifics
+		access.Access[":"] = data.Access{^uint8(0), ^uint64(0)}
 	}
 
 	internal = store.SaveUser(access)
@@ -358,7 +521,7 @@ func (c *coreCmds) register(w irc.Writer,
 		return
 	}
 
-	if isFirst {
+	if !hasAny {
 		w.Noticef(nick, registerSuccessFirst, uname)
 	} else {
 		w.Noticef(nick, registerSuccess, uname)
@@ -372,8 +535,8 @@ func (c *coreCmds) auth(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
 	var access *data.StoredUser
-	pwd := ev.GetArg("password")
-	uname := ev.GetArg("username")
+	pwd := ev.Arg("password")
+	uname := ev.Arg("username")
 	if len(uname) == 0 {
 		uname = strings.TrimLeft(ev.Username(), "~")
 	}
@@ -383,7 +546,7 @@ func (c *coreCmds) auth(w irc.Writer, ev *cmd.Event) (
 
 	access = ev.StoredUser
 	if access == nil {
-		access = ev.GetAuthedUser(ev.NetworkID, host)
+		access = ev.AuthedUser(ev.NetworkID, host)
 	}
 	if access != nil {
 		external = errors.New(errMsgAuthed)
@@ -391,8 +554,6 @@ func (c *coreCmds) auth(w irc.Writer, ev *cmd.Event) (
 	}
 
 	ev.Close()
-	c.b.protectStore.Lock()
-	defer c.b.protectStore.Unlock()
 	store := c.b.store
 
 	var err error
@@ -422,7 +583,7 @@ func (c *coreCmds) logout(w irc.Writer, ev *cmd.Event) (
 	uname := ""
 	host, nick := ev.Sender, ev.Nick()
 	if user != nil {
-		if !ev.StoredUser.HasGlobalFlag('G') {
+		if !ev.StoredUser.HasFlags("", "", "G") {
 			external = cmd.MakeGlobalFlagsError("G")
 			return
 		}
@@ -430,8 +591,6 @@ func (c *coreCmds) logout(w irc.Writer, ev *cmd.Event) (
 	}
 
 	ev.Close()
-	c.b.protectStore.Lock()
-	defer c.b.protectStore.Unlock()
 	store := c.b.store
 
 	if len(uname) != 0 {
@@ -488,7 +647,7 @@ func (c *coreCmds) gusers(w irc.Writer, ev *cmd.Event) (
 		usersListHeadUser, usersListHeadAccess)
 
 	for _, ua = range list {
-		ga := ua.GetGlobal()
+		ga, _ := ua.GetAccess("", "")
 		w.Noticef(nick, usersList, usersWidth, ua.Username, ga)
 	}
 
@@ -520,7 +679,7 @@ func (c *coreCmds) susers(w irc.Writer, ev *cmd.Event) (
 		usersListHeadUser, usersListHeadAccess)
 
 	for _, ua = range list {
-		sa := ua.GetNetwork(ev.NetworkID)
+		sa, _ := ua.GetAccess(ev.NetworkID, "")
 		w.Noticef(nick, usersList, usersWidth, ua.Username, sa)
 	}
 
@@ -535,8 +694,8 @@ func (c *coreCmds) users(w irc.Writer, ev *cmd.Event) (
 	var ua *data.StoredUser
 	var ch string
 
-	if ev.GetArg("chan") != `` {
-		ch = ev.GetArg("chan")
+	if ev.Arg("chan") != `` {
+		ch = ev.Arg("chan")
 	} else {
 		if ev.Channel.Name() != `` {
 			ch = ev.Channel.Name()
@@ -563,7 +722,7 @@ func (c *coreCmds) users(w irc.Writer, ev *cmd.Event) (
 		usersListHeadUser, usersListHeadAccess)
 
 	for _, ua = range list {
-		ca := ua.GetChannel(ev.NetworkID, ch)
+		ca, _ := ua.GetAccess(ev.NetworkID, ch)
 		w.Noticef(nick, usersList, usersWidth, ua.Username, ca)
 	}
 
@@ -574,8 +733,8 @@ func (c *coreCmds) users(w irc.Writer, ev *cmd.Event) (
 func (c *coreCmds) deluser(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	param := ev.GetArg("user")
-	if !ev.StoredUser.HasGlobalFlag('G') {
+	param := ev.Arg("user")
+	if !ev.StoredUser.HasFlags("", "", "G") {
 		external = cmd.MakeGlobalFlagsError("G")
 		return
 	}
@@ -583,8 +742,6 @@ func (c *coreCmds) deluser(w irc.Writer, ev *cmd.Event) (
 
 	nick := ev.Nick()
 	ev.Close()
-	c.b.protectStore.Lock()
-	defer c.b.protectStore.Unlock()
 	store := c.b.store
 
 	store.LogoutByUsername(uname)
@@ -611,8 +768,6 @@ func (c *coreCmds) delme(w irc.Writer, ev *cmd.Event) (
 	host, nick := ev.Sender, ev.Nick()
 	uname := ev.StoredUser.Username
 	ev.Close()
-	c.b.protectStore.Lock()
-	defer c.b.protectStore.Unlock()
 	store := c.b.store
 
 	removed := false
@@ -633,8 +788,8 @@ func (c *coreCmds) delme(w irc.Writer, ev *cmd.Event) (
 func (c *coreCmds) passwd(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	oldpasswd := ev.GetArg("oldpassword")
-	newpasswd := ev.GetArg("newpassword")
+	oldpasswd := ev.Arg("oldpassword")
+	newpasswd := ev.Arg("newpassword")
 	nick := ev.Nick()
 	uname := ev.StoredUser.Username
 	if !ev.StoredUser.VerifyPassword(oldpasswd) {
@@ -643,8 +798,6 @@ func (c *coreCmds) passwd(w irc.Writer, ev *cmd.Event) (
 	}
 
 	ev.Close()
-	c.b.protectStore.Lock()
-	defer c.b.protectStore.Unlock()
 	store := c.b.store
 
 	var access *data.StoredUser
@@ -676,7 +829,7 @@ func (c *coreCmds) masks(w irc.Writer, ev *cmd.Event) (
 	access := ev.StoredUser
 	user := ev.TargetStoredUser["user"]
 	if user != nil {
-		if !ev.StoredUser.HasGlobalFlag('G') {
+		if !ev.StoredUser.HasFlags("", "", "G") {
 			external = cmd.MakeGlobalFlagsError("G")
 			return
 		}
@@ -697,13 +850,13 @@ func (c *coreCmds) masks(w irc.Writer, ev *cmd.Event) (
 func (c *coreCmds) addmask(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	mask := ev.GetArg("mask")
+	mask := ev.Arg("mask")
 	nick := ev.Nick()
 	uname := ev.StoredUser.Username
 
 	user := ev.TargetStoredUser["user"]
 	if user != nil {
-		if !ev.StoredUser.HasGlobalFlag('G') {
+		if !ev.StoredUser.HasFlags("", "", "G") {
 			external = cmd.MakeGlobalFlagsError("G")
 			return
 		}
@@ -711,8 +864,6 @@ func (c *coreCmds) addmask(w irc.Writer, ev *cmd.Event) (
 	}
 
 	ev.Close()
-	c.b.protectStore.Lock()
-	defer c.b.protectStore.Unlock()
 	store := c.b.store
 
 	var access *data.StoredUser
@@ -742,13 +893,13 @@ func (c *coreCmds) addmask(w irc.Writer, ev *cmd.Event) (
 func (c *coreCmds) delmask(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	mask := ev.GetArg("mask")
+	mask := ev.Arg("mask")
 	nick := ev.Nick()
 	uname := ev.StoredUser.Username
 
 	user := ev.TargetStoredUser["user"]
 	if user != nil {
-		if !ev.StoredUser.HasGlobalFlag('G') {
+		if !ev.StoredUser.HasFlags("", "", "G") {
 			external = cmd.MakeGlobalFlagsError("G")
 			return
 		}
@@ -756,8 +907,6 @@ func (c *coreCmds) delmask(w irc.Writer, ev *cmd.Event) (
 	}
 
 	ev.Close()
-	c.b.protectStore.Lock()
-	defer c.b.protectStore.Unlock()
 	store := c.b.store
 
 	var access *data.StoredUser
@@ -770,7 +919,7 @@ func (c *coreCmds) delmask(w irc.Writer, ev *cmd.Event) (
 		return
 	}
 
-	if access.DelMask(mask) {
+	if access.RemoveMask(mask) {
 		internal = store.SaveUser(access)
 		if internal != nil {
 			return
@@ -793,8 +942,6 @@ func (c *coreCmds) resetpasswd(w irc.Writer, ev *cmd.Event) (
 	newpasswd := ""
 
 	ev.Close()
-	c.b.protectStore.Lock()
-	defer c.b.protectStore.Unlock()
 	store := c.b.store
 
 	var access *data.StoredUser
@@ -823,249 +970,152 @@ func (c *coreCmds) resetpasswd(w irc.Writer, ev *cmd.Event) (
 // ggive gives global access to a user.
 func (c *coreCmds) ggive(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
-	return c.giveHelper(w, ev,
-		func(a *data.StoredUser, level uint8, flags string) (string, bool) {
-			if level > 0 {
-				a.GrantGlobalLevel(level)
-			}
-			if len(flags) != 0 {
-				filtered := filterFlags(flags, a.HasGlobalFlag)
-				if len(filtered) == 0 && level == 0 {
-					return fmt.Sprintf(giveFailureHas, a.Username,
-						a.Global, flags), false
-				}
-				a.GrantGlobalFlags(filtered)
-			}
-			return fmt.Sprintf(ggiveSuccess, a.Username, a.Global), true
-		},
-	)
+
+	return c.giveHelper(w, ev, "", "")
 }
 
 // sgive gives network access to a user.
 func (c *coreCmds) sgive(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
-	network := ev.NetworkID
-	return c.giveHelper(w, ev,
-		func(a *data.StoredUser, level uint8, flags string) (string, bool) {
-			if level > 0 {
-				a.GrantNetworkLevel(network, level)
-			}
-			if len(flags) != 0 {
-				filtered := filterFlags(flags, func(r rune) bool {
-					return a.HasNetworkFlag(network, r)
-				})
 
-				if len(filtered) == 0 && level == 0 {
-					return fmt.Sprintf(giveFailureHas, a.Username,
-						a.GetNetwork(network), flags), false
-				}
-				a.GrantNetworkFlags(network, filtered)
-			}
-			return fmt.Sprintf(sgiveSuccess, a.Username, a.GetNetwork(network)),
-				true
-		},
-	)
+	network := ev.NetworkID
+	return c.giveHelper(w, ev, network, "")
 }
 
 // give gives channel access to a user.
-func (c *coreCmds) give(w irc.Writer, ev *cmd.Event) (
-	internal, external error) {
-	network := ev.NetworkID
-	channel := ev.GetArg("chan")
-	return c.giveHelper(w, ev,
-		func(a *data.StoredUser, level uint8, flags string) (string, bool) {
-			if level > 0 {
-				a.GrantChannelLevel(network, channel, level)
-			}
-			if len(flags) != 0 {
-				filtered := filterFlags(flags, func(r rune) bool {
-					return a.HasChannelFlag(network, channel, r)
-				})
+func (c *coreCmds) give(w irc.Writer,
+	ev *cmd.Event) (internal, external error) {
 
-				if len(filtered) == 0 && level == 0 {
-					return fmt.Sprintf(giveFailureHas, a.Username,
-						a.GetChannel(network, channel), flags), false
-				}
-				a.GrantChannelFlags(network, channel, filtered)
-			}
-			return fmt.Sprintf(giveSuccess, a.Username,
-				a.GetChannel(network, channel), channel), true
-		},
-	)
+	network := ev.NetworkID
+	channel := ev.Arg("chan")
+	return c.giveHelper(w, ev, network, channel)
 }
 
 // gtake takes global access from a user.
 func (c *coreCmds) gtake(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
-	return c.takeHelper(w, ev,
-		func(a *data.StoredUser, all, level bool, flags string) (string, bool) {
-			var save bool
-			if all {
-				if a.HasGlobalLevel(1) || a.HasGlobalFlags(flags) {
-					a.RevokeGlobal()
-					save = true
-				}
-			} else if level {
-				if a.HasGlobalLevel(1) {
-					a.RevokeGlobalLevel()
-					save = true
-				}
-			} else if a.HasGlobalFlags(flags) {
-				a.RevokeGlobalFlags(flags)
-				save = true
-			}
 
-			var rstr = a.Global.String()
-			if save {
-				rstr = fmt.Sprintf(ggiveSuccess, a.Username, rstr)
-			} else {
-				rstr = fmt.Sprintf(takeFailureNo, a.Username, rstr)
-			}
-			return rstr, save
-		},
-	)
+	return c.takeHelper(w, ev, "", "")
 }
 
 // stake takes network access from a user.
 func (c *coreCmds) stake(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 	network := ev.NetworkID
-	return c.takeHelper(w, ev,
-		func(a *data.StoredUser, all, level bool, flags string) (string, bool) {
-			var save bool
-			if all {
-				if a.HasNetworkLevel(network, 1) ||
-					a.HasNetworkFlags(network, flags) {
-
-					a.RevokeNetwork(network)
-					save = true
-				}
-			} else if level {
-				if a.HasNetworkLevel(network, 1) {
-					a.RevokeNetworkLevel(network)
-					save = true
-				}
-			} else if a.HasNetworkFlags(network, flags) {
-				a.RevokeNetworkFlags(network, flags)
-				save = true
-			}
-
-			var rstr = a.GetNetwork(network).String()
-			if save {
-				rstr = fmt.Sprintf(sgiveSuccess, a.Username, rstr)
-			} else {
-				rstr = fmt.Sprintf(takeFailureNo, a.Username, rstr)
-			}
-			return rstr, save
-		},
-	)
+	return c.takeHelper(w, ev, network, "")
 }
 
 // take takes global access from a user.
 func (c *coreCmds) take(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 	network := ev.NetworkID
-	channel := ev.GetArg("chan")
-	return c.takeHelper(w, ev,
-		func(a *data.StoredUser, all, level bool, flags string) (string, bool) {
-			var save bool
-			if all {
-				if a.HasChannelLevel(network, channel, 1) ||
-					a.HasChannelFlags(network, channel, flags) {
-
-					a.RevokeChannel(network, channel)
-					save = true
-				}
-			} else if level {
-				if a.HasChannelLevel(network, channel, 1) {
-					a.RevokeChannelLevel(network, channel)
-					save = true
-				}
-			} else if a.HasChannelFlags(network, channel, flags) {
-				a.RevokeChannelFlags(network, channel, flags)
-				save = true
-			}
-
-			var rstr = a.GetChannel(network, channel).String()
-			if save {
-				rstr = fmt.Sprintf(giveSuccess, a.Username, rstr, channel)
-			} else {
-				rstr = fmt.Sprintf(takeFailureNo, a.Username, rstr)
-			}
-			return rstr, save
-		},
-	)
+	channel := ev.Arg("chan")
+	return c.takeHelper(w, ev, network, channel)
 }
 
 // giveHelper parses the args to a give function and executes them in context
 func (c *coreCmds) giveHelper(w irc.Writer, ev *cmd.Event,
-	g giveHelperFunc) (internal, external error) {
+	network, channel string) (internal, external error) {
 
 	uname := ev.TargetStoredUser["user"].Username
 	args := ev.SplitArg("levelOrFlags")
 	nick := ev.Nick()
 
 	ev.Close()
-	c.b.protectStore.Lock()
-	defer c.b.protectStore.Unlock()
 	store := c.b.store
 
-	var access *data.StoredUser
-	access, internal = store.FindUser(uname)
-	if internal != nil {
+	var a *data.StoredUser
+	if a, internal = store.FindUser(uname); internal != nil {
 		return
-	}
-	if access == nil {
+	} else if a == nil {
 		internal = fmt.Errorf(errFmtExpired, uname)
 		return
 	}
 
-	var level uint64
-	var flags string
+	var level uint8
+	var flags, filtered string
+	var hasFlags, hasLevel bool
 
 	for _, arg := range args {
 		if rgxFlags.MatchString(arg) {
 			flags += arg
-		} else if level, internal =
-			strconv.ParseUint(arg, 10, 8); internal != nil {
+		} else if l, err := strconv.ParseUint(arg, 10, 8); err == nil {
+			level = uint8(l)
+		} else {
+			w.Noticef(nick, giveFailure)
 			return
 		}
 	}
 
-	if (level > 0 && level < 256) || len(flags) > 0 {
-		str, dosave := g(access, uint8(level), flags)
-		if dosave {
-			if internal = store.SaveUser(access); internal != nil {
-				return
-			}
-		}
-		w.Noticef(nick, str)
-	} else {
+	if (level <= 0 && level > 255) || len(flags) == 0 {
 		w.Noticef(nick, giveFailure)
+		return
 	}
+
+	if level > 0 {
+		if a.HasLevel(network, channel, level) {
+			hasLevel = true
+		} else {
+			a.Grant(network, channel, level)
+		}
+	}
+
+	if len(flags) != 0 {
+		filtered = filterFlags(network, channel, flags, a)
+		if len(filtered) == 0 {
+			hasFlags = true
+		} else {
+			a.Grant(network, channel, 0, filtered)
+		}
+	}
+
+	if !hasFlags || !hasLevel {
+		if internal = store.SaveUser(a); internal == nil {
+			var msg string
+			var newAccess = ignoreOK(a.GetAccess(network, channel))
+			switch {
+			case len(network) != 0 && len(channel) != 0:
+				msg = fmt.Sprintf(giveSuccess, a.Username, newAccess, channel)
+			case len(network) != 0:
+				msg = fmt.Sprintf(sgiveSuccess, a.Username, newAccess, network)
+			default:
+				msg = fmt.Sprintf(ggiveSuccess, a.Username, newAccess)
+			}
+			w.Noticef(nick, msg)
+		}
+		return
+	}
+
+	var alreadyHas string
+	if hasLevel {
+		alreadyHas += fmt.Sprintf(">=%d", level)
+	}
+	if hasFlags {
+		if len(alreadyHas) > 0 {
+			alreadyHas += " "
+		}
+		alreadyHas = flags
+	}
+	w.Noticef(nick, giveFailureHas, a.Username, a.String(network, channel), alreadyHas)
 
 	return
 }
 
 // takeHelper parses the args to a take function and executes them in context
 func (c *coreCmds) takeHelper(w irc.Writer, ev *cmd.Event,
-	t takeHelperFunc) (internal, external error) {
+	network, channel string) (internal, external error) {
 
 	uname := ev.TargetStoredUser["user"].Username
-	arg := ev.GetArg("allOrFlags")
+	arg := ev.Arg("allOrFlags")
 	nick := ev.Nick()
 
 	ev.Close()
-	c.b.protectStore.Lock()
-	defer c.b.protectStore.Unlock()
 	store := c.b.store
 
-	var access *data.StoredUser
-	access, internal = store.FindUser(uname)
-	if internal != nil {
+	var a *data.StoredUser
+	if a, internal = store.FindUser(uname); internal != nil {
 		return
-	}
-	if access == nil {
+	} else if a == nil {
 		internal = fmt.Errorf(errFmtExpired, uname)
 		return
 	}
@@ -1085,14 +1135,38 @@ func (c *coreCmds) takeHelper(w irc.Writer, ev *cmd.Event,
 		}
 	}
 
-	str, dosave := t(access, all, level, flags)
-	if dosave {
-		if internal = store.SaveUser(access); internal != nil {
-			return
-		}
-	}
-	w.Noticef(nick, str)
+	var save = true
+	if all && a.HasLevel(network, channel, 1) ||
+		a.HasFlags(network, channel, flags) {
 
+		a.RevokeLevel(network, channel)
+		a.RevokeFlags(network, channel, flags)
+	} else if level && a.HasLevel(network, channel, 1) {
+		a.RevokeLevel(network, channel)
+	} else if len(flags) != 0 && a.HasFlags(network, channel, flags) {
+		a.RevokeFlags(network, channel, flags)
+	} else {
+		save = false
+	}
+
+	if save {
+		if internal = store.SaveUser(a); internal == nil {
+			var msg string
+			var newAccess = ignoreOK(a.GetAccess(network, channel))
+			switch {
+			case len(network) != 0 && len(channel) != 0:
+				msg = fmt.Sprintf(giveSuccess, a.Username, newAccess, channel)
+			case len(network) != 0:
+				msg = fmt.Sprintf(sgiveSuccess, a.Username, newAccess, network)
+			default:
+				msg = fmt.Sprintf(ggiveSuccess, a.Username, newAccess)
+			}
+			w.Notice(nick, msg)
+		}
+		return
+	}
+
+	w.Noticef(nick, takeFailureNo, a.Username)
 	return
 }
 
@@ -1100,7 +1174,7 @@ func (c *coreCmds) takeHelper(w irc.Writer, ev *cmd.Event,
 func (c *coreCmds) help(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	search := strings.ToLower(ev.GetArg("command"))
+	search := strings.ToLower(ev.Arg("command"))
 	nick := ev.Nick()
 
 	var extSorted = make(map[string][]string)
@@ -1170,10 +1244,10 @@ func (c *coreCmds) help(w irc.Writer, ev *cmd.Event) (
 }
 
 // filterFlags removes flags that the user already has
-func filterFlags(flags string, check func(rune) bool) string {
+func filterFlags(network, channel, flags string, access *data.StoredUser) string {
 	buf := bytes.Buffer{}
 	for _, flag := range flags {
-		if !check(flag) {
+		if !access.HasFlags(network, channel, string(flag)) {
 			buf.WriteRune(flag)
 		}
 	}
@@ -1191,4 +1265,9 @@ func userListWidth(users []*data.StoredUser) int {
 	}
 
 	return minl
+}
+
+// ignoreOK allows us to easily return an access object even if it's zero'd
+func ignoreOK(access data.Access, ok bool) data.Access {
+	return access
 }

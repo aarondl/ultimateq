@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/aarondl/ultimateq/config"
-	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/irc"
 )
 
@@ -218,9 +217,12 @@ func TestCoreHandler_Join(t *testing.T) {
 	b, _ := createBot(fakeConfig, connProvider, nil, devNull, true, false)
 	srv := b.servers[netID]
 
-	srv.state.Self.User = data.NewUser("nick!user@host")
-	ev := irc.NewEvent(netID, netInfo, irc.JOIN,
-		srv.state.Self.Host(), "#chan")
+	ev := irc.NewEvent(netID, netInfo, irc.RPL_WELCOME, "server",
+		"WELCOME", "nick!user@host")
+	srv.state.Update(ev)
+
+	ev = irc.NewEvent(netID, netInfo, irc.JOIN,
+		"nick!user@host", "#chan")
 
 	endpoint := makeTestPoint(nil)
 	srv.handler.HandleRaw(endpoint, ev)

@@ -27,9 +27,7 @@ const (
 )
 
 var (
-	channelKinds = data.NewChannelModeKinds("a", "b", "c", "d")
-	userKinds, _ = data.NewUserModeKinds("(ov)@+")
-	rgxCreator   = strings.NewReplacer(
+	rgxCreator = strings.NewReplacer(
 		`(`, `\(`, `)`, `\)`, `]`, `\]`, `[`,
 		`\[`, `\`, `\\`, `/`, `\/`, `%v`, `.*`,
 	)
@@ -37,13 +35,13 @@ var (
 )
 
 type tSetup struct {
-	b      *Bot
-	locker data.Locker
-	writer irc.Writer
-	state  *data.State
-	store  *data.Store
-	buffer *bytes.Buffer
-	t      *testing.T
+	b        *Bot
+	provider data.Provider
+	writer   irc.Writer
+	state    *data.State
+	store    *data.Store
+	buffer   *bytes.Buffer
+	t        *testing.T
 }
 
 func commandsSetup(t *testing.T) *tSetup {
@@ -99,7 +97,7 @@ func prvRspChk(ts *tSetup, expected, to, sender string, args ...string) error {
 	ts.buffer.Reset()
 	err := ts.b.cmds.Dispatch(ts.writer, irc.NewEvent(
 		netID, netInfo, irc.PRIVMSG, sender, to, strings.Join(args, " ")),
-		ts.locker,
+		ts.provider,
 	)
 	ts.b.cmds.WaitForHandlers()
 
@@ -149,7 +147,7 @@ func TestCoreCommands_Register(t *testing.T) {
 
 	var err error
 
-	if ts.store.GetAuthedUser(netID, u1user) != nil {
+	if ts.store.AuthedUser(netID, u1user) != nil {
 		t.Error("Somehow user was authed already.")
 	}
 
@@ -158,14 +156,15 @@ func TestCoreCommands_Register(t *testing.T) {
 		t.Error(err)
 	}
 
-	access := ts.store.GetAuthedUser(netID, u1host)
+	access := ts.store.AuthedUser(netID, u1host)
 	if access == nil {
 		t.Error("User was not authenticated.")
 	} else {
-		if access.Global.Level != ^uint8(0) {
+		accessObj := ignoreOK(access.GetAccess("", ""))
+		if accessObj.Level != ^uint8(0) {
 			t.Error("Level not granted.")
 		}
-		if access.Global.Flags != ^uint64(0) {
+		if accessObj.Flags != ^uint64(0) {
 			t.Error("Flags not granted.")
 		}
 	}
@@ -175,14 +174,14 @@ func TestCoreCommands_Register(t *testing.T) {
 		t.Error(err)
 	}
 
-	access = ts.store.GetAuthedUser(netID, u2host)
+	access = ts.store.AuthedUser(netID, u2host)
 	if access == nil {
 		t.Error("User was not authenticated.")
-	} else if access.Global != nil {
-		if access.Global.Level != 0 {
+	} else if accessObj, ok := access.GetAccess("", ""); ok {
+		if accessObj.Level != 0 {
 			t.Error("Level granted by mistake.")
 		}
-		if access.Global.Flags != 0 {
+		if accessObj.Flags != 0 {
 			t.Error("Flags granted by mistake.")
 		}
 	}
@@ -204,7 +203,7 @@ func TestCoreCommands_Auth(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	access := ts.store.GetAuthedUser(netID, u1host)
+	access := ts.store.AuthedUser(netID, u1host)
 	if access == nil {
 		t.Error("User was not authenticated.")
 	}
@@ -212,7 +211,7 @@ func TestCoreCommands_Auth(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	access = ts.store.GetAuthedUser(netID, u1host)
+	access = ts.store.AuthedUser(netID, u1host)
 	if access != nil {
 		t.Error("User was not logged out.")
 	}
@@ -225,7 +224,7 @@ func TestCoreCommands_Auth(t *testing.T) {
 		t.Error(err)
 	}
 
-	access = ts.store.GetAuthedUser(netID, u1host)
+	access = ts.store.AuthedUser(netID, u1host)
 	if access == nil {
 		t.Error("User was not authenticated.")
 	}
@@ -254,7 +253,7 @@ func TestCoreCommands_Logout(t *testing.T) {
 		t.Error(err)
 	}
 
-	access := ts.store.GetAuthedUser(netID, u1host)
+	access := ts.store.AuthedUser(netID, u1host)
 	if access != nil {
 		t.Error("User was not logged out.")
 	}
@@ -344,8 +343,8 @@ func TestCoreCommands_Deluser(t *testing.T) {
 		t.Error(err)
 	}
 
-	access1 := ts.store.GetAuthedUser(netID, u1host)
-	access2 := ts.store.GetAuthedUser(netID, u1host)
+	access1 := ts.store.AuthedUser(netID, u1host)
+	access2 := ts.store.AuthedUser(netID, u1host)
 	if access1 == nil || access2 == nil {
 		t.Error("Users were not authenticated.")
 	}
@@ -360,7 +359,7 @@ func TestCoreCommands_Deluser(t *testing.T) {
 		t.Error(err)
 	}
 
-	access2 = ts.store.GetAuthedUser(netID, u2host)
+	access2 = ts.store.AuthedUser(netID, u2host)
 	if access2 != nil {
 		t.Error("User was not logged out.")
 	}
@@ -382,7 +381,7 @@ func TestCoreCommands_Deluser(t *testing.T) {
 		t.Error(err)
 	}
 
-	access2 = ts.store.GetAuthedUser(netID, u2host)
+	access2 = ts.store.AuthedUser(netID, u2host)
 	if access2 != nil {
 		t.Error("User was not logged out.")
 	}
@@ -419,7 +418,7 @@ func TestCoreCommands_Delme(t *testing.T) {
 		t.Error(err)
 	}
 
-	access := ts.store.GetAuthedUser(netID, u1host)
+	access := ts.store.AuthedUser(netID, u1host)
 	if access == nil {
 		t.Error("User was not authenticated.")
 	}
@@ -429,7 +428,7 @@ func TestCoreCommands_Delme(t *testing.T) {
 		t.Error(err)
 	}
 
-	access = ts.store.GetAuthedUser(netID, u1host)
+	access = ts.store.AuthedUser(netID, u1host)
 	if access != nil {
 		t.Error("User was not logged out.")
 	}
@@ -467,7 +466,7 @@ func TestCoreCommands_Passwd(t *testing.T) {
 		t.Error(err)
 	}
 
-	access = ts.store.GetAuthedUser(netID, u1host)
+	access = ts.store.AuthedUser(netID, u1host)
 	if access == nil {
 		t.Error("User was not authenticatd.")
 	}
@@ -479,7 +478,7 @@ func TestCoreCommands_Passwd(t *testing.T) {
 		t.Error(err)
 	}
 
-	access = ts.store.GetAuthedUser(netID, u1host)
+	access = ts.store.AuthedUser(netID, u1host)
 	if access == nil {
 		t.Error("User was not authenticatd.")
 	}
@@ -536,7 +535,7 @@ func TestCoreCommands_Masks(t *testing.T) {
 		t.Error(err)
 	}
 
-	access = ts.store.GetAuthedUser(netID, u1host)
+	access = ts.store.AuthedUser(netID, u1host)
 	if access == nil {
 		t.Fatal("User was not authed.")
 	}
@@ -591,7 +590,7 @@ func TestCoreCommands_Masks(t *testing.T) {
 		t.Error(err)
 	}
 
-	access = ts.store.GetAuthedUser(netID, u1host)
+	access = ts.store.AuthedUser(netID, u1host)
 	if access == nil {
 		t.Fatal("User was not authed.")
 	}
@@ -621,7 +620,7 @@ func TestCoreCommands_Resetpasswd(t *testing.T) {
 		t.Error(err)
 	}
 
-	access = ts.store.GetAuthedUser(netID, u2host)
+	access = ts.store.AuthedUser(netID, u2host)
 	if access == nil {
 		t.Fatal("User was not authenticatd.")
 	}
@@ -634,7 +633,7 @@ func TestCoreCommands_Resetpasswd(t *testing.T) {
 		t.Error(err)
 	}
 
-	access = ts.store.GetAuthedUser(netID, u2host)
+	access = ts.store.AuthedUser(netID, u2host)
 	if access == nil {
 		t.Fatal("User was not authenticatd.")
 	}
@@ -669,7 +668,7 @@ func TestCoreCommands_GiveTakeGlobal(t *testing.T) {
 		t.Error(err)
 	}
 
-	if !a.HasGlobalFlag('h') || !a.HasGlobalLevel(100) {
+	if !a.HasFlags("", "", "h") || !a.HasLevel("", "", 100) {
 		t.Error("Global access not granted correctly.")
 	}
 
@@ -683,7 +682,7 @@ func TestCoreCommands_GiveTakeGlobal(t *testing.T) {
 		t.Error(err)
 	}
 
-	if a.HasGlobalLevel(100) {
+	if a.HasLevel("", "", 100) {
 		t.Error("Global access not taken correctly.")
 	}
 
@@ -692,17 +691,17 @@ func TestCoreCommands_GiveTakeGlobal(t *testing.T) {
 		t.Error(err)
 	}
 
-	if a.HasGlobalFlag('h') {
+	if a.HasFlags("", "", "h") {
 		t.Error("Global access not taken correctly.")
 	}
 
-	a.GrantGlobal(100, "h")
+	a.Grant("", "", 100, "h")
 	err = rspChk(ts, ggiveSuccess, u1host, gtake, u2nick, "all")
 	if err != nil {
 		t.Error(err)
 	}
 
-	if a.HasGlobalLevel(100) || a.HasGlobalFlag('h') {
+	if a.HasLevel("", "", 100) || a.HasFlags("", "", "h") {
 		t.Error("Global access not taken correctly.")
 	}
 
@@ -738,7 +737,7 @@ func TestCoreCommands_GiveTakeNetwork(t *testing.T) {
 		t.Error(err)
 	}
 
-	if !a.HasNetworkFlag(netID, 'h') || !a.HasNetworkLevel(netID, 100) {
+	if !a.HasFlags(netID, "", "h") || !a.HasLevel(netID, "", 100) {
 		t.Error("Network access not granted correctly.")
 	}
 
@@ -752,7 +751,7 @@ func TestCoreCommands_GiveTakeNetwork(t *testing.T) {
 		t.Error(err)
 	}
 
-	if a.HasNetworkLevel(netID, 100) {
+	if a.HasLevel(netID, "", 100) {
 		t.Error("Network access not taken correctly.")
 	}
 
@@ -761,17 +760,17 @@ func TestCoreCommands_GiveTakeNetwork(t *testing.T) {
 		t.Error(err)
 	}
 
-	if a.HasNetworkFlag(netID, 'h') {
+	if a.HasFlags(netID, "", "h") {
 		t.Error("Network access not taken correctly.")
 	}
 
-	a.GrantNetwork(netID, 100, "h")
+	a.Grant(netID, "", 100, "h")
 	err = rspChk(ts, sgiveSuccess, u1host, stake, u2nick, "all")
 	if err != nil {
 		t.Error(err)
 	}
 
-	if a.HasNetworkLevel(netID, 100) || a.HasNetworkFlag(netID, 'h') {
+	if a.HasLevel(netID, "", 100) || a.HasFlags(netID, "", "h") {
 		t.Error("Network access not taken correctly.")
 	}
 
@@ -807,8 +806,7 @@ func TestCoreCommands_GiveTakeChannel(t *testing.T) {
 		t.Error(err)
 	}
 
-	if !a.HasChannelFlag(netID, channel, 'h') ||
-		!a.HasChannelLevel(netID, channel, 100) {
+	if !a.HasFlags(netID, channel, "h") || !a.HasLevel(netID, channel, 100) {
 		t.Error("Channel access not granted correctly.")
 	}
 
@@ -822,7 +820,7 @@ func TestCoreCommands_GiveTakeChannel(t *testing.T) {
 		t.Error(err)
 	}
 
-	if a.HasChannelLevel(netID, channel, 100) {
+	if a.HasLevel(netID, channel, 100) {
 		t.Error("Channel access not taken correctly.")
 	}
 
@@ -831,18 +829,17 @@ func TestCoreCommands_GiveTakeChannel(t *testing.T) {
 		t.Error(err)
 	}
 
-	if a.HasChannelFlag(netID, channel, 'h') {
+	if a.HasFlags(netID, channel, "h") {
 		t.Error("Channel access not taken correctly.")
 	}
 
-	a.GrantChannel(netID, channel, 100, "h")
+	a.Grant(netID, channel, 100, "h")
 	err = rspChk(ts, giveSuccess, u1host, take, channel, u2nick, "all")
 	if err != nil {
 		t.Error(err)
 	}
 
-	if a.HasChannelFlag(netID, channel, 'h') ||
-		a.HasChannelLevel(netID, channel, 100) {
+	if a.HasFlags(netID, channel, "h") || a.HasLevel(netID, channel, 100) {
 		t.Error("Channel access not taken correctly.")
 	}
 
@@ -930,15 +927,15 @@ func TestCoreCommands_Gusers(t *testing.T) {
 	if err != nil {
 		t.Fatal("Could not find user1.")
 	}
-	a2.GrantGlobal(100, "abc")
+	a2.Grant("", "", 100, "abc")
 	if err = ts.store.SaveUser(a2); err != nil {
 		t.Fatal("Could not save user.")
 	}
 
 	check := gusersHead +
 		`NOTICE .* :` + usersListHeadUser + `.*` + usersListHeadAccess +
-		`NOTICE .* :` + u1user + `.*` + a1.Global.String() +
-		`NOTICE .* :` + u2user + `.*` + a2.Global.String()
+		`NOTICE .* :` + u1user + `.*` + a1.String("", "") +
+		`NOTICE .* :` + u2user + `.*` + a2.String("", "")
 	err = rspChk(ts, check, u1host, gusers)
 	if err != nil {
 		t.Error(err)
@@ -970,12 +967,12 @@ func TestCoreCommands_Susers(t *testing.T) {
 	if err != nil {
 		t.Fatal("Could not find user1.")
 	}
-	a1.GrantNetwork(netID, 2, "b")
+	a1.Grant(netID, "", 2, "b")
 	a2, err = ts.store.FindUser(u2user)
 	if err != nil {
 		t.Fatal("Could not find user1.")
 	}
-	a2.GrantNetwork(netID, 100, "abc")
+	a2.Grant(netID, "", 100, "abc")
 
 	if err = ts.store.SaveUser(a1); err != nil {
 		t.Fatal("Could not save user.")
@@ -986,8 +983,8 @@ func TestCoreCommands_Susers(t *testing.T) {
 
 	check := susersHead +
 		`NOTICE .* :` + usersListHeadUser + `.*` + usersListHeadAccess +
-		`NOTICE .* :` + u1user + `.*` + a1.GetNetwork(netID).String() +
-		`NOTICE .* :` + u2user + `.*` + a2.GetNetwork(netID).String()
+		`NOTICE .* :` + u1user + `.*` + a1.String(netID, "") +
+		`NOTICE .* :` + u2user + `.*` + a2.String(netID, "")
 	err = rspChk(ts, check, u1host, susers)
 	if err != nil {
 		t.Error(err)
@@ -1019,12 +1016,12 @@ func TestCoreCommands_Users(t *testing.T) {
 	if err != nil {
 		t.Fatal("Could not find user1.")
 	}
-	a1.GrantChannel(netID, channel, 3, "c")
+	a1.Grant(netID, channel, 3, "c")
 	a2, err = ts.store.FindUser(u2user)
 	if err != nil {
 		t.Fatal("Could not find user1.")
 	}
-	a2.GrantChannel(netID, channel, 100, "abc")
+	a2.Grant(netID, channel, 100, "abc")
 
 	if err = ts.store.SaveUser(a1); err != nil {
 		t.Fatal("Could not save user.")
@@ -1035,8 +1032,8 @@ func TestCoreCommands_Users(t *testing.T) {
 
 	check := usersHead +
 		`NOTICE .* :` + usersListHeadUser + `.*` + usersListHeadAccess +
-		`NOTICE .* :` + u1user + `.*` + a1.GetChannel(netID, channel).String() +
-		`NOTICE .* :` + u2user + `.*` + a2.GetChannel(netID, channel).String()
+		`NOTICE .* :` + u1user + `.*` + a1.String(netID, channel) +
+		`NOTICE .* :` + u2user + `.*` + a2.String(netID, channel)
 	err = rspChk(ts, check, u1host, users, channel)
 	if err != nil {
 		t.Error(err)

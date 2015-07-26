@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/aarondl/ultimateq/config"
-	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/irc"
 )
 
@@ -93,9 +92,7 @@ func (c *coreHandler) HandleRaw(w irc.Writer, ev *irc.Event) {
 			channel = strings.ToLower(ev.Args[1])
 		}
 
-		c.bot.ReadState(ev.NetworkID, func(st *data.State) {
-			curNick = strings.ToLower(st.Self.Nick())
-		})
+		curNick = strings.ToLower(c.bot.State(ev.NetworkID).Self().Nick())
 
 		if len(curNick) == 0 || nick != curNick {
 			break
@@ -138,10 +135,8 @@ func (c *coreHandler) HandleRaw(w irc.Writer, ev *irc.Event) {
 
 	case irc.JOIN:
 		server := c.getServer(ev.NetworkID)
-		server.protectState.RLock()
-		defer server.protectState.RUnlock()
 		if server.state != nil {
-			if ev.Sender == server.state.Self.Host() {
+			if ev.Sender == server.state.Self().Host() {
 				w.Send("WHO :", ev.Args[0])
 				w.Send("MODE :", ev.Args[0])
 			}
