@@ -44,10 +44,6 @@ func (_ Greeter) Cmd(command string, _ irc.Writer, _ *cmd.Event) error {
 // way we don't need the switch case above. If this method did not exist it
 // would fallback to the above method when the command was issued by a user.
 func (_ Greeter) Hello(w irc.Writer, e *cmd.Event) error {
-	// Remember to call e.Close() if you do any long processing here.
-	// There are internal database locks engaged at this point to make using
-	// them safe.
-
 	// Write out our message.
 	// Normally we'd have to check if e.Channel is nil, but it's safe since
 	// we registered with the cmd.PUBLIC (no private message allowed) flag for

@@ -82,8 +82,6 @@ func (q *Quoter) Addquote(w irc.Writer, ev *cmd.Event) error {
 		return nil
 	}
 
-	ev.Close()
-
 	id, err := q.db.AddQuote(nick, quote)
 	if err != nil {
 		w.Noticef(nick, "\x02Quote:\x02 %v", err)
@@ -96,7 +94,6 @@ func (q *Quoter) Addquote(w irc.Writer, ev *cmd.Event) error {
 func (q *Quoter) Delquote(w irc.Writer, ev *cmd.Event) error {
 	nick := ev.Nick()
 	id, err := strconv.Atoi(ev.Arg("id"))
-	ev.Close()
 
 	if err != nil {
 		w.Notice(nick, "\x02Quote:\x02 Not a valid id.")
@@ -116,7 +113,6 @@ func (q *Quoter) Editquote(w irc.Writer, ev *cmd.Event) error {
 	nick := ev.Nick()
 	quote := ev.Arg("quote")
 	id, err := strconv.Atoi(ev.Arg("id"))
-	ev.Close()
 
 	if len(quote) == 0 {
 		return nil
@@ -139,7 +135,6 @@ func (q *Quoter) Editquote(w irc.Writer, ev *cmd.Event) error {
 func (q *Quoter) Quote(w irc.Writer, ev *cmd.Event) error {
 	strid := ev.Arg("id")
 	nick := ev.Nick()
-	ev.Close()
 
 	var quote string
 	var id int
@@ -171,7 +166,6 @@ func (q *Quoter) Quote(w irc.Writer, ev *cmd.Event) error {
 
 func (q *Quoter) Quotes(w irc.Writer, ev *cmd.Event) error {
 	nick := ev.Nick()
-	ev.Close()
 
 	w.Notifyf(ev.Event, nick, "\x02Quote:\x02 %d quote(s) in database.",
 		q.db.NQuotes())
@@ -181,7 +175,6 @@ func (q *Quoter) Quotes(w irc.Writer, ev *cmd.Event) error {
 func (q *Quoter) Details(w irc.Writer, ev *cmd.Event) error {
 	nick := ev.Nick()
 	id, err := strconv.Atoi(ev.Arg("id"))
-	ev.Close()
 
 	if err != nil {
 		w.Notice(nick, "\x02Quote:\x02 Not a valid id.")
@@ -220,7 +213,6 @@ func (_ *Queryer) PrivmsgChannel(w irc.Writer, ev *irc.Event) {
 func (_ *Queryer) Calc(w irc.Writer, ev *cmd.Event) error {
 	q := ev.Arg("query")
 	nick := ev.Nick()
-	ev.Close()
 
 	if out, err := query.Wolfram(q, &queryConf); len(out) != 0 {
 		out = sanitize(out)
@@ -244,7 +236,6 @@ func (_ *Queryer) Calc(w irc.Writer, ev *cmd.Event) error {
 func (_ *Queryer) Google(w irc.Writer, ev *cmd.Event) error {
 	q := ev.Arg("query")
 	nick := ev.Nick()
-	ev.Close()
 
 	if out, err := query.Google(q); len(out) != 0 {
 		out = sanitize(out)
@@ -259,7 +250,6 @@ func (_ *Queryer) Google(w irc.Writer, ev *cmd.Event) error {
 func (_ *Queryer) Weather(w irc.Writer, ev *cmd.Event) error {
 	q := ev.Arg("query")
 	nick := ev.Nick()
-	ev.Close()
 
 	if out, err := query.Weather(q, &queryConf); len(out) != 0 {
 		out = sanitize(out)
@@ -290,7 +280,6 @@ func sandboxGo(w irc.Writer, ev *cmd.Event, basecode string) error {
 	code := ev.Arg("code")
 	nick := ev.Nick()
 	targ := ev.Target()
-	ev.Close()
 
 	tmp := os.TempDir()
 	frand := rand.Uint32()

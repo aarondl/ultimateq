@@ -493,7 +493,6 @@ func (c *coreCmds) register(w irc.Writer,
 
 	nChans, _ := ev.NChannelsByUser(nick)
 
-	ev.Close()
 	store := c.b.store
 
 	var hasAny bool
@@ -552,7 +551,6 @@ func (c *coreCmds) auth(w irc.Writer, ev *cmd.Event) (
 		return
 	}
 
-	ev.Close()
 	store := c.b.store
 
 	var err error
@@ -589,7 +587,6 @@ func (c *coreCmds) logout(w irc.Writer, ev *cmd.Event) (
 		uname = user.Username
 	}
 
-	ev.Close()
 	store := c.b.store
 
 	if len(uname) != 0 {
@@ -737,7 +734,6 @@ func (c *coreCmds) deluser(w irc.Writer, ev *cmd.Event) (
 	uname := ev.TargetStoredUser["user"].Username
 
 	nick := ev.Nick()
-	ev.Close()
 	store := c.b.store
 
 	store.LogoutByUsername(uname)
@@ -763,7 +759,6 @@ func (c *coreCmds) delme(w irc.Writer, ev *cmd.Event) (
 
 	host, nick := ev.Sender, ev.Nick()
 	uname := ev.StoredUser.Username
-	ev.Close()
 	store := c.b.store
 
 	removed := false
@@ -793,7 +788,6 @@ func (c *coreCmds) passwd(w irc.Writer, ev *cmd.Event) (
 		return
 	}
 
-	ev.Close()
 	store := c.b.store
 
 	var access *data.StoredUser
@@ -859,7 +853,6 @@ func (c *coreCmds) addmask(w irc.Writer, ev *cmd.Event) (
 		uname = user.Username
 	}
 
-	ev.Close()
 	store := c.b.store
 
 	var access *data.StoredUser
@@ -902,7 +895,6 @@ func (c *coreCmds) delmask(w irc.Writer, ev *cmd.Event) (
 		uname = user.Username
 	}
 
-	ev.Close()
 	store := c.b.store
 
 	var access *data.StoredUser
@@ -937,7 +929,6 @@ func (c *coreCmds) resetpasswd(w irc.Writer, ev *cmd.Event) (
 	nick := ev.Nick()
 	newpasswd := ""
 
-	ev.Close()
 	store := c.b.store
 
 	var access *data.StoredUser
@@ -1017,7 +1008,6 @@ func (c *coreCmds) giveHelper(w irc.Writer, ev *cmd.Event,
 	args := ev.SplitArg("levelOrFlags")
 	nick := ev.Nick()
 
-	ev.Close()
 	store := c.b.store
 
 	var a *data.StoredUser
@@ -1105,7 +1095,6 @@ func (c *coreCmds) takeHelper(w irc.Writer, ev *cmd.Event,
 	arg := ev.Arg("allOrFlags")
 	nick := ev.Nick()
 
-	ev.Close()
 	store := c.b.store
 
 	var a *data.StoredUser
