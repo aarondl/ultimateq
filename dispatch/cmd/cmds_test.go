@@ -224,7 +224,7 @@ func setupForAuth() (state *data.State, store *data.Store,
 func TestCmds(t *testing.T) {
 	t.Parallel()
 
-	c := NewCmds(pfxer, core)
+	c := NewCmds(pfxer, dispatch.NewDispatchCore(nil))
 	if c == nil {
 		t.Fatal("Cmds should not be nil.")
 	}
@@ -258,7 +258,7 @@ func chkStr(msg, pattern string) error {
 func TestCmds_Register(t *testing.T) {
 	t.Parallel()
 
-	c := NewCmds(pfxer, core)
+	c := NewCmds(pfxer, dispatch.NewDispatchCore(nil))
 
 	var handler = &commandHandler{}
 
@@ -393,7 +393,7 @@ func TestCmds_Register(t *testing.T) {
 func TestCmds_RegisterAuthed(t *testing.T) {
 	t.Parallel()
 
-	c := NewCmds(pfxer, core)
+	c := NewCmds(pfxer, dispatch.NewDispatchCore(nil))
 
 	handler := &commandHandler{}
 	var success bool
@@ -412,8 +412,7 @@ func TestCmds_RegisterAuthed(t *testing.T) {
 func TestCmds_Dispatch(t *testing.T) {
 	t.Parallel()
 
-	dcore := dispatch.NewDispatchCore(nil)
-	c := NewCmds(pfxer, dcore)
+	c := NewCmds(pfxer, dispatch.NewDispatchCore(nil))
 	c.AddChannels(channel)
 	if c == nil {
 		t.Error("Cmds should not be nil.")
@@ -635,7 +634,7 @@ func TestCmds_Dispatch(t *testing.T) {
 func TestCmds_DispatchAuthed(t *testing.T) {
 	t.Parallel()
 
-	c := NewCmds(pfxer, core)
+	c := NewCmds(pfxer, dispatch.NewDispatchCore(nil))
 
 	var table = []struct {
 		Sender   string
@@ -745,7 +744,7 @@ func TestCmds_DispatchAuthed(t *testing.T) {
 func TestCmds_DispatchNils(t *testing.T) {
 	t.Parallel()
 
-	c := NewCmds(pfxer, core)
+	c := NewCmds(pfxer, dispatch.NewDispatchCore(nil))
 	_, writer := newWriter()
 	provider := testProvider{}
 
@@ -797,7 +796,7 @@ func TestCmds_DispatchNils(t *testing.T) {
 func TestCmds_DispatchReturns(t *testing.T) {
 	t.Parallel()
 
-	c := NewCmds(pfxer, core)
+	c := NewCmds(pfxer, dispatch.NewDispatchCore(nil))
 	buffer, writer := newWriter()
 	provider := testProvider{}
 
@@ -853,7 +852,7 @@ func TestCmds_DispatchReturns(t *testing.T) {
 func TestCmds_DispatchChannel(t *testing.T) {
 	t.Parallel()
 
-	c := NewCmds(pfxer, core)
+	c := NewCmds(pfxer, dispatch.NewDispatchCore(nil))
 
 	_, writer := newWriter()
 	state, store := setup()
@@ -958,7 +957,7 @@ func TestCmds_DispatchChannel(t *testing.T) {
 func TestCmds_DispatchUsers(t *testing.T) {
 	t.Parallel()
 
-	c := NewCmds(pfxer, core)
+	c := NewCmds(pfxer, dispatch.NewDispatchCore(nil))
 
 	_, writer := newWriter()
 	state, store, _ := setupForAuth()
@@ -1058,7 +1057,7 @@ func TestCmds_DispatchUsers(t *testing.T) {
 func TestCmds_DispatchErrors(t *testing.T) {
 	t.Parallel()
 
-	c := NewCmds(pfxer, core)
+	c := NewCmds(pfxer, dispatch.NewDispatchCore(nil))
 
 	_, writer := newWriter()
 	state, store, _ := setupForAuth()
@@ -1161,7 +1160,7 @@ func TestCmds_DispatchErrors(t *testing.T) {
 func TestCmds_DispatchVariadicUsers(t *testing.T) {
 	t.Parallel()
 
-	c := NewCmds(pfxer, core)
+	c := NewCmds(pfxer, dispatch.NewDispatchCore(nil))
 
 	_, writer := newWriter()
 	state, store, _ := setupForAuth()
@@ -1248,7 +1247,7 @@ func TestCmds_DispatchVariadicUsers(t *testing.T) {
 func TestCmds_DispatchMixUserAndChan(t *testing.T) {
 	t.Parallel()
 
-	c := NewCmds(pfxer, core)
+	c := NewCmds(pfxer, dispatch.NewDispatchCore(nil))
 
 	_, writer := newWriter()
 	state, store, _ := setupForAuth()
@@ -1289,7 +1288,7 @@ func TestCmds_DispatchMixUserAndChan(t *testing.T) {
 func TestCmds_DispatchReflection(t *testing.T) {
 	t.Parallel()
 
-	c := NewCmds(pfxer, core)
+	c := NewCmds(pfxer, dispatch.NewDispatchCore(nil))
 	var err error
 
 	buffer, writer := newWriter()
@@ -1373,7 +1372,7 @@ func TestCmds_DispatchReflection(t *testing.T) {
 func TestCmds_EachCmd(t *testing.T) {
 	t.Parallel()
 
-	c := NewCmds(pfxer, core)
+	c := NewCmds(pfxer, dispatch.NewDispatchCore(nil))
 	var err error
 
 	handler := &errorHandler{}
@@ -1412,8 +1411,7 @@ func TestCmds_EachCmd(t *testing.T) {
 func TestCmds_DispatchAmbiguous(t *testing.T) {
 	t.Parallel()
 
-	dcore := dispatch.NewDispatchCore(nil)
-	c := NewCmds(pfxer, dcore)
+	c := NewCmds(pfxer, dispatch.NewDispatchCore(nil))
 	c.AddChannels(channel)
 	if c == nil {
 		t.Error("Cmds should not be nil.")
@@ -1450,8 +1448,7 @@ func TestCmds_DispatchAmbiguous(t *testing.T) {
 func TestCmds_DispatchSpecific(t *testing.T) {
 	t.Parallel()
 
-	dcore := dispatch.NewDispatchCore(nil)
-	c := NewCmds(pfxer, dcore)
+	c := NewCmds(pfxer, dispatch.NewDispatchCore(nil))
 	c.AddChannels(channel)
 	if c == nil {
 		t.Error("Cmds should not be nil.")
@@ -1484,24 +1481,12 @@ func TestCmds_DispatchSpecific(t *testing.T) {
 	}
 }
 
-type lockWriter struct {
-	*bytes.Buffer
-	write chan struct{}
-}
-
-func (l *lockWriter) Write(b []byte) (int, error) {
-	n, err := l.Buffer.Write(b)
-	l.write <- struct{}{}
-	return n, err
-}
-
 func TestCmds_Panic(t *testing.T) {
 	t.Parallel()
 
-	ch := make(chan struct{}, 1)
-	lk := &lockWriter{&bytes.Buffer{}, ch}
+	buf := &bytes.Buffer{}
 	logger := log15.New()
-	logger.SetHandler(log15.StreamHandler(lk, log15.LogfmtFormat()))
+	logger.SetHandler(log15.StreamHandler(buf, log15.LogfmtFormat()))
 	logCore := dispatch.NewDispatchCore(logger)
 
 	c := NewCmds(pfxer, logCore)
@@ -1524,14 +1509,13 @@ func TestCmds_Panic(t *testing.T) {
 	}
 
 	c.WaitForHandlers()
-	<-ch
-	logStr := lk.String()
+	logStr := buf.String()
 
 	if logStr == "" {
 		t.Error("Expected not empty log.")
 	}
 
-	logBytes := lk.Bytes()
+	logBytes := buf.Bytes()
 	if !bytes.Contains(logBytes, []byte(panicMsg)) {
 		t.Errorf("Log does not contain: %s\n%s", panicMsg, logBytes)
 	}

@@ -331,8 +331,8 @@ func (c *Cmds) Dispatch(writer irc.Writer, ev *irc.Event,
 
 	c.HandlerStarted()
 	go func() {
-		defer c.PanicHandler()
 		defer c.HandlerFinished()
+		defer c.PanicHandler()
 		ok, err := cmdNameDispatch(command.Handler, cmd, writer, cmdEv)
 		if !ok {
 			err = command.Handler.Cmd(cmd, writer, cmdEv)
