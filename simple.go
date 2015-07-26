@@ -77,7 +77,7 @@ func (_ *Handler) Cmd(_ string, _ irc.Writer, _ *cmd.Event) error {
 
 func (q *Quoter) Addquote(w irc.Writer, ev *cmd.Event) error {
 	nick := ev.Nick()
-	quote := ev.GetArg("quote")
+	quote := ev.Arg("quote")
 	if len(quote) == 0 {
 		return nil
 	}
@@ -95,7 +95,7 @@ func (q *Quoter) Addquote(w irc.Writer, ev *cmd.Event) error {
 
 func (q *Quoter) Delquote(w irc.Writer, ev *cmd.Event) error {
 	nick := ev.Nick()
-	id, err := strconv.Atoi(ev.GetArg("id"))
+	id, err := strconv.Atoi(ev.Arg("id"))
 	ev.Close()
 
 	if err != nil {
@@ -114,8 +114,8 @@ func (q *Quoter) Delquote(w irc.Writer, ev *cmd.Event) error {
 
 func (q *Quoter) Editquote(w irc.Writer, ev *cmd.Event) error {
 	nick := ev.Nick()
-	quote := ev.GetArg("quote")
-	id, err := strconv.Atoi(ev.GetArg("id"))
+	quote := ev.Arg("quote")
+	id, err := strconv.Atoi(ev.Arg("id"))
 	ev.Close()
 
 	if len(quote) == 0 {
@@ -137,7 +137,7 @@ func (q *Quoter) Editquote(w irc.Writer, ev *cmd.Event) error {
 }
 
 func (q *Quoter) Quote(w irc.Writer, ev *cmd.Event) error {
-	strid := ev.GetArg("id")
+	strid := ev.Arg("id")
 	nick := ev.Nick()
 	ev.Close()
 
@@ -180,7 +180,7 @@ func (q *Quoter) Quotes(w irc.Writer, ev *cmd.Event) error {
 
 func (q *Quoter) Details(w irc.Writer, ev *cmd.Event) error {
 	nick := ev.Nick()
-	id, err := strconv.Atoi(ev.GetArg("id"))
+	id, err := strconv.Atoi(ev.Arg("id"))
 	ev.Close()
 
 	if err != nil {
@@ -218,7 +218,7 @@ func (_ *Queryer) PrivmsgChannel(w irc.Writer, ev *irc.Event) {
 }
 
 func (_ *Queryer) Calc(w irc.Writer, ev *cmd.Event) error {
-	q := ev.GetArg("query")
+	q := ev.Arg("query")
 	nick := ev.Nick()
 	ev.Close()
 
@@ -242,7 +242,7 @@ func (_ *Queryer) Calc(w irc.Writer, ev *cmd.Event) error {
 }
 
 func (_ *Queryer) Google(w irc.Writer, ev *cmd.Event) error {
-	q := ev.GetArg("query")
+	q := ev.Arg("query")
 	nick := ev.Nick()
 	ev.Close()
 
@@ -257,7 +257,7 @@ func (_ *Queryer) Google(w irc.Writer, ev *cmd.Event) error {
 }
 
 func (_ *Queryer) Weather(w irc.Writer, ev *cmd.Event) error {
-	q := ev.GetArg("query")
+	q := ev.Arg("query")
 	nick := ev.Nick()
 	ev.Close()
 
@@ -287,7 +287,7 @@ func sandboxGo(w irc.Writer, ev *cmd.Event, basecode string) error {
 	var err error
 	var f *os.File
 
-	code := ev.GetArg("code")
+	code := ev.Arg("code")
 	nick := ev.Nick()
 	targ := ev.Target()
 	ev.Close()
@@ -400,11 +400,10 @@ func (h *Handler) Up(w irc.Writer, ev *cmd.Event) error {
 
 func (h *Handler) HandleRaw(w irc.Writer, ev *irc.Event) {
 	if ev.Name == irc.JOIN {
-		h.b.ReadStore(func(s *data.Store) {
-			a := s.GetAuthedUser(ev.NetworkID, ev.Sender)
-			ch := ev.Target()
-			putPeopleUp(ev, ch, a, w)
-		})
+		store := h.b.Store()
+		a := store.AuthedUser(ev.NetworkID, ev.Sender)
+		ch := ev.Target()
+		putPeopleUp(ev, ch, a, w)
 	}
 }
 
@@ -412,10 +411,10 @@ func putPeopleUp(ev *irc.Event, ch string,
 	a *data.StoredUser, w irc.Writer) (did bool) {
 	if a != nil {
 		nick := ev.Nick()
-		if a.HasFlag(ev.NetworkID, ch, 'o') {
+		if a.HasFlags(ev.NetworkID, ch, "o") {
 			w.Sendf("MODE %s +o :%s", ch, nick)
 			did = true
-		} else if a.HasFlag(ev.NetworkID, ch, 'v') {
+		} else if a.HasFlags(ev.NetworkID, ch, "v") {
 			w.Sendf("MODE %s +v :%s", ch, nick)
 			did = true
 		}
