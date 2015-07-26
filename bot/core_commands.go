@@ -1,7 +1,6 @@
 package bot
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"regexp"
@@ -14,7 +13,7 @@ import (
 	"github.com/aarondl/ultimateq/irc"
 )
 
-var rgxFlags = regexp.MustCompile(`[A-Za-z]+`)
+var rgxFlags = regexp.MustCompile(`^[A-Za-z]+$`)
 
 const (
 	extension = `core`
@@ -289,7 +288,7 @@ var commands = []struct {
 		Public: false,
 		Level:  0,
 		Flags:  ``,
-		Args:   argv{`~nick`, `*user`},
+		Args:   argv{`nick`, `*user`},
 	},
 	{
 		Name:   ggive,
@@ -504,7 +503,7 @@ func (c *coreCmds) register(w irc.Writer,
 	}
 	if !hasAny {
 		// Secret from the Access map specifics
-		access.Access[":"] = data.Access{^uint8(0), ^uint64(0)}
+		access.Access[":"] = data.Access{Level: ^uint8(0), Flags: ^uint64(0)}
 	}
 
 	internal = store.SaveUser(access)
@@ -647,8 +646,7 @@ func (c *coreCmds) gusers(w irc.Writer, ev *cmd.Event) (
 		usersListHeadUser, usersListHeadAccess)
 
 	for _, ua = range list {
-		ga, _ := ua.GetAccess("", "")
-		w.Noticef(nick, usersList, usersWidth, ua.Username, ga)
+		w.Noticef(nick, usersList, usersWidth, ua.Username, ua.String("", ""))
 	}
 
 	return
@@ -679,8 +677,7 @@ func (c *coreCmds) susers(w irc.Writer, ev *cmd.Event) (
 		usersListHeadUser, usersListHeadAccess)
 
 	for _, ua = range list {
-		sa, _ := ua.GetAccess(ev.NetworkID, "")
-		w.Noticef(nick, usersList, usersWidth, ua.Username, sa)
+		w.Noticef(nick, usersList, usersWidth, ua.Username, ua.String(ev.NetworkID, ""))
 	}
 
 	return
@@ -722,8 +719,7 @@ func (c *coreCmds) users(w irc.Writer, ev *cmd.Event) (
 		usersListHeadUser, usersListHeadAccess)
 
 	for _, ua = range list {
-		ca, _ := ua.GetAccess(ev.NetworkID, ch)
-		w.Noticef(nick, usersList, usersWidth, ua.Username, ca)
+		w.Noticef(nick, usersList, usersWidth, ua.Username, ua.String(ev.NetworkID, ch))
 	}
 
 	return
@@ -937,7 +933,7 @@ func (c *coreCmds) resetpasswd(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
 	uname := ev.TargetStoredUser["user"].Username
-	resetnick := ev.TargetUsers["nick"].Nick()
+	resetnick := ev.Arg("nick")
 	nick := ev.Nick()
 	newpasswd := ""
 
@@ -1069,7 +1065,7 @@ func (c *coreCmds) giveHelper(w irc.Writer, ev *cmd.Event,
 		}
 	}
 
-	if !hasFlags || !hasLevel {
+	if (!hasFlags && len(flags) > 0) || (!hasLevel && level > 0) {
 		if internal = store.SaveUser(a); internal == nil {
 			var msg string
 			var newAccess = ignoreOK(a.GetAccess(network, channel))
@@ -1077,7 +1073,7 @@ func (c *coreCmds) giveHelper(w irc.Writer, ev *cmd.Event,
 			case len(network) != 0 && len(channel) != 0:
 				msg = fmt.Sprintf(giveSuccess, a.Username, newAccess, channel)
 			case len(network) != 0:
-				msg = fmt.Sprintf(sgiveSuccess, a.Username, newAccess, network)
+				msg = fmt.Sprintf(sgiveSuccess, a.Username, newAccess)
 			default:
 				msg = fmt.Sprintf(ggiveSuccess, a.Username, newAccess)
 			}
@@ -1127,23 +1123,19 @@ func (c *coreCmds) takeHelper(w irc.Writer, ev *cmd.Event,
 		level = true
 	} else if arg == takeAllArg {
 		all = true
+	} else if rgxFlags.MatchString(arg) {
+		flags = filterMissingFlags(network, channel, arg, a)
 	} else {
-		if rgxFlags.MatchString(arg) {
-			flags = arg
-		} else {
-			external = fmt.Errorf(takeFailure, arg)
-		}
+		external = fmt.Errorf(takeFailure, arg)
 	}
 
 	var save = true
-	if all && a.HasLevel(network, channel, 1) ||
-		a.HasFlags(network, channel, flags) {
-
+	if all && (a.HasLevel(network, channel, 1) || len(flags) != 0) {
 		a.RevokeLevel(network, channel)
-		a.RevokeFlags(network, channel, flags)
+		a.RevokeFlags(network, channel)
 	} else if level && a.HasLevel(network, channel, 1) {
 		a.RevokeLevel(network, channel)
-	} else if len(flags) != 0 && a.HasFlags(network, channel, flags) {
+	} else if len(flags) != 0 {
 		a.RevokeFlags(network, channel, flags)
 	} else {
 		save = false
@@ -1157,7 +1149,7 @@ func (c *coreCmds) takeHelper(w irc.Writer, ev *cmd.Event,
 			case len(network) != 0 && len(channel) != 0:
 				msg = fmt.Sprintf(giveSuccess, a.Username, newAccess, channel)
 			case len(network) != 0:
-				msg = fmt.Sprintf(sgiveSuccess, a.Username, newAccess, network)
+				msg = fmt.Sprintf(sgiveSuccess, a.Username, newAccess)
 			default:
 				msg = fmt.Sprintf(ggiveSuccess, a.Username, newAccess)
 			}
@@ -1245,13 +1237,24 @@ func (c *coreCmds) help(w irc.Writer, ev *cmd.Event) (
 
 // filterFlags removes flags that the user already has
 func filterFlags(network, channel, flags string, access *data.StoredUser) string {
-	buf := bytes.Buffer{}
+	var buf []rune
 	for _, flag := range flags {
 		if !access.HasFlags(network, channel, string(flag)) {
-			buf.WriteRune(flag)
+			buf = append(buf, flag)
 		}
 	}
-	return buf.String()
+	return string(buf)
+}
+
+// filterMissingFlags removes flags that the user does not have
+func filterMissingFlags(network, channel, flags string, access *data.StoredUser) string {
+	var buf []rune
+	for _, flag := range flags {
+		if access.HasFlags(network, channel, string(flag)) {
+			buf = append(buf, flag)
+		}
+	}
+	return string(buf)
 }
 
 // userListWidth calculates the width of the userList's "User" column.

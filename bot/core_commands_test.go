@@ -13,17 +13,18 @@ import (
 )
 
 const (
-	bothost  = "bot!botuser@bothost"
-	botnick  = "bot"
-	u1host   = "nick1!user1@host1"
-	u1nick   = "nick1"
-	u1user   = "user"
-	u2host   = "nick2!user2@host2"
-	u2nick   = "nick2"
-	u2user   = "user2"
-	channel  = "#chan"
-	password = "password"
-	prefix   = '.'
+	bothost   = "bot!botuser@bothost"
+	botnick   = "bot"
+	u1host    = "nick1!user1@host1"
+	u1nick    = "nick1"
+	u1user    = "user"
+	u2host    = "nick2!user2@host2"
+	u2nick    = "nick2"
+	u2user    = "user2"
+	u2userArg = "*user2"
+	channel   = "#chan"
+	password  = "password"
+	prefix    = '.'
 )
 
 var (
@@ -262,11 +263,11 @@ func TestCoreCommands_Logout(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	err = rspChk(ts, ".*(G) global flag(s) required.*", u2host, logout, u1nick)
+	err = rspChk(ts, ".*(G) global flag(s) required.*", u2host, logout, u2userArg)
 	if err != nil {
 		t.Error(err)
 	}
-	err = rspChk(ts, logoutSuccess, u1host, logout, u2nick)
+	err = rspChk(ts, logoutSuccess, u1host, logout, u2userArg)
 	if err != nil {
 		t.Error(err)
 	}
@@ -297,32 +298,32 @@ func TestCoreCommands_Access(t *testing.T) {
 		t.Error(err)
 	}
 
-	err = rspChk(ts, accessSuccess, u1host, access, "*"+u2user)
+	err = rspChk(ts, accessSuccess, u1host, access, u2userArg)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = rspChk(ts, accessSuccess, u1host, access, u2nick)
+	err = rspChk(ts, accessSuccess, u1host, access, u2userArg)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = rspChk(ts, logoutSuccess, u2host, logout)
+	err = rspChk(ts, logoutSuccess, u1host, logout)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = rspChk(ts, accessSuccess, u1host, access, "*"+u2user)
+	err = rspChk(ts, accessSuccess, u2host, access, "*"+u1user)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = rspChk(ts, ".*not authenticated.*", u1host, access, u2nick)
+	err = rspChk(ts, ".*not authenticated.*", u2host, access, u1nick)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = rspChk(ts, ".*Username must follow.*", u1host, access, "*")
+	err = rspChk(ts, ".*Username must follow.*", u2host, access, "*")
 	if err != nil {
 		t.Error(err)
 	}
@@ -354,7 +355,7 @@ func TestCoreCommands_Deluser(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	err = rspChk(ts, deluserSuccess, u1host, deluser, u2nick)
+	err = rspChk(ts, deluserSuccess, u1host, deluser, u2userArg)
 	if err != nil {
 		t.Error(err)
 	}
@@ -376,7 +377,7 @@ func TestCoreCommands_Deluser(t *testing.T) {
 		t.Error(err)
 	}
 
-	err = rspChk(ts, deluserSuccess, u1host, deluser, "*"+u2user)
+	err = rspChk(ts, deluserSuccess, u1host, deluser, u2userArg)
 	if err != nil {
 		t.Error(err)
 	}
@@ -525,7 +526,7 @@ func TestCoreCommands_Masks(t *testing.T) {
 		t.Error(err)
 	}
 
-	err = rspChk(ts, addmaskSuccess, u1host, addmask, u2host, u2nick)
+	err = rspChk(ts, addmaskSuccess, u1host, addmask, u2host, u2userArg)
 	if err != nil {
 		t.Error(err)
 	}
@@ -554,7 +555,7 @@ func TestCoreCommands_Masks(t *testing.T) {
 		t.Error(err)
 	}
 
-	err = rspChk(ts, ".*"+u2host+".*", u1host, masks, u2nick)
+	err = rspChk(ts, ".*"+u2host+".*", u1host, masks, u2userArg)
 	if err != nil {
 		t.Error(err)
 	}
@@ -575,7 +576,7 @@ func TestCoreCommands_Masks(t *testing.T) {
 		t.Error(err)
 	}
 
-	err = rspChk(ts, delmaskSuccess, u1host, delmask, u2host, u2nick)
+	err = rspChk(ts, delmaskSuccess, u1host, delmask, u2host, u2userArg)
 	if err != nil {
 		t.Error(err)
 	}
@@ -628,7 +629,7 @@ func TestCoreCommands_Resetpasswd(t *testing.T) {
 
 	doubleMessage := resetpasswdSuccess + "NOTICE " +
 		u2nick + " :" + resetpasswdSuccessTarget
-	err = rspChk(ts, doubleMessage, u1host, resetpasswd, u2nick, "*"+u2user)
+	err = rspChk(ts, doubleMessage, u1host, resetpasswd, u2nick, u2userArg)
 	if err != nil {
 		t.Error(err)
 	}
@@ -658,54 +659,57 @@ func TestCoreCommands_GiveTakeGlobal(t *testing.T) {
 		t.Error(err)
 	}
 
-	a, err = ts.store.FindUser(u2user)
+	err = rspChk(ts, ggiveSuccess, u1host, ggive, u2userArg, "100", "h")
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = rspChk(ts, ggiveSuccess, u1host, ggive, u2nick, "100", "h")
-	if err != nil {
-		t.Error(err)
-	}
-
+	a = testGetUser(ts.store.FindUser(u2user))
 	if !a.HasFlags("", "", "h") || !a.HasLevel("", "", 100) {
 		t.Error("Global access not granted correctly.")
 	}
 
-	err = rspChk(ts, giveFailureHas, u1host, ggive, u2nick, "h")
+	err = rspChk(ts, giveFailureHas, u1host, ggive, u2userArg, "h")
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = rspChk(ts, ggiveSuccess, u1host, gtake, u2nick)
+	err = rspChk(ts, ggiveSuccess, u1host, gtake, u2userArg)
 	if err != nil {
 		t.Error(err)
 	}
 
+	a = testGetUser(ts.store.FindUser(u2user))
 	if a.HasLevel("", "", 100) {
 		t.Error("Global access not taken correctly.")
 	}
 
-	err = rspChk(ts, ggiveSuccess, u1host, gtake, u2nick, "h")
+	err = rspChk(ts, ggiveSuccess, u1host, gtake, u2userArg, "h")
 	if err != nil {
 		t.Error(err)
 	}
 
+	a = testGetUser(ts.store.FindUser(u2user))
 	if a.HasFlags("", "", "h") {
 		t.Error("Global access not taken correctly.")
 	}
 
 	a.Grant("", "", 100, "h")
-	err = rspChk(ts, ggiveSuccess, u1host, gtake, u2nick, "all")
+	if err = ts.store.SaveUser(a); err != nil {
+		t.Error(err)
+	}
+
+	err = rspChk(ts, ggiveSuccess, u1host, gtake, u2userArg, "all")
 	if err != nil {
 		t.Error(err)
 	}
 
+	a = testGetUser(ts.store.FindUser(u2user))
 	if a.HasLevel("", "", 100) || a.HasFlags("", "", "h") {
 		t.Error("Global access not taken correctly.")
 	}
 
-	err = rspChk(ts, takeFailureNo, u1host, gtake, u2nick, "h")
+	err = rspChk(ts, takeFailureNo, u1host, gtake, u2userArg, "h")
 	if err != nil {
 		t.Error(err)
 	}
@@ -727,54 +731,57 @@ func TestCoreCommands_GiveTakeNetwork(t *testing.T) {
 		t.Error(err)
 	}
 
-	a, err = ts.store.FindUser(u2user)
+	err = rspChk(ts, sgiveSuccess, u1host, sgive, u2userArg, "100", "h")
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = rspChk(ts, sgiveSuccess, u1host, sgive, u2nick, "100", "h")
-	if err != nil {
-		t.Error(err)
-	}
-
+	a = testGetUser(ts.store.FindUser(u2user))
 	if !a.HasFlags(netID, "", "h") || !a.HasLevel(netID, "", 100) {
 		t.Error("Network access not granted correctly.")
 	}
 
-	err = rspChk(ts, giveFailureHas, u1host, sgive, u2nick, "h")
+	err = rspChk(ts, giveFailureHas, u1host, sgive, u2userArg, "h")
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = rspChk(ts, sgiveSuccess, u1host, stake, u2nick)
+	err = rspChk(ts, sgiveSuccess, u1host, stake, u2userArg)
 	if err != nil {
 		t.Error(err)
 	}
 
+	a = testGetUser(ts.store.FindUser(u2user))
 	if a.HasLevel(netID, "", 100) {
 		t.Error("Network access not taken correctly.")
 	}
 
-	err = rspChk(ts, sgiveSuccess, u1host, stake, u2nick, "h")
+	err = rspChk(ts, sgiveSuccess, u1host, stake, u2userArg, "h")
 	if err != nil {
 		t.Error(err)
 	}
 
+	a = testGetUser(ts.store.FindUser(u2user))
 	if a.HasFlags(netID, "", "h") {
 		t.Error("Network access not taken correctly.")
 	}
 
 	a.Grant(netID, "", 100, "h")
-	err = rspChk(ts, sgiveSuccess, u1host, stake, u2nick, "all")
+	if err = ts.store.SaveUser(a); err != nil {
+		t.Error(err)
+	}
+
+	err = rspChk(ts, sgiveSuccess, u1host, stake, u2userArg, "all")
 	if err != nil {
 		t.Error(err)
 	}
 
+	a = testGetUser(ts.store.FindUser(u2user))
 	if a.HasLevel(netID, "", 100) || a.HasFlags(netID, "", "h") {
 		t.Error("Network access not taken correctly.")
 	}
 
-	err = rspChk(ts, takeFailureNo, u1host, stake, u2nick, "h")
+	err = rspChk(ts, takeFailureNo, u1host, stake, u2userArg, "h")
 	if err != nil {
 		t.Error(err)
 	}
@@ -796,54 +803,58 @@ func TestCoreCommands_GiveTakeChannel(t *testing.T) {
 		t.Error(err)
 	}
 
-	a, err = ts.store.FindUser(u2user)
+	a = testGetUser(ts.store.FindUser(u2user))
+	err = rspChk(ts, giveSuccess, u1host, give, channel, u2userArg, "100", "h")
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = rspChk(ts, giveSuccess, u1host, give, channel, u2nick, "100", "h")
-	if err != nil {
-		t.Error(err)
-	}
-
+	a = testGetUser(ts.store.FindUser(u2user))
 	if !a.HasFlags(netID, channel, "h") || !a.HasLevel(netID, channel, 100) {
 		t.Error("Channel access not granted correctly.")
 	}
 
-	err = rspChk(ts, giveFailureHas, u1host, give, channel, u2nick, "h")
+	err = rspChk(ts, giveFailureHas, u1host, give, channel, u2userArg, "h")
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = rspChk(ts, giveSuccess, u1host, take, channel, u2nick)
+	err = rspChk(ts, giveSuccess, u1host, take, channel, u2userArg)
 	if err != nil {
 		t.Error(err)
 	}
 
+	a = testGetUser(ts.store.FindUser(u2user))
 	if a.HasLevel(netID, channel, 100) {
 		t.Error("Channel access not taken correctly.")
 	}
 
-	err = rspChk(ts, giveSuccess, u1host, take, channel, u2nick, "h")
+	err = rspChk(ts, giveSuccess, u1host, take, channel, u2userArg, "h")
 	if err != nil {
 		t.Error(err)
 	}
 
+	a = testGetUser(ts.store.FindUser(u2user))
 	if a.HasFlags(netID, channel, "h") {
 		t.Error("Channel access not taken correctly.")
 	}
 
 	a.Grant(netID, channel, 100, "h")
-	err = rspChk(ts, giveSuccess, u1host, take, channel, u2nick, "all")
+	if err = ts.store.SaveUser(a); err != nil {
+		t.Error(err)
+	}
+
+	err = rspChk(ts, giveSuccess, u1host, take, channel, u2userArg, "all")
 	if err != nil {
 		t.Error(err)
 	}
 
+	a = testGetUser(ts.store.FindUser(u2user))
 	if a.HasFlags(netID, channel, "h") || a.HasLevel(netID, channel, 100) {
 		t.Error("Channel access not taken correctly.")
 	}
 
-	err = rspChk(ts, takeFailureNo, u1host, take, channel, u2nick, "h")
+	err = rspChk(ts, takeFailureNo, u1host, take, channel, u2userArg, "h")
 	if err != nil {
 		t.Error(err)
 	}
@@ -1038,4 +1049,12 @@ func TestCoreCommands_Users(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+}
+
+func testGetUser(u *data.StoredUser, err error) *data.StoredUser {
+	if err == nil {
+		return u
+	}
+
+	panic(fmt.Sprintf("Failed to get user: %v", err))
 }
