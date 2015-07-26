@@ -544,7 +544,7 @@ func (c *coreCmds) auth(w irc.Writer, ev *cmd.Event) (
 	}
 
 	host, nick := ev.Sender, ev.Nick()
-	nChans := 1 //ev.GetNUserChans(nick)
+	nChans, _ := ev.NChannelsByUser(nick)
 
 	access = ev.StoredUser
 	if access == nil {
@@ -572,7 +572,7 @@ func (c *coreCmds) auth(w irc.Writer, ev *cmd.Event) (
 		return
 	}
 
-	w.Noticef(nick, authSuccess, uname)
+	w.Noticef(nick, authSuccess, strings.ToLower(uname))
 	return
 }
 
