@@ -50,7 +50,7 @@ const (
 	errFmtExpired    = `commander: Could not find user [%v]`
 	cmdExec          = "bot: Core command executed"
 	errInternalError = "bot: Core command error"
-	errInternalPanic = "bot: Core command error"
+	errInternalPanic = "bot: Core command panic"
 
 	errMsgAuthed        = `You are already authenticated.`
 	errFmtUserNotFound  = `The user [%v] could not be found.`
@@ -125,7 +125,7 @@ const (
 		`access to remove.`
 
 	gusersDesc    = `Lists all the users added to the global access list.`
-	gusersNoUsers = `No users for %v`
+	gusersNoUsers = `No global users`
 	gusersHead    = `Showing %v users:`
 
 	usersDesc = `Lists all the users added to the channel's access list. ` +
