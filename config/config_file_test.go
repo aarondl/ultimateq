@@ -90,13 +90,11 @@ password = "Password"
 
 	[ext.config]
 		key = "stringvalue"
-	[[ext.config.channels]]
-		name = "#channel"
+	[ext.config.channels.#channel]
 		key = "stringvalue"
 	[ext.config.networks.ircnet]
 		key = "stringvalue"
-	[[ext.config.networks.ircnet.channels]]
-		name = "#channel"
+	[ext.config.networks.ircnet.channels.#channel]
 		key = "stringvalue"
 
 [exts.myext]

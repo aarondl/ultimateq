@@ -234,7 +234,7 @@ func TestValidation_TypesConfig(t *testing.T) {
 		{"ext active", "list", "array", "int64"},
 		{"extname active", "list", "array", "int64"},
 		{"ext config", "networks", "map", "int64"},
-		{"ext config", "channels", "[]map", "int64"},
+		{"ext config", "channels", "map", "int64"},
 		{"ext config", "more", "string", "map[string]interface {}"},
 	}
 
@@ -247,7 +247,7 @@ func TestValidation_TypesConfig(t *testing.T) {
 
 	exps = []texpect{
 		{"ext config", "networks", "map", "string"},
-		{"ext config", "channels", "[]map", "string"},
+		{"ext config", "channels", "map", "string"},
 	}
 
 	typesTestHelper(cfg, exps, t)
@@ -259,15 +259,15 @@ func TestValidation_TypesConfigMidLevel(t *testing.T) {
 	cfg := `
 	[ext.config.networks]
 	network = 5
-	[ext.config]
-	channels = 5
+	[ext.config.channels]
+	channel = 5
 	[ext.config.networks.ircnet]
 	channels = 5`
 
 	exps := []texpect{
 		{"ext config", "network", "map", "int64"},
-		{"ext config", "channels", "[]map", "int64"},
-		{"ext config ircnet", "channels", "[]map", "int64"},
+		{"ext config", "channel", "map", "int64"},
+		{"ext config ircnet", "channels", "map", "int64"},
 	}
 
 	typesTestHelper(cfg, exps, t)
@@ -335,13 +335,11 @@ func TestValidation_TypesLeafs(t *testing.T) {
 
 			[ext.config]
 				key = 5
-			[[ext.config.channels]]
-				name = "#channel"
+			[ext.config.channels.#channel]
 				key = 5
 			[ext.config.networks.ircnet]
 				key = 5
-			[[ext.config.networks.ircnet.channels]]
-				name = "#channel"
+			[ext.config.networks.ircnet.channels.#channel]
 				key = 5
 
 			[ext.active]

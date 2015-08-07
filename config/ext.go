@@ -169,13 +169,11 @@ are shared.
 	[ext.config]
 		key = "val"
 		global = "val"
-	[[ext.config.channels]]
-		name = "#channel"
+	[ext.config.channels.#channel]
 		key = "chan"
 	[ext.config.networks.ircnet]
 		key = "net"
-	[[ext.config.networks.ircnet.channels]]
-		name = "#channel"
+	[ext.config.networks.ircnet.channels.#channel]
 		key = "netchan"
 
 Given this configuration these results are expected:
@@ -193,8 +191,8 @@ func (e *ExtGlobalCTX) Config(network, channel string) map[string]string {
 	var m = mp(e.ext)
 	cfg := m.get("config")
 	net := cfg.get("networks").get(network)
-	ch := cfg.getArr("channels")
-	netch := net.getArr("channels")
+	ch := cfg.get("channels").get(channel)
+	netch := net.get("channels").get(channel)
 
 	for k, v := range cfg {
 		if str, ok := v.(string); ok {
@@ -211,33 +209,17 @@ func (e *ExtGlobalCTX) Config(network, channel string) map[string]string {
 	}
 
 	if !cEmpty && nEmpty && ch != nil {
-		for _, channelKV := range ch {
-			if channelKV["name"] != channel {
-				break
-			}
-			for k, v := range channelKV {
-				if k == "name" {
-					continue
-				}
-				if str, ok := v.(string); ok {
-					ret[k] = str
-				}
+		for k, v := range ch {
+			if str, ok := v.(string); ok {
+				ret[k] = str
 			}
 		}
 	}
 
 	if !nEmpty && !cEmpty && netch != nil {
-		for _, channelKV := range netch {
-			if channelKV["name"] != channel {
-				break
-			}
-			for k, v := range channelKV {
-				if k == "name" {
-					continue
-				}
-				if str, ok := v.(string); ok {
-					ret[k] = str
-				}
+		for k, v := range netch {
+			if str, ok := v.(string); ok {
+				ret[k] = str
 			}
 		}
 	}
@@ -276,28 +258,18 @@ func (e *ExtGlobalCTX) ConfigVal(network, channel, key string) (string, bool) {
 	}
 
 	if !cEmpty && nEmpty {
-		if channels := cfg.getArr("channels"); channels != nil {
-			for _, channelKV := range channels {
-				if channelKV["name"] != channel {
-					continue
-				}
-				if val, ok := channelKV[key]; ok {
-					str, found = val.(string)
-					break
-				}
+		if ch := cfg.get("channels").get(channel); ch != nil {
+			if val, ok := ch[key]; ok {
+				str, found = val.(string)
 			}
 		}
 	}
 
 	if !nEmpty && !cEmpty {
-		netChannels := cfg.get("networks").get(network).getArr("channels")
-		for _, channelKV := range netChannels {
-			if channelKV["name"] != channel {
-				continue
-			}
-			if val, ok := channelKV[key]; ok {
+		netchan := cfg.get("networks").get(network).get("channels").get(channel)
+		if netchan != nil {
+			if val, ok := netchan[key]; ok {
 				str, found = val.(string)
-				break
 			}
 		}
 	}
@@ -313,23 +285,20 @@ level for that portion.
 	[ext.config]
 		# SetConfig("", "", "key", "val")
 		key = "val"
-	[[ext.config.channels]]
+	[ext.config.channels.#channel]
 		# SetConfig("", "#channel", "key", "val")
-		name = "#channel"
 		key = "val"
 	[ext.config.networks.ircnet]
 		# SetConfig("ircnet", "", "key", "val")
 		key = "val"
-	[[ext.config.networks.ircnet.channels]]
+	[ext.config.networks.ircnet.channels.#channel]
 		# SetConfig("ircnet", "#channel", "key", "val")
-		name = "#channel"
 		key = "val"
 */
 func (e *ExtGlobalCTX) SetConfig(network, channel, key,
 	value string) *ExtGlobalCTX {
 
 	var setMap map[string]interface{}
-	var channels []map[string]interface{}
 	var m = mp(e.ext)
 
 	nEmpty := len(network) == 0
@@ -341,29 +310,10 @@ func (e *ExtGlobalCTX) SetConfig(network, channel, key,
 	case !nEmpty && cEmpty:
 		setMap = m.ensure("config").ensure("networks").ensure(network)
 	case nEmpty && !cEmpty:
-		channels = m.ensure("config").ensureArr("channels")
+		setMap = m.ensure("config").ensure("channels").ensure(channel)
 	case !nEmpty && !cEmpty:
-		channels = m.ensure("config").ensure("networks").ensure(network).
-			ensureArr("channels")
-	}
-
-	if channels != nil {
-		for _, channelKV := range channels {
-			if channelKV["name"] == channel {
-				setMap = channelKV
-			}
-		}
-		if setMap == nil {
-			setMap = map[string]interface{}{
-				"name": channel,
-			}
-			channels = append(channels, setMap)
-			if !nEmpty {
-				m.ensure("config").ensure("networks").ensure(network)["channels"] = channels
-			} else {
-				m.ensure("config")["channels"] = channels
-			}
-		}
+		setMap = m.ensure("config").ensure("networks").ensure(network).
+			ensure("channels").ensure(channel)
 	}
 
 	setMap[key] = value

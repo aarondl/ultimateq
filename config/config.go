@@ -82,13 +82,11 @@ An example configuration looks like this:
 		# on all channels on that network.
 		[ext.config] # Global config value
 			key = "stringvalue"
-		[[ext.config.channels]] # Any network's #channel
-			name = "#channel"
+		[ext.config.channels.#channel] # All networks for #channel
 			key = "stringvalue"
 		[ext.config.networks.ircnet] # All channels on ircnet network
 			key = "stringvalue"
-		[[ext.config.networks.ircnet.channels]] # ircnet's #channel
-			name = "#channel"
+		[ext.config.networks.ircnet.channels.#channel] # Freenode's #channel
 			key = "stringvalue"
 
 	[exts.myext]

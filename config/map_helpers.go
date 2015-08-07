@@ -49,25 +49,6 @@ func (m mp) ensure(name string) mp {
 	}
 }
 
-func (m mp) ensureArr(name string) []map[string]interface{} {
-	if m == nil {
-		return nil
-	}
-
-	if mpVal, ok := m[name]; ok {
-		switch v := mpVal.(type) {
-		case []map[string]interface{}:
-			return v
-		default:
-			return nil
-		}
-	} else {
-		made := []map[string]interface{}{}
-		m[name] = made
-		return made
-	}
-}
-
 func (m mp) getArr(name string) []map[string]interface{} {
 	if m == nil {
 		return nil

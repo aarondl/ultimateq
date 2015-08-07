@@ -210,13 +210,6 @@ func validateExtConfig(m map[string]interface{}, ers *errList) {
 			case "networks":
 				validateExtNetConfig(v, ers)
 			case "channels":
-				addErr("[]map", key, val)
-			default:
-				addErr("string", key, val)
-			}
-		case []map[string]interface{}:
-			switch key {
-			case "channels":
 				validateExtChanConfig("", v, ers)
 			default:
 				addErr("string", key, val)
@@ -224,16 +217,16 @@ func validateExtConfig(m map[string]interface{}, ers *errList) {
 		case string:
 			switch key {
 			case "networks":
-				addErr("map", key, val)
+				fallthrough
 			case "channels":
-				addErr("[]map", key, val)
+				addErr("map", key, val)
 			}
 		default:
 			switch key {
 			case "networks":
-				addErr("map", key, val)
+				fallthrough
 			case "channels":
-				addErr("[]map", key, val)
+				addErr("map", key, val)
 			default:
 				addErr("string", key, val)
 			}
@@ -254,10 +247,10 @@ func validateExtNetConfig(m map[string]interface{}, ers *errList) {
 			for keyname, val := range v {
 				switch keyname {
 				case "channels":
-					if chs, ok := val.([]map[string]interface{}); ok {
+					if chs, ok := val.(map[string]interface{}); ok {
 						validateExtChanConfig(key, chs, ers)
 					} else {
-						addErr(" "+key, "[]map", keyname, val)
+						addErr(" "+key, "map", keyname, val)
 					}
 				default:
 					if _, ok := val.(string); !ok {
@@ -271,7 +264,7 @@ func validateExtNetConfig(m map[string]interface{}, ers *errList) {
 	}
 }
 
-func validateExtChanConfig(net string, m []map[string]interface{}, ers *errList) {
+func validateExtChanConfig(net string, m map[string]interface{}, ers *errList) {
 	addErr := func(ch, kind, key string, val interface{}) {
 		var ctx string
 		if len(net) > 0 {
@@ -284,17 +277,16 @@ func validateExtChanConfig(net string, m []map[string]interface{}, ers *errList)
 			ctx, key, val, kind, val)
 	}
 
-	for _, chanConfig := range m {
-		var chanName string
-		if chanNameIntf, ok := chanConfig["name"]; !ok {
-			addErr("", "string", "name", chanNameIntf)
-		} else if chanName, ok = chanNameIntf.(string); !ok {
-			addErr("", "string", "name", chanNameIntf)
-		}
-		for key, val := range chanConfig {
-			if _, ok := val.(string); !ok {
-				addErr(" "+chanName, "string", key, val)
+	for key, val := range m {
+		switch v := val.(type) {
+		case map[string]interface{}:
+			for keyname, val := range v {
+				if _, ok := val.(string); !ok {
+					addErr(" "+key, "string", keyname, val)
+				}
 			}
+		default:
+			addErr("", "map", key, val)
 		}
 	}
 }
