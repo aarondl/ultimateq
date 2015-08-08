@@ -227,10 +227,10 @@ func (n *NetCTX) Prefix() (rune, bool) {
 // network and global space.
 func (n *NetCTX) ChannelPrefix(channel string) (rune, bool) {
 	n.rlock()
+	defer n.runlock()
 
-	var val interface{}
-	var arr []map[string]interface{}
-	var chArr []Channel
+	var val, chanMap interface{}
+	var channelsMap map[string]interface{}
 	var ok bool
 
 	if val, ok = n.network["channels"]; !ok {
@@ -238,42 +238,30 @@ func (n *NetCTX) ChannelPrefix(channel string) (rune, bool) {
 	}
 
 	if !ok {
-		n.runlock()
 		return n.Prefix()
 	}
 
-	if arr, ok = val.([]map[string]interface{}); ok {
-		for _, ch := range arr {
-			var name string
-			if val, ok = ch["name"]; !ok {
-				continue
-			}
+	channelsMap, ok = val.(map[string]interface{})
+	if !ok {
+		return n.Prefix()
+	}
 
-			if name, ok = val.(string); !ok || name != channel {
-				continue
-			}
+	chanMap, ok = channelsMap[channel]
+	if !ok {
+		return n.Prefix()
+	}
 
-			if prefixVal, ok := ch["prefix"]; !ok {
-				continue
-			} else if prefix, ok := prefixVal.(string); ok {
-				n.runlock()
-				return rune(prefix[0]), true
-			}
-		}
-	} else if chArr, ok = val.([]Channel); ok {
-		for _, ch := range chArr {
-			if ch.Name != channel {
-				continue
-			}
+	ch, ok := chanMap.(map[string]interface{})
+	if !ok {
+		return n.Prefix()
+	}
 
-			if len(ch.Prefix) > 0 {
-				n.runlock()
-				return rune(ch.Prefix[0]), true
-			}
+	if pfxIntf, ok := ch["prefix"]; ok {
+		if str, ok := pfxIntf.(string); ok {
+			return rune(str[0]), true
 		}
 	}
 
-	n.runlock()
 	return n.Prefix()
 }
 
@@ -284,12 +272,11 @@ func (n *NetCTX) SetPrefix(val rune) *NetCTX {
 
 // Channel is the configuration for a single channel.
 type Channel struct {
-	Name     string
 	Password string
 	Prefix   string
 }
 
-func (n *NetCTX) Channels() ([]Channel, bool) {
+func (n *NetCTX) Channels() (map[string]Channel, bool) {
 	n.rlock()
 	defer n.runlock()
 
@@ -304,38 +291,49 @@ func (n *NetCTX) Channels() ([]Channel, bool) {
 		return nil, false
 	}
 
-	if arr, ok := val.([]map[string]interface{}); ok {
-		ret := make([]Channel, len(arr))
-		for i, ch := range arr {
-			if nameVal, ok := ch["name"]; ok {
-				if name, ok := nameVal.(string); ok {
-					ret[i].Name = name
+	if channelsMap, ok := val.(map[string]interface{}); ok {
+		ret := make(map[string]Channel, len(channelsMap))
+
+		for chanName, chanVals := range channelsMap {
+			if chanValMap, ok := chanVals.(map[string]interface{}); ok {
+				var c Channel
+
+				if passwordVal, ok := chanValMap["password"]; ok {
+					if password, ok := passwordVal.(string); ok {
+						c.Password = password
+					}
 				}
-			}
-			if passwordVal, ok := ch["password"]; ok {
-				if password, ok := passwordVal.(string); ok {
-					ret[i].Password = password
+				if prefixVal, ok := chanValMap["prefix"]; ok {
+					if prefix, ok := prefixVal.(string); ok {
+						c.Prefix = prefix
+					}
 				}
-			}
-			if prefixVal, ok := ch["prefix"]; ok {
-				if prefix, ok := prefixVal.(string); ok {
-					ret[i].Prefix = prefix
-				}
+
+				ret[chanName] = c
+			} else if ch, ok := chanVals.(Channel); ok {
+				ret[chanName] = Channel{ch.Password, ch.Prefix}
 			}
 		}
 
-		return ret, true
-	} else if arr, ok := val.([]Channel); ok {
-		ret := make([]Channel, len(arr))
-		copy(ret, arr)
 		return ret, true
 	}
 
 	return nil, false
 }
 
-func (n *NetCTX) SetChannels(val []Channel) *NetCTX {
-	setVal(n, "channels", val)
+func (n *NetCTX) SetChannels(val map[string]Channel) *NetCTX {
+	channelsMap := make(map[string]interface{}, len(val))
+	for k, v := range val {
+		chanMap := map[string]interface{}{}
+		if len(v.Password) > 0 {
+			chanMap["password"] = v.Password
+		}
+		if len(v.Password) > 0 {
+			chanMap["prefix"] = v.Prefix
+		}
+		channelsMap[k] = chanMap
+	}
+	setVal(n, "channels", channelsMap)
 	return n
 }
 

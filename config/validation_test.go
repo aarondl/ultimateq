@@ -206,7 +206,7 @@ func TestValidation_TypesMidLevel(t *testing.T) {
 
 	exps := []texpect{
 		{"global networks", "noirc", "map", "int64"},
-		{"ircnet", "channels", "map array", "int64"},
+		{"ircnet", "channels", "map", "int64"},
 		{"ext", "config", "map", "int64"},
 		{"ext", "active", "map", "int64"},
 		{"exts", "myext", "map", "int64"},
@@ -314,13 +314,11 @@ func TestValidation_TypesLeafs(t *testing.T) {
 
 			prefix = false
 
-			[[networks.ircnet.channels]]
-			name = 5
+			[networks.ircnet.channels."#channel1"]
 			password = 5
 			prefix = 5
 
-			[[networks.ircnet.channels]]
-			name = "#channel2"
+			[networks.ircnet.channels."#channel2"]
 			password = "pass2"
 			prefix = "@"
 
@@ -335,11 +333,11 @@ func TestValidation_TypesLeafs(t *testing.T) {
 
 			[ext.config]
 				key = 5
-			[ext.config.channels.#channel]
+			[ext.config.channels."#channel"]
 				key = 5
 			[ext.config.networks.ircnet]
 				key = 5
-			[ext.config.networks.ircnet.channels.#channel]
+			[ext.config.networks.ircnet.channels."#channel"]
 				key = 5
 
 			[ext.active]
@@ -388,9 +386,8 @@ func TestValidation_TypesLeafs(t *testing.T) {
 		{"ircnet", "noreconnect", "bool", "string"},
 		{"ircnet", "reconnecttimeout", "int", "float64"},
 		{"ircnet", "prefix", "string", "bool"},
-		{"ircnet channels", "name", "string", "int64"},
-		{"ircnet channels", "password", "string", "int64"},
-		{"ircnet channels", "prefix", "string", "int64"},
+		{"ircnet channels #channel1", "password", "string", "int64"},
+		{"ircnet channels #channel1", "prefix", "string", "int64"},
 
 		{"ext", "listen", "string", "int64"},
 		{"ext", "execdir", "string", "int64"},

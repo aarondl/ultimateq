@@ -69,13 +69,11 @@ password = "Password"
 
 	prefix = "."
 
-	[[networks.ircnet.channels]]
-	name = "#channel1"
+	[networks.ircnet.channels."#channel1"]
 	password = "pass1"
 	prefix = "!"
 
-	[[networks.ircnet.channels]]
-	name = "#channel2"
+	[networks.ircnet.channels."#channel2"]
 	password = "pass2"
 	prefix = "@"
 
@@ -90,11 +88,11 @@ password = "Password"
 
 	[ext.config]
 		key = "stringvalue"
-	[ext.config.channels.#channel]
+	[ext.config.channels."#channel"]
 		key = "stringvalue"
 	[ext.config.networks.ircnet]
 		key = "stringvalue"
-	[ext.config.networks.ircnet.channels.#channel]
+	[ext.config.networks.ircnet.channels."#channel"]
 		key = "stringvalue"
 
 [exts.myext]
@@ -249,11 +247,8 @@ func verifyFakeConfig(t *testing.T, conf *Config) {
 	}
 
 	if chans, ok := net1.Channels(); ok {
-		c1, c2 := chans[0], chans[1]
+		c1, c2 := chans["#channel1"], chans["#channel2"]
 
-		if exp, got := "#channel1", c1.Name; exp != got {
-			t.Errorf("Expected: %v, got: %v", exp, got)
-		}
 		if exp, got := "pass1", c1.Password; exp != got {
 			t.Errorf("Expected: %v, got: %v", exp, got)
 		}
@@ -261,9 +256,6 @@ func verifyFakeConfig(t *testing.T, conf *Config) {
 			t.Errorf("Expected: %v, got: %v", exp, got)
 		}
 
-		if exp, got := "#channel2", c2.Name; exp != got {
-			t.Errorf("Expected: %v, got: %v", exp, got)
-		}
 		if exp, got := "pass2", c2.Password; exp != got {
 			t.Errorf("Expected: %v, got: %v", exp, got)
 		}

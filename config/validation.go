@@ -30,13 +30,13 @@ var networkValidator = validatorRules{
 		"ssl", "nostate", "nostore", "noautojoin",
 		"noreconnect", "noverifycert",
 	},
-	floatVals:  []string{"floodtimeout", "floodstep", "keepalive"},
-	uintVals:   []string{"reconnecttimeout", "floodlenpenalty", "joindelay"},
-	mapArrVals: []string{"channels"},
+	floatVals: []string{"floodtimeout", "floodstep", "keepalive"},
+	uintVals:  []string{"reconnecttimeout", "floodlenpenalty", "joindelay"},
+	mapVals:   []string{"channels"},
 }
 
 var channelValidator = validatorRules{
-	stringVals: []string{"name", "prefix", "password"},
+	stringVals: []string{"prefix", "password"},
 }
 
 var extCommonValidator = validatorRules{
@@ -157,9 +157,14 @@ func (c *Config) validateTypes(ers *errList) {
 			} else {
 				networkValidator.validateMap(name, net, ers)
 
-				if chans := net.getArr("channels"); chans != nil {
-					for _, ch := range chans {
-						channelValidator.validateMap(name+" channels", ch, ers)
+				if chans := net.get("channels"); chans != nil {
+					for chanName, ch := range chans {
+						if chanMap, ok := ch.(map[string]interface{}); ok {
+							channelValidator.validateMap(name+" channels "+chanName, chanMap, ers)
+						} else {
+							ers.addError("(%s channels %s) %s is %T but expected map [%v]",
+								name, chanName, ch, ch)
+						}
 					}
 				}
 			}

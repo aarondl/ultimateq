@@ -72,8 +72,8 @@ func TestConfig_Network_GetSetChannels(t *testing.T) {
 	c := NewConfig()
 	glb := c.Network("")
 	net := c.NewNetwork("net")
-	ch1 := Channel{"a", "b", "c"}
-	ch2 := Channel{"a", "b", "c"}
+	ch1 := Channel{"b", "c"}
+	ch2 := Channel{"b", "c"}
 
 	if chans, ok := glb.Channels(); ok || len(chans) != 0 {
 		t.Error("Expected servers to be empty.")
@@ -82,30 +82,30 @@ func TestConfig_Network_GetSetChannels(t *testing.T) {
 		t.Error("Expected servers to be empty.")
 	}
 
-	glb.SetChannels([]Channel{ch1})
+	glb.SetChannels(map[string]Channel{"a": ch1})
 
 	if chans, ok := glb.Channels(); !ok || len(chans) != 1 {
 		t.Error("Expected servers not to be empty.")
-	} else if chans[0] != ch1 {
-		t.Errorf("Expected the first channel to be %v, got: %v", ch1, chans[0])
+	} else if chans["a"] != ch1 {
+		t.Errorf("Expected the first channel to be %v, got: %v", ch1, chans["a"])
 	}
 	if chans, ok := net.Channels(); !ok || len(chans) != 1 {
 		t.Error("Expected servers not to be empty.")
-	} else if chans[0] != ch1 {
-		t.Errorf("Expected the first channel to be %v, got: %v", ch1, chans[0])
+	} else if chans["a"] != ch1 {
+		t.Errorf("Expected the first channel to be %v, got: %v", ch1, chans["a"])
 	}
 
-	net.SetChannels([]Channel{ch2})
+	net.SetChannels(map[string]Channel{"a": ch2})
 
 	if chans, ok := glb.Channels(); !ok || len(chans) != 1 {
 		t.Error("Expected servers not to be empty.")
-	} else if chans[0] != ch1 {
-		t.Errorf("Expected the first channel to be %v, got: %v", ch1, chans[0])
+	} else if chans["a"] != ch1 {
+		t.Errorf("Expected the first channel to be %v, got: %v", ch1, chans["a"])
 	}
 	if chans, ok := net.Channels(); !ok || len(chans) != 1 {
 		t.Error("Expected servers not to be empty.")
-	} else if chans[0] != ch2 {
-		t.Errorf("Expected the first channel to be %v, got: %v", ch2, chans[0])
+	} else if chans["a"] != ch2 {
+		t.Errorf("Expected the first channel to be %v, got: %v", ch2, chans["a"])
 	}
 
 	// Test Coverage, retrieve a value that's not possible.
@@ -121,30 +121,30 @@ func TestConfig_Network_GetChannelPrefix(t *testing.T) {
 	c := NewConfig()
 	glb := c.Network("")
 	net := c.NewNetwork("net")
-	ch1 := Channel{"a", "b", "1"}
-	ch2 := Channel{"a", "b", "1"}
+	ch1 := Channel{"b", "1"}
+	ch2 := Channel{"b", "1"}
 
-	if pfx, ok := glb.ChannelPrefix(ch1.Name); ok || pfx != defaultPrefix {
+	if pfx, ok := glb.ChannelPrefix("a"); ok || pfx != defaultPrefix {
 		t.Error("Expected the prefix to not be set.")
 	}
-	if pfx, ok := net.ChannelPrefix(ch1.Name); ok || pfx != defaultPrefix {
+	if pfx, ok := net.ChannelPrefix("b"); ok || pfx != defaultPrefix {
 		t.Error("Expected the prefix to not be set.")
 	}
 
-	glb.SetChannels([]Channel{ch1, ch2})
-	if pfx, ok := glb.ChannelPrefix(ch1.Name); !ok || pfx != '1' {
+	glb.SetChannels(map[string]Channel{"a": ch1, "b": ch2})
+	if pfx, ok := glb.ChannelPrefix("a"); !ok || pfx != '1' {
 		t.Error("Expected the prefix be set.")
 	}
-	if pfx, ok := net.ChannelPrefix(ch1.Name); !ok || pfx != '1' {
+	if pfx, ok := net.ChannelPrefix("a"); !ok || pfx != '1' {
 		t.Error("Expected the prefix be set.")
 	}
 
 	ch1.Prefix = "2"
-	net.SetChannels([]Channel{ch1, ch2})
-	if pfx, ok := glb.ChannelPrefix(ch1.Name); !ok || pfx != '1' {
+	net.SetChannels(map[string]Channel{"a": ch1, "b": ch2})
+	if pfx, ok := glb.ChannelPrefix("a"); !ok || pfx != '1' {
 		t.Error("Expected the prefix be set.")
 	}
-	if pfx, ok := net.ChannelPrefix(ch1.Name); !ok || pfx != '2' {
+	if pfx, ok := net.ChannelPrefix("a"); !ok || pfx != '2' {
 		t.Error("Expected the prefix be set.")
 	}
 

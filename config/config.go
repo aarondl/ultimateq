@@ -53,12 +53,10 @@ An example configuration looks like this:
 		# For fallback of channels below.
 		prefix = "."
 
-		[[networks.ircnet.channels]]
-			name = "#channel1"
+		[networks.ircnet.channels."#channel1"]
 			password = "pass1"
 			prefix = "!"
-		[[networks.ircnet.channels]]
-			name = "#channel2"
+		[networks.ircnet.channels."&channel2"]
 			password = "pass2"
 			prefix = "@"
 
@@ -82,11 +80,11 @@ An example configuration looks like this:
 		# on all channels on that network.
 		[ext.config] # Global config value
 			key = "stringvalue"
-		[ext.config.channels.#channel] # All networks for #channel
+		[ext.config.channels."#channel"] # All networks for #channel
 			key = "stringvalue"
 		[ext.config.networks.ircnet] # All channels on ircnet network
 			key = "stringvalue"
-		[ext.config.networks.ircnet.channels.#channel] # Freenode's #channel
+		[ext.config.networks.ircnet.channels."#channel"] # Freenode's #channel
 			key = "stringvalue"
 
 	[exts.myext]
