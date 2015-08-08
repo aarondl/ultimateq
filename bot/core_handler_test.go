@@ -56,9 +56,13 @@ func TestCoreHandler_Connect(t *testing.T) {
 	cnf := fakeConfig.Clone()
 	net := cnf.Network(netID).SetPassword("password")
 
-	ch1 := config.Channel{Name: "#channel1", Password: "pass"}
-	ch2 := config.Channel{Name: "#channel2"}
-	net.SetChannels([]config.Channel{ch1, ch2})
+	ch1 := config.Channel{Password: "pass"}
+	ch2 := config.Channel{}
+	ch1Name, ch2Name := "#channel1", "#channel2"
+	net.SetChannels(map[string]config.Channel{
+		ch1Name: ch1,
+		ch2Name: ch2,
+	})
 
 	b, _ := createBot(cnf, nil, nil, devNull, false, false)
 
@@ -71,8 +75,8 @@ func TestCoreHandler_Connect(t *testing.T) {
 	msg1 := fmt.Sprintf("PASS :%v", password)
 	msg2 := fmt.Sprintf("NICK :%v", nick)
 	msg3 := fmt.Sprintf("USER %v 0 * :%v", username, realname)
-	msg4 := fmt.Sprintf("JOIN %v %v", ch1.Name, ch1.Password)
-	msg5 := fmt.Sprintf("JOIN %v", ch2.Name)
+	msg4 := fmt.Sprintf("JOIN %v %v", ch1Name, ch1.Password)
+	msg5 := fmt.Sprintf("JOIN %v", ch2Name)
 
 	ev := irc.NewEvent(netID, netInfo, irc.CONNECT, "")
 	endpoint := makeTestPoint(b.servers[netID])
@@ -130,8 +134,9 @@ func TestCoreHandler_Rejoin(t *testing.T) {
 		SetNoAutoJoin(true)
 
 	nick, _ := net.Nick()
-	ch1 := config.Channel{Name: "#channel1", Password: "pass"}
-	ch2 := config.Channel{Name: "#channel2"}
+	ch1 := config.Channel{Password: "pass"}
+	ch2 := config.Channel{}
+	ch1Name, ch2Name := "#channel1", "#channel2"
 
 	b, _ := createBot(cnf, nil, nil, devNull, false, false)
 	st := b.servers[netID].state
@@ -141,9 +146,9 @@ func TestCoreHandler_Rejoin(t *testing.T) {
 
 	endpoint := makeTestPoint(b.servers[netID])
 	banned := irc.NewEvent(netID, netInfo, irc.ERR_BANNEDFROMCHAN, netID,
-		nick, ch1.Name, "Banned message")
+		nick, ch1Name, "Banned message")
 	kicked := irc.NewEvent(netID, netInfo, irc.KICK, "badguy",
-		ch2.Name, nick, "Kick Message")
+		ch2Name, nick, "Kick Message")
 
 	handler := coreHandler{bot: b}
 	handler.HandleRaw(endpoint, banned)
@@ -162,13 +167,16 @@ func TestCoreHandler_Rejoin(t *testing.T) {
 		t.Error("Expected nothing to happen without channels set.")
 	}
 
-	net.SetChannels([]config.Channel{ch1, ch2})
+	net.SetChannels(map[string]config.Channel{
+		ch1Name: ch1,
+		ch2Name: ch2,
+	})
 
 	handler.HandleRaw(endpoint, banned)
 	handler.HandleRaw(endpoint, kicked)
 
-	exp1 := fmt.Sprintf("JOIN %v %v", ch1.Name, ch1.Password)
-	exp2 := fmt.Sprintf("JOIN %v", ch2.Name)
+	exp1 := fmt.Sprintf("JOIN %v %v", ch1Name, ch1.Password)
+	exp2 := fmt.Sprintf("JOIN %v", ch2Name)
 	got := endpoint.gets()
 	if !strings.Contains(got, exp1) {
 		t.Error("Expected it to have joined #channel1 after ban.")

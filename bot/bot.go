@@ -550,9 +550,9 @@ func (b *Bot) mkPrefixFetcher() func(network, channel string) rune {
 	prefixii[":"], _ = net.Prefix()
 
 	chans, _ := net.Channels()
-	for _, ch := range chans {
+	for name, ch := range chans {
 		if len(ch.Prefix) > 0 {
-			prefixii[":"+ch.Name] = rune(ch.Prefix[0])
+			prefixii[":"+name] = rune(ch.Prefix[0])
 		}
 	}
 
@@ -564,9 +564,9 @@ func (b *Bot) mkPrefixFetcher() func(network, channel string) rune {
 		}
 
 		chans, _ = net.Channels()
-		for _, ch := range chans {
+		for name, ch := range chans {
 			if len(ch.Prefix) > 0 {
-				prefixii[netName+":"+ch.Name] = rune(ch.Prefix[0])
+				prefixii[netName+":"+name] = rune(ch.Prefix[0])
 			}
 		}
 	}

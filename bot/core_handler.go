@@ -59,11 +59,11 @@ func (c *coreHandler) HandleRaw(w irc.Writer, ev *irc.Event) {
 
 		if chs, ok := cfg.Channels(); ok {
 			<-time.After(c.untilJoinScale * time.Duration(joindelay))
-			for _, ch := range chs {
+			for name, ch := range chs {
 				if len(ch.Password) > 0 {
-					w.Sendf("JOIN %s %s", ch.Name, ch.Password)
+					w.Sendf("JOIN %s %s", name, ch.Password)
 				} else {
-					w.Sendf("JOIN %s", ch.Name)
+					w.Sendf("JOIN %s", name)
 				}
 			}
 		}
@@ -77,7 +77,7 @@ func (c *coreHandler) HandleRaw(w irc.Writer, ev *irc.Event) {
 			break
 		}
 
-		var chs []config.Channel
+		var chs map[string]config.Channel
 		var ok bool
 		if chs, ok = cfg.Channels(); !ok {
 			break
@@ -98,8 +98,8 @@ func (c *coreHandler) HandleRaw(w irc.Writer, ev *irc.Event) {
 			break
 		}
 
-		for _, ch := range chs {
-			if strings.ToLower(ch.Name) != channel {
+		for name, ch := range chs {
+			if strings.ToLower(name) != channel {
 				continue
 			}
 
@@ -107,9 +107,9 @@ func (c *coreHandler) HandleRaw(w irc.Writer, ev *irc.Event) {
 				<-time.After(c.untilJoinScale * time.Duration(joindelay))
 			}
 			if len(ch.Password) > 0 {
-				w.Sendf("JOIN %s %s", ch.Name, ch.Password)
+				w.Sendf("JOIN %s %s", name, ch.Password)
 			} else {
-				w.Sendf("JOIN %s", ch.Name)
+				w.Sendf("JOIN %s", name)
 			}
 		}
 
