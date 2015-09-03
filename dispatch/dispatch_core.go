@@ -155,7 +155,7 @@ func (d *DispatchCore) CheckTarget(ev *irc.Event) (isChan, hasChan bool) {
 // hasChannel checks to see if the dispatch core's channel list includes a
 // channel.
 func (d *DispatchCore) hasChannel(channel string) bool {
-	if d.chans == nil {
+	if len(d.chans) == 0 {
 		return true
 	}
 
