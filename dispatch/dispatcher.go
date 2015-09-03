@@ -96,7 +96,7 @@ func (d *Dispatcher) Dispatch(w irc.Writer, ev *irc.Event) {
 	network := strings.ToLower(ev.NetworkID)
 	channel := ""
 	event := strings.ToUpper(ev.Name)
-	if isChan = len(ev.Args) > 1 && ev.IsTargetChan(); isChan {
+	if isChan = len(ev.Args) >= 1 && ev.IsTargetChan(); isChan {
 		channel = strings.ToLower(ev.Target())
 	}
 

@@ -3,6 +3,7 @@ package dispatch
 import (
 	"bytes"
 	"testing"
+	"time"
 
 	"github.com/aarondl/ultimateq/irc"
 	"github.com/inconshreveable/log15"
@@ -59,6 +60,32 @@ func TestDispatcher_Registration(t *testing.T) {
 	}
 	if d.Unregister(id) {
 		t.Error("It should not unregister the same event multiple times.")
+	}
+}
+
+func TestDispatcher_JoinHandlerUsesChannels(t *testing.T) {
+	t.Parallel()
+	var msg1 *irc.Event
+	var s1 irc.Writer
+	h1 := testHandler{func(w irc.Writer, ev *irc.Event) {
+		msg1 = ev
+		s1 = w
+	}}
+
+	d := NewDispatcher(NewDispatchCore(nil))
+	send := testPoint{irc.Helper{}}
+
+	d.Register("gamesurge", "#zamn", irc.JOIN, h1)
+
+	var netInfo = irc.NewNetworkInfo()
+
+	join := &irc.Event{NetworkID: "gamesurge", Name: irc.JOIN, Sender: "zamn!~Adam@zamN.x.gamesurge", Args: []string{"#zamN"}, Time: time.Now(), NetworkInfo: netInfo}
+
+	d.Dispatch(send, join)
+	d.WaitForHandlers()
+
+	if msg1 == nil {
+		t.Fatal("Failed to dispatch to h1.")
 	}
 }
 
