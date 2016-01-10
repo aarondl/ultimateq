@@ -32,6 +32,11 @@ const (
 	errFmtReaderClosed = "bot: %v reader closed\n"
 	// errFmtClosingServer is when a IrcClient.Close returns an error.
 	errFmtClosingServer = "bot: Error closing server (%v)\n"
+	// errFmtExtensionInitErr is returned when an extension has a problem loading
+	errFmtExtensionInitErr = "ext: Failed to load extension (%s): %v"
+	// errFmtExtensionDeinitErr is returned when an extension has a problem
+	// unloading.
+	errFmtExtensionDeinitErr = "ext: Failed to load extension (%s): %v"
 	// fmtFailedConnecting shows when the bot is unable to connect to a server.
 	fmtFailedConnecting = "bot: %v failed to connect (%v)"
 	// fmtDisconnected shows when the bot is disconnected
@@ -478,7 +483,16 @@ func createBot(conf *config.Config, connProv ConnProvider,
 		}
 	}
 
+	if err = b.initLocalExtensions(); err != nil {
+		return nil, err
+	}
+
 	return b, nil
+}
+
+// Cleanup should be called pre application exit.
+func (b *Bot) Cleanup() error {
+	return b.deinitLocalExtensions()
 }
 
 // createServer creates a dispatcher, and an irc client to connect to this
@@ -528,6 +542,27 @@ func (b *Bot) createStore(filename string) (err error) {
 		b.store, err = b.storeProvider(filename)
 	}
 	return
+}
+
+func (b *Bot) initLocalExtensions() error {
+	for name, ext := range extensions {
+		b.Logger.Info("Initializing extension", "name", name)
+		if err := ext.Init(b); err != nil {
+			return fmt.Errorf(errFmtExtensionInitErr, name, err)
+		}
+	}
+
+	return nil
+}
+
+func (b *Bot) deinitLocalExtensions() error {
+	for name, ext := range extensions {
+		b.Logger.Info("Deinitializing extension", "name", name)
+		if err := ext.Deinit(b); err != nil {
+			return fmt.Errorf(errFmtExtensionDeinitErr, name, err)
+		}
+	}
+	return nil
 }
 
 // getServer safely retrieves a server.
@@ -637,6 +672,7 @@ func Run(cb func(b *Bot)) error {
 		}
 	}
 
+	b.Cleanup()
 	b.Info("Shutting down...")
 	<-time.After(1 * time.Second)
 
