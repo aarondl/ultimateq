@@ -1,6 +1,8 @@
 package data
 
 import (
+	"encoding/json"
+	"reflect"
 	"testing"
 )
 
@@ -17,26 +19,10 @@ func TestChannel_Create(t *testing.T) {
 	if ch == nil {
 		t.Error("Unexpected nil.")
 	}
-	if exp, got := ch.Name(), name; exp != got {
+	if exp, got := ch.Name, name; exp != got {
 		t.Error("Expected: %v, got: %v", exp, got)
 	}
-	if exp, got := ch.Topic(), ""; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
-	}
-}
-
-func TestChannel_GettersSetters(t *testing.T) {
-	t.Parallel()
-
-	name := "#chan"
-	topic := "topic"
-
-	ch := NewChannel(name, testKinds)
-	if exp, got := ch.Name(), name; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
-	}
-	ch.SetTopic(topic)
-	if exp, got := ch.Topic(), topic; exp != got {
+	if exp, got := ch.Topic, ""; exp != got {
 		t.Error("Expected: %v, got: %v", exp, got)
 	}
 }
@@ -182,5 +168,34 @@ func TestChannel_String(t *testing.T) {
 	ch := NewChannel("name", testKinds)
 	if exp, got := ch.String(), "name"; exp != got {
 		t.Error("Expected: %v, got: %v", exp, got)
+	}
+}
+
+func TestChannel_JSONify(t *testing.T) {
+	t.Parallel()
+
+	a := &Channel{
+		Name:  "a",
+		Topic: "b",
+	}
+	var b Channel
+
+	str, err := json.Marshal(a)
+	if err != nil {
+		t.Error(err)
+	}
+
+	jsonStr := `{"name":"a","topic":"b","channel_modes":null}`
+
+	if string(str) != jsonStr {
+		t.Errorf("Wrong JSON: %s", str)
+	}
+
+	if err = json.Unmarshal(str, &b); err != nil {
+		t.Error(err)
+	}
+
+	if !reflect.DeepEqual(*a, b) {
+		t.Error("A and B differ:", a, b)
 	}
 }

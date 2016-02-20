@@ -296,7 +296,7 @@ func (s *State) Channels() []string {
 
 	ret := make([]string, 0, len(s.channels))
 	for _, c := range s.channels {
-		ret = append(ret, c.Name())
+		ret = append(ret, c.Name)
 	}
 	return ret
 }
@@ -310,7 +310,7 @@ func (s *State) ChannelsByUser(nickorhost string) []string {
 	if ucs, ok := s.userChannels[nick]; ok {
 		ret := make([]string, 0, len(ucs))
 		for _, uc := range ucs {
-			ret = append(ret, uc.Channel.Name())
+			ret = append(ret, uc.Channel.Name)
 		}
 		return ret
 	}
@@ -688,9 +688,9 @@ func (s *State) topic(ev *irc.Event) []string {
 	if ch, ok := s.channels[chname]; ok {
 		s.addUser(ev.Sender)
 		if len(ev.Args) >= 2 {
-			ch.SetTopic(ev.Args[1])
+			ch.Topic = ev.Args[1]
 		} else {
-			ch.SetTopic("")
+			ch.Topic = ""
 		}
 	}
 	return []string{ev.Sender}
@@ -701,7 +701,7 @@ func (s *State) topic(ev *irc.Event) []string {
 func (s *State) rplTopic(ev *irc.Event) {
 	chname := strings.ToLower(ev.Args[1])
 	if ch, ok := s.channels[chname]; ok {
-		ch.SetTopic(ev.Args[2])
+		ch.Topic = ev.Args[2]
 	}
 }
 

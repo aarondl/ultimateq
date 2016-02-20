@@ -13,9 +13,9 @@ const (
 
 // Channel encapsulates all the data associated with a channel.
 type Channel struct {
-	name  string
-	topic string
-	ChannelModes
+	Name         string `json:"name"`
+	Topic        string `json:"topic"`
+	ChannelModes `json:"channel_modes"`
 }
 
 // NewChannel instantiates a channel object.
@@ -25,29 +25,14 @@ func NewChannel(name string, m *modeKinds) *Channel {
 	}
 
 	return &Channel{
-		name:         name,
+		Name:         name,
 		ChannelModes: NewChannelModes(m),
 	}
 }
 
 // Clone deep copies this Channel.
 func (c *Channel) Clone() *Channel {
-	return &Channel{c.name, c.topic, c.ChannelModes.Clone()}
-}
-
-// Name gets the name of the channel.
-func (c *Channel) Name() string {
-	return c.name
-}
-
-// SetTopic sets the topic of the channel.
-func (c *Channel) SetTopic(topic string) {
-	c.topic = topic
-}
-
-// Topic gets the topic of the channel.
-func (c *Channel) Topic() string {
-	return c.topic
+	return &Channel{c.Name, c.Topic, c.ChannelModes.Clone()}
 }
 
 // IsBanned checks a host to see if it's banned.
@@ -101,7 +86,7 @@ func (c *Channel) DeleteBan(ban string) {
 
 // String returns the name of the channel.
 func (c *Channel) String() string {
-	return c.name
+	return c.Name
 }
 
 // DeleteBans deletes all bans that match a mask.

@@ -1051,19 +1051,19 @@ func TestState_UpdateTopic(t *testing.T) {
 	st.addChannel(channels[0])
 
 	ch, _ := st.Channel(channels[0])
-	if got, exp := ch.Topic(), ""; exp != got {
+	if got, exp := ch.Topic, ""; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	st.Update(ev)
 	ch, _ = st.Channel(channels[0])
-	if got, exp := ch.Topic(), "topic topic"; exp != got {
+	if got, exp := ch.Topic, "topic topic"; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 
 	ev.Args = []string{channels[0]}
 	st.Update(ev)
 	ch, _ = st.Channel(channels[0])
-	if got, exp := ch.Topic(), ""; exp != got {
+	if got, exp := ch.Topic, ""; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 }
@@ -1082,12 +1082,12 @@ func TestState_UpdateRplTopic(t *testing.T) {
 	st.addChannel(channels[0])
 
 	ch, _ := st.Channel(channels[0])
-	if got, exp := ch.Topic(), ""; exp != got {
+	if got, exp := ch.Topic, ""; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	st.Update(ev)
 	ch, _ = st.Channel(channels[0])
-	if got, exp := ch.Topic(), "topic topic"; exp != got {
+	if got, exp := ch.Topic, "topic topic"; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 }
@@ -1104,15 +1104,15 @@ func TestState_UpdateEmptyTopic(t *testing.T) {
 	}
 
 	ch := st.addChannel(channels[0])
-	ch.SetTopic("topic topic")
+	ch.Topic = "topic topic"
 
 	channel, _ := st.Channel(channels[0])
-	if got, exp := channel.Topic(), "topic topic"; exp != got {
+	if got, exp := channel.Topic, "topic topic"; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	st.Update(ev)
 	channel, _ = st.Channel(channels[0])
-	if got, exp := channel.Topic(), ""; exp != got {
+	if got, exp := channel.Topic, ""; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 }
