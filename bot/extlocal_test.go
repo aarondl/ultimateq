@@ -24,6 +24,10 @@ func (f *testFakeExt) Deinit(b *Bot) error {
 }
 
 func TestRegister(t *testing.T) {
+	defer func() {
+		extensions = make(map[string]Extension)
+	}()
+
 	fake := &testFakeExt{}
 	RegisterExtension("fakeext", fake)
 
