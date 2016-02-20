@@ -1,6 +1,7 @@
 package data
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 )
@@ -20,7 +21,7 @@ func TestUser_Create(t *testing.T) {
 	if exp, got := u.Nick(), "nick"; exp != got {
 		t.Error("Expected: %v, got: %v", exp, got)
 	}
-	if exp, got := u.Host(), "nick"; exp != got {
+	if exp, got := u.Host.String(), "nick"; exp != got {
 		t.Error("Expected: %v, got: %v", exp, got)
 	}
 
@@ -37,17 +38,7 @@ func TestUser_Create(t *testing.T) {
 	if exp, got := u.Hostname(), "host"; exp != got {
 		t.Error("Expected: %v, got: %v", exp, got)
 	}
-	if exp, got := u.Host(), "nick!user@host"; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
-	}
-}
-
-func TestUser_Realname(t *testing.T) {
-	t.Parallel()
-
-	u := NewUser("nick!user@host")
-	u.SetRealname("realname realname")
-	if exp, got := u.Realname(), "realname realname"; exp != got {
+	if exp, got := u.Host.String(), "nick!user@host"; exp != got {
 		t.Error("Expected: %v, got: %v", exp, got)
 	}
 }
@@ -68,16 +59,41 @@ func TestUser_String(t *testing.T) {
 	}
 
 	u = NewUser("nick")
-	u.SetRealname("realname realname")
+	u.Realname = "realname realname"
 	str = fmt.Sprint(u)
 	if exp, got := str, "nick realname realname"; exp != got {
 		t.Error("Expected: %v, got: %v", exp, got)
 	}
 
 	u = NewUser("nick!user@host")
-	u.SetRealname("realname realname")
+	u.Realname = "realname realname"
 	str = fmt.Sprint(u)
 	if exp, got := str, "nick nick!user@host realname realname"; exp != got {
 		t.Error("Expected: %v, got: %v", exp, got)
+	}
+}
+
+func TestUser_JSONify(t *testing.T) {
+	t.Parallel()
+
+	a := NewUser("fish!fish@fish")
+	a.Realname = "Fish"
+	var b User
+
+	str, err := json.Marshal(a)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if string(str) != `{"host":"fish!fish@fish","realname":"Fish"}` {
+		t.Errorf("Wrong JSON: %s", str)
+	}
+
+	if err = json.Unmarshal(str, &b); err != nil {
+		t.Error(err)
+	}
+
+	if *a != b {
+		t.Error("A and B differ:", a, b)
 	}
 }

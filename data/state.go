@@ -284,7 +284,7 @@ func (s *State) Users() []string {
 
 	ret := make([]string, 0, len(s.users))
 	for _, u := range s.users {
-		ret = append(ret, u.Host())
+		ret = append(ret, u.Host.String())
 	}
 	return ret
 }
@@ -326,7 +326,7 @@ func (s *State) UsersByChannel(channel string) []string {
 	if cus, ok := s.channelUsers[channel]; ok {
 		ret := make([]string, 0, len(cus))
 		for _, cu := range cus {
-			ret = append(ret, cu.User.Host())
+			ret = append(ret, cu.User.Host.String())
 		}
 		return ret
 	}
@@ -394,8 +394,8 @@ func (s *State) addUser(nickorhost string) bool {
 	var user *User
 	var ok bool
 	if user, ok = s.users[nick]; ok {
-		if excl && at && user.Host() != nickorhost {
-			user.host = irc.Host(nickorhost)
+		if excl && at && user.Host.String() != nickorhost {
+			user.Host = irc.Host(nickorhost)
 		}
 	} else {
 		user = NewUser(nickorhost)
@@ -442,7 +442,7 @@ func (s *State) removeChannel(channel string) (unseen []string) {
 		}
 		if ucs, ok := s.userChannels[nick]; ok {
 			if len(ucs) == 0 {
-				unseen = append(unseen, string(cu.User.host))
+				unseen = append(unseen, string(cu.User.Host))
 				delete(s.users, strings.ToLower(nick))
 			}
 		}
@@ -583,7 +583,7 @@ func (s *State) nick(ev *irc.Event) []string {
 	newnick = strings.ToLower(newnick)
 
 	if user, ok := s.users[nick]; ok {
-		user.host = newuser
+		user.Host = newuser
 		for _, cus := range s.channelUsers {
 			if _, ok := cus[nick]; ok {
 				cus[newnick] = cus[nick]
@@ -604,7 +604,7 @@ func (s *State) nick(ev *irc.Event) []string {
 // join alters the state of the database when a JOIN message is received.
 func (s *State) join(ev *irc.Event) []string {
 	var seen []string
-	if ev.Sender == s.selfUser.Host() {
+	if ev.Sender == string(s.selfUser.Host) {
 		s.addChannel(ev.Args[0])
 	} else {
 		seen = []string{ev.Sender}
@@ -616,7 +616,7 @@ func (s *State) join(ev *irc.Event) []string {
 
 // part alters the state of the database when a PART message is received.
 func (s *State) part(ev *irc.Event) []string {
-	if ev.Sender == s.selfUser.Host() {
+	if ev.Sender == string(s.selfUser.Host) {
 		return s.removeChannel(ev.Args[0])
 	} else {
 		s.removeFromChannel(ev.Sender, ev.Args[0])
@@ -629,7 +629,7 @@ func (s *State) part(ev *irc.Event) []string {
 
 // quit alters the state of the database when a QUIT message is received.
 func (s *State) quit(ev *irc.Event) string {
-	if ev.Sender != s.selfUser.Host() {
+	if ev.Sender != string(s.selfUser.Host) {
 		s.removeUser(ev.Sender)
 		return ev.Sender
 	}
@@ -646,7 +646,7 @@ func (s *State) kick(ev *irc.Event) (seen []string, unseen []string) {
 		oldUser := s.user(ev.Args[1])
 		var oldHost string
 		if oldUser != nil {
-			oldHost = oldUser.Host()
+			oldHost = string(oldUser.Host)
 		}
 
 		s.removeFromChannel(ev.Args[1], ev.Args[0])
@@ -766,7 +766,7 @@ func (s *State) rplWhoReply(ev *irc.Event) {
 
 	s.addUser(fullhost)
 	s.addToChannel(fullhost, channel)
-	s.user(fullhost).SetRealname(realname)
+	s.user(fullhost).Realname = realname
 	for _, modechar := range modes {
 		if mode := s.kinds.Mode(modechar); mode != 0 {
 			if uc := s.userModes(fullhost, channel); uc != nil {

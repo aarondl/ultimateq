@@ -138,20 +138,20 @@ func TestState_User(t *testing.T) {
 	newHost := "nick!user@host.net"
 	st.addUser(oldHost)
 	u, _ := st.User(oldHost)
-	if got, exp := u.Host(), oldHost; exp != got {
+	if got, exp := string(u.Host), oldHost; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	u, _ = st.User(oldHost)
-	if got, exp := u.Host(), newHost; exp == got {
+	if got, exp := string(u.Host), newHost; exp == got {
 		t.Errorf("Did not want: %v, got: %v", exp, got)
 	}
 	st.addUser(newHost)
 	u, _ = st.User(oldHost)
-	if got, exp := u.Host(), oldHost; exp == got {
+	if got, exp := string(u.Host), oldHost; exp == got {
 		t.Errorf("Did not want: %v, got: %v", exp, got)
 	}
 	u, _ = st.User(oldHost)
-	if got, exp := u.Host(), newHost; exp != got {
+	if got, exp := string(u.Host), newHost; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 }
@@ -340,7 +340,7 @@ func TestState_EachUser(t *testing.T) {
 	st.EachUser(func(u User) bool {
 		has := false
 		for _, user := range users {
-			if user == u.Host() {
+			if user == string(u.Host) {
 				has = true
 				break
 			}
@@ -639,7 +639,7 @@ func TestState_UpdateJoinSelf(t *testing.T) {
 	st := setupNewState()
 	ev := &irc.Event{
 		Name:   irc.JOIN,
-		Sender: st.selfUser.Host(),
+		Sender: string(st.selfUser.Host),
 		Args:   []string{channels[0]},
 	}
 
@@ -763,13 +763,13 @@ func TestState_UpdatePartSelf(t *testing.T) {
 	st := setupNewState()
 	ev := &irc.Event{
 		Name:   irc.PART,
-		Sender: st.selfUser.Host(),
+		Sender: string(st.selfUser.Host),
 		Args:   []string{channels[0]},
 	}
 
 	st.addUser(users[0])
 	st.addUser(users[1])
-	st.addUser(st.selfUser.Host())
+	st.addUser(string(st.selfUser.Host))
 	st.addChannel(channels[0])
 	st.addChannel(channels[1])
 	st.addToChannel(users[0], channels[0])
@@ -883,7 +883,7 @@ func TestState_UpdateQuitSelf(t *testing.T) {
 	st := setupNewState()
 	ev := &irc.Event{
 		Name:   irc.QUIT,
-		Sender: st.selfUser.Host(),
+		Sender: string(st.selfUser.Host),
 		Args:   []string{"quit message"},
 	}
 
@@ -928,7 +928,7 @@ func TestState_UpdateKickSelf(t *testing.T) {
 		Args:   []string{channels[0], st.selfUser.Nick()},
 	}
 
-	st.addUser(st.selfUser.Host())
+	st.addUser(string(st.selfUser.Host))
 	st.addChannel(channels[0])
 	st.addToChannel(users[0], channels[0])
 
@@ -1015,7 +1015,7 @@ func TestState_UpdateModeSelf(t *testing.T) {
 
 	ev := &irc.Event{
 		Name:        irc.MODE,
-		Sender:      st.selfUser.Host(),
+		Sender:      string(st.selfUser.Host),
 		Args:        []string{st.selfUser.Nick(), "+i-o"},
 		NetworkInfo: testNetInfo,
 	}
@@ -1215,10 +1215,10 @@ func TestState_UpdateWelcome(t *testing.T) {
 	}
 
 	st.Update(ev)
-	if got, exp := st.selfUser.Host(), nicks[1]; exp != got {
+	if got, exp := string(st.selfUser.Host), nicks[1]; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
-	if got, exp := st.users[nicks[1]].Host(), st.selfUser.Host(); exp != got {
+	if got, exp := st.users[nicks[1]].Host, st.selfUser.Host; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 
@@ -1229,10 +1229,10 @@ func TestState_UpdateWelcome(t *testing.T) {
 	}
 
 	st.Update(ev)
-	if got, exp := st.selfUser.Host(), users[1]; exp != got {
+	if got, exp := string(st.selfUser.Host), users[1]; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
-	if got, exp := st.users[nicks[1]].Host(), st.selfUser.Host(); exp != got {
+	if got, exp := st.users[nicks[1]].Host, st.selfUser.Host; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 }
@@ -1305,10 +1305,10 @@ func TestState_RplWhoReply(t *testing.T) {
 		t.Error("Unexpected nil.")
 	}
 	user, _ := st.User(users[0])
-	if got, exp := user.Host(), users[0]; exp != got {
+	if got, exp := string(user.Host), users[0]; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
-	if got, exp := user.Realname(), "real name"; exp != got {
+	if got, exp := user.Realname, "real name"; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	got, _ := st.UserModes(users[0], channels[0])

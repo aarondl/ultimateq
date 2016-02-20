@@ -1,6 +1,7 @@
 package data
 
 import (
+	"encoding/json"
 	"testing"
 )
 
@@ -221,5 +222,29 @@ func Test_getFlagString(t *testing.T) {
 	should := "Aab"
 	if was := getFlagString(bits); was != should {
 		t.Errorf("Flag string should be: (%s) was: (%s)", should, was)
+	}
+}
+
+func TestAccess_JSONifying(t *testing.T) {
+	t.Parallel()
+
+	a := NewAccess(23, "DEFabc")
+	var b Access
+
+	str, err := json.Marshal(a)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if string(str) != `{"level":23,"flags":469762104}` {
+		t.Errorf("Wrong JSON: %s", str)
+	}
+
+	if err = json.Unmarshal(str, &b); err != nil {
+		t.Error(err)
+	}
+
+	if *a != b {
+		t.Error("A and B differ:", a, b)
 	}
 }

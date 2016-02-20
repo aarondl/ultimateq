@@ -17,8 +17,8 @@ const (
 
 // Access defines an access level and flags a-zA-Z for a user.
 type Access struct {
-	Level uint8
-	Flags uint64
+	Level uint8  `json:"level"`
+	Flags uint64 `json:"flags"`
 }
 
 // NewAccess creates an access type with the permissions.
