@@ -379,7 +379,7 @@ func (h *Handler) Up(w irc.Writer, ev *cmd.Event) error {
 	if ch == nil {
 		return fmt.Errorf("Must be a channel that the bot is on.")
 	}
-	chname := ch.Name()
+	chname := ch.Name
 
 	if !putPeopleUp(ev.Event, chname, user, w) {
 		return cmd.MakeFlagsError("ov")

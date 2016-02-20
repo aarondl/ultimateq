@@ -117,7 +117,7 @@ func (ev *Event) FindAccessByUser(server, nickOrUser string) (
 			user = &u
 		}
 
-		access = ev.Store.AuthedUser(server, user.Host())
+		access = ev.Store.AuthedUser(server, user.Host.String())
 		if access == nil {
 			err = fmt.Errorf(errFmtUserNotAuthed, nickOrUser)
 			return

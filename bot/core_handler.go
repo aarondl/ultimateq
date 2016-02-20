@@ -136,7 +136,7 @@ func (c *coreHandler) HandleRaw(w irc.Writer, ev *irc.Event) {
 	case irc.JOIN:
 		server := c.getServer(ev.NetworkID)
 		if server.state != nil {
-			if ev.Sender == server.state.Self().Host() {
+			if ev.Sender == server.state.Self().Host.String() {
 				w.Send("WHO :", ev.Args[0])
 				w.Send("MODE :", ev.Args[0])
 			}

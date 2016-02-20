@@ -615,7 +615,7 @@ func (c *coreCmds) access(w irc.Writer, ev *cmd.Event) (
 
 	ch := ""
 	if ev.Channel != nil {
-		ch = ev.Channel.Name()
+		ch = ev.Channel.Name
 	}
 	w.Noticef(ev.Nick(), accessSuccess,
 		access.Username, access.String(ev.NetworkID, ch))
@@ -695,8 +695,8 @@ func (c *coreCmds) users(w irc.Writer, ev *cmd.Event) (
 
 	if ev.Arg("chan") != `` {
 		ch = ev.Arg("chan")
-	} else if ev.Channel != nil && ev.Channel.Name() != `` {
-		ch = ev.Channel.Name()
+	} else if ev.Channel != nil && ev.Channel.Name != `` {
+		ch = ev.Channel.Name
 	} else {
 		return
 	}
