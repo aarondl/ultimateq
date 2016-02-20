@@ -1,6 +1,8 @@
 package data
 
 import (
+	"encoding/json"
+	"reflect"
 	"regexp"
 	"testing"
 )
@@ -597,5 +599,46 @@ func TestChannelModes_String(t *testing.T) {
 	}
 	if !matched {
 		t.Errorf("Expected: %q to match the pattern.", str)
+	}
+}
+
+func TestChannelModes_JSONify(t *testing.T) {
+	t.Parallel()
+
+	a := NewChannelModes(testKinds)
+	a.Apply("tdb 5 a!b@c.com")
+	var b ChannelModes
+
+	str, err := json.Marshal(a)
+	if err != nil {
+		t.Error(err)
+	}
+
+	jsonStr := `{"modes":{"t":true},"arg_modes":{"d":"5"},` +
+		`"address_modes":{"b":["a!b@c.com"]},` +
+		`"addresses":1,` +
+		`"mode_kinds":{` +
+		`"user_prefixes":[["o","@"],["v","+"]],` +
+		`"channel_modes":{"a":1,"b":4,"c":2,"d":3,"x":1,"y":1,"z":1}}}`
+
+	if string(str) != jsonStr {
+		t.Errorf("Wrong JSON: %s", str)
+	}
+
+	if err = json.Unmarshal(str, &b); err != nil {
+		t.Error(err)
+	}
+
+	if !reflect.DeepEqual(a.modes, b.modes) {
+		t.Error("A and B differ:", a.modes, b.modes)
+	}
+	if !reflect.DeepEqual(a.argModes, b.argModes) {
+		t.Error("A and B differ:", a.argModes, b.argModes)
+	}
+	if !reflect.DeepEqual(a.addressModes, b.addressModes) {
+		t.Error("A and B differ:", a.addressModes, b.addressModes)
+	}
+	if a.addresses != b.addresses {
+		t.Error("A and B differ:", a.addresses, b.addresses)
 	}
 }

@@ -1,6 +1,8 @@
 package data
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -34,6 +36,11 @@ type modeKinds struct {
 	sync.RWMutex
 }
 
+type modeKindJSON struct {
+	UserPrefixes [][]string     `json:"user_prefixes"`
+	ChannelModes map[string]int `json:"channel_modes"`
+}
+
 // userMode is returned by apply helper when it encounters a user mode
 type userMode struct {
 	Mode rune
@@ -56,6 +63,69 @@ func newModeKinds(prefix, chanModes string) (*modeKinds, error) {
 		userPrefixes: userPrefixes,
 		channelModes: channelModes,
 	}, nil
+}
+
+// MarshalJSON turns modeKinds -> JSON
+func (m *modeKinds) MarshalJSON() ([]byte, error) {
+	if m == nil {
+		return []byte(`null`), nil
+	}
+
+	var toJSON modeKindJSON
+
+	m.RLock()
+	defer m.RUnlock()
+
+	if m.userPrefixes != nil {
+		toJSON.UserPrefixes = make([][]string, len(m.userPrefixes))
+		for i, prefix := range m.userPrefixes {
+			toJSON.UserPrefixes[i] = []string{
+				string(prefix[0]), string(prefix[1]),
+			}
+		}
+	}
+	if m.channelModes != nil {
+		toJSON.ChannelModes = make(map[string]int, len(m.channelModes))
+		for k, v := range m.channelModes {
+			toJSON.ChannelModes[string(k)] = v
+		}
+	}
+
+	return json.Marshal(toJSON)
+}
+
+// UnmarshalJSON turns JSON -> modeKinds
+func (m *modeKinds) UnmarshalJSON(b []byte) error {
+	var fromJSON modeKindJSON
+
+	if err := json.Unmarshal(b, &fromJSON); err != nil {
+		return err
+	}
+
+	if fromJSON.UserPrefixes != nil {
+		m.userPrefixes = make([][2]rune, len(fromJSON.UserPrefixes))
+		for i, prefix := range fromJSON.UserPrefixes {
+			if len(prefix) != 2 || len(prefix[0]) != 1 || len(prefix[1]) != 1 {
+				return errors.New("user_prefixes is an array of length 2 of 1 character strings")
+			}
+
+			m.userPrefixes[i] = [2]rune{
+				rune(prefix[0][0]),
+				rune(prefix[1][0]),
+			}
+		}
+	}
+	if fromJSON.ChannelModes != nil {
+		m.channelModes = make(map[rune]int, len(fromJSON.ChannelModes))
+		for k, v := range fromJSON.ChannelModes {
+			if len(k) != 1 {
+				return errors.New("channel_modes is a map of characters to integers")
+			}
+			m.channelModes[rune(k[0])] = v
+		}
+	}
+
+	return nil
 }
 
 // updateModes updates lookup structures in place.

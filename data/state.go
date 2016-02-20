@@ -665,7 +665,7 @@ func (s *State) mode(ev *irc.Event) []string {
 	if ev.IsTargetChan() {
 		s.addUser(ev.Sender)
 		if ch, ok := s.channels[target]; ok {
-			pos, neg := ch.Apply(strings.Join(ev.Args[1:], " "))
+			pos, neg := ch.Modes.Apply(strings.Join(ev.Args[1:], " "))
 			for i := 0; i < len(pos); i++ {
 				nick := strings.ToLower(pos[i].Arg)
 				s.channelUsers[target][nick].SetMode(pos[i].Mode)
@@ -782,7 +782,7 @@ func (s *State) rplChannelModeIs(ev *irc.Event) {
 	channel := ev.Args[1]
 	modes := strings.Join(ev.Args[2:], " ")
 	if ch := s.channel(channel); ch != nil {
-		ch.Apply(modes)
+		ch.Modes.Apply(modes)
 	}
 }
 

@@ -1,6 +1,8 @@
 package data
 
 import (
+	"encoding/json"
+	"errors"
 	"strings"
 )
 
@@ -49,6 +51,88 @@ func (m *ChannelModes) Clone() ChannelModes {
 	}
 
 	return cm
+}
+
+type channelModesJSON struct {
+	Modes        map[string]bool     `json:"modes"`
+	ArgModes     map[string]string   `json:"arg_modes"`
+	AddressModes map[string][]string `json:"address_modes"`
+	Addresses    int                 `json:"addresses"`
+	ModeKinds    *modeKinds          `json:"mode_kinds"`
+}
+
+// MarshalJSON turns ChannelModes -> JSON
+func (c ChannelModes) MarshalJSON() ([]byte, error) {
+	var toJSON channelModesJSON
+
+	if c.modes != nil {
+		toJSON.Modes = make(map[string]bool, len(c.modes))
+		for k, v := range c.modes {
+			toJSON.Modes[string(k)] = v
+		}
+	}
+	if c.argModes != nil {
+		toJSON.ArgModes = make(map[string]string, len(c.argModes))
+		for k, v := range c.argModes {
+			toJSON.ArgModes[string(k)] = v
+		}
+	}
+	if c.addressModes != nil {
+		toJSON.AddressModes = make(map[string][]string, len(c.addressModes))
+		for k, v := range c.addressModes {
+			toJSON.AddressModes[string(k)] = append([]string{}, v...)
+		}
+	}
+
+	toJSON.Addresses = c.addresses
+	toJSON.ModeKinds = c.modeKinds
+
+	return json.Marshal(toJSON)
+}
+
+// UnmarshalJSON turns JSON -> ChannelModes
+func (c *ChannelModes) UnmarshalJSON(b []byte) error {
+	var fromJSON channelModesJSON
+
+	if err := json.Unmarshal(b, &fromJSON); err != nil {
+		return err
+	}
+
+	if fromJSON.Modes != nil {
+		c.modes = make(map[rune]bool, len(fromJSON.Modes))
+		for k, v := range fromJSON.Modes {
+			if len(k) != 1 {
+				return errors.New("modes is a map of char to bool")
+			}
+
+			c.modes[rune(k[0])] = v
+		}
+	}
+	if fromJSON.ArgModes != nil {
+		c.argModes = make(map[rune]string, len(fromJSON.ArgModes))
+		for k, v := range fromJSON.ArgModes {
+			if len(k) != 1 {
+				return errors.New("arg_modes is a map of char to string")
+			}
+
+			c.argModes[rune(k[0])] = v
+		}
+	}
+	if fromJSON.AddressModes != nil {
+		c.addressModes = make(map[rune][]string, len(fromJSON.AddressModes))
+		for k, v := range fromJSON.AddressModes {
+			if len(k) != 1 {
+				return errors.New("address_modes is a map of char to []string")
+			}
+
+			c.addressModes[rune(k[0])] = v
+		}
+	}
+
+	c.addresses = fromJSON.Addresses
+	c.modeKinds = fromJSON.ModeKinds
+
+	return nil
 }
 
 // Apply takes a complex modestring and applies it to a an existing modeset.

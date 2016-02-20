@@ -969,13 +969,13 @@ func TestState_UpdateMode(t *testing.T) {
 	u2modes, _ := st.UserModes(users[1], channels[0])
 	u2modes.SetMode('v')
 	realCh := st.channel(channels[0])
-	realCh.Set("n")
+	realCh.Modes.Set("n")
 
 	ch, _ := st.Channel(channels[0])
-	if got, exp := ch.IsSet("n"), true; exp != got {
+	if got, exp := ch.Modes.IsSet("n"), true; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
-	if got, exp := ch.IsSet("mb"), false; exp != got {
+	if got, exp := ch.Modes.IsSet("mb"), false; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := u1modes.HasMode('o'), false; exp != got {
@@ -991,10 +991,10 @@ func TestState_UpdateMode(t *testing.T) {
 	u1modes, _ = st.UserModes(users[0], channels[0])
 	u2modes, _ = st.UserModes(users[1], channels[0])
 	ch, _ = st.Channel(channels[0])
-	if got, exp := ch.IsSet("n"), false; exp != got {
+	if got, exp := ch.Modes.IsSet("n"), false; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
-	if got, exp := ch.IsSet("mb *!*mask"), true; exp != got {
+	if got, exp := ch.Modes.IsSet("mb *!*mask"), true; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := u1modes.HasMode('o'), true; exp != got {
@@ -1331,12 +1331,12 @@ func TestState_UpdateRplMode(t *testing.T) {
 
 	st.addChannel(channels[0])
 	ch, _ := st.Channel(channels[0])
-	if got, exp := ch.IsSet("ntzl 10"), false; exp != got {
+	if got, exp := ch.Modes.IsSet("ntzl 10"), false; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	st.Update(ev)
 	ch, _ = st.Channel(channels[0])
-	if got, exp := ch.IsSet("ntzl 10"), true; exp != got {
+	if got, exp := ch.Modes.IsSet("ntzl 10"), true; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 }

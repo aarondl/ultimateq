@@ -185,7 +185,9 @@ func TestChannel_JSONify(t *testing.T) {
 		t.Error(err)
 	}
 
-	jsonStr := `{"name":"a","topic":"b","channel_modes":null}`
+	jsonStr := `{"name":"a","topic":"b",` +
+		`"channel_modes":{"modes":null,"arg_modes":null,` +
+		`"address_modes":null,"addresses":0,"mode_kinds":null}}`
 
 	if string(str) != jsonStr {
 		t.Errorf("Wrong JSON: %s", str)
