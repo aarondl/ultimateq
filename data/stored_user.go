@@ -43,11 +43,11 @@ const (
 // but passing in blank strings to these methods allow us to set global,
 // channel, and/or network specific access levels.
 type StoredUser struct {
-	Username string
-	Password []byte
-	Masks    []string
-	Access   map[string]Access
-	JSONStorer
+	Username   string            `json:"username"`
+	Password   []byte            `json:"password"`
+	Masks      []string          `json:"masks"`
+	Access     map[string]Access `json:"access"`
+	JSONStorer `json:"data"`
 }
 
 // StoredUserPwdCost is the cost factor for bcrypt. It should not be set

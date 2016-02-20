@@ -9,9 +9,9 @@ import (
 
 // StoredChannel stores attributes for channels.
 type StoredChannel struct {
-	NetID string
-	Name  string
-	JSONStorer
+	NetID      string `json:"netid"`
+	Name       string `json:"name"`
+	JSONStorer `json:"data"`
 }
 
 // NewStoredChannel creates a new stored channel.

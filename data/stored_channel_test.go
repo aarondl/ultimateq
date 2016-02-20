@@ -1,6 +1,10 @@
 package data
 
-import "testing"
+import (
+	"encoding/json"
+	"reflect"
+	"testing"
+)
 
 func TestStoredChannel(t *testing.T) {
 	t.Parallel()
@@ -43,5 +47,35 @@ func TestStoredChannel_SerializeDeserialize(t *testing.T) {
 	}
 	if a.NetID != b.NetID {
 		t.Error("NetID not deserlialize correctly.")
+	}
+}
+
+func TestStoredChannel_JSONify(t *testing.T) {
+	t.Parallel()
+
+	a := &StoredChannel{
+		NetID:      "a",
+		Name:       "b",
+		JSONStorer: JSONStorer{"some": "data"},
+	}
+	var b StoredChannel
+
+	str, err := json.Marshal(a)
+	if err != nil {
+		t.Error(err)
+	}
+
+	jsonStr := `{"netid":"a","name":"b","data":{"some":"data"}}`
+
+	if string(str) != jsonStr {
+		t.Errorf("Wrong JSON: %s", str)
+	}
+
+	if err = json.Unmarshal(str, &b); err != nil {
+		t.Error(err)
+	}
+
+	if !reflect.DeepEqual(*a, b) {
+		t.Error("A and B differ:", a, b)
 	}
 }

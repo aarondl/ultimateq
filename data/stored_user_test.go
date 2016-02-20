@@ -2,7 +2,9 @@ package data
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"reflect"
 	"regexp"
 	"strings"
 	"testing"
@@ -543,5 +545,39 @@ func TestStoredUser_ResetPassword(t *testing.T) {
 		t.Error("Regular Expression did not compile.")
 	} else if !m {
 		t.Error("New password was malformed:", newpasswd)
+	}
+}
+
+func TestStoredUser_JSONify(t *testing.T) {
+	t.Parallel()
+
+	a := &StoredUser{
+		Username:   "a",
+		Password:   []byte("b"),
+		Masks:      []string{"c"},
+		Access:     map[string]Access{"net:#chan": *NewAccess(23, "abc")},
+		JSONStorer: JSONStorer{"some": "data"},
+	}
+	var b StoredUser
+
+	str, err := json.Marshal(a)
+	if err != nil {
+		t.Error(err)
+	}
+
+	jsonStr := `{"username":"a","password":"Yg==","masks":["c"],` +
+		`"access":{"net:#chan":{"level":23,"flags":469762048}},` +
+		`"data":{"some":"data"}}`
+
+	if string(str) != jsonStr {
+		t.Errorf("Wrong JSON: %s", str)
+	}
+
+	if err = json.Unmarshal(str, &b); err != nil {
+		t.Error(err)
+	}
+
+	if !reflect.DeepEqual(*a, b) {
+		t.Error("A and B differ:", a, b)
 	}
 }
