@@ -82,9 +82,13 @@ func TestCoreHandler_Connect(t *testing.T) {
 	endpoint := makeTestPoint(b.servers[netID])
 	handler.HandleRaw(endpoint, ev)
 
-	expect := msg1 + msg2 + msg3 + msg4 + msg5
-	if got := endpoint.gets(); got != expect {
+	expect := msg1 + msg2 + msg3
+	if got := endpoint.gets(); !strings.HasPrefix(got, expect) {
 		t.Errorf("Expected: %s, got: %s", expect, got)
+	} else if !strings.Contains(got, msg4) {
+		t.Errorf("It should try to autojoin #channel1, got: %s", got)
+	} else if !strings.Contains(got, msg5) {
+		t.Errorf("It should try to autojoin #channel2, got: %s", got)
 	}
 
 	endpoint.resetTestWritten()
