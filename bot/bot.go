@@ -136,12 +136,13 @@ func New(conf *config.Config) (*Bot, error) {
 // there are no more servers left to run and the program can safely exit.
 func (b *Bot) Start() <-chan error {
 	b.protectServers.RLock()
+	nServers := len(b.servers)
 	for _, srv := range b.servers {
 		go b.startServer(srv, true, true)
 	}
 	b.protectServers.RUnlock()
 
-	go b.monitorServers()
+	go b.monitorServers(nServers)
 
 	return b.botEnd
 }
@@ -149,11 +150,25 @@ func (b *Bot) Start() <-chan error {
 // monitorServers watches the starting and stopping of servers. It sends any
 // permanent server deaths to the botEnd channel, and if all servers
 // are stopped it closes the botEnd channel.
-func (b *Bot) monitorServers() {
+func (b *Bot) monitorServers(nServers int) {
 	servers := 0
+
+	// We shut down the "serverEnd" part of the select until such time as
+	// all servers were given a chance at life to prevent a race where one
+	// server comes up and down before any other gets the chance to start
+	// and the exit condition of the bot is satisfied (servers == 0)
+	allHadLifeChance := false
+	serverControl := b.serverControl
+	var serverEnd chan serverOp
+
 	for {
+		if allHadLifeChance || servers == nServers {
+			serverEnd = b.serverEnd
+			allHadLifeChance = true
+		}
+
 		select {
-		case op := <-b.serverControl:
+		case op := <-serverControl:
 			isStarted := op.server.started
 			if op.starting {
 				op.server.killable = make(chan int)
@@ -169,7 +184,7 @@ func (b *Bot) monitorServers() {
 				}
 				b.serverStop <- isStarted
 			}
-		case op := <-b.serverEnd:
+		case op := <-serverEnd:
 			op.server.started = false
 			b.botEnd <- op.err
 			servers--
