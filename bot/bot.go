@@ -162,7 +162,7 @@ func (b *Bot) monitorServers(nServers int) {
 	var serverEnd chan serverOp
 
 	for {
-		if allHadLifeChance || servers == nServers {
+		if !allHadLifeChance && servers == nServers {
 			serverEnd = b.serverEnd
 			allHadLifeChance = true
 		}
