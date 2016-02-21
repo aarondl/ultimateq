@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/inconshreveable/log15"
+	"gopkg.in/inconshreveable/log15.v2"
 )
 
 const (

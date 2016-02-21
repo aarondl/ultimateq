@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/aarondl/ultimateq/irc"
-	"github.com/inconshreveable/log15"
+	"gopkg.in/inconshreveable/log15.v2"
 )
 
 //===========================================================

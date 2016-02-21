@@ -13,7 +13,7 @@ import (
 	"github.com/aarondl/ultimateq/dispatch/cmd"
 	"github.com/aarondl/ultimateq/irc"
 	"github.com/aarondl/ultimateq/mocks"
-	"github.com/inconshreveable/log15"
+	"gopkg.in/inconshreveable/log15.v2"
 )
 
 type testHandler struct {

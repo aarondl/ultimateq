@@ -15,7 +15,7 @@ import (
 	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/inet"
 	"github.com/aarondl/ultimateq/irc"
-	"github.com/inconshreveable/log15"
+	"gopkg.in/inconshreveable/log15.v2"
 )
 
 // Status is the status of a network connection.

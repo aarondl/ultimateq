@@ -8,7 +8,7 @@ import (
 	"github.com/aarondl/ultimateq/config"
 	"github.com/aarondl/ultimateq/irc"
 	"github.com/aarondl/ultimateq/mocks"
-	"github.com/inconshreveable/log15"
+	"gopkg.in/inconshreveable/log15.v2"
 )
 
 var zeroConnProvider = func(srv string) (net.Conn, error) {

@@ -20,7 +20,7 @@ import (
 	"github.com/aarondl/ultimateq/dispatch/cmd"
 	"github.com/aarondl/ultimateq/irc"
 	"github.com/aarondl/ultimateq/parse"
-	"github.com/inconshreveable/log15"
+	"gopkg.in/inconshreveable/log15.v2"
 )
 
 const (

@@ -11,7 +11,7 @@ import (
 	"sync"
 
 	"github.com/aarondl/ultimateq/irc"
-	"github.com/inconshreveable/log15"
+	"gopkg.in/inconshreveable/log15.v2"
 )
 
 // DispatchCore is a core for any dispatching mechanisms that includes a sync'd

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/inconshreveable/log15"
+	"gopkg.in/inconshreveable/log15.v2"
 )
 
 func TestValidation(t *testing.T) {

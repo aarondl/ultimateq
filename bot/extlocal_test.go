@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/inconshreveable/log15"
+	"gopkg.in/inconshreveable/log15.v2"
 )
 
 type testFakeExt struct {
