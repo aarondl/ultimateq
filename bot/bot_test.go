@@ -2,9 +2,9 @@ package bot
 
 import (
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
-	"os"
 	"testing"
 	"time"
 
@@ -48,12 +48,8 @@ func (r reconnErr) Timeout() bool   { return true }
 func (r reconnErr) Temporary() bool { return true }
 
 func init() {
-	f, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
-	if err != nil {
-		log.Println("Could not set logger:", err)
-	} else {
-		log.SetOutput(f)
-	}
+	log.SetOutput(ioutil.Discard)
+	log15.Root().SetHandler(log15.DiscardHandler())
 
 	data.StoredUserPwdCost = 4 // See bcrypt.MinCost
 }
