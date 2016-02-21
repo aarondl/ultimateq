@@ -314,6 +314,7 @@ func TestBot_ReconnectConnection(t *testing.T) {
 	<-listen
 	wantedConn <- 0
 	<-listen
+	close(wantedConn)
 
 	b.Stop()
 	for err := range end {
