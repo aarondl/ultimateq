@@ -6,7 +6,6 @@ import (
 	"io"
 	"net"
 	"testing"
-	"time"
 
 	"github.com/aarondl/ultimateq/irc"
 	"github.com/aarondl/ultimateq/mocks"
@@ -56,24 +55,26 @@ func TestServer_createIrcClient_failConn(t *testing.T) {
 func TestServer_createIrcClient_killConn(t *testing.T) {
 	t.Parallel()
 	errch := make(chan error)
+	connCh := make(chan int)
 	connProvider := func(srv string) (net.Conn, error) {
-		time.Sleep(time.Second * 5)
+		<-connCh
 		return nil, io.EOF
 	}
 	b, _ := createBot(fakeConfig, connProvider, nil, devNull, false, false)
 	srv := b.servers[netID]
+	srv.killable = make(chan int)
 
 	go func() {
 		err, _ := srv.createIrcClient()
 		errch <- err
 	}()
 
-	if _, ok := <-srv.killable; !ok {
-		t.Error("The connection was not killed by request.")
-	}
+	close(srv.killable)
 	if <-errch != errServerKilledConn {
 		t.Error("Expected a killed connection.")
 	}
+
+	close(connCh)
 }
 
 func TestServer_createTlsConfig(t *testing.T) {

@@ -314,7 +314,6 @@ func TestBot_ReconnectConnection(t *testing.T) {
 	<-listen
 	wantedConn <- 0
 	<-listen
-	close(wantedConn)
 
 	b.Stop()
 	for err := range end {
@@ -322,6 +321,8 @@ func TestBot_ReconnectConnection(t *testing.T) {
 			t.Error("Expected it to die during connecting:", err)
 		}
 	}
+
+	close(wantedConn)
 }
 
 func TestBot_ReconnectKill(t *testing.T) {

@@ -180,7 +180,7 @@ func (b *Bot) monitorServers(nServers int) {
 			} else {
 				if isStarted {
 					op.server.started = false
-					_, isStarted = <-op.server.killable
+					close(op.server.killable)
 				}
 				b.serverStop <- isStarted
 			}
@@ -254,14 +254,13 @@ func (b *Bot) startServer(srv *Server, writing, reading bool) {
 		srv.setStatus(STATUS_RECONNECTING)
 		srv.Info("Reconnecting", "timeout", wait)
 		select {
-		case srv.killable <- 0:
+		case <-srv.killable:
 			err = errServerKilledReconn
 		case <-time.After(wait):
 		}
 	}
 
 	srv.Close()
-	close(srv.killable)
 	b.serverEnd <- serverOp{srv, false, err}
 	srv.setStatus(STATUS_STOPPED)
 }
@@ -294,7 +293,7 @@ func (b *Bot) dispatch(srv *Server) (disconnect bool, err error) {
 				srv.state.Update(ircMsg)
 			}
 			b.dispatchMessage(srv, ircMsg)
-		case srv.killable <- 0:
+		case <-srv.killable:
 			err = errServerKilled
 			break
 		}
@@ -519,7 +518,6 @@ func (b *Bot) createServer(netID string, conf *config.Config) (*Server, error) {
 		networkID:   netID,
 		netInfo:     irc.NewNetworkInfo(),
 		conf:        conf,
-		killable:    make(chan int),
 		reconnScale: defaultReconnScale,
 	}
 

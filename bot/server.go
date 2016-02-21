@@ -130,7 +130,7 @@ func (s *Server) createIrcClient() (error, bool) {
 		if result.err != nil {
 			return result.err, result.temporary
 		}
-	case s.killable <- 0:
+	case <-s.killable:
 		close(resultService)
 		return errServerKilledConn, false
 	}

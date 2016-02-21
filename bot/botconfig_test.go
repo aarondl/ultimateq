@@ -154,8 +154,8 @@ func TestBotConfig_ReplaceConfig(t *testing.T) {
 		t.Error("A valid new config should succeed.")
 	}
 
-	if <-end == nil {
-		t.Error("Expected a kill error")
+	if err := <-end; err != errServerKilled {
+		t.Error("Expected a kill error:", err)
 	}
 
 	//newsrv1 := b.servers["anothernewserver"]
