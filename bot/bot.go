@@ -658,6 +658,9 @@ func Run(cb func(b *Bot)) error {
 
 	end := b.Start()
 
+	api := newBotAPI(b)
+	go api.start(":8080")
+
 	input, quit := make(chan int), make(chan os.Signal, 2)
 
 	go func() {
