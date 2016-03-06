@@ -14,6 +14,7 @@ import (
 )
 
 var (
+	// ErrNotFound occurs when the server responds with a 404
 	ErrNotFound = errors.New("entity not found")
 )
 
@@ -93,7 +94,7 @@ func (c *Client) doRequest(verb, path string, request, response interface{}, que
 	endpoint := c.Endpoint + path + queryString
 	req, err := http.NewRequest(verb, endpoint, body)
 	if err != nil {
-		fmt.Errorf("could not create request: %v", err)
+		return fmt.Errorf("could not create request: %v", err)
 	}
 
 	req.Header.Set("User-Agent", "ultimateq apiclient 0.1")
@@ -102,7 +103,7 @@ func (c *Client) doRequest(verb, path string, request, response interface{}, que
 
 	resp, err := c.RestClient.Do(req)
 	if err != nil {
-		fmt.Errorf("failed to complete request: %v", err)
+		return fmt.Errorf("failed to complete request: %v", err)
 	}
 
 	switch resp.StatusCode {

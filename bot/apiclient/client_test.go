@@ -108,6 +108,8 @@ func mkNotFoundClient() *Client {
 }
 
 func TestDoGetRequest(t *testing.T) {
+	t.Parallel()
+
 	client := NewClient("a", "http://127.0.0.1:5000")
 	mock := &mockRestClient{
 		Status:   http.StatusOK,
@@ -155,6 +157,8 @@ func TestDoGetRequest(t *testing.T) {
 }
 
 func TestDoGetRequestError(t *testing.T) {
+	t.Parallel()
+
 	client := NewClient("a", "http://127.0.0.1:5000")
 	mock := &mockRestClient{
 		Status: http.StatusInternalServerError,
@@ -171,6 +175,8 @@ func TestDoGetRequestError(t *testing.T) {
 }
 
 func TestDoGetRequestNotFound(t *testing.T) {
+	t.Parallel()
+
 	client := NewClient("a", "http://127.0.0.1:5000")
 	mock := &mockRestClient{
 		Status: http.StatusNotFound,
@@ -184,6 +190,8 @@ func TestDoGetRequestNotFound(t *testing.T) {
 }
 
 func TestGetEndpointURL(t *testing.T) {
+	t.Parallel()
+
 	ep, err := url.Parse("http://rofl:clown@127.0.0.1:5000/hello/there")
 	if err != nil {
 		t.Fatal(err)
