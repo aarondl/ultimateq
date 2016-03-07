@@ -52,12 +52,12 @@ func newBotAPI(b *Bot) botAPI {
 	e.Get("/api/v1/store/net/:network/channel/:channel/users", api.storeNetworkChannelUsers)
 
 	e.Get("/api/v1/store/net/:network/channel/:channel", api.storeChannel)
-	e.Get("/api/v1/store/net/:network/channels", api.storeChannels)
+	e.Get("/api/v1/store/channels", api.storeChannels)
 
 	e.Put("/api/v1/store/user", api.storePutUser)
 	e.Put("/api/v1/store/channel", api.storePutChannel)
-	e.Delete("/api/v1/store/user", api.storeDeleteUser)
-	e.Delete("/api/v1/store/channel", api.storeDeleteChannel)
+	e.Delete("/api/v1/store/user/:username", api.storeDeleteUser)
+	e.Delete("/api/v1/store/net/:network/channel/:channel", api.storeDeleteChannel)
 
 	e.Delete("/api/v1/store/logout", api.storeLogout)
 
