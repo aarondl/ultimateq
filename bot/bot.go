@@ -347,16 +347,16 @@ func (b *Bot) Close() error {
 	return nil
 }
 
-// Register an event handler to the bot in global space. Returns an identifier
+// RegisterGlobal event handler to the bot. Returns an identifier
 // that can be used to unregister the event.
-func (b *Bot) Register(event string, handler interface{}) uint64 {
-	return b.RegisterFiltered("", "", event, handler)
+func (b *Bot) RegisterGlobal(event string, handler interface{}) uint64 {
+	return b.Register("", "", event, handler)
 }
 
-// RegisterFiltered event handlers to the specified network and channel.
+// Register event handlers to the specified network and channel.
 // Leave either blank to create a filter based on that field alone. Returns
 // an identifier that can be used to unregister the event.
-func (b *Bot) RegisterFiltered(network, channel, event string,
+func (b *Bot) Register(network, channel, event string,
 	handler interface{}) uint64 {
 
 	return b.dispatcher.Register(network, channel, event, handler)
@@ -367,31 +367,30 @@ func (b *Bot) Unregister(id uint64) bool {
 	return b.dispatcher.Unregister(id)
 }
 
-// RegisterCmd registers a command with the bot.
-// See Cmder.Register for in-depth documentation.
-func (b *Bot) RegisterCmd(command *cmd.Cmd) error {
-	return b.RegisterFilteredCmd("", "", command)
+// RegisterGlobalCmd registers a command with the bot.
+// See cmds.Cmds.Register for in-depth documentation.
+func (b *Bot) RegisterGlobalCmd(command *cmd.Cmd) error {
+	return b.RegisterCmd("", "", command)
 }
 
-// RegisterFilteredCmd registers a command with the bot filtered based on the
+// RegisterCmd registers a command with the bot filtered based on the
 // network and channel. Leave either field blank to create a filter based on
 // that field alone.
-func (b *Bot) RegisterFilteredCmd(network, channel string,
-	command *cmd.Cmd) error {
-
+// See cmds.Cmds.Register for in-depth documentation.
+func (b *Bot) RegisterCmd(network, channel string, command *cmd.Cmd) error {
 	return b.cmds.Register(network, channel, command)
 }
 
-// UnregisterCmd from the bot. Leaving ext blank will cause all commands with
-// this name from all extensions to be unregistered.
-func (b *Bot) UnregisterCmd(ext, command string) bool {
-	return b.UnregisterFilteredCmd("", "", ext, command)
+// UnregisterGlobalCmd from the bot. Leaving ext blank will cause all commands
+// with this name from all extensions to be unregistered.
+func (b *Bot) UnregisterGlobalCmd(ext, command string) bool {
+	return b.UnregisterCmd("", "", ext, command)
 }
 
-// UnregisterFilteredCmd from the bot. All parameters can be blank except for
+// UnregisterCmd from the bot. All parameters can be blank except for
 // cmd. Leaving ext blank wipes out other extension's commands with the same
 // name.
-func (b *Bot) UnregisterFilteredCmd(network, channel, ext, cmd string) bool {
+func (b *Bot) UnregisterCmd(network, channel, ext, cmd string) bool {
 	return b.cmds.Unregister(network, channel, ext, cmd)
 }
 
