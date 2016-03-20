@@ -371,7 +371,7 @@ func NewCoreCmds(b *Bot) (*coreCmds, error) {
 		if command.Public {
 			privacy = cmd.ALLSCOPES
 		}
-		err := b.RegisterCmd(&cmd.Cmd{
+		err := b.RegisterGlobalCmd(&cmd.Cmd{
 			Cmd:         command.Name,
 			Extension:   extension,
 			Description: command.Desc,
@@ -394,7 +394,7 @@ func NewCoreCmds(b *Bot) (*coreCmds, error) {
 // unregisterCoreCmds unregisters all core commands. Made for testing.
 func (c *coreCmds) unregisterCoreCmds() {
 	for _, cmd := range commands {
-		c.b.UnregisterCmd(extension, cmd.Name)
+		c.b.UnregisterGlobalCmd(extension, cmd.Name)
 	}
 }
 

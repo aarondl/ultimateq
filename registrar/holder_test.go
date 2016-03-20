@@ -13,13 +13,15 @@ type mockReg struct {
 	cmds   int
 	uncmds int
 
+	id  uint64
 	err error
 	ret bool
 }
 
 func (m *mockReg) Register(_, _, _ string, _ interface{}) uint64 {
 	m.regs++
-	return 1
+	m.id++
+	return m.id
 }
 
 func (m *mockReg) RegisterCmd(_, _, _ string, _ *cmd.Cmd) error {
