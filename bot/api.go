@@ -5,7 +5,9 @@ import (
 	"net/http"
 
 	"github.com/aarondl/ultimateq/data"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/labstack/echo"
+	"github.com/labstack/echo/engine/standard"
 	"github.com/labstack/echo/middleware"
 	"gopkg.in/inconshreveable/log15.v2"
 )
@@ -16,11 +18,16 @@ type botAPI struct {
 	e *echo.Echo
 }
 
+const (
+	signingKey = "supersecretsigningkeythatnobodycaneverknow"
+)
+
 func newBotAPI(b *Bot) botAPI {
 	e := echo.New()
-	e.SetLogger(EchoLogger{b.Logger})
+	e.SetLogOutput(EchoLogger{b.Logger})
 	e.SetHTTPErrorHandler(errorHandler)
 
+	e.Use(jwtAuth(signingKey))
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 
@@ -29,51 +36,55 @@ func newBotAPI(b *Bot) botAPI {
 		e: e,
 	}
 
-	// State
-	e.Get("/api/v1/state/net/:network/self", api.stateSelf)
-	e.Get("/api/v1/state/net/:network/user/:user", api.stateUser)
-	e.Get("/api/v1/state/net/:network/users", api.stateUsers)
-	e.Get("/api/v1/state/net/:network/users/count", api.stateUserCount)
-	e.Get("/api/v1/state/net/:network/user_modes/:channel/:nick_or_host", api.stateUserModes)
-
-	e.Get("/api/v1/state/net/:network/channel/:channel", api.stateChannel)
-	e.Get("/api/v1/state/net/:network/channels", api.stateChannels)
-	e.Get("/api/v1/state/net/:network/channels/count", api.stateChannelCount)
-
-	e.Get("/api/v1/state/net/:network/is_on/:channel/:user", api.stateIsOn)
-
-	// Store
-	e.Put("/api/v1/store/auth_user", api.storeAuthUser)
-
-	e.Get("/api/v1/store/net/:network/authed_user/:host", api.storeAuthedUser)
-	e.Get("/api/v1/store/user/:username", api.storeUser)
-	e.Get("/api/v1/store/users", api.storeUsers)
-	e.Get("/api/v1/store/net/:network/users", api.storeNetworkUsers)
-	e.Get("/api/v1/store/net/:network/channel/:channel/users", api.storeNetworkChannelUsers)
-
-	e.Get("/api/v1/store/net/:network/channel/:channel", api.storeChannel)
-	e.Get("/api/v1/store/channels", api.storeChannels)
-
-	e.Put("/api/v1/store/user", api.storePutUser)
-	e.Put("/api/v1/store/channel", api.storePutChannel)
-	e.Delete("/api/v1/store/user/:username", api.storeDeleteUser)
-	e.Delete("/api/v1/store/net/:network/channel/:channel", api.storeDeleteChannel)
-
-	e.Delete("/api/v1/store/logout", api.storeLogout)
+	registerRoutes(api, e)
 
 	return api
 }
 
-// Start the server on the bind address
-func (b botAPI) start(addr string) {
-	b.e.Run(addr)
+func registerRoutes(api botAPI, e *echo.Echo) {
+	// State
+	e.Get("/api/v1/state/net/:network/self", echo.HandlerFunc(api.stateSelf))
+	e.Get("/api/v1/state/net/:network/user/:user", echo.HandlerFunc(api.stateUser))
+	e.Get("/api/v1/state/net/:network/users", echo.HandlerFunc(api.stateUsers))
+	e.Get("/api/v1/state/net/:network/users/count", echo.HandlerFunc(api.stateUserCount))
+	e.Get("/api/v1/state/net/:network/user_modes/:channel/:nick_or_host", echo.HandlerFunc(api.stateUserModes))
+
+	e.Get("/api/v1/state/net/:network/channel/:channel", echo.HandlerFunc(api.stateChannel))
+	e.Get("/api/v1/state/net/:network/channels", echo.HandlerFunc(api.stateChannels))
+	e.Get("/api/v1/state/net/:network/channels/count", echo.HandlerFunc(api.stateChannelCount))
+
+	e.Get("/api/v1/state/net/:network/is_on/:channel/:user", echo.HandlerFunc(api.stateIsOn))
+
+	// Store
+	e.Put("/api/v1/store/auth_user", echo.HandlerFunc(api.storeAuthUser))
+
+	e.Get("/api/v1/store/net/:network/authed_user/:host", echo.HandlerFunc(api.storeAuthedUser))
+	e.Get("/api/v1/store/user/:username", echo.HandlerFunc(api.storeUser))
+	e.Get("/api/v1/store/users", echo.HandlerFunc(api.storeUsers))
+	e.Get("/api/v1/store/net/:network/users", echo.HandlerFunc(api.storeNetworkUsers))
+	e.Get("/api/v1/store/net/:network/channel/:channel/users", echo.HandlerFunc(api.storeNetworkChannelUsers))
+
+	e.Get("/api/v1/store/net/:network/channel/:channel", echo.HandlerFunc(api.storeChannel))
+	e.Get("/api/v1/store/channels", echo.HandlerFunc(api.storeChannels))
+
+	e.Put("/api/v1/store/user", echo.HandlerFunc(api.storePutUser))
+	e.Put("/api/v1/store/channel", echo.HandlerFunc(api.storePutChannel))
+	e.Delete("/api/v1/store/user/:username", echo.HandlerFunc(api.storeDeleteUser))
+	e.Delete("/api/v1/store/net/:network/channel/:channel", echo.HandlerFunc(api.storeDeleteChannel))
+
+	e.Delete("/api/v1/store/logout", echo.HandlerFunc(api.storeLogout))
 }
 
-func errorHandler(err error, e *echo.Context) {
+// Start the server on the bind address
+func (b botAPI) start(addr string) {
+	b.e.Run(standard.New(addr))
+}
+
+func errorHandler(err error, e echo.Context) {
 	status := http.StatusInternalServerError
 
 	if httperr, ok := err.(*echo.HTTPError); ok {
-		status = httperr.Code()
+		status = httperr.Code
 	}
 
 	e.JSON(status, struct {
@@ -83,7 +94,7 @@ func errorHandler(err error, e *echo.Context) {
 	})
 }
 
-func (b botAPI) getNetState(e *echo.Context) (*data.State, error) {
+func (b botAPI) getNetState(e echo.Context) (*data.State, error) {
 	value := e.Param("network")
 	if len(value) == 0 {
 		return nil, echo.NewHTTPError(http.StatusBadRequest, "missing network route param")
@@ -97,7 +108,7 @@ func (b botAPI) getNetState(e *echo.Context) (*data.State, error) {
 	return state, nil
 }
 
-func getParam(e *echo.Context, key string) (string, error) {
+func getParam(e echo.Context, key string) (string, error) {
 	p := e.Param(key)
 	if len(p) == 0 {
 		return "", echo.NewHTTPError(http.StatusBadRequest, "missing route parameter: "+key)
@@ -106,7 +117,7 @@ func getParam(e *echo.Context, key string) (string, error) {
 	return p, nil
 }
 
-func getQueryParam(e *echo.Context, key string) (string, error) {
+func getQueryParam(e echo.Context, key string) (string, error) {
 	p := e.Query(key)
 	if len(p) == 0 {
 		return "", echo.NewHTTPError(http.StatusBadRequest, "missing query parameter: "+key)
@@ -115,7 +126,37 @@ func getQueryParam(e *echo.Context, key string) (string, error) {
 	return p, nil
 }
 
-func (b botAPI) stateSelf(e *echo.Context) error {
+type registerMessage struct {
+	Network string `json:"network,omitempty"`
+	Channel string `json:"channel,omitempty"`
+	Event   string `json:"event,omitempty"`
+}
+
+func (b botAPI) connect(e echo.Context) error {
+	return nil
+}
+
+func (b botAPI) register(e echo.Context) error {
+	var r registerMessage
+
+	if err := e.Bind(r); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (b botAPI) unregister(e echo.Context) error {
+	var r registerMessage
+
+	if err := e.Bind(r); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (b botAPI) stateSelf(e echo.Context) error {
 	state, err := b.getNetState(e)
 	if err != nil {
 		return err
@@ -133,7 +174,7 @@ func (b botAPI) stateSelf(e *echo.Context) error {
 	return nil
 }
 
-func (b botAPI) stateUser(e *echo.Context) error {
+func (b botAPI) stateUser(e echo.Context) error {
 	state, err := b.getNetState(e)
 	if err != nil {
 		return err
@@ -154,7 +195,7 @@ func (b botAPI) stateUser(e *echo.Context) error {
 	return nil
 }
 
-func (b botAPI) stateUsers(e *echo.Context) error {
+func (b botAPI) stateUsers(e echo.Context) error {
 	state, err := b.getNetState(e)
 	if err != nil {
 		return err
@@ -178,7 +219,7 @@ func (b botAPI) stateUsers(e *echo.Context) error {
 	return nil
 }
 
-func (b botAPI) stateUserCount(e *echo.Context) error {
+func (b botAPI) stateUserCount(e echo.Context) error {
 	state, err := b.getNetState(e)
 	if err != nil {
 		return err
@@ -207,7 +248,7 @@ func (b botAPI) stateUserCount(e *echo.Context) error {
 	return nil
 }
 
-func (b botAPI) stateUserModes(e *echo.Context) error {
+func (b botAPI) stateUserModes(e echo.Context) error {
 	state, err := b.getNetState(e)
 	if err != nil {
 		return err
@@ -233,7 +274,7 @@ func (b botAPI) stateUserModes(e *echo.Context) error {
 	return nil
 }
 
-func (b botAPI) stateChannel(e *echo.Context) error {
+func (b botAPI) stateChannel(e echo.Context) error {
 	state, err := b.getNetState(e)
 	if err != nil {
 		return err
@@ -255,7 +296,7 @@ func (b botAPI) stateChannel(e *echo.Context) error {
 	return nil
 }
 
-func (b botAPI) stateChannels(e *echo.Context) error {
+func (b botAPI) stateChannels(e echo.Context) error {
 	state, err := b.getNetState(e)
 	if err != nil {
 		return err
@@ -279,7 +320,7 @@ func (b botAPI) stateChannels(e *echo.Context) error {
 	return nil
 }
 
-func (b botAPI) stateChannelCount(e *echo.Context) error {
+func (b botAPI) stateChannelCount(e echo.Context) error {
 	state, err := b.getNetState(e)
 	if err != nil {
 		return err
@@ -308,7 +349,7 @@ func (b botAPI) stateChannelCount(e *echo.Context) error {
 	return nil
 }
 
-func (b botAPI) stateIsOn(e *echo.Context) error {
+func (b botAPI) stateIsOn(e echo.Context) error {
 	state, err := b.getNetState(e)
 	if err != nil {
 		return err
@@ -334,7 +375,7 @@ func (b botAPI) stateIsOn(e *echo.Context) error {
 	return nil
 }
 
-func (b botAPI) storeAuthUser(e *echo.Context) error {
+func (b botAPI) storeAuthUser(e echo.Context) error {
 	store := b.b.Store()
 
 	auth := struct {
@@ -373,7 +414,7 @@ func (b botAPI) storeAuthUser(e *echo.Context) error {
 	return nil
 }
 
-func (b botAPI) storeAuthedUser(e *echo.Context) error {
+func (b botAPI) storeAuthedUser(e echo.Context) error {
 	store := b.b.Store()
 
 	network, err := getParam(e, "network")
@@ -395,7 +436,7 @@ func (b botAPI) storeAuthedUser(e *echo.Context) error {
 	return nil
 }
 
-func (b botAPI) storeUser(e *echo.Context) error {
+func (b botAPI) storeUser(e echo.Context) error {
 	store := b.b.Store()
 
 	username, err := getParam(e, "username")
@@ -415,7 +456,7 @@ func (b botAPI) storeUser(e *echo.Context) error {
 	return nil
 }
 
-func (b botAPI) storeUsers(e *echo.Context) error {
+func (b botAPI) storeUsers(e echo.Context) error {
 	store := b.b.Store()
 
 	users, err := store.GlobalUsers()
@@ -428,7 +469,7 @@ func (b botAPI) storeUsers(e *echo.Context) error {
 	return nil
 }
 
-func (b botAPI) storeNetworkUsers(e *echo.Context) error {
+func (b botAPI) storeNetworkUsers(e echo.Context) error {
 	store := b.b.Store()
 
 	network, err := getParam(e, "network")
@@ -446,7 +487,7 @@ func (b botAPI) storeNetworkUsers(e *echo.Context) error {
 	return nil
 }
 
-func (b botAPI) storeNetworkChannelUsers(e *echo.Context) error {
+func (b botAPI) storeNetworkChannelUsers(e echo.Context) error {
 	store := b.b.Store()
 
 	network, err := getParam(e, "network")
@@ -468,7 +509,7 @@ func (b botAPI) storeNetworkChannelUsers(e *echo.Context) error {
 	return nil
 }
 
-func (b botAPI) storeChannel(e *echo.Context) error {
+func (b botAPI) storeChannel(e echo.Context) error {
 	store := b.b.Store()
 
 	network, err := getParam(e, "network")
@@ -494,7 +535,7 @@ func (b botAPI) storeChannel(e *echo.Context) error {
 	return nil
 }
 
-func (b botAPI) storeChannels(e *echo.Context) error {
+func (b botAPI) storeChannels(e echo.Context) error {
 	store := b.b.Store()
 
 	channels, err := store.Channels()
@@ -507,7 +548,7 @@ func (b botAPI) storeChannels(e *echo.Context) error {
 	return nil
 }
 
-func (b botAPI) storePutUser(e *echo.Context) error {
+func (b botAPI) storePutUser(e echo.Context) error {
 	store := b.b.Store()
 
 	var user data.StoredUser
@@ -524,7 +565,7 @@ func (b botAPI) storePutUser(e *echo.Context) error {
 	return nil
 }
 
-func (b botAPI) storePutChannel(e *echo.Context) error {
+func (b botAPI) storePutChannel(e echo.Context) error {
 	store := b.b.Store()
 
 	var channel data.StoredChannel
@@ -541,7 +582,7 @@ func (b botAPI) storePutChannel(e *echo.Context) error {
 	return nil
 }
 
-func (b botAPI) storeDeleteUser(e *echo.Context) error {
+func (b botAPI) storeDeleteUser(e echo.Context) error {
 	store := b.b.Store()
 
 	username, err := getParam(e, "username")
@@ -563,7 +604,7 @@ func (b botAPI) storeDeleteUser(e *echo.Context) error {
 	return nil
 }
 
-func (b botAPI) storeDeleteChannel(e *echo.Context) error {
+func (b botAPI) storeDeleteChannel(e echo.Context) error {
 	store := b.b.Store()
 
 	network, err := getParam(e, "network")
@@ -589,7 +630,7 @@ func (b botAPI) storeDeleteChannel(e *echo.Context) error {
 	return nil
 }
 
-func (b botAPI) storeLogout(e *echo.Context) error {
+func (b botAPI) storeLogout(e echo.Context) error {
 	store := b.b.Store()
 
 	network, host, username := e.Query("network"), e.Query("host"), e.Query("username")
@@ -613,33 +654,40 @@ type EchoLogger struct {
 	logger log15.Logger
 }
 
-func (e EchoLogger) Debug(args ...interface{}) {
-	e.logger.Debug(fmt.Sprintln(args...))
+func (e EchoLogger) Write(b []byte) (int, error) {
+	e.logger.Info(string(b))
+	return len(b), nil
 }
-func (e EchoLogger) Debugf(format string, args ...interface{}) {
-	e.logger.Debug(fmt.Sprintf(format, args...))
-}
-func (e EchoLogger) Info(args ...interface{}) {
-	e.logger.Info(fmt.Sprintln(args...))
-}
-func (e EchoLogger) Infof(format string, args ...interface{}) {
-	e.logger.Info(fmt.Sprintf(format, args...))
-}
-func (e EchoLogger) Warn(args ...interface{}) {
-	e.logger.Warn(fmt.Sprintln(args...))
-}
-func (e EchoLogger) Warnf(format string, args ...interface{}) {
-	e.logger.Warn(fmt.Sprintf(format, args...))
-}
-func (e EchoLogger) Error(args ...interface{}) {
-	e.logger.Error(fmt.Sprintln(args...))
-}
-func (e EchoLogger) Errorf(format string, args ...interface{}) {
-	e.logger.Error(fmt.Sprintf(format, args...))
-}
-func (e EchoLogger) Fatal(args ...interface{}) {
-	e.logger.Crit(fmt.Sprintln(args...))
-}
-func (e EchoLogger) Fatalf(format string, args ...interface{}) {
-	e.logger.Crit(fmt.Sprintf(format, args...))
+
+const (
+	bearer = "Bearer"
+)
+
+func jwtAuth(key string) echo.MiddlewareFunc {
+	return func(next echo.Handler) echo.Handler {
+		return echo.HandlerFunc(func(c echo.Context) error {
+			auth := c.Request().Header().Get("Authorization")
+			l := len(bearer)
+			he := echo.ErrUnauthorized
+
+			if len(auth) > l+1 && auth[:l] == bearer {
+				t, err := jwt.Parse(auth[l+1:], func(token *jwt.Token) (interface{}, error) {
+
+					// Always check the signing method
+					if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+						return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+					}
+
+					// Return the key for validation
+					return []byte(key), nil
+				})
+				if err == nil && t.Valid {
+					// Store token claims in echo.Context
+					c.Set("claims", t.Claims)
+					return next.Handle(c)
+				}
+			}
+			return he
+		})
+	}
 }
