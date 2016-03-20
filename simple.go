@@ -440,49 +440,49 @@ func main() {
 
 	err = bot.Run(func(b *bot.Bot) {
 		// Quote commands
-		b.RegisterCmd(cmd.MkCmd(
+		b.RegisterGlobalCmd(cmd.MkCmd(
 			"quote",
 			"Retrieves a quote. Randomly selects a quote if no id is provided.",
 			"quote",
 			&quoter,
 			cmd.PRIVMSG, cmd.ALLSCOPES, "[id]",
 		))
-		b.RegisterCmd(cmd.MkCmd(
+		b.RegisterGlobalCmd(cmd.MkCmd(
 			"quote",
 			"Shows the number of quotes in the database.",
 			"quotes",
 			&quoter,
 			cmd.PRIVMSG, cmd.ALLSCOPES,
 		))
-		b.RegisterCmd(cmd.MkCmd(
+		b.RegisterGlobalCmd(cmd.MkCmd(
 			"quote",
 			"Gets the details for a specific quote.",
 			"details",
 			&quoter,
 			cmd.PRIVMSG, cmd.ALLSCOPES, "id",
 		))
-		b.RegisterCmd(cmd.MkCmd(
+		b.RegisterGlobalCmd(cmd.MkCmd(
 			"quote",
 			"Adds a quote to the database.",
 			"addquote",
 			&quoter,
 			cmd.PRIVMSG, cmd.ALLSCOPES, "quote...",
 		))
-		b.RegisterCmd(cmd.MkAuthCmd(
+		b.RegisterGlobalCmd(cmd.MkAuthCmd(
 			"quote",
 			"Removes a quote from the database.",
 			"delquote",
 			&quoter,
 			cmd.PRIVMSG, cmd.ALLSCOPES, 0, "Q", "id",
 		))
-		b.RegisterCmd(cmd.MkAuthCmd(
+		b.RegisterGlobalCmd(cmd.MkAuthCmd(
 			"quote",
 			"Edits an existing quote.",
 			"editquote",
 			&quoter,
 			cmd.PRIVMSG, cmd.ALLSCOPES, 0, "Q", "id", "quote...",
 		))
-		b.RegisterCmd(cmd.MkCmd(
+		b.RegisterGlobalCmd(cmd.MkCmd(
 			"quote",
 			"Shows the address for the quote webserver.",
 			"quoteweb",
@@ -491,22 +491,22 @@ func main() {
 		))
 
 		// Queryer commands
-		b.Register(irc.PRIVMSG, &queryer)
-		b.RegisterCmd(cmd.MkCmd(
+		b.RegisterGlobal(irc.PRIVMSG, &queryer)
+		b.RegisterGlobalCmd(cmd.MkCmd(
 			"query",
 			"Submits a query to Google.",
 			"google",
 			&queryer,
 			cmd.PRIVMSG, cmd.ALLSCOPES, "query...",
 		))
-		b.RegisterCmd(cmd.MkCmd(
+		b.RegisterGlobalCmd(cmd.MkCmd(
 			"query",
 			"Submits a query to Wolfram Alpha.",
 			"calc",
 			&queryer,
 			cmd.PRIVMSG, cmd.ALLSCOPES, "query...",
 		))
-		b.RegisterCmd(cmd.MkCmd(
+		b.RegisterGlobalCmd(cmd.MkCmd(
 			"query",
 			"Fetches a weather report from yr.no.",
 			"weather",
@@ -515,14 +515,14 @@ func main() {
 		))
 
 		// Runnable Commands
-		b.RegisterCmd(cmd.MkCmd(
+		b.RegisterGlobalCmd(cmd.MkCmd(
 			"runnable",
 			"Runs a snippet of sandboxed go code.",
 			"go",
 			&runnable,
 			cmd.PRIVMSG, cmd.ALLSCOPES, "code...",
 		))
-		b.RegisterCmd(cmd.MkCmd(
+		b.RegisterGlobalCmd(cmd.MkCmd(
 			"runnable",
 			"Runs a snippet of sandboxed go code inside fmt.Println().",
 			"gop",
@@ -532,9 +532,9 @@ func main() {
 
 		// Handler commands
 		handler := Handler{b}
-		b.Register(irc.PRIVMSG, &handler)
-		b.Register(irc.JOIN, &handler)
-		b.RegisterCmd(cmd.MkAuthCmd(
+		b.RegisterGlobal(irc.PRIVMSG, &handler)
+		b.RegisterGlobal(irc.JOIN, &handler)
+		b.RegisterGlobalCmd(cmd.MkAuthCmd(
 			"simple",
 			"Ops or voices a user if they have o or v flags respectively.",
 			"up",
