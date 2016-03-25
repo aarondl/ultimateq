@@ -38,12 +38,12 @@ func (h *holder) Register(network, channel, event string, handler interface{}) u
 }
 
 // RegisterCmd and save the names we use for later
-func (h *holder) RegisterCmd(network, channel, ext string, command *cmd.Cmd) error {
-	if err := h.registrar.RegisterCmd(network, channel, ext, command); err != nil {
+func (h *holder) RegisterCmd(network, channel string, command *cmd.Cmd) error {
+	if err := h.registrar.RegisterCmd(network, channel, command); err != nil {
 		return err
 	}
 
-	key := strings.Join([]string{network, channel, ext, command.Cmd}, ":")
+	key := strings.Join([]string{network, channel, command.Extension, command.Cmd}, ":")
 	h.commands[key] = struct{}{}
 
 	return nil
@@ -60,12 +60,12 @@ func (h *holder) Unregister(id uint64) bool {
 }
 
 // UnregisterCmd and discard our record of its registration.
-func (h *holder) UnregisterCmd(network, channel, ext, cmd string) error {
-	err := h.registrar.UnregisterCmd(network, channel, ext, cmd)
+func (h *holder) UnregisterCmd(network, channel, ext, cmd string) bool {
+	ok := h.registrar.UnregisterCmd(network, channel, ext, cmd)
 
 	key := strings.Join([]string{network, channel, ext, cmd}, ":")
 	delete(h.commands, key)
-	return err
+	return ok
 }
 
 // unregisterAll applies unregister to all known registered things as well

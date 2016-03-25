@@ -24,7 +24,7 @@ func (m *mockReg) Register(_, _, _ string, _ interface{}) uint64 {
 	return m.id
 }
 
-func (m *mockReg) RegisterCmd(_, _, _ string, _ *cmd.Cmd) error {
+func (m *mockReg) RegisterCmd(_, _ string, _ *cmd.Cmd) error {
 	m.cmds++
 	return m.err
 }
@@ -34,9 +34,9 @@ func (m *mockReg) Unregister(_ uint64) bool {
 	return m.ret
 }
 
-func (m *mockReg) UnregisterCmd(_, _, _, _ string) error {
+func (m *mockReg) UnregisterCmd(_, _, _, _ string) bool {
 	m.uncmds++
-	return m.err
+	return m.ret
 }
 
 func (m *mockReg) verifyMock(t *testing.T, regs, unregs, cmds, uncmds int) {
@@ -124,7 +124,7 @@ func TestHolder_RegisterCmd(t *testing.T) {
 	m := &mockReg{}
 	h := newHolder(m)
 
-	if err := h.RegisterCmd("n", "c", "e", &cmd.Cmd{Cmd: "cmd"}); err != nil {
+	if err := h.RegisterCmd("n", "c", &cmd.Cmd{Cmd: "cmd", Extension: "e"}); err != nil {
 		t.Error(err)
 	}
 	if _, ok := h.commands["n:c:e:cmd"]; !ok {
@@ -141,7 +141,7 @@ func TestHolder_RegisterCmdFail(t *testing.T) {
 	m := &mockReg{err: e}
 	h := newHolder(m)
 
-	if err := h.RegisterCmd("n", "c", "e", &cmd.Cmd{Cmd: "cmd"}); err != e {
+	if err := h.RegisterCmd("n", "c", &cmd.Cmd{Cmd: "cmd", Extension: "e"}); err != e {
 		t.Error("wrong error:", err, "want:", e)
 	}
 	if _, ok := h.commands["n:c:e:cmd"]; ok {
@@ -157,11 +157,13 @@ func TestHolder_UnregisterCmd(t *testing.T) {
 	m := &mockReg{}
 	h := newHolder(m)
 
-	if err := h.RegisterCmd("n", "c", "e", &cmd.Cmd{Cmd: "cmd"}); err != nil {
+	if err := h.RegisterCmd("n", "c", &cmd.Cmd{Cmd: "cmd", Extension: "e"}); err != nil {
 		t.Error(err)
 	}
-	if err := h.UnregisterCmd("n", "c", "e", "cmd"); err != nil {
-		t.Error(err)
+
+	m.ret = true
+	if ok := h.UnregisterCmd("n", "c", "e", "cmd"); !ok {
+		t.Error("command not found")
 	}
 
 	if _, ok := h.commands["n:c:e:cmd"]; ok {
@@ -174,17 +176,16 @@ func TestHolder_UnregisterCmd(t *testing.T) {
 func TestHolder_UnregisterCmdFail(t *testing.T) {
 	t.Parallel()
 
-	e := errors.New("failure")
 	m := &mockReg{}
 	h := newHolder(m)
 
-	if err := h.RegisterCmd("n", "c", "e", &cmd.Cmd{Cmd: "cmd"}); err != nil {
+	if err := h.RegisterCmd("n", "c", &cmd.Cmd{Cmd: "cmd", Extension: "e"}); err != nil {
 		t.Error(err)
 	}
 
-	m.err = e
-	if err := h.UnregisterCmd("n", "c", "e", "cmd"); err != e {
-		t.Error("wrong error:", err, "want:", e)
+	m.ret = false
+	if ok := h.UnregisterCmd("n", "c", "e", "cmd"); ok {
+		t.Error("command was found, should not have been found")
 	}
 	if _, ok := h.commands["n:c:e:cmd"]; ok {
 		t.Error("did not delete the registration")
