@@ -11,6 +11,7 @@ An example configuration looks like this:
 	nocorecmds = false
 	loglevel = "debug"
 	logfile = "/path/to/file.log"
+	secret_key = "myunbelievablylongandsecrettoken"
 
 	# Most of the configuration values below have healthy defaults which means
 	# you don't have to set any of them. servers, nick, username, realname is
@@ -408,6 +409,29 @@ func (c *Config) SetNoCoreCmds(val bool) *Config {
 	defer c.protect.Unlock()
 
 	c.values["nocorecmds"] = interface{}(val)
+	return c
+}
+
+// SecretKey gets the value of the secretKey variable
+func (c *Config) SecretKey() (string, bool) {
+	c.protect.RLock()
+	defer c.protect.RUnlock()
+
+	if val, ok := c.values["secret_key"]; ok {
+		if skey, ok := val.(string); ok {
+			return skey, true
+		}
+	}
+
+	return "", false
+}
+
+// SetSecretKey value in the config.
+func (c *Config) SetSecretKey(key string) *Config {
+	c.protect.Lock()
+	defer c.protect.Unlock()
+
+	c.values["secret_key"] = interface{}(key)
 	return c
 }
 

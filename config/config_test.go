@@ -231,10 +231,18 @@ func TestConfig_Config_GetSet(t *testing.T) {
 	}
 
 	if v, ok := c.NoCoreCmds(); ok || v != false {
-		t.Error("Expected store file not to be set, and to get default:", v)
+		t.Error("Expected no core cmds not to be set, and to get default:", v)
 	}
 	c.SetNoCoreCmds(true)
 	if v, ok := c.NoCoreCmds(); !ok || v != true {
-		t.Error("Expected store file to be set, and to get a, got:", v)
+		t.Error("Expected no core cmds to be set, and to get a, got:", v)
+	}
+
+	if v, ok := c.SecretKey(); ok || v != "" {
+		t.Error("Expected secret key not to be set, and to get default:", v)
+	}
+	c.SetSecretKey("a")
+	if v, ok := c.SecretKey(); !ok || v != "a" {
+		t.Error("Expected secret key to be set, and to get a, got:", v)
 	}
 }
