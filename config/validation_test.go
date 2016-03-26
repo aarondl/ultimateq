@@ -281,6 +281,7 @@ func TestValidation_TypesLeafs(t *testing.T) {
 		nocorecmds = "hello"
 		logfile = 5
 		loglevel = 5
+		secret_key = 5
 
 		nick = 6
 		altnick = 7
@@ -363,6 +364,7 @@ func TestValidation_TypesLeafs(t *testing.T) {
 		{"global", "nocorecmds", "bool", "string"},
 		{"global", "loglevel", "string", "int64"},
 		{"global", "logfile", "string", "int64"},
+		{"global", "secret_key", "string", "int64"},
 		{"global", "nick", "string", "int64"},
 		{"global", "altnick", "string", "int64"},
 		{"global", "username", "string", "int64"},

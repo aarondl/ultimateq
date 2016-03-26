@@ -15,7 +15,7 @@ type validatorRules struct {
 }
 
 var globalValidator = validatorRules{
-	stringVals: []string{"storefile", "loglevel", "logfile"},
+	stringVals: []string{"storefile", "loglevel", "logfile", "secret_key"},
 	mapVals:    []string{"ext", "exts", "networks"},
 	boolVals:   []string{"nocorecmds"},
 }
