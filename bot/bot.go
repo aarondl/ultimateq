@@ -646,7 +646,7 @@ func (b *Bot) mkPrefixFetcher() func(network, channel string) rune {
 // Watches for Keyboard Input OR SIGTERM OR SIGKILL and shuts down normally.
 // Pauses after death to allow all goroutines to come to a graceful shutdown.
 func Run(cb func(b *Bot)) error {
-	cfg := config.NewConfig().FromFile("config.toml")
+	cfg := config.New().FromFile("config.toml")
 	b, err := New(cfg)
 	if err != nil {
 		return err

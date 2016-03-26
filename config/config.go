@@ -167,8 +167,8 @@ type Config struct {
 	protect  sync.RWMutex
 }
 
-// NewConfig initializes a Config object.
-func NewConfig() *Config {
+// New initializes a Config object.
+func New() *Config {
 	c := &Config{}
 	c.clear()
 
@@ -195,7 +195,7 @@ func (c *Config) Clone() *Config {
 	c.protect.RLock()
 	defer c.protect.RUnlock()
 
-	nc := NewConfig()
+	nc := New()
 	copyMap(nc.values, c.values)
 
 	return nc

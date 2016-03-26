@@ -105,7 +105,7 @@ func TestBotConfig_ReplaceConfig(t *testing.T) {
 	c2.NewNetwork("anothernewserver").
 		SetServers([]string{"anothernewserver:6667"})
 
-	c3 := config.NewConfig()
+	c3 := config.New()
 
 	b, _ := createBot(c1, connProvider, nil, devNull, false, false)
 	b.Logger.SetHandler(log15.DiscardHandler())

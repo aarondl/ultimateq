@@ -12,7 +12,7 @@ import (
 func TestValidation(t *testing.T) {
 	t.Parallel()
 
-	c := NewConfig().FromString(`
+	c := New().FromString(`
 	[networks.net]
 	`)
 
@@ -27,7 +27,7 @@ func TestValidation(t *testing.T) {
 		t.Error("Expected a particular error message, got:", ers[0])
 	}
 
-	c = NewConfig().FromString(`
+	c = New().FromString(`
 	nick = "n"
 	altnick = "n"
 	realname = "n"
@@ -57,7 +57,7 @@ func TestValidation_DisplayErrors(t *testing.T) {
 	logger := log15.New()
 	logger.SetHandler(log15.StreamHandler(b, log15.LogfmtFormat()))
 
-	c := NewConfig().FromString(`
+	c := New().FromString(`
 	nick = "n"
 	altnick = "n"
 	realname = "n"
@@ -128,7 +128,7 @@ func TestValidation_RequiredTypes(t *testing.T) {
 func requiredTestHelper(cfg string, expects []rexpect, t *testing.T) {
 	ers := make(errList, 0)
 
-	c := NewConfig().FromString(cfg)
+	c := New().FromString(cfg)
 	c.validateRequired(&ers)
 
 	if len(expects) != len(ers) {
@@ -418,7 +418,7 @@ func TestValidation_TypesLeafs(t *testing.T) {
 func typesTestHelper(cfg string, expects []texpect, t *testing.T) {
 	ers := make(errList, 0)
 
-	c := NewConfig().FromString(cfg)
+	c := New().FromString(cfg)
 	c.validateTypes(&ers)
 
 	if len(expects) != len(ers) {

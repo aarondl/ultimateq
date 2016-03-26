@@ -46,7 +46,7 @@ type tSetup struct {
 }
 
 func commandsSetup(t *testing.T) *tSetup {
-	conf := config.NewConfig()
+	conf := config.New()
 	conf.Network("").SetNick("nobody").SetAltnick("nobody1").
 		SetUsername("nobody").SetRealname("ultimateq").
 		SetNoReconnect(true).SetSSL(true).SetPrefix(prefix)
@@ -122,7 +122,7 @@ func prvRspChk(ts *tSetup, expected, to, sender string, args ...string) error {
 }
 
 func TestCoreCommands(t *testing.T) {
-	conf := config.NewConfig()
+	conf := config.New()
 	conf.Network("").SetNick("nobody").SetAltnick("nobody1").
 		SetUsername("nobody").SetRealname("ultimateq").SetNoReconnect(true).
 		SetSSL(true)

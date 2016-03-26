@@ -8,7 +8,7 @@ import (
 func TestConfig_Network_GetSet(t *testing.T) {
 	t.Parallel()
 
-	c := NewConfig()
+	c := New()
 	glb := c.Network("")
 	net := c.NewNetwork("net")
 
@@ -69,7 +69,7 @@ func TestConfig_Network_GetSet(t *testing.T) {
 func TestConfig_Network_GetSetChannels(t *testing.T) {
 	t.Parallel()
 
-	c := NewConfig()
+	c := New()
 	glb := c.Network("")
 	net := c.NewNetwork("net")
 	ch1 := Channel{"b", "c"}
@@ -118,7 +118,7 @@ func TestConfig_Network_GetSetChannels(t *testing.T) {
 func TestConfig_Network_GetChannelPrefix(t *testing.T) {
 	t.Parallel()
 
-	c := NewConfig()
+	c := New()
 	glb := c.Network("")
 	net := c.NewNetwork("net")
 	ch1 := Channel{"b", "1"}

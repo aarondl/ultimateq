@@ -56,7 +56,7 @@ func init() {
 
 var netID = "test"
 
-var fakeConfig = config.NewConfig().FromString(`
+var fakeConfig = config.New().FromString(`
 nick = "nobody"
 altnick = "nobody1"
 username = "nobody"
@@ -84,7 +84,7 @@ func TestBot_Create(t *testing.T) {
 	}
 
 	log15.Root().SetHandler(log15.DiscardHandler())
-	_, err = New(config.NewConfig())
+	_, err = New(config.New())
 	if err != errInvalidConfig {
 		t.Error("Expected error:", errInvalidConfig, "got", err)
 	}

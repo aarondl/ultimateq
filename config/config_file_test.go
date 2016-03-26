@@ -378,7 +378,7 @@ func verifyFakeConfig(t *testing.T, conf *Config) {
 
 func TestConfig_FromReader(t *testing.T) {
 	t.Parallel()
-	c := NewConfig().FromString(configuration)
+	c := New().FromString(configuration)
 
 	if !c.Validate() {
 		t.Error(c.errors)
@@ -390,7 +390,7 @@ func TestConfig_FromReader(t *testing.T) {
 
 func TestConfig_FromReaderErrors(t *testing.T) {
 	t.Parallel()
-	c := NewConfig().FromReader(&dyingReader{})
+	c := New().FromReader(&dyingReader{})
 
 	ers := c.Errors()
 	if exp, got := 1, len(ers); exp != got {
@@ -404,7 +404,7 @@ func TestConfig_FromReaderErrors(t *testing.T) {
 	}
 
 	buf := bytes.NewBufferString("defaults:\n\tport: 5555")
-	c = NewConfig().FromReader(buf)
+	c = New().FromReader(buf)
 
 	ers = c.Errors()
 	if exp, got := 1, len(ers); exp != got {
@@ -422,7 +422,7 @@ func TestConfig_fromFile(t *testing.T) {
 	buf := &testBuffer{bytes.NewBufferString(configuration), false}
 
 	name := "check.yaml"
-	c := NewConfig().fromFile(name, func(f string) (io.ReadCloser, error) {
+	c := New().fromFile(name, func(f string) (io.ReadCloser, error) {
 		return buf, nil
 	})
 
@@ -437,7 +437,7 @@ func TestConfig_fromFile(t *testing.T) {
 
 	name = ""
 	buf = &testBuffer{bytes.NewBufferString(configuration), false}
-	c = NewConfig().fromFile(name, func(f string) (io.ReadCloser, error) {
+	c = New().fromFile(name, func(f string) (io.ReadCloser, error) {
 		return buf, nil
 	})
 
@@ -450,7 +450,7 @@ func TestConfig_fromFileErrors(t *testing.T) {
 	t.Parallel()
 	errMsg := errMsgFileError[:len(errMsgFileError)-4]
 
-	c := NewConfig().fromFile("", func(_ string) (io.ReadCloser, error) {
+	c := New().fromFile("", func(_ string) (io.ReadCloser, error) {
 		return nil, io.EOF
 	})
 	ers := c.Errors()
@@ -466,14 +466,14 @@ func TestConfig_fromFileErrors(t *testing.T) {
 
 func TestConfig_ToWriter(t *testing.T) {
 	t.Parallel()
-	c := NewConfig().FromString(configuration)
+	c := New().FromString(configuration)
 
 	buf := &bytes.Buffer{}
 	if err := c.ToWriter(buf); err != nil {
 		t.Error("Unexpected error:", err)
 	}
 
-	c = NewConfig().FromReader(buf)
+	c = New().FromReader(buf)
 
 	verifyFakeConfig(t, c)
 }
@@ -481,7 +481,7 @@ func TestConfig_ToWriter(t *testing.T) {
 func TestConfig_ToWriterErrors(t *testing.T) {
 	t.Parallel()
 
-	err := NewConfig().FromString(configuration).ToWriter(&dyingWriter{})
+	err := New().FromString(configuration).ToWriter(&dyingWriter{})
 	if err == nil || err == io.EOF {
 		t.Error("Expected to see an unconventional error.")
 	}
@@ -490,7 +490,7 @@ func TestConfig_ToWriterErrors(t *testing.T) {
 func TestConfig_toFile(t *testing.T) {
 	t.Parallel()
 
-	c := NewConfig()
+	c := New()
 	buf := &testBuffer{&bytes.Buffer{}, false}
 
 	filename := ""
@@ -524,7 +524,7 @@ func TestConfig_toFile(t *testing.T) {
 
 func TestConfig_toFileErrors(t *testing.T) {
 	t.Parallel()
-	err := NewConfig().toFile("", func(_ string) (io.WriteCloser, error) {
+	err := New().toFile("", func(_ string) (io.WriteCloser, error) {
 		return nil, io.EOF
 	})
 

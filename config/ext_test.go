@@ -8,7 +8,7 @@ import (
 func TestConfig_Ext_GetSet(t *testing.T) {
 	t.Parallel()
 
-	c := NewConfig()
+	c := New()
 	gext := c.ExtGlobal()
 	ext := c.NewExt("ext1")
 
@@ -34,7 +34,7 @@ func TestConfig_Ext_GetSet(t *testing.T) {
 func TestConfig_Ext_GetSetActive(t *testing.T) {
 	t.Parallel()
 
-	c := NewConfig()
+	c := New()
 	gext := c.ExtGlobal()
 	ext := c.NewExt("ext1")
 
@@ -86,7 +86,7 @@ func TestConfig_Ext_GetSetActive(t *testing.T) {
 func TestExt_Config(t *testing.T) {
 	t.Parallel()
 
-	c := NewConfig()
+	c := New()
 	glb := c.ExtGlobal()
 
 	if exp, got := 0, glb.Config("", ""); len(got) != exp {
@@ -193,7 +193,7 @@ func TestExt_Config(t *testing.T) {
 func TestExt_ConfigOverride(t *testing.T) {
 	t.Parallel()
 
-	c := NewConfig()
+	c := New()
 	glb := c.ExtGlobal()
 
 	glb.SetConfig("", "", "k", "v1")
@@ -223,7 +223,7 @@ func TestExt_ConfigOverride(t *testing.T) {
 func TestExt_ConfigVal(t *testing.T) {
 	t.Parallel()
 
-	c := NewConfig()
+	c := New()
 	glb := c.ExtGlobal()
 
 	if _, ok := glb.ConfigVal("", "", "k"); ok {
