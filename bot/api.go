@@ -3,8 +3,10 @@ package bot
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/aarondl/ultimateq/data"
+	"github.com/aarondl/ultimateq/dispatch/remote"
 	"github.com/aarondl/ultimateq/registrar"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/labstack/echo"
@@ -15,23 +17,26 @@ import (
 
 // api provides a REST api around a bot
 type api struct {
-	bot   *Bot
-	e     *echo.Echo
-	proxy *registrar.Proxy
+	bot      *Bot
+	e        *echo.Echo
+	proxy    *registrar.Proxy
+	dispatch *remote.Dispatcher
 }
-
-const (
-	signingKey = "supersecretsigningkeythatnobodycaneverknow"
-)
 
 func newAPI(b *Bot) api {
 	e := echo.New()
 	e.SetLogOutput(EchoLogger{b.Logger})
 	e.SetHTTPErrorHandler(errorHandler)
 
-	e.Use(jwtAuth(signingKey))
+	signingKey, ok := b.conf.SecretKey()
+	if !ok {
+		panic("must have a signing key in the config")
+	}
+
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
+	e.Use(jwtAuth(signingKey))
+	e.Use(echo.MiddlewareFunc(checkClaims))
 
 	api := api{
 		bot:   b,
@@ -129,31 +134,74 @@ func getQueryParam(e echo.Context, key string) (string, error) {
 	return p, nil
 }
 
+func getExtName(e echo.Context) (ext string) {
+	return e.Get("ext").(string)
+}
+
+func (a api) connect(e echo.Context) error {
+	ext := getExtName(e)
+
+	stdRes := e.Response().(*standard.Response)
+	w := stdRes.ResponseWriter.(http.Hijacker)
+
+	conn, buffer, err := w.Hijack()
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "could not hijack connection")
+	}
+
+	// Flush buffer and discard
+	buffer.Flush()
+
+	// Reset read/write deadlines
+	conn.SetReadDeadline(time.Time{})
+	conn.SetWriteDeadline(time.Time{})
+
+	a.dispatch.New(ext, conn, func(name string) {
+		a.dispatch.Remove(name)
+		a.proxy.Unregister(name)
+	})
+
+	return nil
+}
+
 type registerMessage struct {
 	Network string `json:"network,omitempty"`
 	Channel string `json:"channel,omitempty"`
 	Event   string `json:"event,omitempty"`
 }
 
-func (a api) connect(e echo.Context) error {
-	return nil
+type unregisterMessage struct {
+	ID uint64 `json:"id"`
 }
 
 func (a api) register(e echo.Context) error {
 	var r registerMessage
 
-	if err := e.Bind(r); err != nil {
+	if err := e.Bind(&r); err != nil {
 		return err
 	}
+
+	ext := getExtName(e)
+	proxy := a.proxy.Get(ext)
+	handler := a.dispatch.Get(ext)
+	proxy.Register(r.Network, r.Channel, r.Event, handler)
 
 	return nil
 }
 
 func (a api) unregister(e echo.Context) error {
-	var r registerMessage
+	var r unregisterMessage
 
-	if err := e.Bind(r); err != nil {
+	if err := e.Bind(&r); err != nil {
 		return err
+	}
+
+	ext := getExtName(e)
+	proxy := a.proxy.Get(ext)
+	did := proxy.Unregister(r.ID)
+
+	if !did {
+		return e.NoContent(http.StatusNotFound)
 	}
 
 	return nil
@@ -686,11 +734,47 @@ func jwtAuth(key string) echo.MiddlewareFunc {
 				})
 				if err == nil && t.Valid {
 					// Store token claims in echo.Context
-					c.Set("claims", t.Claims)
+					if uqIntf, ok := t.Claims["uq"]; ok {
+						if uq, ok := uqIntf.(string); ok {
+							c.Set("uq", uq)
+						}
+					}
+					if extNameIntf, ok := t.Claims["ext"]; ok {
+						if extName, ok := extNameIntf.(string); ok {
+							c.Set("ext", extName)
+						}
+					}
+
 					return next.Handle(c)
 				}
 			}
 			return he
 		})
 	}
+}
+
+func checkClaims(next echo.Handler) echo.Handler {
+	return echo.HandlerFunc(func(c echo.Context) error {
+
+		var errStr string
+		if uqIntf := c.Get("uq"); uqIntf == nil {
+			errStr = "missing uq claim in token"
+		} else if uq, ok := uqIntf.(string); !ok {
+			errStr = "uq claim in token wrong type"
+		} else if uq != "extension" {
+			errStr = `uq claim in token must be "extension"`
+		}
+
+		if extIntf := c.Get("ext"); extIntf == nil {
+			errStr = `ext claim must exist`
+		} else if ext, ok := extIntf.(string); !ok || len(ext) == 0 {
+			errStr = `ext claim must be a non-empty string`
+		}
+
+		if len(errStr) > 0 {
+			return echo.NewHTTPError(http.StatusBadRequest, errStr)
+		}
+
+		return next.Handle(c)
+	})
 }

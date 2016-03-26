@@ -52,3 +52,35 @@ func TestDispatcher_NewReplace(t *testing.T) {
 		t.Error("Want e2 to be stored")
 	}
 }
+
+func TestDispatcher_Get(t *testing.T) {
+	t.Parallel()
+
+	d := NewDispatcher(nil, nil)
+
+	var b *bytes.Buffer
+	e := d.New("a", NopCloser(b), func(string) {})
+
+	if e != d.Get("a") || e != d.exts["a"] {
+		t.Error("Should be stored and be retrieved")
+	}
+}
+
+func TestDispatcher_Remove(t *testing.T) {
+	t.Parallel()
+
+	d := NewDispatcher(nil, nil)
+
+	var b *bytes.Buffer
+	e := d.New("a", NopCloser(b), func(string) {})
+
+	if e != d.exts["a"] {
+		t.Error("e should be stored")
+	}
+
+	d.Remove("a")
+
+	if nil != d.exts["a"] {
+		t.Error("e should be deleted")
+	}
+}

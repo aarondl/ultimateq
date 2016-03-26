@@ -59,3 +59,11 @@ func (d *Dispatcher) Get(ext string) *ExtHandler {
 
 	return d.exts[ext]
 }
+
+// Remove an extension handler by it's name
+func (d *Dispatcher) Remove(ext string) {
+	d.mut.Lock()
+	defer d.mut.Unlock()
+
+	delete(d.exts, ext)
+}
