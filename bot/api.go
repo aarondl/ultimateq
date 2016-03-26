@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/aarondl/ultimateq/data"
+	"github.com/aarondl/ultimateq/registrar"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/engine/standard"
@@ -14,8 +15,9 @@ import (
 
 // api provides a REST api around a bot
 type api struct {
-	bot *Bot
-	e   *echo.Echo
+	bot   *Bot
+	e     *echo.Echo
+	proxy *registrar.Proxy
 }
 
 const (
@@ -32,8 +34,9 @@ func newAPI(b *Bot) api {
 	e.Use(middleware.Recover())
 
 	api := api{
-		bot: b,
-		e:   e,
+		bot:   b,
+		e:     e,
+		proxy: registrar.NewProxy(b),
 	}
 
 	registerRoutes(api, e)
