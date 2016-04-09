@@ -262,7 +262,7 @@ func (_ *Queryer) Weather(w irc.Writer, ev *cmd.Event) error {
 }
 
 func (_ *Queryer) Shorten(w irc.Writer, ev *cmd.Event) error {
-	q := ev.GetArg("query")
+	q := ev.Arg("query")
 	nick := ev.Nick()
 	ev.Close()
 
@@ -528,6 +528,13 @@ func main() {
 			&queryer,
 			cmd.PRIVMSG, cmd.ALLSCOPES, "query...",
 		))
+		b.RegisterCmd(cmd.MkCmd(
+			"query",
+			"Shorten a URL with the goo.gl url shortener",
+			"shorten",
+			&queryer,
+			cmd.PRIVMSG, cmd.ALLSCOPES, "query...",
+		))
 
 		// Runnable Commands
 		b.RegisterCmd(cmd.MkCmd(
@@ -543,13 +550,6 @@ func main() {
 			"gop",
 			&runnable,
 			cmd.PRIVMSG, cmd.ALLSCOPES, "code...",
-		))
-		b.RegisterCmd(cmd.MkCmd(
-			"query",
-			"Shorten a URL with the goo.gl url shortener",
-			"shorten",
-			&queryer,
-			cmd.PRIVMSG, cmd.ALL, "query...",
 		))
 
 		// Handler commands
