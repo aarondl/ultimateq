@@ -237,7 +237,7 @@ func (_ *Queryer) Google(w irc.Writer, ev *cmd.Event) error {
 	q := ev.Arg("query")
 	nick := ev.Nick()
 
-	if out, err := query.Google(q); len(out) != 0 {
+	if out, err := query.Google(q, &queryConf); len(out) != 0 {
 		out = sanitize(out)
 		w.Notify(ev.Event, nick, out)
 	} else if err != nil {
@@ -252,6 +252,21 @@ func (_ *Queryer) Weather(w irc.Writer, ev *cmd.Event) error {
 	nick := ev.Nick()
 
 	if out, err := query.Weather(q, &queryConf); len(out) != 0 {
+		out = sanitize(out)
+		w.Notify(ev.Event, nick, out)
+	} else if err != nil {
+		w.Notice(nick, err.Error())
+	}
+
+	return nil
+}
+
+func (_ *Queryer) Shorten(w irc.Writer, ev *cmd.Event) error {
+	q := ev.GetArg("query")
+	nick := ev.Nick()
+	ev.Close()
+
+	if out, err := query.GetShortUrl(q, &queryConf); len(out) != 0 {
 		out = sanitize(out)
 		w.Notify(ev.Event, nick, out)
 	} else if err != nil {
@@ -528,6 +543,13 @@ func main() {
 			"gop",
 			&runnable,
 			cmd.PRIVMSG, cmd.ALLSCOPES, "code...",
+		))
+		b.RegisterCmd(cmd.MkCmd(
+			"query",
+			"Shorten a URL with the goo.gl url shortener",
+			"shorten",
+			&queryer,
+			cmd.PRIVMSG, cmd.ALL, "query...",
 		))
 
 		// Handler commands
