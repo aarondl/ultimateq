@@ -267,8 +267,7 @@ func (_ *Queryer) Shorten(w irc.Writer, ev *cmd.Event) error {
 	ev.Close()
 
 	if out, err := query.GetShortUrl(q, &queryConf); len(out) != 0 {
-		out = sanitize(out)
-		w.Notify(ev.Event, nick, out)
+		w.Notifyf(ev.Event, nick, "\x02Shorten:\x02 %s", sanitize(out))
 	} else if err != nil {
 		w.Notice(nick, err.Error())
 	}
@@ -438,10 +437,10 @@ func main() {
 
 	var runnable Runnable
 	var queryer Queryer
-	if conf := query.NewConfig("wolfid.toml"); conf != nil {
+	if conf := query.NewConfig("query.toml"); conf != nil {
 		queryConf = *conf
 	} else {
-		log.Println("Error loading wolfram configuration.")
+		log.Println("Error loading query configuration.")
 	}
 
 	qdb, err := quotes.OpenDB("quotes.sqlite3")
