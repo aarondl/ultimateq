@@ -1,0 +1,18 @@
+test:
+  pre:
+    - go get github.com/jstemmer/go-junit-report
+    - go get github.com/mattn/goveralls
+  override:
+    - >
+      go test -v -race ./... |
+      go-junit-report >> $CIRCLE_TEST_REPORTS/junit.xml
+    - >
+      echo "mode: set" > $CIRCLE_ARTIFACTS/coverage.txt &&
+      for i in $(go list ./...); do
+      rm -f coverage.tmp;
+      go test -v -coverprofile coverage.tmp $i &&
+      tail -n +2 coverage.tmp >> $CIRCLE_ARTIFACTS/coverage.txt;
+      done
+  post:
+    - >
+      goveralls -coverprofile=$CIRCLE_ARTIFACTS/coverage.txt -service=circle-ci -repotoken=$COVERALLS_TOKEN
