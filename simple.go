@@ -266,7 +266,7 @@ func (_ *Queryer) Shorten(w irc.Writer, ev *cmd.Event) error {
 	nick := ev.Nick()
 	ev.Close()
 
-	if out, err := query.GetShortUrl(q, &queryConf); len(out) != 0 {
+	if out, err := query.GetShortURL(q, &queryConf); len(out) != 0 {
 		w.Notifyf(ev.Event, nick, "\x02Shorten:\x02 %s", sanitize(out))
 	} else if err != nil {
 		w.Notice(nick, err.Error())
