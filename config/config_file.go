@@ -70,7 +70,7 @@ func (c *Config) FromReader(reader io.Reader) *Config {
 	defer c.protect.Unlock()
 	c.clear()
 
-	_, err := toml.DecodeReader(reader, c.values)
+	_, err := toml.DecodeReader(reader, &c.values)
 	if err != nil {
 		c.addError(errMsgInvalidConfigFile, err)
 	}

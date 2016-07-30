@@ -237,7 +237,7 @@ func (_ *Queryer) Google(w irc.Writer, ev *cmd.Event) error {
 	q := ev.Arg("query")
 	nick := ev.Nick()
 
-	if out, err := query.Google(q); len(out) != 0 {
+	if out, err := query.Google(q, &queryConf); len(out) != 0 {
 		out = sanitize(out)
 		w.Notify(ev.Event, nick, out)
 	} else if err != nil {
@@ -254,6 +254,20 @@ func (_ *Queryer) Weather(w irc.Writer, ev *cmd.Event) error {
 	if out, err := query.Weather(q, &queryConf); len(out) != 0 {
 		out = sanitize(out)
 		w.Notify(ev.Event, nick, out)
+	} else if err != nil {
+		w.Notice(nick, err.Error())
+	}
+
+	return nil
+}
+
+func (_ *Queryer) Shorten(w irc.Writer, ev *cmd.Event) error {
+	q := ev.Arg("query")
+	nick := ev.Nick()
+	ev.Close()
+
+	if out, err := query.GetShortURL(q, &queryConf); len(out) != 0 {
+		w.Notifyf(ev.Event, nick, "\x02Shorten:\x02 %s", sanitize(out))
 	} else if err != nil {
 		w.Notice(nick, err.Error())
 	}
@@ -423,10 +437,10 @@ func main() {
 
 	var runnable Runnable
 	var queryer Queryer
-	if conf := query.NewConfig("wolfid.toml"); conf != nil {
+	if conf := query.NewConfig("query.toml"); conf != nil {
 		queryConf = *conf
 	} else {
-		log.Println("Error loading wolfram configuration.")
+		log.Println("Error loading query configuration.")
 	}
 
 	qdb, err := quotes.OpenDB("quotes.sqlite3")
@@ -510,6 +524,13 @@ func main() {
 			"query",
 			"Fetches a weather report from yr.no.",
 			"weather",
+			&queryer,
+			cmd.PRIVMSG, cmd.ALLSCOPES, "query...",
+		))
+		b.RegisterCmd(cmd.MkCmd(
+			"query",
+			"Shorten a URL with the goo.gl url shortener",
+			"shorten",
 			&queryer,
 			cmd.PRIVMSG, cmd.ALLSCOPES, "query...",
 		))
