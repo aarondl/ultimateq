@@ -1,6 +1,73 @@
 syntax = "proto3";
 
-import "data.proto";
+package api;
+
+message Handler {
+  string network = 1;
+  string channel = 2;
+  string event   = 3;
+}
+
+message Command {
+  message Cmd {
+    string network     = 1;
+    string channel     = 2;
+    string description = 3;
+    int32  kind        = 4;
+    int32  scope       = 5;
+
+    repeated string args = 6;
+
+    bool   require_auth = 7;
+    int32  req_level    = 8;
+    string req_flags    = 9;
+  }
+  string network = 1;
+  string channel = 2;
+  Cmd    cmd     = 3;
+}
+
+message SimpleUser {
+  string host = 1;
+  string name = 2;
+}
+
+message SelfResponse {
+  SimpleUser   user  = 1;
+  ChannelModes modes = 2;
+}
+
+message ChannelModes {
+  message ChanModeKind {
+    message UserPrefix {
+      string symbol = 1;
+      string char   = 2;
+    }
+    repeated UserPrefix user_prefixes = 1;
+    map<string,int32> channel_modes   = 2;
+  }
+  string       modes = 1;
+  ChanModeKind kinds = 2;
+}
+
+message StoredUser {
+  string username = 1;
+  string password = 2;
+  repeated string masks     = 3;
+  map<string,Access> access = 4;
+  map<string,string> data   = 5;
+}
+
+message StoredChannel {
+  string network = 1;
+  string name    = 2;
+  map<string,string> data = 3;
+}
+
+message Access {
+  int32  level = 1;
+  string flags = 2;
+}
 
 message Empty {
 }
@@ -47,11 +114,6 @@ message RegisterRequest {
 
 message UnregisterRequest {
   string name = 1;
-}
-
-message SelfResponse {
-  SimpleUser self    = 1;
-  ChannelModes modes = 2;
 }
 
 message UserResponse {
@@ -137,7 +199,7 @@ service ExtService {
   rpc Register(RegisterRequest) returns (stream IRCMessage);
   rpc Unregister(UnregisterRequest) returns (Result);
 
-  rpc StateSelf(Query) returns (SimpleUser);
+  rpc StateSelf(Query) returns (SelfResponse);
   rpc StateUsersByChan(NetworkQuery) returns (ListResponse);
   rpc StateUsersByChanCount(NetworkQuery) returns (CountResponse);
   rpc StateUserModes(ChannelQuery) returns (ChannelModes);
