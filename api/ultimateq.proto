@@ -1,0 +1,167 @@
+syntax = "proto3";
+
+import "data.proto";
+
+message Empty {
+}
+
+message Query {
+  string query = 1;
+}
+
+message NetworkQuery {
+  string network = 1;
+  string query   = 2;
+}
+
+message ChannelQuery {
+  string network = 1;
+  string channel = 2;
+  string query   = 3;
+}
+
+message ListResponse {
+  repeated string list = 1;
+}
+
+message CountResponse {
+  int32 count = 1;
+}
+
+message Result {
+  message OK {
+  }
+  message NotFound {
+  }
+  oneof result {
+    OK ok              = 1;
+    NotFound not_found = 2;
+  }
+}
+
+message RegisterRequest {
+  string name = 1;
+  repeated Handler handlers = 2;
+  repeated Command cmds     = 3;
+}
+
+message UnregisterRequest {
+  string name = 1;
+}
+
+message SelfResponse {
+  SimpleUser self    = 1;
+  ChannelModes modes = 2;
+}
+
+message UserResponse {
+  SimpleUser self = 1;
+}
+
+message UserModesResponse {
+  ChannelModes modes = 1;
+}
+
+message ChannelResponse {
+  string name  = 1;
+  string topic = 2;
+  message ChannelModeSet {
+    message AddressModes {
+      repeated string address_modes = 1;
+    }
+    map<string,string> arg_modes           = 1;
+    map<string,AddressModes> address_modes = 2;
+  }
+  ChannelModeSet modes = 3;
+}
+
+message StoredUsersResponse {
+  repeated StoredUser users = 1;
+}
+
+message StoredChannelsResponse {
+  repeated StoredChannel channels = 1;
+}
+
+message LogoutRequest {
+  message HostUser {
+    string network = 1;
+    string host    = 2;
+  }
+  oneof query {
+    HostUser host_user = 1;
+    string   username  = 2;
+  }
+}
+
+message IRCMessage {
+  string name          = 1;
+  string sender        = 2;
+  repeated string args = 3;
+  int64 date           = 4;
+  string network_id    = 5;
+}
+
+message NetworkInfo {
+  string server_name  = 1;
+  string ircd_version = 2;
+  string usermodes    = 3;
+  string lchanmodes   = 4;
+
+  string rfc         = 5;
+  string ircd        = 6;
+  string casemapping = 7;
+  string prefix      = 8;
+  string chantypes   = 9;
+  string chanmodes   = 10;
+  int32 chanlimit    = 11;
+  int32 channellen   = 12;
+  int32 nicklen      = 13;
+  int32 topiclen     = 14;
+  int32 awaylen      = 15;
+  int32 kicklen      = 16;
+  int32 modes        = 17;
+
+  map<string,string> extras = 18;
+}
+
+message AuthUserRequest {
+  string network  = 1;
+  string host     = 2;
+  string username = 3;
+  string password = 4;
+  bool permanent  = 5;
+}
+
+service ExtService {
+  rpc Register(RegisterRequest) returns (stream IRCMessage);
+  rpc Unregister(UnregisterRequest) returns (Result);
+
+  rpc StateSelf(Query) returns (SimpleUser);
+  rpc StateUsersByChan(NetworkQuery) returns (ListResponse);
+  rpc StateUsersByChanCount(NetworkQuery) returns (CountResponse);
+  rpc StateUserModes(ChannelQuery) returns (ChannelModes);
+
+  rpc StateChannel(NetworkQuery) returns (ChannelResponse);
+  rpc StateChannels(NetworkQuery) returns (ListResponse);
+  rpc StateChannelCount(NetworkQuery) returns (CountResponse);
+
+  rpc StateIsOn(ChannelQuery) returns (Result.OK);
+
+  rpc StoreAuthUser(AuthUserRequest) returns (Result.OK);
+  rpc StoreAuthedUser(NetworkQuery) returns (StoredUser);
+  rpc StoreUser(Query) returns (StoredUser);
+
+  rpc StoreUsers(Empty) returns (StoredUsersResponse);
+  rpc StoreUsersByNetwork(Query) returns (StoredUsersResponse);
+  rpc StoreUsersByChannel(NetworkQuery) returns (StoredUsersResponse);
+
+  rpc StoreChannel(NetworkQuery) returns (StoredChannel);
+  rpc StoreChannels(Empty) returns (StoredChannelsResponse);
+
+  rpc StorePutUser(StoredUser) returns (Result);
+  rpc StorePutChannel(StoredChannel) returns (Result);
+
+  rpc StoreDeleteUser(Query) returns (Result);
+  rpc StoreDeleteChannel(NetworkQuery) returns (Result);
+}

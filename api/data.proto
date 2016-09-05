@@ -1,0 +1,174 @@
+syntax = "proto3";
+
+message Handler {
+  string network = 1;
+  string channel = 2;
+  string event   = 3;
+}
+
+message Command {
+  message Cmd {
+    string network     = 1;
+    string channel     = 2;
+    string description = 3;
+    int32  kind        = 4;
+    int32  scope       = 5;
+
+    repeated string args = 6;
+
+    bool   require_auth = 7;
+    int32  req_level    = 8;
+    string req_flags    = 9;
+  }
+  string network = 1;
+  string channel = 2;
+  Cmd    cmd     = 3;
+}
+
+message SimpleUser {
+  string host = 1;
+  string name = 2;
+}
+
+message ChannelModes {
+  message ChanModeKind {
+    message UserPrefix {
+      string symbol = 1;
+      string char   = 2;
+    }
+    repeated UserPrefix user_prefixes = 1;
+    map<string,int32> channel_modes   = 2;
+  }
+  string       modes = 1;
+  ChanModeKind kinds = 2;
+}
+
+message StoredUser {
+  string username = 1;
+  string password = 2;
+  repeated string masks     = 3;
+  map<string,Access> access = 4;
+  map<string,string> data   = 5;
+}
+
+message StoredChannel {
+  string network = 1;
+  string name    = 2;
+  map<string,string> data = 3;
+}
+
+message Access {
+  int32  level = 1;
+  string flags = 2;
+}
+
+/*
+
+/////////////////////////////////////////
+State:
+/////////////////////////////////////////
+
+GET /api/v1/net/{network}/state/self
+  {
+    "user": { "host": "who!who@who.com", "name": "Who Bot" },
+    "modes": CHANNELMODES
+  }
+
+GET /api/v1/net/{network}/state/user/{user}
+  Response: 200 404 { "host": "fish!fish@fish.com", "name": "Dylan Johnstoner" }
+GET /api/v1/net/{network}/state/users?channel="#channel"
+  Response: 200 404 [ "fish!fish@fish.com", "cm!cm@cm.com" ]
+GET /api/v1/net/{network}/state/users/count?channel="#channel"
+  Response: 200 404 { "count": N }
+
+GET /api/v1/net/{network}/state/user_modes/{channel}/{nick_or_host}
+  Response: 200 404
+  CHANNELMODES
+
+GET /api/v1/net/{network}/state/channel/{channel}
+  Response: 200 404
+  {
+    "name": "#deviate",
+    "topic": "meetup at cm's house whatever... just show up and say hello!"
+    "modes": {
+      "arg_modes": {
+        "l": "5",
+        "k": "password"
+      },
+      "address_modes": {
+        "b": ["fish*", "cm*"],
+      },
+    }
+  }
+GET /api/v1/net/{network}/state/channels?user="fish"
+  Response: 200 ["#deviate", "#bots"]
+GET /api/v1/net/{network}/state/channels/count?user="fish"
+  Response: 200 404 { "count": N }
+
+GET /api/v1/net/{network}/state/is_on/{channel}/{nick_or_host}
+  Response: 200 404
+
+
+/////////////////////////////////////////
+Store:
+/////////////////////////////////////////
+
+PUT /api/v1/auth_user
+  {
+    "network": "irc.zkpq.ca",
+    "host": "fish!fish@fish.com",
+    "username": "username",
+    "password": "bcrypt",
+    "permanent": true
+  }
+  Response: 200 / 401
+
+GET /api/v1/store/net/{network}/authed_user/{host}
+  Response: 200 / 404
+  STOREDUSER
+
+GET /api/v1/store/user/{username}
+  Response: 200 / 404
+  STOREDUSER
+
+GET /api/v1/store/users
+  Response: 200
+  [ STOREDUSER ]
+
+GET /api/v1/store/net/{network}/users
+  Response: 200 / 404
+  [ STOREDUSER ]
+
+GET /api/v1/store/net/{network}/channel/{channel}/users
+  Response: 200 / 404
+  [ STOREDUSER ]
+
+GET /api/v1/store/net/{network}/channel/{channel}
+  Response: 200 / 404
+  STOREDCHANNEL
+
+GET /api/v1/store/channels
+  Response: 200
+  [ STOREDCHANNEL ]
+
+PUT /api/v1/store/user
+  STOREDUSER
+  Response: 200 500
+  { "error": "description" }
+
+PUT /api/v1/store/channel
+  STOREDCHANNEL
+  Response: 200 500
+  { "error": "description" }
+
+DELETE /api/v1/store/user/{username}
+  Response: 200 404
+
+DELETE /api/v1/store/net/{network}/channel/{channel}
+  Response: 200 404
+
+// Username OR Net+Host
+DELETE /api/v1/logout?network={network}&host={host}&username={username}
+  Response: 200 404
+
+*/
