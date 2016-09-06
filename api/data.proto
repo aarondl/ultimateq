@@ -2,6 +2,11 @@ syntax = "proto3";
 
 package api;
 
+message SimpleUser {
+  string host = 1;
+  string name = 2;
+}
+
 message Handler {
   string network = 1;
   string channel = 2;
@@ -27,22 +32,25 @@ message Command {
   Cmd    cmd     = 3;
 }
 
-message SimpleUser {
-  string host = 1;
-  string name = 2;
+message ChannelModes {
+  message AddressMode {
+    repeated string mode_addresses = 1;
+  }
+  map<string,bool>        modes         = 1;
+  map<string,string>      arg_modes     = 2;
+  map<string,AddressMode> address_modes = 3;
+  int32                   addresses     = 4;
+
+  ModeKinds kinds = 5;
 }
 
-message ChannelModes {
-  message ChanModeKind {
-    message UserPrefix {
-      string symbol = 1;
-      string char   = 2;
-    }
-    repeated UserPrefix user_prefixes = 1;
-    map<string,int32> channel_modes   = 2;
+message ModeKinds {
+  message UserPrefix {
+    string symbol = 1;
+    string char   = 2;
   }
-  string       modes = 1;
-  ChanModeKind kinds = 2;
+  repeated UserPrefix user_prefixes = 1;
+  map<string,int32> channel_modes   = 2;
 }
 
 message StoredUser {

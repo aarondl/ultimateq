@@ -1,2 +1,2 @@
 #!/usr/bin/env sh
-protoc -I ./ ultimateq.proto --go_out=plugins=grpc:./
+protoc -I ./ *.proto --go_out=plugins=grpc:./
