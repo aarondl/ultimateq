@@ -135,6 +135,79 @@ func (c *ChannelModes) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+/*
+// ToProto turns ChannelModes -> API Structs
+func (c ChannelModes) ToProto() (*api.ChannelModes, error) {
+	var proto api.ChannelModes
+
+	if c.modes != nil {
+		proto.Modes = make(map[string]bool, len(c.modes))
+		for k, v := range c.modes {
+			proto.Modes[string(k)] = v
+		}
+	}
+	if c.argModes != nil {
+		toJSON.ArgModes = make(map[string]string, len(c.argModes))
+		for k, v := range c.argModes {
+			toJSON.ArgModes[string(k)] = v
+		}
+	}
+	if c.addressModes != nil {
+		toJSON.AddressModes = make(map[string][]string, len(c.addressModes))
+		for k, v := range c.addressModes {
+			toJSON.AddressModes[string(k)] = append([]string{}, v...)
+		}
+	}
+
+	toJSON.Addresses = c.addresses
+	toJSON.ModeKinds = c.modeKinds
+
+	return json.Marshal(toJSON)
+}
+
+// FromProto turns API Structs -> ChannelModes
+func (c *ChannelModes) FromProto(proto *api.ChannelModes) error {
+	if proto.Modes != nil {
+		c.modes = make(map[rune]bool, len(proto.Modes))
+		for k, v := range proto.Modes {
+			if len(k) != 1 {
+				return errors.New("modes is a map of char to bool")
+			}
+
+			c.modes[rune(k[0])] = v
+		}
+	}
+	if proto.ArgModes != nil {
+		c.argModes = make(map[rune]string, len(proto.ArgModes))
+		for k, v := range proto.ArgModes {
+			if len(k) != 1 {
+				return errors.New("arg_modes is a map of char to string")
+			}
+
+			c.argModes[rune(k[0])] = v
+		}
+	}
+	if proto.AddressModes != nil {
+		c.addressModes = make(map[rune][]string, len(proto.AddressModes))
+		for k, v := range proto.AddressModes {
+			if len(k) != 1 {
+				return errors.New("address_modes is a map of char to []string")
+			}
+
+			modeAddresses := make([]string, len(v.ModeAddresses))
+			copy(modeAddresses, v.ModeAddresses)
+			c.addressModes[rune(k[0])] = modeAddresses
+		}
+	}
+
+	c.addresses = int(proto.Addresses)
+
+	c.modeKinds = proto.ModeKinds
+
+	return nil
+}
+*/
+
 // Apply takes a complex modestring and applies it to a an existing modeset.
 // Assumes any modes not declared as part of ChannelModeKinds were not intended
 // for channel and are user-targeted (therefore taking an argument)

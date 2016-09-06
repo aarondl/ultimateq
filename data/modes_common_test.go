@@ -226,3 +226,26 @@ func TestUserModeKinds_JSONify(t *testing.T) {
 		t.Error("A and B differ:", a.channelModes, b.channelModes)
 	}
 }
+
+func TestModeKinds_Protofy(t *testing.T) {
+	t.Parallel()
+
+	a, err := newModeKinds(testUserKindStr, testChannelKindStr)
+	if err != nil {
+		t.Error(err)
+	}
+
+	var b modeKinds
+
+	err = b.FromProto(a.ToProto())
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !reflect.DeepEqual(a.userPrefixes, b.userPrefixes) {
+		t.Error("A and B differ:", a.userPrefixes, b.userPrefixes)
+	}
+	if !reflect.DeepEqual(a.channelModes, b.channelModes) {
+		t.Error("A and B differ:", a.channelModes, b.channelModes)
+	}
+}
