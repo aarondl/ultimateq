@@ -1,15 +1,12 @@
 package bot
 
 import (
-	"context"
 	"net"
-	"net/http"
-
-	"google.golang.org/grpc"
 
 	"github.com/aarondl/ultimateq/api"
-	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/registrar"
+	"golang.org/x/net/context"
+	"google.golang.org/grpc"
 )
 
 // api provides a REST api around a bot
@@ -27,47 +24,34 @@ func newAPIServer(b *Bot) apiServer {
 	return server
 }
 
-func (a apiServer) start() error {
-	//TODO(aarondl): Configurable port
-	lis, err := net.Listen("tcp", ":3000")
+func (a apiServer) start(port string) error {
+	lis, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		return err
 	}
 
 	grpcServer := grpc.NewServer()
-	api.RegisterExtServiceServer(grpcServer, a)
+	api.RegisterExtServer(grpcServer, a)
 
 	//TODO(aarondl): TLS
 	return grpcServer.Serve(lis)
 }
 
-func (a apiServer) Register(ctx context.Context, in *api.RegisterRequest, opts ...grpc.CallOption) (api.ExtService_RegisterClient, error) {
-	return nil, nil
-}
-
-func (a apiServer) Unregister(ctx context.Context, in *api.UnregisterRequest, opts ...grpc.CallOption) (*api.Result, error) {
-	return nil, nil
-}
-
-func (a apiServer) StateSelf(ctx context.Context, in *api.Query, opts ...grpc.CallOption) (*api.SelfResponse, error) {
-	state := a.bot.State(e)
-	if err != nil {
-		return err
+func (a apiServer) StateSelf(ctx context.Context, in *api.Query) (*api.SelfResponse, error) {
+	state := a.bot.State(in.Query)
+	if state == nil {
+		return nil, nil
 	}
 
 	self := state.Self()
-	e.JSON(http.StatusOK, struct {
-		User         data.User         `json:"user"`
-		ChannelModes data.ChannelModes `json:"user_modes"`
-	}{
-		self.User,
-		self.ChannelModes,
-	})
-
 	ret := &api.SelfResponse{}
-	ret.Modes = &api.ChannelModes{}
+	ret.User = &api.SimpleUser{
+		Host: string(self.User.Host),
+		Name: self.User.Realname,
+	}
+	ret.Modes = self.ChannelModes.ToProto()
 
-	return nil
+	return ret, nil
 }
 
 /*
@@ -220,82 +204,6 @@ func (a api) stateChannels(e echo.Context) error {
 	return nil
 }
 */
-
-func (a apiServer) StateUsersByChan(ctx context.Context, in *api.NetworkQuery, opts ...grpc.CallOption) (*api.ListResponse, error) {
-	return nil, nil
-}
-
-func (a apiServer) StateUsersByChanCount(ctx context.Context, in *api.NetworkQuery, opts ...grpc.CallOption) (*api.CountResponse, error) {
-	return nil, nil
-}
-
-func (a apiServer) StateUserModes(ctx context.Context, in *api.ChannelQuery, opts ...grpc.CallOption) (*api.ChannelModes, error) {
-	return nil, nil
-}
-
-func (a apiServer) StateChannel(ctx context.Context, in *api.NetworkQuery, opts ...grpc.CallOption) (*api.ChannelResponse, error) {
-	return nil, nil
-}
-
-func (a apiServer) StateChannels(ctx context.Context, in *api.NetworkQuery, opts ...grpc.CallOption) (*api.ListResponse, error) {
-	return nil, nil
-}
-
-func (a apiServer) StateChannelCount(ctx context.Context, in *api.NetworkQuery, opts ...grpc.CallOption) (*api.CountResponse, error) {
-	return nil, nil
-}
-
-func (a apiServer) StateIsOn(ctx context.Context, in *api.ChannelQuery, opts ...grpc.CallOption) (*api.Result_OK, error) {
-	return nil, nil
-}
-
-func (a apiServer) StoreAuthUser(ctx context.Context, in *api.AuthUserRequest, opts ...grpc.CallOption) (*api.Result_OK, error) {
-	return nil, nil
-}
-
-func (a apiServer) StoreAuthedUser(ctx context.Context, in *api.NetworkQuery, opts ...grpc.CallOption) (*api.StoredUser, error) {
-	return nil, nil
-}
-
-func (a apiServer) StoreUser(ctx context.Context, in *api.Query, opts ...grpc.CallOption) (*api.StoredUser, error) {
-	return nil, nil
-}
-
-func (a apiServer) StoreUsers(ctx context.Context, in *api.Empty, opts ...grpc.CallOption) (*api.StoredUsersResponse, error) {
-	return nil, nil
-}
-
-func (a apiServer) StoreUsersByNetwork(ctx context.Context, in *api.Query, opts ...grpc.CallOption) (*api.StoredUsersResponse, error) {
-	return nil, nil
-}
-
-func (a apiServer) StoreUsersByChannel(ctx context.Context, in *api.NetworkQuery, opts ...grpc.CallOption) (*api.StoredUsersResponse, error) {
-	return nil, nil
-}
-
-func (a apiServer) StoreChannel(ctx context.Context, in *api.NetworkQuery, opts ...grpc.CallOption) (*api.StoredChannel, error) {
-	return nil, nil
-}
-
-func (a apiServer) StoreChannels(ctx context.Context, in *api.Empty, opts ...grpc.CallOption) (*api.StoredChannelsResponse, error) {
-	return nil, nil
-}
-
-func (a apiServer) StorePutUser(ctx context.Context, in *api.StoredUser, opts ...grpc.CallOption) (*api.Result, error) {
-	return nil, nil
-}
-
-func (a apiServer) StorePutChannel(ctx context.Context, in *api.StoredChannel, opts ...grpc.CallOption) (*api.Result, error) {
-	return nil, nil
-}
-
-func (a apiServer) StoreDeleteUser(ctx context.Context, in *api.Query, opts ...grpc.CallOption) (*api.Result, error) {
-	return nil, nil
-}
-
-func (a apiServer) StoreDeleteChannel(ctx context.Context, in *api.NetworkQuery, opts ...grpc.CallOption) (*api.Result, error) {
-	return nil, nil
-}
 
 /*
 func (a api) getNetState(e echo.Context) (*data.State, error) {
@@ -812,3 +720,91 @@ func checkClaims(next echo.Handler) echo.Handler {
 	})
 }
 */
+
+func (a apiServer) Pipe(pipe api.Ext_PipeServer) error {
+	return nil
+}
+
+func (a apiServer) Register(ctx context.Context, in *api.RegisterRequest) (*api.Result, error) {
+	return nil, nil
+}
+
+func (a apiServer) Unregister(ctx context.Context, in *api.UnregisterRequest) (*api.Result, error) {
+	return nil, nil
+}
+
+func (a apiServer) StateUsersByChan(ctx context.Context, in *api.NetworkQuery) (*api.ListResponse, error) {
+	return nil, nil
+}
+
+func (a apiServer) StateUsersByChanCount(ctx context.Context, in *api.NetworkQuery) (*api.CountResponse, error) {
+	return nil, nil
+}
+
+func (a apiServer) StateUserModes(ctx context.Context, in *api.ChannelQuery) (*api.ChannelModes, error) {
+	return nil, nil
+}
+
+func (a apiServer) StateChannel(ctx context.Context, in *api.NetworkQuery) (*api.ChannelResponse, error) {
+	return nil, nil
+}
+
+func (a apiServer) StateChannels(ctx context.Context, in *api.NetworkQuery) (*api.ListResponse, error) {
+	return nil, nil
+}
+
+func (a apiServer) StateChannelCount(ctx context.Context, in *api.NetworkQuery) (*api.CountResponse, error) {
+	return nil, nil
+}
+
+func (a apiServer) StateIsOn(ctx context.Context, in *api.ChannelQuery) (*api.Result_OK, error) {
+	return nil, nil
+}
+
+func (a apiServer) StoreAuthUser(ctx context.Context, in *api.AuthUserRequest) (*api.Result_OK, error) {
+	return nil, nil
+}
+
+func (a apiServer) StoreAuthedUser(ctx context.Context, in *api.NetworkQuery) (*api.StoredUser, error) {
+	return nil, nil
+}
+
+func (a apiServer) StoreUser(ctx context.Context, in *api.Query) (*api.StoredUser, error) {
+	return nil, nil
+}
+
+func (a apiServer) StoreUsers(ctx context.Context, in *api.Empty) (*api.StoredUsersResponse, error) {
+	return nil, nil
+}
+
+func (a apiServer) StoreUsersByNetwork(ctx context.Context, in *api.Query) (*api.StoredUsersResponse, error) {
+	return nil, nil
+}
+
+func (a apiServer) StoreUsersByChannel(ctx context.Context, in *api.NetworkQuery) (*api.StoredUsersResponse, error) {
+	return nil, nil
+}
+
+func (a apiServer) StoreChannel(ctx context.Context, in *api.NetworkQuery) (*api.StoredChannel, error) {
+	return nil, nil
+}
+
+func (a apiServer) StoreChannels(ctx context.Context, in *api.Empty) (*api.StoredChannelsResponse, error) {
+	return nil, nil
+}
+
+func (a apiServer) StorePutUser(ctx context.Context, in *api.StoredUser) (*api.Result, error) {
+	return nil, nil
+}
+
+func (a apiServer) StorePutChannel(ctx context.Context, in *api.StoredChannel) (*api.Result, error) {
+	return nil, nil
+}
+
+func (a apiServer) StoreDeleteUser(ctx context.Context, in *api.Query) (*api.Result, error) {
+	return nil, nil
+}
+
+func (a apiServer) StoreDeleteChannel(ctx context.Context, in *api.NetworkQuery) (*api.Result, error) {
+	return nil, nil
+}
