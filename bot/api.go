@@ -1,214 +1,56 @@
 package bot
 
 import (
-	"fmt"
+	"context"
+	"net"
 	"net/http"
-	"time"
 
+	"google.golang.org/grpc"
+
+	"github.com/aarondl/ultimateq/api"
 	"github.com/aarondl/ultimateq/data"
-	"github.com/aarondl/ultimateq/dispatch/remote"
 	"github.com/aarondl/ultimateq/registrar"
-	"github.com/dgrijalva/jwt-go"
-	"github.com/labstack/echo"
-	"github.com/labstack/echo/engine/standard"
-	"github.com/labstack/echo/middleware"
-	"gopkg.in/inconshreveable/log15.v2"
 )
 
 // api provides a REST api around a bot
-type api struct {
-	bot      *Bot
-	e        *echo.Echo
-	proxy    *registrar.Proxy
-	dispatch *remote.Dispatcher
+type apiServer struct {
+	bot   *Bot
+	proxy *registrar.Proxy
 }
 
-func newAPI(b *Bot) api {
-	e := echo.New()
-	e.SetLogOutput(EchoLogger{b.Logger})
-	e.SetHTTPErrorHandler(errorHandler)
-
-	signingKey, ok := b.conf.SecretKey()
-	if !ok {
-		panic("must have a signing key in the config")
-	}
-
-	e.Use(middleware.Logger())
-	e.Use(middleware.Recover())
-	e.Use(jwtAuth(signingKey))
-	e.Use(echo.MiddlewareFunc(checkClaims))
-
-	api := api{
+func newAPIServer(b *Bot) apiServer {
+	server := apiServer{
 		bot:   b,
-		e:     e,
 		proxy: registrar.NewProxy(b),
 	}
 
-	registerRoutes(api, e)
-
-	return api
+	return server
 }
 
-func registerRoutes(a api, e *echo.Echo) {
-	// State
-	e.Get("/api/v1/state/net/:network/self", echo.HandlerFunc(a.stateSelf))
-	e.Get("/api/v1/state/net/:network/user/:user", echo.HandlerFunc(a.stateUser))
-	e.Get("/api/v1/state/net/:network/users", echo.HandlerFunc(a.stateUsers))
-	e.Get("/api/v1/state/net/:network/users/count", echo.HandlerFunc(a.stateUserCount))
-	e.Get("/api/v1/state/net/:network/user_modes/:channel/:nick_or_host", echo.HandlerFunc(a.stateUserModes))
-
-	e.Get("/api/v1/state/net/:network/channel/:channel", echo.HandlerFunc(a.stateChannel))
-	e.Get("/api/v1/state/net/:network/channels", echo.HandlerFunc(a.stateChannels))
-	e.Get("/api/v1/state/net/:network/channels/count", echo.HandlerFunc(a.stateChannelCount))
-
-	e.Get("/api/v1/state/net/:network/is_on/:channel/:user", echo.HandlerFunc(a.stateIsOn))
-
-	// Store
-	e.Put("/api/v1/store/auth_user", echo.HandlerFunc(a.storeAuthUser))
-
-	e.Get("/api/v1/store/net/:network/authed_user/:host", echo.HandlerFunc(a.storeAuthedUser))
-	e.Get("/api/v1/store/user/:username", echo.HandlerFunc(a.storeUser))
-	e.Get("/api/v1/store/users", echo.HandlerFunc(a.storeUsers))
-	e.Get("/api/v1/store/net/:network/users", echo.HandlerFunc(a.storeNetworkUsers))
-	e.Get("/api/v1/store/net/:network/channel/:channel/users", echo.HandlerFunc(a.storeNetworkChannelUsers))
-
-	e.Get("/api/v1/store/net/:network/channel/:channel", echo.HandlerFunc(a.storeChannel))
-	e.Get("/api/v1/store/channels", echo.HandlerFunc(a.storeChannels))
-
-	e.Put("/api/v1/store/user", echo.HandlerFunc(a.storePutUser))
-	e.Put("/api/v1/store/channel", echo.HandlerFunc(a.storePutChannel))
-	e.Delete("/api/v1/store/user/:username", echo.HandlerFunc(a.storeDeleteUser))
-	e.Delete("/api/v1/store/net/:network/channel/:channel", echo.HandlerFunc(a.storeDeleteChannel))
-
-	e.Delete("/api/v1/store/logout", echo.HandlerFunc(a.storeLogout))
-}
-
-// Start the server on the bind address
-func (a api) start(addr string) {
-	a.e.Run(standard.New(addr))
-}
-
-func errorHandler(err error, e echo.Context) {
-	status := http.StatusInternalServerError
-
-	if httperr, ok := err.(*echo.HTTPError); ok {
-		status = httperr.Code
-	}
-
-	e.JSON(status, struct {
-		Error string `json:"error"`
-	}{
-		Error: err.Error(),
-	})
-}
-
-func (a api) getNetState(e echo.Context) (*data.State, error) {
-	value := e.Param("network")
-	if len(value) == 0 {
-		return nil, echo.NewHTTPError(http.StatusBadRequest, "missing network route param")
-	}
-
-	state := a.bot.State(value)
-	if state == nil {
-		return nil, echo.NewHTTPError(http.StatusBadRequest, "unknown network or state disabled")
-	}
-
-	return state, nil
-}
-
-func getParam(e echo.Context, key string) (string, error) {
-	p := e.Param(key)
-	if len(p) == 0 {
-		return "", echo.NewHTTPError(http.StatusBadRequest, "missing route parameter: "+key)
-	}
-
-	return p, nil
-}
-
-func getQueryParam(e echo.Context, key string) (string, error) {
-	p := e.Query(key)
-	if len(p) == 0 {
-		return "", echo.NewHTTPError(http.StatusBadRequest, "missing query parameter: "+key)
-	}
-
-	return p, nil
-}
-
-func getExtName(e echo.Context) (ext string) {
-	return e.Get("ext").(string)
-}
-
-func (a api) connect(e echo.Context) error {
-	ext := getExtName(e)
-
-	stdRes := e.Response().(*standard.Response)
-	w := stdRes.ResponseWriter.(http.Hijacker)
-
-	conn, buffer, err := w.Hijack()
+func (a apiServer) start() error {
+	//TODO(aarondl): Configurable port
+	lis, err := net.Listen("tcp", ":3000")
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "could not hijack connection")
-	}
-
-	// Flush buffer and discard
-	buffer.Flush()
-
-	// Reset read/write deadlines
-	conn.SetReadDeadline(time.Time{})
-	conn.SetWriteDeadline(time.Time{})
-
-	a.dispatch.New(ext, conn, func(name string) {
-		a.dispatch.Remove(name)
-		a.proxy.Unregister(name)
-	})
-
-	return nil
-}
-
-type registerMessage struct {
-	Network string `json:"network,omitempty"`
-	Channel string `json:"channel,omitempty"`
-	Event   string `json:"event,omitempty"`
-}
-
-type unregisterMessage struct {
-	ID uint64 `json:"id"`
-}
-
-func (a api) register(e echo.Context) error {
-	var r registerMessage
-
-	if err := e.Bind(&r); err != nil {
 		return err
 	}
 
-	ext := getExtName(e)
-	proxy := a.proxy.Get(ext)
-	handler := a.dispatch.Get(ext)
-	proxy.Register(r.Network, r.Channel, r.Event, handler)
+	grpcServer := grpc.NewServer()
+	api.RegisterExtServiceServer(grpcServer, a)
 
-	return nil
+	//TODO(aarondl): TLS
+	return grpcServer.Serve(lis)
 }
 
-func (a api) unregister(e echo.Context) error {
-	var r unregisterMessage
-
-	if err := e.Bind(&r); err != nil {
-		return err
-	}
-
-	ext := getExtName(e)
-	proxy := a.proxy.Get(ext)
-	did := proxy.Unregister(r.ID)
-
-	if !did {
-		return e.NoContent(http.StatusNotFound)
-	}
-
-	return nil
+func (a apiServer) Register(ctx context.Context, in *api.RegisterRequest, opts ...grpc.CallOption) (api.ExtService_RegisterClient, error) {
+	return nil, nil
 }
 
-func (a api) stateSelf(e echo.Context) error {
-	state, err := a.getNetState(e)
+func (a apiServer) Unregister(ctx context.Context, in *api.UnregisterRequest, opts ...grpc.CallOption) (*api.Result, error) {
+	return nil, nil
+}
+
+func (a apiServer) StateSelf(ctx context.Context, in *api.Query, opts ...grpc.CallOption) (*api.SelfResponse, error) {
+	state := a.bot.State(e)
 	if err != nil {
 		return err
 	}
@@ -222,7 +64,14 @@ func (a api) stateSelf(e echo.Context) error {
 		self.ChannelModes,
 	})
 
+	ret := &api.SelfResponse{}
+	ret.Modes = &api.ChannelModes{}
+
 	return nil
+}
+
+/*
+func (a api) stateSelf(e echo.Context) error {
 }
 
 func (a api) stateUser(e echo.Context) error {
@@ -370,6 +219,190 @@ func (a api) stateChannels(e echo.Context) error {
 
 	return nil
 }
+*/
+
+func (a apiServer) StateUsersByChan(ctx context.Context, in *api.NetworkQuery, opts ...grpc.CallOption) (*api.ListResponse, error) {
+	return nil, nil
+}
+
+func (a apiServer) StateUsersByChanCount(ctx context.Context, in *api.NetworkQuery, opts ...grpc.CallOption) (*api.CountResponse, error) {
+	return nil, nil
+}
+
+func (a apiServer) StateUserModes(ctx context.Context, in *api.ChannelQuery, opts ...grpc.CallOption) (*api.ChannelModes, error) {
+	return nil, nil
+}
+
+func (a apiServer) StateChannel(ctx context.Context, in *api.NetworkQuery, opts ...grpc.CallOption) (*api.ChannelResponse, error) {
+	return nil, nil
+}
+
+func (a apiServer) StateChannels(ctx context.Context, in *api.NetworkQuery, opts ...grpc.CallOption) (*api.ListResponse, error) {
+	return nil, nil
+}
+
+func (a apiServer) StateChannelCount(ctx context.Context, in *api.NetworkQuery, opts ...grpc.CallOption) (*api.CountResponse, error) {
+	return nil, nil
+}
+
+func (a apiServer) StateIsOn(ctx context.Context, in *api.ChannelQuery, opts ...grpc.CallOption) (*api.Result_OK, error) {
+	return nil, nil
+}
+
+func (a apiServer) StoreAuthUser(ctx context.Context, in *api.AuthUserRequest, opts ...grpc.CallOption) (*api.Result_OK, error) {
+	return nil, nil
+}
+
+func (a apiServer) StoreAuthedUser(ctx context.Context, in *api.NetworkQuery, opts ...grpc.CallOption) (*api.StoredUser, error) {
+	return nil, nil
+}
+
+func (a apiServer) StoreUser(ctx context.Context, in *api.Query, opts ...grpc.CallOption) (*api.StoredUser, error) {
+	return nil, nil
+}
+
+func (a apiServer) StoreUsers(ctx context.Context, in *api.Empty, opts ...grpc.CallOption) (*api.StoredUsersResponse, error) {
+	return nil, nil
+}
+
+func (a apiServer) StoreUsersByNetwork(ctx context.Context, in *api.Query, opts ...grpc.CallOption) (*api.StoredUsersResponse, error) {
+	return nil, nil
+}
+
+func (a apiServer) StoreUsersByChannel(ctx context.Context, in *api.NetworkQuery, opts ...grpc.CallOption) (*api.StoredUsersResponse, error) {
+	return nil, nil
+}
+
+func (a apiServer) StoreChannel(ctx context.Context, in *api.NetworkQuery, opts ...grpc.CallOption) (*api.StoredChannel, error) {
+	return nil, nil
+}
+
+func (a apiServer) StoreChannels(ctx context.Context, in *api.Empty, opts ...grpc.CallOption) (*api.StoredChannelsResponse, error) {
+	return nil, nil
+}
+
+func (a apiServer) StorePutUser(ctx context.Context, in *api.StoredUser, opts ...grpc.CallOption) (*api.Result, error) {
+	return nil, nil
+}
+
+func (a apiServer) StorePutChannel(ctx context.Context, in *api.StoredChannel, opts ...grpc.CallOption) (*api.Result, error) {
+	return nil, nil
+}
+
+func (a apiServer) StoreDeleteUser(ctx context.Context, in *api.Query, opts ...grpc.CallOption) (*api.Result, error) {
+	return nil, nil
+}
+
+func (a apiServer) StoreDeleteChannel(ctx context.Context, in *api.NetworkQuery, opts ...grpc.CallOption) (*api.Result, error) {
+	return nil, nil
+}
+
+/*
+func (a api) getNetState(e echo.Context) (*data.State, error) {
+	value := e.Param("network")
+	if len(value) == 0 {
+		return nil, echo.NewHTTPError(http.StatusBadRequest, "missing network route param")
+	}
+
+	state := a.bot.State(value)
+	if state == nil {
+		return nil, echo.NewHTTPError(http.StatusBadRequest, "unknown network or state disabled")
+	}
+
+	return state, nil
+}
+
+func getParam(e echo.Context, key string) (string, error) {
+	p := e.Param(key)
+	if len(p) == 0 {
+		return "", echo.NewHTTPError(http.StatusBadRequest, "missing route parameter: "+key)
+	}
+
+	return p, nil
+}
+
+func getQueryParam(e echo.Context, key string) (string, error) {
+	p := e.Query(key)
+	if len(p) == 0 {
+		return "", echo.NewHTTPError(http.StatusBadRequest, "missing query parameter: "+key)
+	}
+
+	return p, nil
+}
+
+func getExtName(e echo.Context) (ext string) {
+	return e.Get("ext").(string)
+}
+
+func (a api) connect(e echo.Context) error {
+	ext := getExtName(e)
+
+	stdRes := e.Response().(*standard.Response)
+	w := stdRes.ResponseWriter.(http.Hijacker)
+
+	conn, buffer, err := w.Hijack()
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "could not hijack connection")
+	}
+
+	// Flush buffer and discard
+	buffer.Flush()
+
+	// Reset read/write deadlines
+	conn.SetReadDeadline(time.Time{})
+	conn.SetWriteDeadline(time.Time{})
+
+	a.dispatch.New(ext, conn, func(name string) {
+		a.dispatch.Remove(name)
+		a.proxy.Unregister(name)
+	})
+
+	return nil
+}
+
+type registerMessage struct {
+	Network string `json:"network,omitempty"`
+	Channel string `json:"channel,omitempty"`
+	Event   string `json:"event,omitempty"`
+}
+
+type unregisterMessage struct {
+	ID uint64 `json:"id"`
+}
+
+func (a api) register(e echo.Context) error {
+	var r registerMessage
+
+	if err := e.Bind(&r); err != nil {
+		return err
+	}
+
+	ext := getExtName(e)
+	proxy := a.proxy.Get(ext)
+	handler := a.dispatch.Get(ext)
+	proxy.Register(r.Network, r.Channel, r.Event, handler)
+
+	return nil
+}
+
+func (a api) unregister(e echo.Context) error {
+	var r unregisterMessage
+
+	if err := e.Bind(&r); err != nil {
+		return err
+	}
+
+	ext := getExtName(e)
+	proxy := a.proxy.Get(ext)
+	did := proxy.Unregister(r.ID)
+
+	if !did {
+		return e.NoContent(http.StatusNotFound)
+	}
+
+	return nil
+}
+
 
 func (a api) stateChannelCount(e echo.Context) error {
 	state, err := a.getNetState(e)
@@ -778,3 +811,4 @@ func checkClaims(next echo.Handler) echo.Handler {
 		return next.Handle(c)
 	})
 }
+*/

@@ -195,8 +195,14 @@ message AuthUserRequest {
   bool permanent  = 5;
 }
 
-service ExtService {
-  rpc Register(RegisterRequest) returns (stream IRCMessage);
+message RawIRC {
+  bytes msg = 1;
+}
+
+service Ext {
+  rpc Pipe(stream RawIRC) returns (stream IRCMessage);
+
+  rpc Register(RegisterRequest) returns (Result);
   rpc Unregister(UnregisterRequest) returns (Result);
 
   rpc StateSelf(Query) returns (SelfResponse);
@@ -226,4 +232,13 @@ service ExtService {
 
   rpc StoreDeleteUser(Query) returns (Result);
   rpc StoreDeleteChannel(NetworkQuery) returns (Result);
+}
+
+message ConnectionDetails {
+  string host = 1;
+  int32  port = 2;
+}
+
+service Boomerang {
+  rpc Connect(ConnectionDetails) returns (Result.OK);
 }
