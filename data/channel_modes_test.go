@@ -642,3 +642,33 @@ func TestChannelModes_JSONify(t *testing.T) {
 		t.Error("A and B differ:", a.addresses, b.addresses)
 	}
 }
+
+func TestChannelModes_Protofy(t *testing.T) {
+	t.Parallel()
+
+	a := NewChannelModes(testKinds)
+	a.Apply("tdb 5 a!b@c.com")
+
+	var b ChannelModes
+	err := b.FromProto(a.ToProto())
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !reflect.DeepEqual(a.modes, b.modes) {
+		t.Error("A and B differ:", a.modes, b.modes)
+	}
+	if !reflect.DeepEqual(a.argModes, b.argModes) {
+		t.Error("A and B differ:", a.argModes, b.argModes)
+	}
+	if !reflect.DeepEqual(a.addressModes, b.addressModes) {
+		t.Error("A and B differ:", a.addressModes, b.addressModes)
+	}
+	if a.addresses != b.addresses {
+		t.Error("A and B differ:", a.addresses, b.addresses)
+	}
+
+	if !reflect.DeepEqual(a.modeKinds, b.modeKinds) {
+		t.Error("A and B differ:", a.modeKinds, b.modeKinds)
+	}
+}

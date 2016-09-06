@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+
+	"github.com/aarondl/ultimateq/api"
 )
 
 // ChannelModes encapsulates flag-based modestrings, setting and getting any
@@ -135,9 +137,8 @@ func (c *ChannelModes) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-/*
 // ToProto turns ChannelModes -> API Structs
-func (c ChannelModes) ToProto() (*api.ChannelModes, error) {
+func (c ChannelModes) ToProto() *api.ChannelModes {
 	var proto api.ChannelModes
 
 	if c.modes != nil {
@@ -147,22 +148,26 @@ func (c ChannelModes) ToProto() (*api.ChannelModes, error) {
 		}
 	}
 	if c.argModes != nil {
-		toJSON.ArgModes = make(map[string]string, len(c.argModes))
+		proto.ArgModes = make(map[string]string, len(c.argModes))
 		for k, v := range c.argModes {
-			toJSON.ArgModes[string(k)] = v
+			proto.ArgModes[string(k)] = v
 		}
 	}
 	if c.addressModes != nil {
-		toJSON.AddressModes = make(map[string][]string, len(c.addressModes))
+		proto.AddressModes = make(map[string]*api.ChannelModes_AddressMode, len(c.addressModes))
 		for k, v := range c.addressModes {
-			toJSON.AddressModes[string(k)] = append([]string{}, v...)
+			addressModes := make([]string, len(v))
+			copy(addressModes, v)
+			proto.AddressModes[string(k)] = &api.ChannelModes_AddressMode{
+				ModeAddresses: addressModes,
+			}
 		}
 	}
 
-	toJSON.Addresses = c.addresses
-	toJSON.ModeKinds = c.modeKinds
+	proto.Addresses = int32(c.addresses)
+	proto.Kinds = c.modeKinds.ToProto()
 
-	return json.Marshal(toJSON)
+	return &proto
 }
 
 // FromProto turns API Structs -> ChannelModes
@@ -202,11 +207,13 @@ func (c *ChannelModes) FromProto(proto *api.ChannelModes) error {
 
 	c.addresses = int(proto.Addresses)
 
-	c.modeKinds = proto.ModeKinds
+	if c.modeKinds == nil {
+		c.modeKinds = new(modeKinds)
+	}
+	c.modeKinds.FromProto(proto.Kinds)
 
 	return nil
 }
-*/
 
 // Apply takes a complex modestring and applies it to a an existing modeset.
 // Assumes any modes not declared as part of ChannelModeKinds were not intended
