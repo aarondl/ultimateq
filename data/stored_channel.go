@@ -5,6 +5,8 @@ import (
 	"encoding/gob"
 	"fmt"
 	"strings"
+
+	"github.com/aarondl/ultimateq/api"
 )
 
 // StoredChannel stores attributes for channels.
@@ -52,4 +54,32 @@ func deserializeChannel(serialized []byte) (*StoredChannel, error) {
 	dec := &StoredChannel{}
 	err := decoder.Decode(dec)
 	return dec, err
+}
+
+func (s *StoredChannel) ToProto() *api.StoredChannel {
+	var proto api.StoredChannel
+
+	proto.Network = s.NetID
+	proto.Name = s.Name
+
+	if len(s.JSONStorer) != 0 {
+		proto.Data = make(map[string]string, len(s.JSONStorer))
+		for k, v := range s.JSONStorer {
+			proto.Data[k] = v
+		}
+	}
+
+	return &proto
+}
+
+func (s *StoredChannel) FromProto(proto *api.StoredChannel) {
+	s.NetID = proto.Network
+	s.Name = proto.Name
+
+	if len(proto.Data) != 0 {
+		s.JSONStorer = make(JSONStorer, len(proto.Data))
+		for k, v := range proto.Data {
+			s.JSONStorer[k] = v
+		}
+	}
 }
