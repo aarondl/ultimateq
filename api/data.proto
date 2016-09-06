@@ -55,7 +55,7 @@ message ModeKinds {
 
 message StoredUser {
   string username = 1;
-  string password = 2;
+  bytes  password = 2;
   repeated string masks     = 3;
   map<string,Access> access = 4;
   map<string,string> data   = 5;
@@ -68,6 +68,6 @@ message StoredChannel {
 }
 
 message Access {
-  int32  level = 1;
-  string flags = 2;
+  uint32 level = 1;
+  uint64 flags = 2;
 }

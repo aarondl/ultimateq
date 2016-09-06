@@ -248,3 +248,16 @@ func TestAccess_JSONifying(t *testing.T) {
 		t.Error("A and B differ:", a, b)
 	}
 }
+
+func TestAccess_Protofy(t *testing.T) {
+	t.Parallel()
+
+	a := NewAccess(23, "DEFabc")
+	var b Access
+
+	b.FromProto(a.ToProto())
+
+	if *a != b {
+		t.Error("A and B differ:", a, b)
+	}
+}
