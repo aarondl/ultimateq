@@ -581,3 +581,22 @@ func TestStoredUser_JSONify(t *testing.T) {
 		t.Error("A and B differ:", a, b)
 	}
 }
+
+func TestStoredUser_Protofy(t *testing.T) {
+	t.Parallel()
+
+	a := &StoredUser{
+		Username:   "a",
+		Password:   []byte("b"),
+		Masks:      []string{"c"},
+		Access:     map[string]Access{"net:#chan": *NewAccess(23, "abc")},
+		JSONStorer: JSONStorer{"some": "data"},
+	}
+	var b StoredUser
+
+	b.FromProto(a.ToProto())
+
+	if !reflect.DeepEqual(*a, b) {
+		t.Error("A and B differ:", a, b)
+	}
+}

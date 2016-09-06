@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aarondl/ultimateq/api"
 	"github.com/aarondl/ultimateq/irc"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -490,4 +491,54 @@ func (s *StoredUser) writeIt(b *bytes.Buffer, key string) {
 func mkKey(network, channel string) string {
 	return fmt.Sprintf("%s:%s",
 		strings.ToLower(network), strings.ToLower(channel))
+}
+
+func (s *StoredUser) ToProto() *api.StoredUser {
+	var proto api.StoredUser
+
+	proto.Username = s.Username
+	proto.Password = make([]byte, len(s.Password))
+	copy(proto.Password, s.Password)
+	proto.Masks = make([]string, len(s.Masks))
+	copy(proto.Masks, s.Masks)
+
+	if len(s.Access) != 0 {
+		proto.Access = make(map[string]*api.Access, len(s.Access))
+		for k, v := range s.Access {
+			proto.Access[k] = v.ToProto()
+		}
+	}
+
+	if len(s.JSONStorer) != 0 {
+		proto.Data = make(map[string]string, len(s.JSONStorer))
+		for k, v := range s.JSONStorer {
+			proto.Data[k] = v
+		}
+	}
+
+	return &proto
+}
+
+func (s *StoredUser) FromProto(proto *api.StoredUser) {
+	s.Username = proto.Username
+	s.Password = make([]byte, len(proto.Password))
+	copy(s.Password, proto.Password)
+	s.Masks = make([]string, len(proto.Masks))
+	copy(s.Masks, proto.Masks)
+
+	if len(proto.Access) != 0 {
+		s.Access = make(map[string]Access, len(proto.Access))
+		for k, v := range proto.Access {
+			var a Access
+			a.FromProto(v)
+			s.Access[k] = a
+		}
+	}
+
+	if len(proto.Data) != 0 {
+		s.JSONStorer = make(JSONStorer, len(proto.Data))
+		for k, v := range proto.Data {
+			s.JSONStorer[k] = v
+		}
+	}
 }
