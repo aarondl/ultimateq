@@ -44,6 +44,11 @@ message ChannelModes {
   ModeKinds kinds = 5;
 }
 
+message UserModes {
+  ModeKinds kinds = 1;
+  int32     modes = 2;
+}
+
 message ModeKinds {
   message UserPrefix {
     string symbol = 1;

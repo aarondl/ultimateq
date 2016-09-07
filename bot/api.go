@@ -4,9 +4,11 @@ import (
 	"net"
 
 	"github.com/aarondl/ultimateq/api"
+	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/registrar"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 )
 
 // api provides a REST api around a bot
@@ -37,10 +39,19 @@ func (a apiServer) start(port string) error {
 	return grpcServer.Serve(lis)
 }
 
-func (a apiServer) StateSelf(ctx context.Context, in *api.Query) (*api.SelfResponse, error) {
-	state := a.bot.State(in.Query)
+func (a apiServer) getState(network string) (*data.State, error) {
+	state := a.bot.State(network)
 	if state == nil {
-		return nil, nil
+		return nil, grpc.Errorf(codes.NotFound, "state not found")
+	}
+
+	return state, nil
+}
+
+func (a apiServer) StateSelf(ctx context.Context, in *api.Query) (*api.SelfResponse, error) {
+	state, err := a.getState(in.Query)
+	if err != nil {
+		return nil, err
 	}
 
 	self := state.Self()
@@ -54,83 +65,101 @@ func (a apiServer) StateSelf(ctx context.Context, in *api.Query) (*api.SelfRespo
 	return ret, nil
 }
 
-/*
-func (a api) stateSelf(e echo.Context) error {
-}
-
-func (a api) stateUser(e echo.Context) error {
-	state, err := a.getNetState(e)
+func (a apiServer) StateUser(ctx context.Context, in *api.NetworkQuery) (*api.SimpleUser, error) {
+	state, err := a.getState(in.Network)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	nickOrHost, err := getParam(e, "user")
-	if err != nil {
-		return err
-	}
-
-	user, ok := state.User(nickOrHost)
+	user, ok := state.User(in.Query)
 	if !ok {
-		return echo.NewHTTPError(http.StatusNotFound, "user not found")
+		return nil, grpc.Errorf(codes.NotFound, "user not found")
 	}
 
-	e.JSON(http.StatusOK, user)
-
-	return nil
+	return &api.SimpleUser{
+		Host: string(user.Host),
+		Name: user.Realname,
+	}, nil
 }
 
-func (a api) stateUsers(e echo.Context) error {
-	state, err := a.getNetState(e)
+func (a apiServer) StateUsersByChan(ctx context.Context, in *api.NetworkQuery) (*api.ListResponse, error) {
+	state, err := a.getState(in.Network)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	channel := e.Param("channel")
 
 	var users []string
-	if len(channel) > 0 {
-		users = state.UsersByChannel(channel)
-		if users == nil {
-			return echo.NewHTTPError(http.StatusNotFound,
-				fmt.Sprintf("channel %q not found", channel))
-		}
+	if len(in.Query) != 0 {
+		users = state.UsersByChannel(in.Query)
 	} else {
 		users = state.Users()
 	}
 
-	e.JSON(http.StatusOK, users)
-
-	return nil
+	return &api.ListResponse{List: users}, nil
 }
 
-func (a api) stateUserCount(e echo.Context) error {
-	state, err := a.getNetState(e)
+func (a apiServer) StateUsersByChanCount(ctx context.Context, in *api.NetworkQuery) (*api.CountResponse, error) {
+	state, err := a.getState(in.Network)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	channel := e.Query("channel")
 
 	var users int
 	var ok bool
-	if len(channel) > 0 {
-		users, ok = state.NUsersByChannel(channel)
+	if len(in.Query) != 0 {
+		users, ok = state.NUsersByChannel(in.Query)
 		if !ok {
-			return echo.NewHTTPError(http.StatusNotFound,
-				fmt.Sprintf("channel %q not found", channel))
+			return nil, grpc.Errorf(codes.NotFound, "channel not found")
 		}
 	} else {
 		users = state.NUsers()
 	}
 
-	e.JSON(http.StatusOK, struct {
-		Count int `json:"count"`
-	}{
-		Count: users,
-	})
-
-	return nil
+	return &api.CountResponse{Count: int32(users)}, nil
 }
+
+func (a apiServer) StateUserModes(ctx context.Context, in *api.ChannelQuery) (*api.UserModes, error) {
+	state, err := a.getState(in.Network)
+	if err != nil {
+		return nil, err
+	}
+
+	umodes, ok := state.UserModes(in.Query, in.Channel)
+	if !ok {
+		return nil, grpc.Errorf(codes.NotFound, "user or channel not found")
+	}
+
+	return &api.UserModes{
+		Kinds: umodes.ModeKinds.ToProto(),
+		Modes: int32(umodes.Modes),
+	}, nil
+}
+
+func (a apiServer) StateChannel(ctx context.Context, in *api.NetworkQuery) (*api.ChannelResponse, error) {
+	state, err := a.getState(in.Network)
+	if err != nil {
+		return nil, err
+	}
+	return nil, nil
+}
+
+func (a apiServer) StateChannels(ctx context.Context, in *api.NetworkQuery) (*api.ListResponse, error) {
+	state, err := a.getState(in.Network)
+	if err != nil {
+		return nil, err
+	}
+	return nil, nil
+}
+
+func (a apiServer) StateChannelCount(ctx context.Context, in *api.NetworkQuery) (*api.CountResponse, error) {
+	state, err := a.getState(in.Network)
+	if err != nil {
+		return nil, err
+	}
+	return nil, nil
+}
+
+/*
 
 func (a api) stateUserModes(e echo.Context) error {
 	state, err := a.getNetState(e)
@@ -147,11 +176,6 @@ func (a api) stateUserModes(e echo.Context) error {
 		return err
 	}
 
-	umodes, ok := state.UserModes(nickOrHost, channel)
-	if !ok {
-		return echo.NewHTTPError(http.StatusNotFound,
-			fmt.Sprintf("host %q or channel %q not found", nickOrHost, channel))
-	}
 
 	e.JSON(http.StatusOK, umodes)
 
@@ -730,30 +754,6 @@ func (a apiServer) Register(ctx context.Context, in *api.RegisterRequest) (*api.
 }
 
 func (a apiServer) Unregister(ctx context.Context, in *api.UnregisterRequest) (*api.Result, error) {
-	return nil, nil
-}
-
-func (a apiServer) StateUsersByChan(ctx context.Context, in *api.NetworkQuery) (*api.ListResponse, error) {
-	return nil, nil
-}
-
-func (a apiServer) StateUsersByChanCount(ctx context.Context, in *api.NetworkQuery) (*api.CountResponse, error) {
-	return nil, nil
-}
-
-func (a apiServer) StateUserModes(ctx context.Context, in *api.ChannelQuery) (*api.ChannelModes, error) {
-	return nil, nil
-}
-
-func (a apiServer) StateChannel(ctx context.Context, in *api.NetworkQuery) (*api.ChannelResponse, error) {
-	return nil, nil
-}
-
-func (a apiServer) StateChannels(ctx context.Context, in *api.NetworkQuery) (*api.ListResponse, error) {
-	return nil, nil
-}
-
-func (a apiServer) StateChannelCount(ctx context.Context, in *api.NetworkQuery) (*api.CountResponse, error) {
 	return nil, nil
 }
 

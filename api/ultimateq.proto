@@ -142,7 +142,7 @@ service Ext {
   rpc StateUser(NetworkQuery) returns (SimpleUser);
   rpc StateUsersByChan(NetworkQuery) returns (ListResponse);
   rpc StateUsersByChanCount(NetworkQuery) returns (CountResponse);
-  rpc StateUserModes(ChannelQuery) returns (ChannelModes);
+  rpc StateUserModes(ChannelQuery) returns (UserModes);
 
   rpc StateChannel(NetworkQuery) returns (ChannelResponse);
   rpc StateChannels(NetworkQuery) returns (ListResponse);
