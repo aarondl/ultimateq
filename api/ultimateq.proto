@@ -139,6 +139,7 @@ service Ext {
   rpc Unregister(UnregisterRequest) returns (Result);
 
   rpc StateSelf(Query) returns (SelfResponse);
+  rpc StateUser(NetworkQuery) returns (SimpleUser);
   rpc StateUsersByChan(NetworkQuery) returns (ListResponse);
   rpc StateUsersByChanCount(NetworkQuery) returns (CountResponse);
   rpc StateUserModes(ChannelQuery) returns (ChannelModes);
