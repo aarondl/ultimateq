@@ -219,9 +219,9 @@ func (a apiServer) StoreAuthedUser(ctx context.Context, in *api.NetworkQuery) (*
 		return nil, err
 	}
 
-	user, err := store.AuthedUser(in.Network, in.Query)
-	if err != nil {
-		return nil, err
+	user := store.AuthedUser(in.Network, in.Query)
+	if user == nil {
+		return nil, nil
 	}
 
 	return user.ToProto(), nil
@@ -241,181 +241,55 @@ func (a apiServer) StoreUser(ctx context.Context, in *api.Query) (*api.StoredUse
 	return user.ToProto(), nil
 }
 
-func (a apiServer) StoreUsers(ctx context.Context, in *api.Empty) (*api.StoredUsersResponse, error) {
-	store, err := a.getStore()
-	if err != nil {
-		return nil, err
-	}
-
-	user, err := store.GlobalUsers()
-	if err != nil {
-		return nil, err
-	}
-
-	return user.ToProto(), nil
-}
-
-/*
-func (a api) stateIsOn(e echo.Context) error {
-	state, err := a.getNetState(e)
-	if err != nil {
-		return err
-	}
-
-	channel, err := getParam(e, "channel")
-	if err != nil {
-		return err
-	}
-	user, err := getParam(e, "user")
-	if err != nil {
-		return err
-	}
-
-	ison := state.IsOn(user, channel)
-
-	if ison {
-		e.NoContent(http.StatusOK)
-	} else {
-		e.NoContent(http.StatusNotFound)
-	}
-
-	return nil
-}
-
-func (a api) storeAuthUser(e echo.Context) error {
-	store := a.bot.Store()
-
-	auth := struct {
-		Network   string `json:"network"`
-		Host      string `json:"host"`
-		Username  string `json:"username"`
-		Password  string `json:"password"`
-		Permanent bool   `json:"permanent"`
-	}{}
-
-	if err := e.Bind(&auth); err != nil {
-		return err
-	}
-
-	if len(auth.Host) == 0 || len(auth.Network) == 0 ||
-		len(auth.Username) == 0 || len(auth.Password) == 0 {
-
-		return echo.NewHTTPError(http.StatusBadRequest, "must supply all parameters (network, host, username, password)")
-	}
-
-	var err error
-	if auth.Permanent {
-		_, err = store.AuthUserPerma(auth.Network, auth.Host, auth.Username, auth.Password)
-	} else {
-		_, err = store.AuthUserTmp(auth.Network, auth.Host, auth.Username, auth.Password)
-	}
-
-	if _, ok := err.(data.AuthError); ok {
-		return echo.NewHTTPError(http.StatusForbidden, err.Error())
-	} else if err != nil {
-		return err
-	}
-
-	e.NoContent(http.StatusOK)
-
-	return nil
-}
-
-func (a api) storeAuthedUser(e echo.Context) error {
-	store := a.bot.Store()
-
-	network, err := getParam(e, "network")
-	if err != nil {
-		return err
-	}
-	host, err := getParam(e, "host")
-	if err != nil {
-		return err
-	}
-
-	authedUser := store.AuthedUser(network, host)
-	if authedUser == nil {
-		return echo.NewHTTPError(http.StatusNotFound, "user not found")
-	}
-
-	e.JSON(http.StatusOK, authedUser)
-
-	return nil
-}
-
-func (a api) storeUser(e echo.Context) error {
-	store := a.bot.Store()
-
-	username, err := getParam(e, "username")
-	if err != nil {
-		return err
-	}
-
-	user, err := store.FindUser(username)
-	if err != nil {
-		return err
-	} else if user == nil {
-		return echo.NewHTTPError(http.StatusNotFound, "user not found")
-	}
-
-	e.JSON(http.StatusOK, user)
-
-	return nil
-}
-
-func (a api) storeUsers(e echo.Context) error {
+func (a apiServer) StoreUsers(ctx context.Context, _ *api.Empty) (*api.StoredUsersResponse, error) {
 	store := a.bot.Store()
 
 	users, err := store.GlobalUsers()
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
-	e.JSON(http.StatusOK, users)
-
-	return nil
+	return makeUsersResponse(users), nil
 }
 
-func (a api) storeNetworkUsers(e echo.Context) error {
+func (a apiServer) StoreUsersByNetwork(ctx context.Context, in *api.Query) (*api.StoredUsersResponse, error) {
 	store := a.bot.Store()
 
-	network, err := getParam(e, "network")
+	users, err := store.NetworkUsers(in.Query)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	users, err := store.NetworkUsers(network)
-	if err != nil {
-		return nil
-	}
-
-	e.JSON(http.StatusOK, users)
-
-	return nil
+	return makeUsersResponse(users), nil
 }
 
-func (a api) storeNetworkChannelUsers(e echo.Context) error {
+func (a apiServer) StoreUsersByChannel(ctx context.Context, in *api.NetworkQuery) (*api.StoredUsersResponse, error) {
 	store := a.bot.Store()
 
-	network, err := getParam(e, "network")
+	users, err := store.ChanUsers(in.Network, in.Query)
 	if err != nil {
-		return err
-	}
-	channel, err := getParam(e, "channel")
-	if err != nil {
-		return err
+		return nil, err
 	}
 
-	users, err := store.ChanUsers(network, channel)
-	if err != nil {
-		return nil
-	}
-
-	e.JSON(http.StatusOK, users)
-
-	return nil
+	return makeUsersResponse(users), nil
 }
 
+func makeUsersResponse(users []*data.StoredUser) *api.StoredUsersResponse {
+	if len(users) == 0 {
+		return &api.StoredUsersResponse{}
+	}
+
+	var resp api.StoredUsersResponse
+	resp.Users = make([]*api.StoredUser, len(users))
+
+	for i, u := range users {
+		resp.Users[i] = u.ToProto()
+	}
+
+	return &resp
+}
+
+/*
 func (a api) storeChannel(e echo.Context) error {
 	store := a.bot.Store()
 
@@ -645,14 +519,6 @@ func (a apiServer) Register(ctx context.Context, in *api.RegisterRequest) (*api.
 }
 
 func (a apiServer) Unregister(ctx context.Context, in *api.UnregisterRequest) (*api.Empty, error) {
-	return nil, nil
-}
-
-func (a apiServer) StoreUsersByNetwork(ctx context.Context, in *api.Query) (*api.StoredUsersResponse, error) {
-	return nil, nil
-}
-
-func (a apiServer) StoreUsersByChannel(ctx context.Context, in *api.NetworkQuery) (*api.StoredUsersResponse, error) {
 	return nil, nil
 }
 
