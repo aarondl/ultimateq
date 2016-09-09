@@ -21,12 +21,12 @@
 		Access
 		SelfResponse
 		Empty
+		Result
 		Query
 		NetworkQuery
 		ChannelQuery
 		ListResponse
 		CountResponse
-		Result
 		RegisterRequest
 		UnregisterRequest
 		UserResponse

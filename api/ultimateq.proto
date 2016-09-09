@@ -12,6 +12,10 @@ message SelfResponse {
 message Empty {
 }
 
+message Result {
+  bool ok = 1;
+}
+
 message Query {
   string query = 1;
 }
@@ -33,17 +37,6 @@ message ListResponse {
 
 message CountResponse {
   int32 count = 1;
-}
-
-message Result {
-  message OK {
-  }
-  message NotFound {
-  }
-  oneof result {
-    OK ok              = 1;
-    NotFound not_found = 2;
-  }
 }
 
 message RegisterRequest {
@@ -135,8 +128,8 @@ message RawIRC {
 service Ext {
   rpc Pipe(stream RawIRC) returns (stream IRCMessage);
 
-  rpc Register(RegisterRequest) returns (Result);
-  rpc Unregister(UnregisterRequest) returns (Result);
+  rpc Register(RegisterRequest) returns (Empty);
+  rpc Unregister(UnregisterRequest) returns (Empty);
 
   rpc StateSelf(Query) returns (SelfResponse);
   rpc StateUser(NetworkQuery) returns (SimpleUser);
@@ -145,12 +138,12 @@ service Ext {
   rpc StateUserModes(ChannelQuery) returns (UserModes);
 
   rpc StateChannel(NetworkQuery) returns (ChannelResponse);
-  rpc StateChannels(NetworkQuery) returns (ListResponse);
-  rpc StateChannelCount(NetworkQuery) returns (CountResponse);
+  rpc StateChannels(Query) returns (ListResponse);
+  rpc StateChannelCount(Query) returns (CountResponse);
 
-  rpc StateIsOn(ChannelQuery) returns (Result.OK);
+  rpc StateIsOn(ChannelQuery) returns (Result);
 
-  rpc StoreAuthUser(AuthUserRequest) returns (Result.OK);
+  rpc StoreAuthUser(AuthUserRequest) returns (Empty);
   rpc StoreAuthedUser(NetworkQuery) returns (StoredUser);
   rpc StoreUser(Query) returns (StoredUser);
 
@@ -161,11 +154,11 @@ service Ext {
   rpc StoreChannel(NetworkQuery) returns (StoredChannel);
   rpc StoreChannels(Empty) returns (StoredChannelsResponse);
 
-  rpc StorePutUser(StoredUser) returns (Result);
-  rpc StorePutChannel(StoredChannel) returns (Result);
+  rpc StorePutUser(StoredUser) returns (Empty);
+  rpc StorePutChannel(StoredChannel) returns (Empty);
 
-  rpc StoreDeleteUser(Query) returns (Result);
-  rpc StoreDeleteChannel(NetworkQuery) returns (Result);
+  rpc StoreDeleteUser(Query) returns (Empty);
+  rpc StoreDeleteChannel(NetworkQuery) returns (Empty);
 }
 
 message ConnectionDetails {
@@ -174,5 +167,5 @@ message ConnectionDetails {
 }
 
 service Boomerang {
-  rpc Connect(ConnectionDetails) returns (Result.OK);
+  rpc Connect(ConnectionDetails) returns (Empty);
 }
