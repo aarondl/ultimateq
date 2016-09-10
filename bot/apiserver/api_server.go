@@ -7,6 +7,7 @@ import (
 	"github.com/aarondl/ultimateq/api"
 	"github.com/aarondl/ultimateq/bot"
 	"github.com/aarondl/ultimateq/data"
+	"github.com/aarondl/ultimateq/dispatch/cmd"
 	"github.com/aarondl/ultimateq/registrar"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -15,11 +16,11 @@ import (
 
 // apiServer provides a grpc api around a bot
 type apiServer struct {
-	bot   *bot.Bot
-	proxy *registrar.Proxy
+	bot *bot.Bot
 
 	mut   sync.RWMutex
-	pipes map[string]msgPipe
+	proxy *registrar.Proxy
+	pipes map[string]*msgPipe
 }
 
 func NewAPIServer(b *bot.Bot) apiServer {
@@ -41,6 +42,8 @@ func (a apiServer) Start(port string) error {
 	api.RegisterExtServer(grpcServer, a)
 
 	//TODO(aarondl): TLS
+	//TODO(aarondl): Disconnection handler, each Register/RegisterCmd leaves around
+	// a msgPipe
 	return grpcServer.Serve(lis)
 }
 
@@ -53,15 +56,23 @@ func (a apiServer) getState(network string) (*data.State, error) {
 	return state, nil
 }
 
+// getMsgPipe must be called under mut.Lock()
+func (a apiServer) getMsgPipe(ext string) *msgPipe {
+	pipe, ok := a.pipes[ext]
+	if !ok {
+		pipe = newMsgPipe(a.bot.Logger.New("ext", ext))
+		a.pipes[ext] = pipe
+	}
+
+	return pipe
+}
+
 func (a apiServer) Pipe(pipe api.Ext_PipeServer) error {
 	return nil
 }
 
 func (a apiServer) Register(ctx context.Context, in *api.RegisterRequest) (*api.Empty, error) {
 	proxy := a.proxy.Get(in.Name)
-	if proxy == nil {
-		return nil, grpc.Errorf(codes.NotFound, "extension not found")
-	}
 
 	return nil, nil
 }
@@ -78,6 +89,66 @@ func (a apiServer) getStore() (*data.Store, error) {
 	}
 
 	return store, nil
+}
+
+func (a apiServer) Register(ctx context, in *api.RegisterRequest) (*api.RegisterResponse, error) {
+	a.mut.Lock()
+	proxy := a.proxy.Get(in.Ext)
+	pipe := a.getMsgPipe(in.Ext)
+	a.mut.Unlock()
+
+	id := proxy.Register(in.Network, in.Channel, in.Event, pipe)
+	return &api.RegisterResponse{
+		id: id,
+	}, nil
+}
+
+func (a apiServer) RegisterCmd(ctx context.Context, in *api.RegisterCmdRequest) (*api.Empty, error) {
+	a.mut.Lock()
+	proxy := a.proxy.Get(in.Ext)
+	pipe := a.getMsgPipe(in.Ext)
+	a.mut.Unlock()
+
+	command := &cmd.Cmd{
+		Cmd:         in.Cmd.Cmd,
+		Extension:   in.Cmd.Ext,
+		Description: in.Cmd.Desc,
+		Kind:        cmd.MsgKind(in.Cmd.Kind),
+		Scope:       cmd.MsgScope(in.Cmd.Scope),
+		RequireAuth: in.Cmd.RequireAuth,
+		ReqLevel:    uint8(in.Cmd.ReqLevel),
+		ReqFlags:    in.Cmd.ReqFlags,
+	}
+
+	id := proxy.RegisterCmd(in.Network, in.Channel, command, pipe)
+	return nil, nil
+}
+
+func (a apiServer) Unregister(ctx context.Context, in *api.UnregisterRequest) (*api.Empty, error) {
+	a.mut.Lock()
+	proxy := a.proxy.Get(in.Ext)
+	a.mut.Unlock()
+
+	proxy.Unregister(in.Id)
+	return nil, nil
+}
+
+func (a apiServer) UnregisterCmd(ctx context.Context, in *api.UnregisterCmdRequest) (*api.Empty, error) {
+	a.mut.Lock()
+	proxy := a.proxy.Get(in.Ext)
+	a.mut.Unlock()
+
+	proxy.UnregisterCmd(in.Network, in.Channel, in.Ext, in.Command)
+	return nil, nil
+}
+
+func (a apiServer) UnregisterAll(ctx context.Context, in *api.UnregisterAllRequest) (*api.Empty, error) {
+	a.mut.Lock()
+	proxy := a.proxy.Unregister(in.Ext)
+	delete(a.pipes, in.Ext)
+	a.mut.Unlock()
+
+	return nil, nil
 }
 
 func (a apiServer) StateSelf(ctx context.Context, in *api.Query) (*api.SelfResponse, error) {

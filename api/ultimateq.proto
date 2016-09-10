@@ -40,13 +40,37 @@ message CountResponse {
 }
 
 message RegisterRequest {
-  string name = 1;
-  repeated Handler handlers = 2;
-  repeated Command cmds     = 3;
+  string ext     = 1;
+  string network = 2;
+  string channel = 3;
+  string event   = 4;
+}
+
+message RegisterResponse {
+  uint64 id = 1;
 }
 
 message UnregisterRequest {
-  string name = 1;
+  string ext = 1;
+  uint64 id  = 2;
+}
+
+message RegisterCmdRequest {
+  string  ext     = 1;
+  string  network = 2;
+  string  channel = 3;
+  Cmd     cmd     = 4;
+}
+
+message UnregisterCmdRequest {
+  string ext     = 1;
+  string network = 2;
+  string channel = 3;
+  string command = 4;
+}
+
+message UnregisterAllRequest {
+  string ext = 1;
 }
 
 message UserResponse {
@@ -128,8 +152,13 @@ message RawIRC {
 service Ext {
   rpc Pipe(stream RawIRC) returns (stream IRCMessage);
 
-  rpc Register(RegisterRequest) returns (Empty);
+  rpc Ping(Empty) returns (Empty);
+
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc RegisterCmd(RegisterCmdRequest) returns (Empty);
   rpc Unregister(UnregisterRequest) returns (Empty);
+  rpc UnregisterCmd(UnregisterCmdRequest) returns (Empty);
+  rpc UnregisterAll(UnregisterAllRequest) returns (Empty);
 
   rpc StateSelf(Query) returns (SelfResponse);
   rpc StateUser(NetworkQuery) returns (SimpleUser);

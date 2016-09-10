@@ -35,7 +35,16 @@ type msgPipe struct {
 	writers  map[uint32]chan<- []byte
 }
 
-func (m msgPipe) openWriter() (uint32, <-chan []byte) {
+func newMsgPipe(log log15.Logger) *msgPipe {
+	return &msgPipe{
+		log:       log,
+		Events:    make(chan ircEvent),
+		CmdEvents: make(chan cmdEvent),
+		writers:   make(map[uint32]chan<- []byte),
+	}
+}
+
+func (m *msgPipe) openWriter() (uint32, <-chan []byte) {
 	writer := make(chan []byte)
 	var streamID uint32
 
@@ -49,7 +58,7 @@ func (m msgPipe) openWriter() (uint32, <-chan []byte) {
 	return streamID, writer
 }
 
-func (m msgPipe) getWriter(streamID uint32) chan<- []byte {
+func (m *msgPipe) getWriter(streamID uint32) chan<- []byte {
 	msgPipe.mut.Lock()
 	w := msgPipe.writers[streamID]
 	m.log.Debug("get writer", "streamid", streamID)
@@ -58,7 +67,7 @@ func (m msgPipe) getWriter(streamID uint32) chan<- []byte {
 	return w
 }
 
-func (m msgPipe) closeWriter(streamID uint32) {
+func (m *msgPipe) closeWriter(streamID uint32) {
 	msgPipe.mut.Lock()
 	w, ok := msgPipe.writers[streamID]
 	delete(msgPipe.writers, streamID)
@@ -72,7 +81,18 @@ func (m msgPipe) closeWriter(streamID uint32) {
 	close(w)
 }
 
-func (m msgPipe) HandleRaw(w irc.Writer, ev *irc.Event) {
+func (m *msgPipe) closeAll() {
+	m.log.Debug("close all")
+
+	msgPipe.mut.Lock()
+	for k, w := range m.writers {
+		close(w)
+		delete(msgPipe.writers, streamID)
+	}
+	msgPipe.mut.Unlock()
+}
+
+func (m *msgPipe) HandleRaw(w irc.Writer, ev *irc.Event) {
 	streamID, writer := m.openWriter()
 
 	select {
@@ -95,7 +115,7 @@ func (m msgPipe) HandleRaw(w irc.Writer, ev *irc.Event) {
 	}
 }
 
-func (m msgPipe) Cmd(command string, w irc.Writer, ev *cmd.Event) error {
+func (m *msgPipe) Cmd(command string, w irc.Writer, ev *cmd.Event) error {
 	writer := m.openWriter()
 
 	select {

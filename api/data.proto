@@ -7,29 +7,18 @@ message SimpleUser {
   string name = 2;
 }
 
-message Handler {
-  string network = 1;
-  string channel = 2;
-  string event   = 3;
-}
+message Cmd {
+  string cmd         = 1;
+  string ext         = 2;
+  string desc        = 3;
+  int32  kind        = 4;
+  int32  scope       = 5;
 
-message Command {
-  message Cmd {
-    string network     = 1;
-    string channel     = 2;
-    string description = 3;
-    int32  kind        = 4;
-    int32  scope       = 5;
+  repeated string args = 6;
 
-    repeated string args = 6;
-
-    bool   require_auth = 7;
-    int32  req_level    = 8;
-    string req_flags    = 9;
-  }
-  string network = 1;
-  string channel = 2;
-  Cmd    cmd     = 3;
+  bool   require_auth = 7;
+  int32  req_level    = 8;
+  string req_flags    = 9;
 }
 
 message ChannelModes {
