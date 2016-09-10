@@ -13,7 +13,7 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
-// api provides a REST api around a bot
+// apiServer provides a grpc api around a bot
 type apiServer struct {
 	bot   *bot.Bot
 	proxy *registrar.Proxy
@@ -29,24 +29,6 @@ func NewAPIServer(b *bot.Bot) apiServer {
 	}
 
 	return server
-}
-
-func (a apiServer) Pipe(pipe api.Ext_PipeServer) error {
-	return nil
-}
-
-func (a apiServer) Register(ctx context.Context, in *api.RegisterRequest) (*api.Empty, error) {
-	proxy := a.proxy.Get(in.Name)
-	if proxy == nil {
-		return nil, grpc.Errorf(codes.NotFound, "extension not found")
-	}
-
-	return nil, nil
-}
-
-func (a apiServer) Unregister(ctx context.Context, in *api.UnregisterRequest) (*api.Empty, error) {
-	a.proxy.Unregister(in.Name)
-	return nil, nil
 }
 
 func (a apiServer) Start(port string) error {
@@ -69,6 +51,24 @@ func (a apiServer) getState(network string) (*data.State, error) {
 	}
 
 	return state, nil
+}
+
+func (a apiServer) Pipe(pipe api.Ext_PipeServer) error {
+	return nil
+}
+
+func (a apiServer) Register(ctx context.Context, in *api.RegisterRequest) (*api.Empty, error) {
+	proxy := a.proxy.Get(in.Name)
+	if proxy == nil {
+		return nil, grpc.Errorf(codes.NotFound, "extension not found")
+	}
+
+	return nil, nil
+}
+
+func (a apiServer) Unregister(ctx context.Context, in *api.UnregisterRequest) (*api.Empty, error) {
+	a.proxy.Unregister(in.Name)
+	return nil, nil
 }
 
 func (a apiServer) getStore() (*data.Store, error) {
