@@ -1,40 +1,28 @@
-package bot
+package apiserver
 
 import (
 	"net"
 	"sync"
 
 	"github.com/aarondl/ultimateq/api"
+	"github.com/aarondl/ultimateq/bot"
 	"github.com/aarondl/ultimateq/data"
-	"github.com/aarondl/ultimateq/dispatch/cmd"
-	"github.com/aarondl/ultimateq/irc"
 	"github.com/aarondl/ultimateq/registrar"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 )
 
-type msgPipe struct {
-	Events    <-chan *irc.Event
-	CmdEvents <-chan *cmd.Event
-}
-
 // api provides a REST api around a bot
 type apiServer struct {
-	bot   *Bot
+	bot   *bot.Bot
 	proxy *registrar.Proxy
 
 	mut   sync.RWMutex
 	pipes map[string]msgPipe
 }
 
-func (a apiServer) HandleRaw(w irc.Writer, ev *irc.Event) {
-}
-
-func (a apiServer) Cmd(command string, w irc.Writer, ev *cmd.Event) {
-}
-
-func newAPIServer(b *Bot) apiServer {
+func NewAPIServer(b *bot.Bot) apiServer {
 	server := apiServer{
 		bot:   b,
 		proxy: registrar.NewProxy(b),
@@ -53,9 +41,7 @@ func (a apiServer) Register(ctx context.Context, in *api.RegisterRequest) (*api.
 		return nil, grpc.Errorf(codes.NotFound, "extension not found")
 	}
 
-	ext := in.Name
-	for _, cmd := range in.Cmds {
-	}
+	return nil, nil
 }
 
 func (a apiServer) Unregister(ctx context.Context, in *api.UnregisterRequest) (*api.Empty, error) {
@@ -63,7 +49,7 @@ func (a apiServer) Unregister(ctx context.Context, in *api.UnregisterRequest) (*
 	return nil, nil
 }
 
-func (a apiServer) start(port string) error {
+func (a apiServer) Start(port string) error {
 	lis, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		return err
@@ -448,7 +434,7 @@ func (a apiServer) StoreLogout(ctx context.Context, in *api.NetworkQuery) (*api.
 	return nil, nil
 }
 
-func (a apiServer) StoreLogoutByUser(context.Context, *Query) (*Empty, error) {
+func (a apiServer) StoreLogoutByUser(ctx context.Context, in *api.Query) (*api.Empty, error) {
 	store, err := a.getStore()
 	if err != nil {
 		return nil, err
