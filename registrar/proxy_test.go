@@ -54,4 +54,8 @@ func TestProxy_Unregister(t *testing.T) {
 	p.Unregister("hello")
 
 	m.verifyMock(t, 2, 2, 0, 0)
+
+	if len(p.holders) != 0 {
+		t.Error("should be empty")
+	}
 }

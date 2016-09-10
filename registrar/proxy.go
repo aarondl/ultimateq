@@ -48,6 +48,7 @@ func (p *Proxy) Unregister(name string) {
 	if !ok {
 		return
 	}
+	delete(p.holders, name)
 
 	holder.unregisterAll()
 }
