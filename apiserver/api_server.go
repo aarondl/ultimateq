@@ -1,6 +1,7 @@
 package apiserver
 
 import (
+	"log"
 	"net"
 	"sync"
 
@@ -12,6 +13,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/grpclog"
 )
 
 // apiServer provides a grpc api around a bot
@@ -38,11 +40,14 @@ func (a apiServer) Start(port string) error {
 		return err
 	}
 
+	// TODO(aarondl): Delete
+	grpclog.SetLogger(log.Logger)
+
 	grpcServer := grpc.NewServer()
 	api.RegisterExtServer(grpcServer, a)
 
-	//TODO(aarondl): TLS
-	//TODO(aarondl): Disconnection handler, each Register/RegisterCmd leaves around
+	// TODO(aarondl): TLS
+	// TODO(aarondl): Disconnection handler, each Register/RegisterCmd leaves around
 	// a msgPipe
 	return grpcServer.Serve(lis)
 }
