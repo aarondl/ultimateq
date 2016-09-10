@@ -159,6 +159,9 @@ service Ext {
 
   rpc StoreDeleteUser(Query) returns (Empty);
   rpc StoreDeleteChannel(NetworkQuery) returns (Empty);
+
+  rpc StoreLogout(NetworkQuery) returns (Empty);
+  rpc StoreLogoutByUser(Query) returns (Empty);
 }
 
 message ConnectionDetails {
