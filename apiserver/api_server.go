@@ -76,17 +76,6 @@ func (a apiServer) Pipe(pipe api.Ext_PipeServer) error {
 	return nil
 }
 
-func (a apiServer) Register(ctx context.Context, in *api.RegisterRequest) (*api.Empty, error) {
-	proxy := a.proxy.Get(in.Name)
-
-	return nil, nil
-}
-
-func (a apiServer) Unregister(ctx context.Context, in *api.UnregisterRequest) (*api.Empty, error) {
-	a.proxy.Unregister(in.Name)
-	return nil, nil
-}
-
 func (a apiServer) getStore() (*data.Store, error) {
 	store := a.bot.Store()
 	if store == nil {
