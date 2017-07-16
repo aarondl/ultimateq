@@ -1,14 +1,4 @@
-/*
-Package cmd is a more involved dispatcher implementation. In short it
-allows users to create commands very easily rather than doing everything by hand
-in a privmsg handler.
-
-It uses the data package to achieve command access verification. It also
-provides some automatic parsing and handling of the command keyword and
-arguments. Cmd keywords become unique for each server and may not be
-duplicated.
-*/
-package cmd
+package dispatch
 
 import (
 	"bytes"
@@ -19,31 +9,7 @@ import (
 	"sync"
 
 	"github.com/aarondl/ultimateq/data"
-	"github.com/aarondl/ultimateq/dispatch"
 	"github.com/aarondl/ultimateq/irc"
-)
-
-// MsgKind is the kind of messages to listen to.
-type MsgKind int
-
-// MsgScope is the scope of the messages to listen to.
-type MsgScope int
-
-// Constants used for defining the targets/scope of a command.
-const (
-	// PRIVMSG only listens to irc.PRIVMSG events.
-	PRIVMSG MsgKind = 0x1
-	// NOTICE only listens to irc.NOTICE events.
-	NOTICE MsgKind = 0x2
-	// ALLKINDS listens to both irc.PRIVMSG and irc.NOTICE events.
-	ALLKINDS MsgKind = 0x3
-
-	// PRIVATE only listens to PRIVMSG or NOTICE sent directly to the bot.
-	PRIVATE MsgScope = 0x1
-	// PUBLIC only listens to PRIVMSG or NOTICE sent to a channel.
-	PUBLIC MsgScope = 0x2
-	// ALLSCOPES listens to events sent to a channel or directly to the bot.
-	ALLSCOPES MsgScope = 0x3
 )
 
 // Error messages.
@@ -101,42 +67,21 @@ const (
 		`allowed (given: %v)`
 )
 
-// CmdHandler is the interface that Cmds expects structs to implement
-// in order to be able to handle command events. Although this interface must
-// be implemented for fallback, if the type has a method with the same name as
-// the command being invoked with the first letter uppercased and the same
-// arguments and return types as the Cmd function below (minus the cmd arg),
-// it will be called instead of the Cmd function.
-//
-//	Example:
-//	type Handler struct {}
-//	func (b *Handler) Cmd(cmd string, d *data.DataEndpoint,
-//	    c *cmd.Event) error { return nil }
-//	func (b *Handler) Supercommand(d *data.DataEndpoint,
-//	    c *cmd.Event) error { return nil }
-//
-// !supercommand in a channel would invoke the bottom handler.
-type CmdHandler interface {
-	Cmd(string, irc.Writer, *Event) error
-}
-
-// commandTable is used to store all the string->command assocations.
-type commandTable map[string][]*Cmd
-
 // pfxFetcher is used to look up prefixes for different areas of configuration.
 type pfxFetcher func(network, channel string) rune
 
-// Cmds allows for registration of commands that can involve user access,
+// CommandDispatcher allows for registration of commands that can involve user access,
 // and provides a rich programming interface for command handling.
-type Cmds struct {
-	*dispatch.DispatchCore
-	fetcher  pfxFetcher
-	commands commandTable
-	sync.RWMutex
+type CommandDispatcher struct {
+	*DispatchCore
+	fetcher pfxFetcher
+
+	mutTrie sync.RWMutex
+	trie    *trie
 }
 
 // NewCmds initializes a cmds.
-func NewCmds(fetcher pfxFetcher, core *dispatch.DispatchCore) *Cmds {
+func NewCommandDispatcher(fetcher pfxFetcher, core *DispatchCore) *Cmds {
 	return &Cmds{
 		DispatchCore: core,
 		fetcher:      fetcher,
@@ -149,7 +94,7 @@ func NewCmds(fetcher pfxFetcher, core *dispatch.DispatchCore) *Cmds {
 // the documentation for CmdHandler for how to respond to commands issued by
 // users. Network and Channel may be given to restrict which networks/channels
 // this event will fire on.
-func (c *Cmds) Register(network, channel string, cmd *Cmd) error {
+func (c *CommandDispatcher) Register(network, channel string, cmd *Cmd) error {
 	switch {
 	case len(cmd.Cmd) == 0:
 		return errors.New(errMsgCmdRequired)
@@ -187,7 +132,7 @@ func (c *Cmds) Register(network, channel string, cmd *Cmd) error {
 // Unregister a command from the bot. If ext is left blank and there are
 // multiple event handlers registered under the name 'cmd' it will unregister
 // all of them, the safe bet is to provide the ext parameter.
-func (c *Cmds) Unregister(network, channel, ext, cmd string) (found bool) {
+func (c *CommandDispatcher) Unregister(network, channel, ext, cmd string) (found bool) {
 	c.Lock()
 	defer c.Unlock()
 
@@ -215,7 +160,7 @@ func (c *Cmds) Unregister(network, channel, ext, cmd string) (found bool) {
 }
 
 // Dispatch dispatches an IrcEvent into the cmds event handlers.
-func (c *Cmds) Dispatch(writer irc.Writer, ev *irc.Event,
+func (c *CommandDispatcher) Dispatch(writer irc.Writer, ev *irc.Event,
 	provider data.Provider) (err error) {
 
 	// Filter non privmsg/notice
@@ -346,7 +291,7 @@ func (c *Cmds) Dispatch(writer irc.Writer, ev *irc.Event,
 }
 
 // lookupCmd finds the command to execute, returns user-facing errors if not.
-func (c *Cmds) lookupCmd(network, channel, ext, cmd string) (*Cmd, error) {
+func (c *CommandDispatcher) lookupCmd(network, channel, ext, cmd string) (*Cmd, error) {
 	network = strings.ToLower(network)
 	channel = strings.ToLower(channel)
 
@@ -380,7 +325,7 @@ func (c *Cmds) lookupCmd(network, channel, ext, cmd string) (*Cmd, error) {
 
 // lookupCmdArr returns the most specific list of commands it can for the given
 // key values.
-func (c *Cmds) lookupCmdArr(network, channel, cmd string) ([]*Cmd, bool) {
+func (c *CommandDispatcher) lookupCmdArr(network, channel, cmd string) ([]*Cmd, bool) {
 	var cmdArr []*Cmd
 	var ok bool
 	if cmdArr, ok = c.commands[mkKey(network, channel, cmd)]; ok {
@@ -466,7 +411,7 @@ func filterAccess(store *data.Store, command *Cmd, server, channel string,
 // filterArgs parses all the arguments. It looks up channel and user arguments
 // using the state and store, and generally populates the Event struct
 // with argument information.
-func (c *Cmds) filterArgs(server string, command *Cmd, channel string,
+func (c *CommandDispatcher) filterArgs(server string, command *Cmd, channel string,
 	isChan bool, msgArgs []string, ev *Event, ircEvent *irc.Event,
 	state *data.State, store *data.Store) (err error) {
 
@@ -475,8 +420,8 @@ func (c *Cmds) filterArgs(server string, command *Cmd, channel string,
 	i, j := 0, 0
 	for i = 0; i < len(command.args); i, j = i+1, j+1 {
 		arg := &command.args[i]
-		req, opt, varg, ch, nick, user := REQUIRED&arg.Type != 0,
-			OPTIONAL&arg.Type != 0, VARIADIC&arg.Type != 0,
+		req, opt, varg, ch, nick, user := argTypeRequired&arg.Type != 0,
+			argTypeOptional&arg.Type != 0, VARIADIC&arg.Type != 0,
 			CHANNEL&arg.Type != 0, NICK&arg.Type != 0, USER&arg.Type != 0
 
 		switch {
@@ -546,7 +491,7 @@ func (c *Cmds) filterArgs(server string, command *Cmd, channel string,
 // parseChanArg checks the argument provided and ensures it's a valid situation
 // for the channel arg to be in (isChan & validChan) | (isChan & missing) |
 // (!isChan & validChan)
-func (c *Cmds) parseChanArg(command *Cmd, ev *Event,
+func (c *CommandDispatcher) parseChanArg(command *Cmd, ev *Event,
 	state *data.State,
 	index int, msgArgs []string, channel string, isChan bool) (bool, error) {
 
@@ -586,7 +531,7 @@ func (c *Cmds) parseChanArg(command *Cmd, ev *Event,
 
 // parseUserArg takes user arguments and assigns them to the correct structures
 // in a command data struct.
-func (c *Cmds) parseUserArg(ev *Event, state *data.State,
+func (c *CommandDispatcher) parseUserArg(ev *Event, state *data.State,
 	store *data.Store, srv, name string, t argType, users ...string) error {
 
 	vargs := (t & VARIADIC) != 0
@@ -631,7 +576,7 @@ func (c *Cmds) parseUserArg(ev *Event, state *data.State,
 			}
 		}
 		for i, u := range users {
-			access, user, err = ev.FindAccessByUser(srv, u)
+			access, user, err = findAccessByUser(state, store, ev, srv, u)
 			if err != nil {
 				return err
 			}
@@ -639,7 +584,7 @@ func (c *Cmds) parseUserArg(ev *Event, state *data.State,
 		}
 	case NICK:
 		for i, u := range users {
-			user, err = ev.FindUserByNick(u)
+			user, err = findUserByNick(state, ev, u)
 			if err != nil {
 				return err
 			}
@@ -654,7 +599,7 @@ func (c *Cmds) parseUserArg(ev *Event, state *data.State,
 // function for consumption. These should be considered read-only. Optionally
 // the results can be filtered by network and channel.
 // To end iteration prematurely the callback function can return true.
-func (c *Cmds) EachCmd(network, channel string, cb func(Cmd) bool) {
+func (c *CommandDispatcher) EachCmd(network, channel string, cb func(Cmd) bool) {
 	c.RLock()
 	defer c.RUnlock()
 
@@ -676,6 +621,70 @@ func (c *Cmds) EachCmd(network, channel string, cb func(Cmd) bool) {
 			break
 		}
 	}
+}
+
+// findUserByNick finds a user by their nickname. An error is returned if
+// they were not found.
+func findUserByNick(state *data.State, ev *Event, nick string) (*data.User, error) {
+	if ev.State == nil {
+		return nil, errors.New(errMsgStateDisabled)
+	}
+
+	if user, ok := ev.State.User(nick); ok {
+		return &user, nil
+	}
+
+	return nil, fmt.Errorf(errFmtUserNotFound, nick)
+}
+
+// findAccessByUser locates a user's access based on their nick or
+// username. To look up by username instead of nick use the * prefix before the
+// username in the string. The user parameter is returned when a nickname lookup
+// is done. An error occurs if the user is not found, the user is not authed,
+// the username is not registered, etc.
+func findAccessByUser(state *data.State, store *data.Store, ev *Event, server, nickOrUser string) (
+	access *data.StoredUser, user *data.User, err error) {
+	if store == nil {
+		err = errors.New(errMsgStoreDisabled)
+		return
+	}
+
+	switch nickOrUser[0] {
+	case '*':
+		if len(nickOrUser) == 1 {
+			err = errors.New(errMsgMissingUsername)
+			return
+		}
+		uname := nickOrUser[1:]
+		access, err = store.FindUser(uname)
+		if access == nil {
+			err = fmt.Errorf(errFmtUserNotRegistered, uname)
+			return
+		}
+	default:
+		if ev.State == nil {
+			err = errors.New(errMsgStateDisabled)
+			return
+		}
+
+		if u, ok := state.User(nickOrUser); !ok {
+			err = fmt.Errorf(errFmtUserNotFound, nickOrUser)
+			return
+		} else {
+			user = &u
+		}
+
+		access = store.AuthedUser(server, user.Host.String())
+		if access == nil {
+			err = fmt.Errorf(errFmtUserNotAuthed, nickOrUser)
+			return
+		}
+	}
+
+	if err != nil {
+		err = fmt.Errorf(errFmtInternal, err)
+	}
+	return
 }
 
 // makeIdentifier creates an identifier from a server and a command for
