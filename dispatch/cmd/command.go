@@ -1,10 +1,14 @@
 package cmd
 
-import "github.com/aarondl/ultimateq/irc"
+import (
+	"strings"
+
+	"github.com/aarondl/ultimateq/irc"
+)
 
 // Handler for command types
 type Handler interface {
-	Cmd(irc.Writer, *Event) error
+	Cmd(name string, writer irc.Writer, event *Event) error
 }
 
 // Command holds all the information about a command.
@@ -15,11 +19,11 @@ type Command struct {
 	Extension string
 	// Description is a description of the command's function.
 	Description string
-	// Kind is the kind of messages this command reacts to, may be the
-	// any of the constants: PRIVMSG, NOTICE or ALLKINDS.
+	// Kind is the kind of messages this command reacts to, may be
+	// any of the constants: Privmsg, Notice or AllKinds.
 	Kind Kind
-	// Scope is the scope of the messages this command reacts to. May be
-	// any of the constants: PRIVATE, PUBLIC or ALLSCOPES.
+	// Scope is the scope of the messages this command reacts to, may be
+	// any of the constants: Private, Public or Allscopes.
 	Scope Scope
 	// Args is the arguments for the command. Each argument must be in it's own
 	// element, be named with flags optionally prefixing the name, and have the
@@ -61,10 +65,12 @@ type Command struct {
 	ReqFlags string
 	// Handler the handler structure that will handle events for this command.
 	Handler Handler
+
+	parsedArgs commandArgs
 }
 
 // New is a helper method to easily create a Command. See the documentation
-// for Command on what each parameter is.
+// for Command on what each parameter is. Panics if the args are invalid.
 func New(
 	ext,
 	desc,
@@ -74,19 +80,44 @@ func New(
 	scope Scope,
 	args ...string) *Command {
 
-	return &Command{
-		Name:        cmd,
-		Extension:   ext,
+	command, err := NewErr(ext, desc, cmd, handler, kind, scope, args...)
+	if err != nil {
+		panic(err)
+	}
+
+	return command
+}
+
+// NewErr is like New but does not panic
+func NewErr(
+	ext,
+	desc,
+	cmd string,
+	handler Handler,
+	kind Kind,
+	scope Scope,
+	args ...string) (*Command, error) {
+
+	command := &Command{
+		Name:        strings.ToLower(cmd),
+		Extension:   strings.ToLower(ext),
 		Description: desc,
 		Handler:     handler,
 		Kind:        kind,
 		Scope:       scope,
 		Args:        args,
 	}
+
+	if err := command.parseArgs(); err != nil {
+		return nil, err
+	}
+
+	return command, nil
 }
 
 // NewAuthed is a helper method to easily create an authenticated Command. See
 // the documentation on Command for what each parameter is.
+// Panics if the args are invalid.
 func NewAuthed(
 	ext,
 	desc,
@@ -98,9 +129,33 @@ func NewAuthed(
 	reqFlags string,
 	args ...string) *Command {
 
-	command := New(ext, desc, cmd, handler, kind, scope, args...)
+	command, err := NewAuthedErr(ext, desc, cmd, handler, kind, scope, reqLevel, reqFlags, args...)
+	if err != nil {
+		panic(err)
+	}
+
+	return command
+}
+
+// NewAuthedErr is the same as NewAuthed but returns an error instead of panics
+func NewAuthedErr(
+	ext,
+	desc,
+	cmd string,
+	handler Handler,
+	kind Kind,
+	scope Scope,
+	reqLevel uint8,
+	reqFlags string,
+	args ...string) (*Command, error) {
+
+	command, err := NewErr(ext, desc, cmd, handler, kind, scope, args...)
+	if err != nil {
+		return nil, err
+	}
 	command.RequireAuth = true
 	command.ReqLevel = reqLevel
 	command.ReqFlags = reqFlags
-	return command
+
+	return command, nil
 }

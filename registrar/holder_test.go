@@ -24,9 +24,9 @@ func (m *mockReg) Register(_, _, _ string, _ interface{}) uint64 {
 	return m.id
 }
 
-func (m *mockReg) RegisterCmd(_, _ string, _ *cmd.Cmd) error {
+func (m *mockReg) RegisterCmd(_, _ string, _ *cmd.Command) (uint64, error) {
 	m.cmds++
-	return m.err
+	return 0, m.err
 }
 
 func (m *mockReg) Unregister(_ uint64) bool {
@@ -34,12 +34,13 @@ func (m *mockReg) Unregister(_ uint64) bool {
 	return m.ret
 }
 
-func (m *mockReg) UnregisterCmd(_, _, _, _ string) bool {
+func (m *mockReg) UnregisterCmd(_ uint64) bool {
 	m.uncmds++
 	return m.ret
 }
 
 func (m *mockReg) verifyMock(t *testing.T, regs, unregs, cmds, uncmds int) {
+	t.Helper()
 	if regs != m.regs {
 		t.Errorf("regs wrong, want: %d, got: %d", regs, m.regs)
 	}
@@ -63,8 +64,8 @@ func TestHolder_New(t *testing.T) {
 	if h.registrar != m {
 		t.Error("registrar is wrong")
 	}
-	if h.ids == nil {
-		t.Error("ids is nil")
+	if h.events == nil {
+		t.Error("events is nil")
 	}
 	if h.commands == nil {
 		t.Error("commands is nil")
@@ -80,7 +81,7 @@ func TestHolder_Register(t *testing.T) {
 	h := newHolder(m)
 
 	id := h.Register("n", "c", "e", nil)
-	if _, ok := h.ids[id]; !ok {
+	if _, ok := h.events[id]; !ok {
 		t.Error("did not record the registration")
 	}
 
@@ -97,7 +98,7 @@ func TestHolder_Unregister(t *testing.T) {
 	if !h.Unregister(id) {
 		t.Error("should be true")
 	}
-	if _, ok := h.ids[id]; ok {
+	if _, ok := h.events[id]; ok {
 		t.Error("did not delete the registration")
 	}
 
@@ -124,10 +125,11 @@ func TestHolder_RegisterCmd(t *testing.T) {
 	m := &mockReg{}
 	h := newHolder(m)
 
-	if err := h.RegisterCmd("n", "c", &cmd.Cmd{Cmd: "cmd", Extension: "e"}); err != nil {
+	id, err := h.RegisterCmd("n", "c", &cmd.Command{Name: "cmd", Extension: "e"})
+	if err != nil {
 		t.Error(err)
 	}
-	if _, ok := h.commands["n:c:e:cmd"]; !ok {
+	if _, ok := h.commands[id]; !ok {
 		t.Error("did not record the registration")
 	}
 
@@ -141,10 +143,11 @@ func TestHolder_RegisterCmdFail(t *testing.T) {
 	m := &mockReg{err: e}
 	h := newHolder(m)
 
-	if err := h.RegisterCmd("n", "c", &cmd.Cmd{Cmd: "cmd", Extension: "e"}); err != e {
+	id, err := h.RegisterCmd("n", "c", &cmd.Command{Name: "cmd", Extension: "e"})
+	if err != e {
 		t.Error("wrong error:", err, "want:", e)
 	}
-	if _, ok := h.commands["n:c:e:cmd"]; ok {
+	if _, ok := h.commands[id]; ok {
 		t.Error("should not record the registration")
 	}
 
@@ -157,16 +160,17 @@ func TestHolder_UnregisterCmd(t *testing.T) {
 	m := &mockReg{}
 	h := newHolder(m)
 
-	if err := h.RegisterCmd("n", "c", &cmd.Cmd{Cmd: "cmd", Extension: "e"}); err != nil {
+	id, err := h.RegisterCmd("n", "c", &cmd.Command{Name: "cmd", Extension: "e"})
+	if err != nil {
 		t.Error(err)
 	}
 
 	m.ret = true
-	if ok := h.UnregisterCmd("n", "c", "e", "cmd"); !ok {
+	if ok := h.UnregisterCmd(id); !ok {
 		t.Error("command not found")
 	}
 
-	if _, ok := h.commands["n:c:e:cmd"]; ok {
+	if _, ok := h.commands[id]; ok {
 		t.Error("did not delete the registration")
 	}
 
@@ -176,18 +180,19 @@ func TestHolder_UnregisterCmd(t *testing.T) {
 func TestHolder_UnregisterCmdFail(t *testing.T) {
 	t.Parallel()
 
-	m := &mockReg{}
+	m := &mockReg{ret: false}
 	h := newHolder(m)
 
-	if err := h.RegisterCmd("n", "c", &cmd.Cmd{Cmd: "cmd", Extension: "e"}); err != nil {
+	id, err := h.RegisterCmd("n", "c", &cmd.Command{Name: "cmd", Extension: "e"})
+	if err != nil {
 		t.Error(err)
 	}
 
 	m.ret = false
-	if ok := h.UnregisterCmd("n", "c", "e", "cmd"); ok {
+	if ok := h.UnregisterCmd(id); ok {
 		t.Error("command was found, should not have been found")
 	}
-	if _, ok := h.commands["n:c:e:cmd"]; ok {
+	if _, ok := h.commands[id]; ok {
 		t.Error("did not delete the registration")
 	}
 
