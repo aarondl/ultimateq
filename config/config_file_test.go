@@ -239,11 +239,11 @@ func verifyFakeConfig(t *testing.T, conf *Config) {
 	}
 
 	if pfx, ok := net1.ChannelPrefix("#channel1"); !ok && pfx != '!' {
-		t.Error("Expected: %c, got: %c", "!", pfx)
+		t.Errorf("Expected: %s, got: %c", "!", pfx)
 	}
 
 	if pfx, ok := net1.ChannelPrefix("#"); !ok && pfx != '!' {
-		t.Error("Expected: %c, got: %c", "!", pfx)
+		t.Errorf("Expected: %s, got: %c", "!", pfx)
 	}
 
 	if chans, ok := net1.Channels(); ok {

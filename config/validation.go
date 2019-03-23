@@ -163,7 +163,7 @@ func (c *Config) validateTypes(ers *errList) {
 							channelValidator.validateMap(name+" channels "+chanName, chanMap, ers)
 						} else {
 							ers.addError("(%s channels %s) %s is %T but expected map [%v]",
-								name, chanName, ch, ch)
+								net, name, chanName, ch, ch)
 						}
 					}
 				}

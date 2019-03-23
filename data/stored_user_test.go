@@ -87,7 +87,7 @@ func TestStoredUser_SerializeDeserialize(t *testing.T) {
 	} else {
 		for i := range s.Masks {
 			if s.Masks[i] != b.Masks[i] {
-				t.Errorf("Serialized mask not found:", s.Masks[i])
+				t.Error("Serialized mask not found:", s.Masks[i])
 			}
 		}
 	}

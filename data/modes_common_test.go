@@ -15,7 +15,7 @@ func TestModeKinds_Create(t *testing.T) {
 
 	m, err := newModeKinds(testUserKindStr, "a,b,c,d")
 	if err != nil {
-		t.Errorf("Unexpected error:", err)
+		t.Error("Unexpected error:", err)
 	}
 	if got, exp := m.channelModes['a'], ARGS_ADDRESS; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
@@ -32,7 +32,7 @@ func TestModeKinds_Create(t *testing.T) {
 
 	m, err = newModeKinds("(o)@", "a, b, c, d")
 	if err != nil {
-		t.Errorf("Unexpected error:", err)
+		t.Error("Unexpected error:", err)
 	}
 	if got, exp := m.channelModes['a'], ARGS_ADDRESS; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
@@ -49,7 +49,7 @@ func TestModeKinds_Create(t *testing.T) {
 
 	err = m.update("(o)@", "d, c, b, a")
 	if err != nil {
-		t.Errorf("Unexpected error:", err)
+		t.Error("Unexpected error:", err)
 	}
 	if got, exp := m.channelModes['d'], ARGS_ADDRESS; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
@@ -84,7 +84,7 @@ func TestModeKindsUpdate(t *testing.T) {
 
 	err = m.update(testUserKindStr, "d,c,b,a")
 	if err != nil {
-		t.Errorf("Unexpected Errorf:", err)
+		t.Error("Unexpected Errorf:", err)
 	}
 	if got, exp := m.channelModes['d'], ARGS_ADDRESS; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
@@ -138,7 +138,7 @@ func TestUserModeKinds_Create(t *testing.T) {
 		t.Errorf("Unexpected nil.")
 	}
 	if err != nil {
-		t.Errorf("Unexpected Errorf:", err)
+		t.Error("Unexpected Error:", err)
 	}
 	if got, exp := u.userPrefixes[0], [2]rune{'o', '@'}; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
@@ -153,7 +153,7 @@ func TestUserModeKinds_Symbol(t *testing.T) {
 
 	u, err := newModeKinds("(ov)@+", testChannelKindStr)
 	if err != nil {
-		t.Errorf("Unexpected Errorf:", err)
+		t.Error("Unexpected Error:", err)
 	}
 	if got, exp := u.Symbol('o'), '@'; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
@@ -168,7 +168,7 @@ func TestUserModeKinds_Mode(t *testing.T) {
 
 	u, err := newModeKinds("(ov)@+", testChannelKindStr)
 	if err != nil {
-		t.Errorf("Unexpected Errorf:", err)
+		t.Error("Unexpected Error:", err)
 	}
 	if got, exp := u.Mode('@'), 'o'; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
@@ -183,14 +183,14 @@ func TestUserModeKinds_Update(t *testing.T) {
 
 	u, err := newModeKinds("(ov)@+", testChannelKindStr)
 	if err != nil {
-		t.Errorf("Unexpected Errorf:", err)
+		t.Error("Unexpected Error:", err)
 	}
 	if got, exp := u.modeBit('o'), byte(0); exp == got {
 		t.Errorf("Did not want: %v, got: %v", exp, got)
 	}
 	err = u.update("(v)+", "")
 	if err != nil {
-		t.Errorf("Unexpected Errorf:", err)
+		t.Error("Unexpected Error:", err)
 	}
 	if got, exp := u.modeBit('o'), byte(0); exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
