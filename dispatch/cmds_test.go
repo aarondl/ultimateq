@@ -19,7 +19,7 @@ var (
 	pfxer  = func(_, _ string) rune {
 		return '.'
 	}
-	core = NewDispatchCore(nil)
+	core = NewCore(nil)
 )
 
 func init() {
@@ -216,7 +216,7 @@ func setupForAuth() (state *data.State, store *data.Store,
 func TestCmds(t *testing.T) {
 	t.Parallel()
 
-	c := NewCommandDispatcher(pfxer, NewDispatchCore(nil))
+	c := NewCommandDispatcher(pfxer, NewCore(nil))
 	if c == nil {
 		t.Fatal("Cmds should not be nil.")
 	}
@@ -247,12 +247,12 @@ func chkStr(msg, pattern string) error {
 func TestCmds_Register(t *testing.T) {
 	t.Parallel()
 
-	c := NewCommandDispatcher(pfxer, NewDispatchCore(nil))
+	c := NewCommandDispatcher(pfxer, NewCore(nil))
 
 	var handler = &commandHandler{}
 
 	var success bool
-	_, err := c.Register("", "", cmd.New(ext, dsc, command, nil, cmd.AnyKind, cmd.AnyScope))
+	_, err := c.Register("", "", cmd.New(ext, command, dsc, nil, cmd.AnyKind, cmd.AnyScope))
 	err = chkErr(err, errMsgHandlerRequired)
 	if err != nil {
 		t.Error(err)
@@ -310,12 +310,12 @@ func TestCmds_Register(t *testing.T) {
 func TestCmds_RegisterAuthed(t *testing.T) {
 	t.Parallel()
 
-	c := NewCommandDispatcher(pfxer, NewDispatchCore(nil))
+	c := NewCommandDispatcher(pfxer, NewCore(nil))
 
 	handler := &commandHandler{}
 	var success bool
 	id, err := c.Register("", "",
-		cmd.NewAuthed(ext, dsc, command, handler, cmd.AnyKind, cmd.AnyScope, 100, "ab"))
+		cmd.NewAuthed(ext, command, dsc, handler, cmd.AnyKind, cmd.AnyScope, 100, "ab"))
 	if err != nil {
 		t.Error("Unexpected Error:", err)
 	}
@@ -328,7 +328,7 @@ func TestCmds_RegisterAuthed(t *testing.T) {
 func TestCmds_Dispatch(t *testing.T) {
 	t.Parallel()
 
-	c := NewCommandDispatcher(pfxer, NewDispatchCore(nil))
+	c := NewCommandDispatcher(pfxer, NewCore(nil))
 	if c == nil {
 		t.Error("Cmds should not be nil.")
 	}
@@ -451,7 +451,7 @@ func TestCmds_Dispatch(t *testing.T) {
 		if test.Scope == 0 {
 			test.Scope = cmd.AnyScope
 		}
-		id, err := c.Register("", "", cmd.New(ext, dsc, command, handler,
+		id, err := c.Register("", "", cmd.New(ext, command, dsc, handler,
 			test.Kind, test.Scope, test.CmdArgs...))
 		if err != nil {
 			t.Errorf("Failed to register test: [%v]\n(%v)", err, test)
@@ -544,7 +544,7 @@ func TestCmds_Dispatch(t *testing.T) {
 func TestCmds_DispatchAuthed(t *testing.T) {
 	t.Parallel()
 
-	c := NewCommandDispatcher(pfxer, NewDispatchCore(nil))
+	c := NewCommandDispatcher(pfxer, NewCore(nil))
 
 	var table = []struct {
 		Sender   string
@@ -573,7 +573,7 @@ func TestCmds_DispatchAuthed(t *testing.T) {
 		buffer.Reset()
 		handler := &commandHandler{}
 
-		id, err := c.Register("", "", cmd.NewAuthed(ext, dsc, command, handler, cmd.AnyKind, cmd.AnyScope,
+		id, err := c.Register("", "", cmd.NewAuthed(ext, command, dsc, handler, cmd.AnyKind, cmd.AnyScope,
 			test.LevelReq, test.Flags))
 		if err != nil {
 			t.Errorf("Failed to register test: [%v]\n(%v)", err, test)
@@ -648,7 +648,7 @@ func TestCmds_DispatchAuthed(t *testing.T) {
 func TestCmds_DispatchNils(t *testing.T) {
 	t.Parallel()
 
-	c := NewCommandDispatcher(pfxer, NewDispatchCore(nil))
+	c := NewCommandDispatcher(pfxer, NewCore(nil))
 	_, writer := newWriter()
 	provider := testProvider{}
 
@@ -663,7 +663,7 @@ func TestCmds_DispatchNils(t *testing.T) {
 	handler := &commandHandler{}
 
 	id, err := c.Register("", "",
-		cmd.NewAuthed(ext, dsc, command, handler, cmd.AnyKind, cmd.AnyScope, 100, "a"))
+		cmd.NewAuthed(ext, command, dsc, handler, cmd.AnyKind, cmd.AnyScope, 100, "a"))
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
@@ -677,7 +677,7 @@ func TestCmds_DispatchNils(t *testing.T) {
 		t.Error("Unregistration failed.")
 	}
 
-	id, err = c.Register("", "", cmd.New(ext, dsc, command, handler, cmd.AnyKind, cmd.AnyScope))
+	id, err = c.Register("", "", cmd.New(ext, command, dsc, handler, cmd.AnyKind, cmd.AnyScope))
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
@@ -700,7 +700,7 @@ func TestCmds_DispatchNils(t *testing.T) {
 func TestCmds_DispatchReturns(t *testing.T) {
 	t.Parallel()
 
-	c := NewCommandDispatcher(pfxer, NewDispatchCore(nil))
+	c := NewCommandDispatcher(pfxer, NewCore(nil))
 	buffer, writer := newWriter()
 	provider := testProvider{}
 
@@ -713,7 +713,7 @@ func TestCmds_DispatchReturns(t *testing.T) {
 
 	handler := &errorHandler{}
 
-	id, err := c.Register("", "", cmd.New(ext, dsc, command, handler, cmd.AnyKind, cmd.AnyScope))
+	id, err := c.Register("", "", cmd.New(ext, command, dsc, handler, cmd.AnyKind, cmd.AnyScope))
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
@@ -756,7 +756,7 @@ func TestCmds_DispatchReturns(t *testing.T) {
 func TestCmds_DispatchChannel(t *testing.T) {
 	t.Parallel()
 
-	c := NewCommandDispatcher(pfxer, NewDispatchCore(nil))
+	c := NewCommandDispatcher(pfxer, NewCore(nil))
 
 	_, writer := newWriter()
 	state, store := setup()
@@ -770,7 +770,7 @@ func TestCmds_DispatchChannel(t *testing.T) {
 	handler := &commandHandler{}
 
 	id, err := c.Register("", "",
-		cmd.New(ext, dsc, command, handler, cmd.AnyKind, cmd.AnyScope, "#channelArg"))
+		cmd.New(ext, command, dsc, handler, cmd.AnyKind, cmd.AnyScope, "#channelArg"))
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
@@ -858,7 +858,7 @@ func TestCmds_DispatchChannel(t *testing.T) {
 func TestCmds_DispatchUsers(t *testing.T) {
 	t.Parallel()
 
-	c := NewCommandDispatcher(pfxer, NewDispatchCore(nil))
+	c := NewCommandDispatcher(pfxer, NewCore(nil))
 
 	_, writer := newWriter()
 	state, store, _ := setupForAuth()
@@ -872,7 +872,7 @@ func TestCmds_DispatchUsers(t *testing.T) {
 
 	handler := &commandHandler{}
 
-	id, err := c.Register("", "", cmd.New(ext, dsc, command, handler, cmd.AnyKind, cmd.AnyScope,
+	id, err := c.Register("", "", cmd.New(ext, command, dsc, handler, cmd.AnyKind, cmd.AnyScope,
 		"*user1", "~user2", "[*user3]", "~users..."),
 	)
 	if err != nil {
@@ -958,7 +958,7 @@ func TestCmds_DispatchUsers(t *testing.T) {
 func TestCmds_DispatchErrors(t *testing.T) {
 	t.Parallel()
 
-	c := NewCommandDispatcher(pfxer, NewDispatchCore(nil))
+	c := NewCommandDispatcher(pfxer, NewCore(nil))
 
 	_, writer := newWriter()
 	state, store, _ := setupForAuth()
@@ -971,7 +971,7 @@ func TestCmds_DispatchErrors(t *testing.T) {
 	}
 
 	handler := &commandHandler{}
-	id, err := c.Register("", "", cmd.New(ext, dsc, command, handler, cmd.AnyKind, cmd.AnyScope,
+	id, err := c.Register("", "", cmd.New(ext, command, dsc, handler, cmd.AnyKind, cmd.AnyScope,
 		"*user1", "~user2", "[*user3]", "~users..."),
 	)
 	if err != nil {
@@ -1038,7 +1038,7 @@ func TestCmds_DispatchErrors(t *testing.T) {
 		t.Error("Handler could not be unregistered.")
 	}
 
-	id, err = c.Register("", "", cmd.New(ext, dsc, command, handler, cmd.AnyKind, cmd.AnyScope, "~user1"))
+	id, err = c.Register("", "", cmd.New(ext, command, dsc, handler, cmd.AnyKind, cmd.AnyScope, "~user1"))
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
@@ -1060,7 +1060,7 @@ func TestCmds_DispatchErrors(t *testing.T) {
 func TestCmds_DispatchVariadicUsers(t *testing.T) {
 	t.Parallel()
 
-	c := NewCommandDispatcher(pfxer, NewDispatchCore(nil))
+	c := NewCommandDispatcher(pfxer, NewCore(nil))
 
 	_, writer := newWriter()
 	state, store, _ := setupForAuth()
@@ -1073,7 +1073,7 @@ func TestCmds_DispatchVariadicUsers(t *testing.T) {
 	}
 
 	handler := &commandHandler{}
-	id, err := c.Register("", "", cmd.New(ext, dsc, command, handler, cmd.AnyKind, cmd.AnyScope,
+	id, err := c.Register("", "", cmd.New(ext, command, dsc, handler, cmd.AnyKind, cmd.AnyScope,
 		"*users..."),
 	)
 	if err != nil {
@@ -1146,7 +1146,7 @@ func TestCmds_DispatchVariadicUsers(t *testing.T) {
 func TestCmds_DispatchMixUserAndChan(t *testing.T) {
 	t.Parallel()
 
-	c := NewCommandDispatcher(pfxer, NewDispatchCore(nil))
+	c := NewCommandDispatcher(pfxer, NewCore(nil))
 
 	_, writer := newWriter()
 	state, store, _ := setupForAuth()
@@ -1159,7 +1159,7 @@ func TestCmds_DispatchMixUserAndChan(t *testing.T) {
 	}
 
 	handler := &commandHandler{}
-	id, err := c.Register("", "", cmd.New(ext, dsc, command, handler, cmd.AnyKind, cmd.AnyScope,
+	id, err := c.Register("", "", cmd.New(ext, command, dsc, handler, cmd.AnyKind, cmd.AnyScope,
 		"#chan", "~user"),
 	)
 	if err != nil {
@@ -1186,7 +1186,7 @@ func TestCmds_DispatchMixUserAndChan(t *testing.T) {
 func TestCmds_DispatchReflection(t *testing.T) {
 	t.Parallel()
 
-	c := NewCommandDispatcher(pfxer, NewDispatchCore(nil))
+	c := NewCommandDispatcher(pfxer, NewCore(nil))
 
 	buffer, writer := newWriter()
 	state, _ := setup()
@@ -1198,7 +1198,7 @@ func TestCmds_DispatchReflection(t *testing.T) {
 	commands := []string{"reflect", "badargnum", "noreturn", "badargs"}
 	var ids []uint64
 	for _, command := range commands {
-		id, err := c.Register("", "", cmd.New(ext, dsc, command, handler, cmd.AnyKind, cmd.AnyScope))
+		id, err := c.Register("", "", cmd.New(ext, command, dsc, handler, cmd.AnyKind, cmd.AnyScope))
 		if err != nil {
 			t.Error("Unexpected:", command, err)
 		}
@@ -1285,16 +1285,16 @@ TODO: fix this
 func TestCmds_EachCmd(t *testing.T) {
 	t.Parallel()
 
-	c := NewCommandDispatcher(pfxer, NewDispatchCore(nil))
+	c := NewCommandDispatcher(pfxer, NewCore(nil))
 	var err error
 
 	handler := &errorHandler{}
 
-	id1, err := c.Register("", "", cmd.New(ext, dsc, command, handler, cmd.AnyKind, cmd.AnyScope))
+	id1, err := c.Register("", "", cmd.New(ext, command, dsc, handler, cmd.AnyKind, cmd.AnyScope))
 	if err != nil {
 		t.Error("Unexpected:", err)
 	}
-	id2, err := c.Register("", "", cmd.New(ext, dsc, "other", handler,
+	id2, err := c.Register("", "", cmd.New(ext, "other", dsc, handler,
 		cmd.AnyKind, cmd.AnyScope))
 
 	if err != nil {
@@ -1325,7 +1325,7 @@ func TestCmds_EachCmd(t *testing.T) {
 func TestCmds_DispatchAmbiguous(t *testing.T) {
 	t.Parallel()
 
-	c := NewCommandDispatcher(pfxer, NewDispatchCore(nil))
+	c := NewCommandDispatcher(pfxer, NewCore(nil))
 	if c == nil {
 		t.Error("Cmds should not be nil.")
 	}
@@ -1335,8 +1335,8 @@ func TestCmds_DispatchAmbiguous(t *testing.T) {
 	provider := testProvider{state, store}
 	handler := &commandHandler{}
 
-	c.Register("", "", cmd.New("one", "d", "command", handler, cmd.AnyKind, cmd.AnyScope))
-	c.Register("", "", cmd.New("two", "d", "command", handler, cmd.AnyKind, cmd.AnyScope))
+	c.Register("", "", cmd.New("one", "command", "d", handler, cmd.AnyKind, cmd.AnyScope))
+	c.Register("", "", cmd.New("two", "command", "d", handler, cmd.AnyKind, cmd.AnyScope))
 
 	ev := &irc.Event{
 		Name: irc.PRIVMSG, Sender: host,
@@ -1361,7 +1361,7 @@ func TestCmds_DispatchAmbiguous(t *testing.T) {
 func TestCmds_DispatchSpecific(t *testing.T) {
 	t.Parallel()
 
-	c := NewCommandDispatcher(pfxer, NewDispatchCore(nil))
+	c := NewCommandDispatcher(pfxer, NewCore(nil))
 	if c == nil {
 		t.Error("Cmds should not be nil.")
 	}
@@ -1372,11 +1372,11 @@ func TestCmds_DispatchSpecific(t *testing.T) {
 	handler1 := &commandHandler{}
 	handler2 := &commandHandler{}
 
-	_, err := c.Register("", "", cmd.New("one", "d", "command", handler1, cmd.AnyKind, cmd.AnyScope))
+	_, err := c.Register("", "", cmd.New("one", "command", "d", handler1, cmd.AnyKind, cmd.AnyScope))
 	if err != nil {
 		t.Error(err)
 	}
-	_, err = c.Register("", "", cmd.New("two", "d", "command", handler2, cmd.AnyKind, cmd.AnyScope))
+	_, err = c.Register("", "", cmd.New("two", "command", "d", handler2, cmd.AnyKind, cmd.AnyScope))
 	if err != nil {
 		t.Error(err)
 	}
@@ -1405,7 +1405,7 @@ func TestCmds_Panic(t *testing.T) {
 	buf := &bytes.Buffer{}
 	logger := log15.New()
 	logger.SetHandler(log15.StreamHandler(buf, log15.LogfmtFormat()))
-	logCore := NewDispatchCore(logger)
+	logCore := NewCore(logger)
 
 	c := NewCommandDispatcher(pfxer, logCore)
 	panicMsg := "dispatch panic"
@@ -1417,7 +1417,7 @@ func TestCmds_Panic(t *testing.T) {
 		panicMsg,
 	}
 
-	tmpCmd := cmd.New("panic", "panic desc", "panic", handler, cmd.AnyKind, cmd.AnyScope)
+	tmpCmd := cmd.New("panic", "panic", "panic desc", handler, cmd.AnyKind, cmd.AnyScope)
 	c.Register("", "", tmpCmd)
 
 	ev := irc.NewEvent("", netInfo, irc.PRIVMSG, host, self, "panic")

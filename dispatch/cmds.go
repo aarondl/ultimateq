@@ -51,7 +51,7 @@ type pfxFetcher func(network, channel string) rune
 // CommandDispatcher allows for registration of commands that can involve user access,
 // and provides a rich programming interface for command handling.
 type CommandDispatcher struct {
-	*DispatchCore
+	*Core
 	fetcher pfxFetcher
 
 	mutTrie sync.RWMutex
@@ -59,11 +59,11 @@ type CommandDispatcher struct {
 }
 
 // NewCommandDispatcher initializes a cmds.
-func NewCommandDispatcher(fetcher pfxFetcher, core *DispatchCore) *CommandDispatcher {
+func NewCommandDispatcher(fetcher pfxFetcher, core *Core) *CommandDispatcher {
 	return &CommandDispatcher{
-		DispatchCore: core,
-		fetcher:      fetcher,
-		trie:         newTrie(false),
+		Core:    core,
+		fetcher: fetcher,
+		trie:    newTrie(false),
 	}
 }
 

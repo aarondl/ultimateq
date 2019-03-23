@@ -27,7 +27,7 @@ func (handler testHandler) Handle(w irc.Writer, ev *irc.Event) {
 
 func TestDispatcher(t *testing.T) {
 	t.Parallel()
-	d := NewDispatcher(NewDispatchCore(nil))
+	d := NewDispatcher(NewCore(nil))
 	if d == nil || d.trie == nil {
 		t.Error("Initialization failed.")
 	}
@@ -35,7 +35,7 @@ func TestDispatcher(t *testing.T) {
 
 func TestDispatcherRegistration(t *testing.T) {
 	t.Parallel()
-	d := NewDispatcher(NewDispatchCore(nil))
+	d := NewDispatcher(NewCore(nil))
 	handler := testHandler{}
 
 	id := d.Register("", "", irc.PRIVMSG, handler)
@@ -56,7 +56,7 @@ func TestDispatcherRegistration(t *testing.T) {
 
 func TestDispatcherDispatch(t *testing.T) {
 	t.Parallel()
-	d := NewDispatcher(NewDispatchCore(nil))
+	d := NewDispatcher(NewCore(nil))
 
 	var count int64
 	handler := testHandler{callback: func(irc.Writer, *irc.Event) {
@@ -86,7 +86,7 @@ func TestDispatcherPanic(t *testing.T) {
 	logger := log15.New()
 	logger.SetHandler(log15.StreamHandler(buf, log15.LogfmtFormat()))
 
-	logCore := NewDispatchCore(logger)
+	logCore := NewCore(logger)
 	d := NewDispatcher(logCore)
 
 	panicMsg := "dispatch panic"

@@ -1,6 +1,7 @@
 package registrar
 
 import (
+	"github.com/aarondl/ultimateq/dispatch"
 	"github.com/aarondl/ultimateq/dispatch/cmd"
 )
 
@@ -28,7 +29,7 @@ func (h *holder) initMaps() {
 }
 
 // Register and save the token we get back.
-func (h *holder) Register(network, channel, event string, handler interface{}) uint64 {
+func (h *holder) Register(network, channel, event string, handler dispatch.Handler) uint64 {
 	id := h.registrar.Register(network, channel, event, handler)
 	h.events[id] = struct{}{}
 

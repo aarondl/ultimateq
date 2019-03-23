@@ -73,14 +73,14 @@ type Command struct {
 // for Command on what each parameter is. Panics if the args are invalid.
 func New(
 	ext,
-	desc,
-	cmd string,
+	cmd,
+	desc string,
 	handler Handler,
 	kind Kind,
 	scope Scope,
 	args ...string) *Command {
 
-	command, err := NewErr(ext, desc, cmd, handler, kind, scope, args...)
+	command, err := NewErr(ext, cmd, desc, handler, kind, scope, args...)
 	if err != nil {
 		panic(err)
 	}
@@ -91,8 +91,8 @@ func New(
 // NewErr is like New but does not panic
 func NewErr(
 	ext,
-	desc,
-	cmd string,
+	cmd,
+	desc string,
 	handler Handler,
 	kind Kind,
 	scope Scope,
@@ -120,8 +120,8 @@ func NewErr(
 // Panics if the args are invalid.
 func NewAuthed(
 	ext,
-	desc,
-	cmd string,
+	cmd,
+	desc string,
 	handler Handler,
 	kind Kind,
 	scope Scope,
@@ -140,8 +140,8 @@ func NewAuthed(
 // NewAuthedErr is the same as NewAuthed but returns an error instead of panics
 func NewAuthedErr(
 	ext,
-	desc,
-	cmd string,
+	cmd,
+	desc string,
 	handler Handler,
 	kind Kind,
 	scope Scope,

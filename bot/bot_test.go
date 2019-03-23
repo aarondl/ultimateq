@@ -20,7 +20,7 @@ type testHandler struct {
 	callback func(irc.Writer, *irc.Event)
 }
 
-func (h testHandler) HandleRaw(w irc.Writer, ev *irc.Event) {
+func (h testHandler) Handle(w irc.Writer, ev *irc.Event) {
 	if h.callback != nil {
 		h.callback(w, ev)
 	}
@@ -190,8 +190,9 @@ func TestBot_Dispatching(t *testing.T) {
 		},
 	}
 	b.RegisterGlobal(irc.PRIVMSG, thandler)
-	if err := b.RegisterGlobalCmd(cmd.MkCmd(
-		"a", "b", "cmd", tcommand, cmd.ALLKINDS, cmd.ALLSCOPES)); err != nil {
+	id, err := b.RegisterGlobalCmd(cmd.New(
+		"a", "cmd", "b", tcommand, cmd.AnyKind, cmd.AnyScope))
+	if err != nil {
 		t.Error("Should have registered a command successfully.")
 	}
 
@@ -212,10 +213,10 @@ func TestBot_Dispatching(t *testing.T) {
 		t.Error("Expected:", testMsg, "got:", c)
 	}
 
-	for _ = range end {
+	for range end {
 	}
 
-	if !b.UnregisterGlobalCmd("", "cmd") {
+	if !b.UnregisterCmd(id) {
 		t.Error("Should have unregistered a command.")
 	}
 }
@@ -365,31 +366,32 @@ func TestBot_RegisterGlobal(t *testing.T) {
 }
 
 func TestBot_RegisterGlobalCmd(t *testing.T) {
+	var id uint64
 	var err error
 	var success bool
 	b, _ := createBot(fakeConfig, nil, nil, devNull, false, false)
 	command := "cmd"
-	err = b.RegisterGlobalCmd(cmd.MkCmd("ext", "desc", command, &testCommand{},
-		cmd.ALLKINDS, cmd.ALLSCOPES))
+	id, err = b.RegisterGlobalCmd(cmd.New("ext", command, "desc", &testCommand{},
+		cmd.AnyKind, cmd.AnyScope))
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
 
-	err = b.RegisterGlobalCmd(cmd.MkCmd("ext", "desc", command, &testCommand{},
-		cmd.ALLKINDS, cmd.ALLSCOPES))
+	_, err = b.RegisterGlobalCmd(cmd.New("ext", command, "desc", &testCommand{},
+		cmd.AnyKind, cmd.AnyScope))
 	if err == nil {
 		t.Error("Expecting error about duplicates.")
 	}
-	if success = b.UnregisterGlobalCmd("ext", command); !success {
+	if success = b.UnregisterCmd(id); !success {
 		t.Error("It should unregister correctly.")
 	}
 
-	err = b.RegisterCmd(netID, channel, cmd.MkCmd("e", "d", command,
-		&testCommand{}, cmd.ALLKINDS, cmd.ALLSCOPES))
+	id, err = b.RegisterCmd(netID, channel, cmd.New("e", command, "d",
+		&testCommand{}, cmd.AnyKind, cmd.AnyScope))
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
-	success = b.UnregisterCmd(netID, channel, "e", command)
+	success = b.UnregisterCmd(id)
 	if !success {
 		t.Error("It should unregister correctly.")
 	}

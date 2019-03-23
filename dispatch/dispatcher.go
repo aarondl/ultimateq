@@ -3,6 +3,9 @@ package dispatch
 import (
 	"sync"
 
+	"github.com/aarondl/ultimateq/data"
+	"github.com/aarondl/ultimateq/dispatch/cmd"
+
 	"github.com/aarondl/ultimateq/irc"
 )
 
@@ -11,19 +14,41 @@ type Handler interface {
 	Handle(w irc.Writer, ev *irc.Event)
 }
 
+// HandlerFunc implements the Handler interface
+type HandlerFunc func(w irc.Writer, ev *irc.Event)
+
+// Handle implements Handler interface
+func (h HandlerFunc) Handle(w irc.Writer, ev *irc.Event) {
+	h(w, ev)
+}
+
+// EventDispatcher dispatches simple events
+type EventDispatcher interface {
+	Register(network, channel, event string, handler Handler) uint64
+	Unregister(id uint64) bool
+	Dispatch(w irc.Writer, ev *irc.Event)
+}
+
+// CmdDispatcher dispatches complex commands
+type CmdDispatcher interface {
+	Register(network, channel string, command *cmd.Command) (uint64, error)
+	Unregister(id uint64) bool
+	Dispatch(irc.Writer, *irc.Event, data.Provider) error
+}
+
 // Dispatcher is made for handling dispatching of raw-ish irc events.
 type Dispatcher struct {
-	*DispatchCore
+	*Core
 
 	trieMut sync.RWMutex
 	trie    *trie
 }
 
 // NewDispatcher initializes an empty dispatcher ready to register events.
-func NewDispatcher(core *DispatchCore) *Dispatcher {
+func NewDispatcher(core *Core) *Dispatcher {
 	return &Dispatcher{
-		DispatchCore: core,
-		trie:         newTrie(false),
+		Core: core,
+		trie: newTrie(false),
 	}
 }
 

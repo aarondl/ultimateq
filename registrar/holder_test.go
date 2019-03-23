@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/aarondl/ultimateq/dispatch"
 	"github.com/aarondl/ultimateq/dispatch/cmd"
 )
 
@@ -18,7 +19,7 @@ type mockReg struct {
 	ret bool
 }
 
-func (m *mockReg) Register(_, _, _ string, _ interface{}) uint64 {
+func (m *mockReg) Register(_, _, _ string, _ dispatch.Handler) uint64 {
 	m.regs++
 	m.id++
 	return m.id

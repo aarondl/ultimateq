@@ -94,9 +94,9 @@ type Bot struct {
 	serverEnd     chan serverOp
 
 	// Dispatching
-	dispatchCore *dispatch.DispatchCore
+	dispatchCore *dispatch.Core
 	dispatcher   *dispatch.Dispatcher
-	cmds         *cmd.Cmds
+	cmds         *dispatch.CommandDispatcher
 	coreCommands *coreCmds
 
 	// IoC and DI components mostly for testing.
@@ -346,7 +346,7 @@ func (b *Bot) Close() error {
 
 // RegisterGlobal event handler to the bot. Returns an identifier
 // that can be used to unregister the event.
-func (b *Bot) RegisterGlobal(event string, handler interface{}) uint64 {
+func (b *Bot) RegisterGlobal(event string, handler dispatch.Handler) uint64 {
 	return b.Register("", "", event, handler)
 }
 
@@ -354,7 +354,7 @@ func (b *Bot) RegisterGlobal(event string, handler interface{}) uint64 {
 // Leave either blank to create a filter based on that field alone. Returns
 // an identifier that can be used to unregister the event.
 func (b *Bot) Register(network, channel, event string,
-	handler interface{}) uint64 {
+	handler dispatch.Handler) uint64 {
 
 	return b.dispatcher.Register(network, channel, event, handler)
 }
@@ -366,7 +366,7 @@ func (b *Bot) Unregister(id uint64) bool {
 
 // RegisterGlobalCmd registers a command with the bot.
 // See cmds.Cmds.Register for in-depth documentation.
-func (b *Bot) RegisterGlobalCmd(command *cmd.Cmd) error {
+func (b *Bot) RegisterGlobalCmd(command *cmd.Command) (uint64, error) {
 	return b.RegisterCmd("", "", command)
 }
 
@@ -374,21 +374,15 @@ func (b *Bot) RegisterGlobalCmd(command *cmd.Cmd) error {
 // network and channel. Leave either field blank to create a filter based on
 // that field alone.
 // See cmds.Cmds.Register for in-depth documentation.
-func (b *Bot) RegisterCmd(network, channel string, command *cmd.Cmd) error {
+func (b *Bot) RegisterCmd(network, channel string, command *cmd.Command) (uint64, error) {
 	return b.cmds.Register(network, channel, command)
-}
-
-// UnregisterGlobalCmd from the bot. Leaving ext blank will cause all commands
-// with this name from all extensions to be unregistered.
-func (b *Bot) UnregisterGlobalCmd(ext, command string) bool {
-	return b.UnregisterCmd("", "", ext, command)
 }
 
 // UnregisterCmd from the bot. All parameters can be blank except for
 // cmd. Leaving ext blank wipes out other extension's commands with the same
 // name.
-func (b *Bot) UnregisterCmd(network, channel, ext, cmd string) bool {
-	return b.cmds.Unregister(network, channel, ext, cmd)
+func (b *Bot) UnregisterCmd(id uint64) bool {
+	return b.cmds.Unregister(id)
 }
 
 // State returns the state db for that network id. If the server doesn't exist
@@ -536,11 +530,11 @@ func (b *Bot) createServer(netID string, conf *config.Config) (*Server, error) {
 	return s, nil
 }
 
-// createDispatcher uses the bot's current ProtoCaps to create a dispatcher.
+// createDispatching for the bot
 func (b *Bot) createDispatching(channels ...string) {
-	b.dispatchCore = dispatch.NewDispatchCore(b.Logger, channels...)
+	b.dispatchCore = dispatch.NewCore(b.Logger)
 	b.dispatcher = dispatch.NewDispatcher(b.dispatchCore)
-	b.cmds = cmd.NewCmds(b.mkPrefixFetcher(), b.dispatchCore)
+	b.cmds = dispatch.NewCommandDispatcher(b.mkPrefixFetcher(), b.dispatchCore)
 }
 
 // createStore creates a store from a filename.

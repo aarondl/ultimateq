@@ -12,40 +12,39 @@ import (
 	"gopkg.in/inconshreveable/log15.v2"
 )
 
-// DispatchCore is a core for any dispatching mechanisms that includes a sync'd
-// list of channels, channel identification services, and a waiter to
-// synchronize the exit of all the event handlers sharing this core.
-type DispatchCore struct {
+//Core is a core for any dispatching mechanisms that includes a sync'd
+// a waiter to synchronize the exit of all the event handlers sharing this core.
+type Core struct {
 	log     log15.Logger
 	waiter  sync.WaitGroup
 	protect sync.RWMutex
 }
 
-// NewDispatchCore initializes a dispatch core
-func NewDispatchCore(logger log15.Logger) *DispatchCore {
-	d := &DispatchCore{log: logger}
+// NewCore initializes a dispatch core
+func NewCore(logger log15.Logger) *Core {
+	d := &Core{log: logger}
 
 	return d
 }
 
 // HandlerStarted tells the core that a handler has started and it should be
 // waited on.
-func (d *DispatchCore) HandlerStarted() {
+func (d *Core) HandlerStarted() {
 	d.waiter.Add(1)
 }
 
 // HandlerFinished tells the core that a handler has ended.
-func (d *DispatchCore) HandlerFinished() {
+func (d *Core) HandlerFinished() {
 	d.waiter.Done()
 }
 
 // WaitForHandlers waits for the unfinished handlers to finish.
-func (d *DispatchCore) WaitForHandlers() {
+func (d *Core) WaitForHandlers() {
 	d.waiter.Wait()
 }
 
 // PanicHandler catches any panics and logs a stack trace
-func (d *DispatchCore) PanicHandler() {
+func (d *Core) PanicHandler() {
 	recovered := recover()
 	if recovered == nil {
 		return
