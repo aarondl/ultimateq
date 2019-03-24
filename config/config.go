@@ -25,9 +25,8 @@ An example configuration looks like this:
 		realname = "Realname"
 		password = "Password"
 
-		# SSL Options
-		ssl = true
-		sslcert = "/path/to/a.crt"
+		# TLS Options
+		tls_cert = "/path/to/a.crt"
 		noverifycert = false
 
 		# Bot Internal Database Options
@@ -54,12 +53,14 @@ An example configuration looks like this:
 		# For fallback of channels below.
 		prefix = "."
 
-		[networks.ircnet.channels."#channel1"]
+		[[networks.ircnet.channels]]
+			name     = "#channel1"
 			password = "pass1"
-			prefix = "!"
-		[networks.ircnet.channels."&channel2"]
+			prefix   = "!"
+		[[networks.ircnet.channels]]
+			name     = "&channel2"
 			password = "pass2"
-			prefix = "@"
+			prefix   = "@"
 
 	# Ext provides defaults for all exts, much as the global definitions provide
 	# defaults for all networks.
@@ -69,44 +70,41 @@ An example configuration looks like this:
 		# OR
 		listen = "/path/to/unix.sock"
 
+		# If tls key & cert are present the remote extensions will require tls
+		tls_key      = "/path/to/a.key"
+		tls_cert     = "/path/to/a.crt"
+
 		# Define the execdir to start all executables in the path.
 		execdir = "/path/to/executables"
-
-		# Control reconnection for remote extensions.
-		noreconnect = false
-		reconnecttimeout = 20
 
 		# Ext configuration is deeply nested so we can configure it globally
 		# based on the network, or based on the channel on that network, or even
 		# on all channels on that network.
 		[ext.config] # Global config value
 			key = "stringvalue"
-		[ext.config.channels."#channel"] # All networks for #channel
-			key = "stringvalue"
+		[[ext.config.channels]] # All networks for #channel
+			name = "#channel"
+			key  = "stringvalue"
 		[ext.config.networks.ircnet] # All channels on ircnet network
 			key = "stringvalue"
-		[ext.config.networks.ircnet.channels."#channel"] # Freenode's #channel
-			key = "stringvalue"
+		[[ext.config.networks.ircnet.channels]] # Freenode's #channel
+			name = "#channel1"
+			key  = "stringvalue"
 
 	[exts.myext]
 		# Define exec to specify a path to the executable to launch.
 		exec = "/path/to/executable"
 
 		# Defining this means that the bot will try to connect to this extension
-		# rather than expecting it to connect to the listen server above.
-		server = "localhost:44"
-		ssl = true
-		sslcert = "/path/to/a.crt"
+		# rather than expecting it to connect to the listen server in the
+		# global configuration. Server can also be unix:/path/to/sock
+		server       = "localhost:44"
+		tls_cert     = "/path/to/a.crt"
 		noverifycert = false
-
-		# Define the above connection properties, or simply this one property.
-		unix = "/path/to/sock.sock"
-
-		# Use json not gob.
-		usejson = false
 
 		[exts.myext.active]
 			ircnet = ["#channel1", "#channel2"]
+
 
 Once again note the fallback mechanisms between network and the "global scope"
 as well as the exts and ext. This can save you lots of repetitive typing.
@@ -276,11 +274,11 @@ func (c *Config) ExtGlobal() *ExtGlobalCTX {
 
 	if ext := c.values.get("ext"); ext != nil {
 		return &ExtGlobalCTX{&ExtCTX{&c.protect, nil, ext}}
-	} else {
-		ext := make(map[string]interface{})
-		c.values["ext"] = ext
-		return &ExtGlobalCTX{&ExtCTX{&c.protect, nil, ext}}
 	}
+
+	ext := make(map[string]interface{})
+	c.values["ext"] = ext
+	return &ExtGlobalCTX{&ExtCTX{&c.protect, nil, ext}}
 }
 
 // Exts returns a list of configured extensions.
@@ -294,7 +292,7 @@ func (c *Config) Exts() []string {
 	}
 
 	rets := make([]string, 0)
-	for key, _ := range exts {
+	for key := range exts {
 		rets = append(rets, key)
 	}
 

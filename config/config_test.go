@@ -62,7 +62,7 @@ func TestConfig_Clone(t *testing.T) {
 
 	c.NewNetwork("othernet").
 		SetServers([]string{"str"}).
-		SetChannels(map[string]Channel{"a": {"b", "c"}})
+		SetChannels([]Channel{{"a", "b", "c"}})
 
 	nc := c.Clone()
 

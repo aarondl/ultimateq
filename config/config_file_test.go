@@ -69,22 +69,25 @@ password = "Password"
 
 	prefix = "."
 
-	[networks.ircnet.channels."#channel1"]
+	[[networks.ircnet.channels]]
+	name = "#channel1"
 	password = "pass1"
 	prefix = "!"
 
-	[networks.ircnet.channels."#channel2"]
+	[[networks.ircnet.channels]]
+	name = "#channel2"
 	password = "pass2"
 	prefix = "@"
 
 [ext]
 	listen = "localhost:3333"
+	tls_cert = "/path/to/a.crt"
+	tls_key = "/path/to/a.key"
+
 	execdir = "/path/to/executables"
 
 	noreconnect = false
 	reconnecttimeout = 20
-
-	usejson = true
 
 	[ext.config]
 		key = "stringvalue"
@@ -99,13 +102,10 @@ password = "Password"
 	exec = "/path/to/executable"
 
 	server = "localhost:44"
-	ssl = true
-	sslcert = "/path/to/a.crt"
+	tls_cert = "/path/to/another.crt"
 	noverifycert = false
 
 	unix = "/path/to/sock.sock"
-
-	usejson = false
 
 	[exts.myext.active]
 		ircnet = ["#channel1", "#channel2"]
@@ -302,6 +302,16 @@ func verifyFakeConfig(t *testing.T, conf *Config) {
 		t.Errorf("Expected: %v, got: %v", exps, got)
 	}
 
+	exps = "/path/to/a.crt"
+	if got, ok := globalExt.TLSCert(); !ok || exps != got {
+		t.Errorf("Expected: %v, got: %v", exps, got)
+	}
+
+	exps = "/path/to/a.key"
+	if got, ok := globalExt.TLSKey(); !ok || exps != got {
+		t.Errorf("Expected: %v, got: %v", exps, got)
+	}
+
 	expb = false
 	if got, ok := globalExt.NoReconnect(); !ok || expb != got {
 		t.Errorf("Expected: %v, got: %v", expb, got)
@@ -310,11 +320,6 @@ func verifyFakeConfig(t *testing.T, conf *Config) {
 	expu = 20
 	if got, ok := globalExt.ReconnectTimeout(); !ok || expu != got {
 		t.Errorf("Expected: %v, got: %v", expu, got)
-	}
-
-	expb = true
-	if got, ok := globalExt.UseJson(); !ok || expb != got {
-		t.Errorf("Expected: %v, got: %v", expb, got)
 	}
 
 	ext := conf.Ext("myext")
@@ -339,13 +344,8 @@ func verifyFakeConfig(t *testing.T, conf *Config) {
 		t.Errorf("Expected: %v, got: %v", expu, got)
 	}
 
-	expb = true
-	if got, ok := ext.SSL(); !ok || expb != got {
-		t.Errorf("Expected: %v, got: %v", expb, got)
-	}
-
-	exps = "/path/to/a.crt"
-	if got, ok := ext.SSLCert(); !ok || exps != got {
+	exps = "/path/to/another.crt"
+	if got, ok := ext.TLSCert(); !ok || exps != got {
 		t.Errorf("Expected: %v, got: %v", exps, got)
 	}
 
@@ -357,11 +357,6 @@ func verifyFakeConfig(t *testing.T, conf *Config) {
 	exps = "/path/to/sock.sock"
 	if got, ok := ext.Unix(); !ok || exps != got {
 		t.Errorf("Expected: %v, got: %v", exps, got)
-	}
-
-	expb = false
-	if got, ok := ext.UseJson(); !ok || expb != got {
-		t.Errorf("Expected: %v, got: %v", expb, got)
 	}
 
 	if active, ok := ext.Active("ircnet"); !ok || active == nil {

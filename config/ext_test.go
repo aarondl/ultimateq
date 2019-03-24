@@ -13,7 +13,6 @@ func TestConfig_Ext_GetSet(t *testing.T) {
 	ext := c.NewExt("ext1")
 
 	// Common
-	checkExt("UseJson", false, false, true, gext, ext, t)
 	checkExt("NoReconnect", false, false, true, gext, ext, t)
 	checkExt("ReconnectTimeout", defaultReconnectTimeout, uint(20), uint(40),
 		gext, ext, t)
@@ -21,12 +20,13 @@ func TestConfig_Ext_GetSet(t *testing.T) {
 	// Global Only
 	checkExt("ExecDir", "", "execdir", "execdir2", gext, nil, t)
 	checkExt("Listen", "", "listen", "", gext, nil, t)
+	checkExt("TLSCert", "", "crt", "", gext, nil, t)
+	checkExt("TLSKey", "", "key", "", gext, nil, t)
 
 	// Ext Only
 	checkExt("Exec", "", "exec", "exec2", nil, ext, t)
 	checkExt("Server", "", "serv", "serv2", nil, ext, t)
-	checkExt("SSL", false, false, true, nil, ext, t)
-	checkExt("SSLCert", "", "cert", "cert2", nil, ext, t)
+	checkExt("TLSCert", "", "cert", "cert2", nil, ext, t)
 	checkExt("NoVerifyCert", false, false, true, nil, ext, t)
 	checkExt("Unix", "", "unix", "unix2", nil, ext, t)
 }

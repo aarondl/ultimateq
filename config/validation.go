@@ -23,38 +23,38 @@ var globalValidator = validatorRules{
 var networkValidator = validatorRules{
 	stringVals: []string{
 		"nick", "altnick", "username", "realname", "password",
-		"sslcert", "prefix",
+		"tls_cert", "prefix",
 	},
 	stringSliceVals: []string{"servers"},
 	boolVals: []string{
-		"ssl", "nostate", "nostore", "noautojoin",
+		"nostate", "nostore", "noautojoin",
 		"noreconnect", "noverifycert",
 	},
-	floatVals: []string{"floodtimeout", "floodstep", "keepalive"},
-	uintVals:  []string{"reconnecttimeout", "floodlenpenalty", "joindelay"},
-	mapVals:   []string{"channels"},
+	floatVals:  []string{"floodtimeout", "floodstep", "keepalive"},
+	uintVals:   []string{"reconnecttimeout", "floodlenpenalty", "joindelay"},
+	mapArrVals: []string{"channels"},
 }
 
 var channelValidator = validatorRules{
-	stringVals: []string{"prefix", "password"},
+	stringVals: []string{"name", "prefix", "password"},
 }
 
 var extCommonValidator = validatorRules{
 	boolVals: []string{
-		"usejson", "noreconnect",
+		"noreconnect",
 	},
 	uintVals: []string{"reconnecttimeout"},
 	mapVals:  []string{"active"},
 }
 
 var extGlobalValidator = validatorRules{
-	stringVals: []string{"execdir", "listen"},
+	stringVals: []string{"execdir", "listen", "tls_cert", "tls_key"},
 	mapVals:    []string{"config"},
 }
 
 var extNormalValidator = validatorRules{
-	stringVals: []string{"server", "exec", "sslcert", "unix"},
-	boolVals:   []string{"ssl", "noreconnect", "noverifycert"},
+	stringVals: []string{"server", "exec", "tls_cert"},
+	boolVals:   []string{"noreconnect", "noverifycert"},
 }
 
 // errList is an array of errors.
@@ -157,14 +157,9 @@ func (c *Config) validateTypes(ers *errList) {
 			} else {
 				networkValidator.validateMap(name, net, ers)
 
-				if chans := net.get("channels"); chans != nil {
-					for chanName, ch := range chans {
-						if chanMap, ok := ch.(map[string]interface{}); ok {
-							channelValidator.validateMap(name+" channels "+chanName, chanMap, ers)
-						} else {
-							ers.addError("(%s channels %s) %s is %T but expected map [%v]",
-								net, name, chanName, ch, ch)
-						}
+				if chans := net.getArr("channels"); chans != nil {
+					for _, ch := range chans {
+						channelValidator.validateMap(name+" channels", ch, ers)
 					}
 				}
 			}

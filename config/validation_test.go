@@ -294,8 +294,7 @@ func TestValidation_TypesLeafs(t *testing.T) {
 		[networks.ircnet]
 			servers = [10]
 
-			ssl = "destroy"
-			sslcert = false
+			tls_cert = false
 			noverifycert = "lol"
 
 			nostate = 5
@@ -315,11 +314,13 @@ func TestValidation_TypesLeafs(t *testing.T) {
 
 			prefix = false
 
-			[networks.ircnet.channels."#channel1"]
+			[[networks.ircnet.channels]]
+			name = 5
 			password = 5
 			prefix = 5
 
-			[networks.ircnet.channels."#channel2"]
+			[[networks.ircnet.channels]]
+			name = "#channel2"
 			password = "pass2"
 			prefix = "@"
 
@@ -330,7 +331,8 @@ func TestValidation_TypesLeafs(t *testing.T) {
 			noreconnect = "true"
 			reconnecttimeout = 40.0
 
-			usejson = "what"
+			tls_cert = true
+			tls_key  = true
 
 			[ext.config]
 				key = 5
@@ -348,13 +350,10 @@ func TestValidation_TypesLeafs(t *testing.T) {
 			exec = 5
 
 			server = 5
-			ssl = "hello"
-			sslcert = true
+			tls_cert = true
 			noverifycert = "what"
 
 			unix = 5
-
-			usejson = "there"
 
 			[exts.myext.active]
 				ircnet = [5, 6]`
@@ -374,8 +373,7 @@ func TestValidation_TypesLeafs(t *testing.T) {
 		{"noirc", "servers", "array", "string"},
 
 		{"ircnet", "servers 1", "string", "int64"},
-		{"ircnet", "ssl", "bool", "string"},
-		{"ircnet", "sslcert", "string", "bool"},
+		{"ircnet", "tls_cert", "string", "bool"},
 		{"ircnet", "noverifycert", "bool", "string"},
 		{"ircnet", "nostate", "bool", "int64"},
 		{"ircnet", "nostore", "bool", "int64"},
@@ -388,14 +386,16 @@ func TestValidation_TypesLeafs(t *testing.T) {
 		{"ircnet", "noreconnect", "bool", "string"},
 		{"ircnet", "reconnecttimeout", "int", "float64"},
 		{"ircnet", "prefix", "string", "bool"},
-		{"ircnet channels #channel1", "password", "string", "int64"},
-		{"ircnet channels #channel1", "prefix", "string", "int64"},
+		{"ircnet channels", "name", "string", "int64"},
+		{"ircnet channels", "password", "string", "int64"},
+		{"ircnet channels", "prefix", "string", "int64"},
 
 		{"ext", "listen", "string", "int64"},
+		{"ext", "tls_cert", "string", "bool"},
+		{"ext", "tls_key", "string", "bool"},
 		{"ext", "execdir", "string", "int64"},
 		{"ext", "noreconnect", "bool", "string"},
 		{"ext", "reconnecttimeout", "int", "float64"},
-		{"ext", "usejson", "bool", "string"},
 		{"ext config", "key", "string", "int64"},
 		{"ext config #channel", "key", "string", "int64"},
 		{"ext config ircnet", "key", "string", "int64"},
@@ -405,11 +405,8 @@ func TestValidation_TypesLeafs(t *testing.T) {
 
 		{"myext", "exec", "string", "int64"},
 		{"myext", "server", "string", "int64"},
-		{"myext", "ssl", "bool", "string"},
-		{"myext", "sslcert", "string", "bool"},
+		{"myext", "tls_cert", "string", "bool"},
 		{"myext", "noverifycert", "bool", "string"},
-		{"myext", "unix", "string", "int64"},
-		{"myext", "usejson", "bool", "string"},
 		{"myext active ircnet", "channel 1", "string", "int64"},
 		{"myext active ircnet", "channel 2", "string", "int64"},
 	}
