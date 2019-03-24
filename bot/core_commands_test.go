@@ -49,7 +49,7 @@ func commandsSetup(t *testing.T) *tSetup {
 	conf := config.New()
 	conf.Network("").SetNick("nobody").SetAltnick("nobody1").
 		SetUsername("nobody").SetRealname("ultimateq").
-		SetNoReconnect(true).SetSSL(true).SetPrefix(prefix)
+		SetNoReconnect(true).SetTLS(true).SetPrefix(prefix)
 	conf.NewNetwork(netID)
 
 	b, err := createBot(conf, nil, func(_ string) (*data.Store, error) {
@@ -127,7 +127,7 @@ func TestCoreCommands(t *testing.T) {
 	conf := config.New()
 	conf.Network("").SetNick("nobody").SetAltnick("nobody1").
 		SetUsername("nobody").SetRealname("ultimateq").SetNoReconnect(true).
-		SetSSL(true)
+		SetTLS(true)
 	conf.NewNetwork(netID)
 
 	b, err := createBot(conf, nil, func(_ string) (*data.Store, error) {

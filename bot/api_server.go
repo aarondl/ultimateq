@@ -1,6 +1,9 @@
 package bot
 
 import (
+	"crypto/tls"
+	"crypto/x509"
+	"io/ioutil"
 	"net"
 	"strings"
 	"sync"
@@ -76,24 +79,53 @@ func (a *apiServer) Start() error {
 
 	cert, certOk := a.bot.conf.ExtGlobal().TLSCert()
 	key, keyOk := a.bot.conf.ExtGlobal().TLSKey()
-	if certOk && keyOk {
+	ca, caOk := a.bot.conf.ExtGlobal().TLSClientCA()
+	insecure, _ := a.bot.conf.ExtGlobal().TLSInsecureSkipVerify()
 
-		creds, err := credentials.NewServerTLSFromFile(cert, key)
+	var config *tls.Config
+	if certOk && keyOk {
+		config = &tls.Config{}
+
+		keypair, err := tls.LoadX509KeyPair(cert, key)
 		if err != nil {
-			return errors.Wrap(err, "failed to read tls key/cert files")
+			return errors.Wrap(err, "failed to load server keypair")
 		}
 
-		opts = append(opts, grpc.Creds(creds))
+		config.Certificates = append(config.Certificates, keypair)
+
+		config.ClientAuth = tls.RequireAndVerifyClientCert
+		if insecure {
+			config.ClientAuth = tls.RequireAnyClientCert
+		}
+
+		if caOk {
+			certPool := x509.NewCertPool()
+			asn1Data, err := ioutil.ReadFile(ca)
+			cert, err := x509.ParseCertificate(asn1Data)
+			if err != nil {
+				return errors.Wrap(err, "failed to load tls client ca cert")
+			}
+
+			certPool.AddCert(cert)
+			config.ClientCAs = certPool
+		} else {
+			certPool, err := x509.SystemCertPool()
+			if err != nil {
+				return errors.Wrap(err, "failed to load system ca cert pool")
+			}
+			config.ClientCAs = certPool
+		}
 	}
 
 	a.bot.Logger.Info("API Server Listening", "addr", addr)
 
+	if config != nil {
+		opts = append(opts, grpc.Creds(credentials.NewTLS(config)))
+	}
+
 	grpcServer := grpc.NewServer(opts...)
 	api.RegisterExtServer(grpcServer, a)
 
-	// TODO(aarondl): TLS
-	// TODO(aarondl): Disconnection handler, each Register/RegisterCmd leaves around
-	// a msgPipe
 	return grpcServer.Serve(lis)
 }
 

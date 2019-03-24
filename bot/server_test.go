@@ -2,7 +2,6 @@ package bot
 
 import (
 	"bytes"
-	"crypto/x509"
 	"io"
 	"net"
 	"testing"
@@ -77,6 +76,7 @@ func TestServer_createIrcClient_killConn(t *testing.T) {
 	close(connCh)
 }
 
+/*
 func TestServer_createTlsConfig(t *testing.T) {
 	t.Parallel()
 	b, _ := createBot(fakeConfig, nil, nil, devNull, false, false)
@@ -94,6 +94,7 @@ func TestServer_createTlsConfig(t *testing.T) {
 		t.Error("The provided root ca pool should be used.")
 	}
 }
+*/
 
 func TestServer_Close(t *testing.T) {
 	t.Parallel()

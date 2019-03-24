@@ -64,8 +64,8 @@ realname = "ultimateq"
 noreconnect = true
 nostore = true
 noverifycert = true
-sslcert = "fakecert"
-ssl = true
+tls_ca_cert = "fakecert"
+tls = true
 [networks.test]
 	servers = ["irc.test.net"]
 `)

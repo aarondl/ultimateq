@@ -3,7 +3,6 @@ package bot
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -15,6 +14,7 @@ import (
 	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/inet"
 	"github.com/aarondl/ultimateq/irc"
+	"github.com/pkg/errors"
 	"gopkg.in/inconshreveable/log15.v2"
 )
 
@@ -52,7 +52,7 @@ type connResult struct {
 	err       error
 }
 
-// certReader is for IoC of the createTlsConfig function.
+// certReader is for IoC of the createTLSConfig function.
 type certReader func(string) (*x509.CertPool, error)
 
 // Server is all the details around a specific server connection. Also contains
@@ -164,7 +164,6 @@ func (s *Server) createConnection(resultService chan chan *connResult) {
 
 	cfg := s.conf.Network(s.networkID)
 	srvs, _ := cfg.Servers()
-	ssl, _ := cfg.SSL()
 	if s.serverIndex >= len(srvs) {
 		s.serverIndex = 0
 	}
@@ -173,12 +172,10 @@ func (s *Server) createConnection(resultService chan chan *connResult) {
 	s.Info("Connecting", "host", server)
 
 	if s.bot.connProvider == nil {
-		if ssl {
-			var conf *tls.Config
-			conf, r.err = s.createTlsConfig(readCert)
-			if r.err == nil {
-				r.conn, r.err = tls.Dial("tcp", server, conf)
-			}
+		if tlsConfig, err := s.createTLSConfig(); err != nil {
+			r.err = err
+		} else if tlsConfig != nil {
+			r.conn, r.err = tls.Dial("tcp", server, tlsConfig)
 		} else {
 			r.conn, r.err = net.Dial("tcp", server)
 		}
@@ -205,18 +202,52 @@ func (s *Server) createConnection(resultService chan chan *connResult) {
 	}
 }
 
-// createTlsConfig creates a tls config appropriate for the
-func (s *Server) createTlsConfig(cr certReader) (conf *tls.Config, err error) {
-	conf = &tls.Config{}
+// createTLSConfig creates a tls config appropriate for the
+func (s *Server) createTLSConfig() (*tls.Config, error) {
 	cfg := s.conf.Network(s.networkID)
-	skipVerify, _ := cfg.NoVerifyCert()
-	conf.InsecureSkipVerify = skipVerify
 
-	if cert, ok := cfg.SSLCert(); ok {
-		conf.RootCAs, err = cr(cert)
+	doTLS, _ := cfg.TLS()
+	if !doTLS {
+		return nil, nil
 	}
 
-	return
+	ca, caOk := cfg.TLSCACert()
+	cert, certOk := cfg.TLSCert()
+	key, keyOk := cfg.TLSKey()
+	insecure, _ := cfg.TLSInsecureSkipVerify()
+
+	conf := new(tls.Config)
+
+	if caOk {
+		caCertBytes, err := ioutil.ReadFile(ca)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to read ca cert")
+		}
+
+		caCert, err := x509.ParseCertificate(caCertBytes)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to parse ca cert")
+		}
+
+		certPool := new(x509.CertPool)
+		certPool.AddCert(caCert)
+		conf.RootCAs = certPool
+	}
+
+	if certOk && keyOk {
+		certificate, err := tls.LoadX509KeyPair(cert, key)
+		if err != nil {
+			return nil, err
+		}
+
+		conf.Certificates = append(conf.Certificates, certificate)
+	}
+
+	if insecure {
+		conf.InsecureSkipVerify = true
+	}
+
+	return conf, nil
 }
 
 // Close shuts down the connection and returns.

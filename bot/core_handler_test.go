@@ -56,13 +56,10 @@ func TestCoreHandler_Connect(t *testing.T) {
 	cnf := fakeConfig.Clone()
 	net := cnf.Network(netID).SetPassword("password")
 
-	ch1 := config.Channel{Password: "pass"}
-	ch2 := config.Channel{}
 	ch1Name, ch2Name := "#channel1", "#channel2"
-	net.SetChannels(map[string]config.Channel{
-		ch1Name: ch1,
-		ch2Name: ch2,
-	})
+	ch1 := config.Channel{Name: ch1Name, Password: "pass"}
+	ch2 := config.Channel{Name: ch2Name}
+	net.SetChannels([]config.Channel{ch1, ch2})
 
 	b, _ := createBot(cnf, nil, nil, devNull, false, false)
 
@@ -138,9 +135,9 @@ func TestCoreHandler_Rejoin(t *testing.T) {
 		SetNoAutoJoin(true)
 
 	nick, _ := net.Nick()
-	ch1 := config.Channel{Password: "pass"}
-	ch2 := config.Channel{}
 	ch1Name, ch2Name := "#channel1", "#channel2"
+	ch1 := config.Channel{Name: ch1Name, Password: "pass"}
+	ch2 := config.Channel{Name: ch2Name}
 
 	b, _ := createBot(cnf, nil, nil, devNull, false, false)
 	st := b.servers[netID].state
@@ -171,10 +168,7 @@ func TestCoreHandler_Rejoin(t *testing.T) {
 		t.Error("Expected nothing to happen without channels set.")
 	}
 
-	net.SetChannels(map[string]config.Channel{
-		ch1Name: ch1,
-		ch2Name: ch2,
-	})
+	net.SetChannels([]config.Channel{ch1, ch2})
 
 	handler.Handle(endpoint, banned)
 	handler.Handle(endpoint, kicked)
