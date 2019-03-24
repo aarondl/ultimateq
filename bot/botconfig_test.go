@@ -191,6 +191,6 @@ func TestBotConfig_ReplaceConfig(t *testing.T) {
 	}
 
 	b.Stop()
-	for _ = range end {
+	for range end {
 	}
 }

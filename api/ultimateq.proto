@@ -206,13 +206,13 @@ message CmdEvent {
 
   StateUser     user          = 2;
   StoredUser    storedUser    = 3;
-  UserModes     userChanModes = 4; 
+  UserModes     userChanModes = 4;
   StateChannel  channel       = 5;
   StateChannel  targetChannel = 6;
 
   map<string, StateUser>  targetUsers       = 7;
   map<string, StoredUser> targetStoredUsers = 8;
-  
+
   repeated StateUser  targetVariadicUsers       = 9;
   repeated StoredUser targetVariadicStoredUsers = 10;
 
@@ -237,11 +237,6 @@ message IRCEvent {
   int64 time           = 4;
   string network_id    = 5;
 }
-
-message EventStreamRequest {
-  string ext = 1;
-}
-
 message RegisterCmdRequest {
   string  ext     = 1;
   string  network = 2;
@@ -258,6 +253,14 @@ message RegisterRequest {
 
 message RegisterResponse {
   uint64 id = 1;
+}
+
+message SubscriptionRequest {
+  // The extension name that
+  string ext = 1;
+  // The event or command ids to receive in this subscription, may be omitted
+  // to recieve all events registered to the extension named by ext.
+  repeated uint64 ids = 2;
 }
 
 message UnregisterRequest {
@@ -278,15 +281,24 @@ message RawIRC {
   bytes msg = 1;
 }
 
+// Write raw irc data directly to a network
 message WriteRequest {
-  string extension = 1;
-  string networkId = 2;
-  RawIRC msg       = 3;
+  string ext = 1;
+  string net = 2;
+  RawIRC msg = 3;
 }
 
 service Ext {
-  rpc StreamEvents(EventStreamRequest) returns (stream IRCEventResponse);
-  rpc StreamCommands(EventStreamRequest) returns (stream CmdEventResponse);
+  /*==================================
+  Eventing/Pubsub methods
+  ==================================*/
+  // Events subscribes a client to a specified (or all) events for a given
+  // extension. A client can optionally include the ids returned from
+  // Register* rpc calls to create a filtered list that will not collide
+  // with another extension even of the same name.
+  rpc Events(SubscriptionRequest) returns (stream IRCEventResponse);
+  // Commands is the same as Events above but for Commands.
+  rpc Commands(SubscriptionRequest) returns (stream CmdEventResponse);
 
   rpc Write(WriteRequest) returns (Empty);
 
@@ -296,6 +308,9 @@ service Ext {
   rpc UnregisterCmd(UnregisterRequest) returns (Result);
   rpc UnregisterAll(UnregisterAllRequest) returns (Empty);
 
+  /*==================================
+  Data methods
+  ==================================*/
   rpc NetworkInformation(NetworkInfoRequest) returns (NetworkInfo);
 
   rpc StateSelf(Query) returns (SelfResponse);

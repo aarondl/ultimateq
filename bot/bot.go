@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"sync"
 	"time"
 
@@ -445,7 +446,7 @@ func createBot(conf *config.Config, connProv ConnProvider,
 				return nil, err
 			}
 		} else {
-			logHandler = log15.StdoutHandler
+			logHandler = log15.StreamHandler(os.Stdout, log15.JsonFormat())
 		}
 		if level, ok := conf.LogLevel(); ok {
 			lvl, _ := log15.LvlFromString(level)

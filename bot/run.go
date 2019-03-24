@@ -28,11 +28,11 @@ func Run(cb func(b *Bot)) error {
 
 	end := b.Start()
 
-	listen, ok := cfg.ExtGlobal().Listen()
+	_, ok := cfg.ExtGlobal().Listen()
 	if ok {
 		api := NewAPIServer(b)
 		go func() {
-			err := api.Start(listen)
+			err := api.Start()
 			if err != nil {
 				b.Logger.Error("failed to start apiserver", "err", err)
 			}

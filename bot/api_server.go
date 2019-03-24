@@ -2,32 +2,41 @@ package bot
 
 import (
 	"net"
-	"os"
+	"strings"
 	"sync"
+	"time"
 
-	"google.golang.org/grpc/grpclog"
-
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
 
 	"github.com/aarondl/ultimateq/api"
 	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/dispatch/cmd"
 	"github.com/aarondl/ultimateq/registrar"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+)
+
+const (
+	broadcastTimeout = 500 * time.Millisecond
 )
 
 // apiServer provides a grpc api around a bot
 type apiServer struct {
 	bot *Bot
 
-	mut     sync.RWMutex
-	proxy   *registrar.Proxy
-	streams map[string]stream
+	mut       sync.RWMutex
+	proxy     *registrar.Proxy
+	nextSubID uint64
+	subs      map[string]map[uint64]*sub
 }
 
-type stream struct {
+type sub struct {
+	subID    uint64
+	eventIDs []uint64
+
 	eventChan   chan *api.IRCEventResponse
 	commandChan chan *api.CmdEventResponse
 }
@@ -40,24 +49,46 @@ func NewAPIServer(b *Bot) *apiServer {
 		bot:   b,
 		proxy: registrar.NewProxy(b),
 
-		streams: make(map[string]stream),
+		nextSubID: 1,
+		subs:      make(map[string]map[uint64]*sub),
 	}
 
 	return server
 }
 
-func (a *apiServer) Start(listen string) error {
-	lis, err := net.Listen("tcp", listen)
+func (a *apiServer) Start() error {
+	addr, ok := a.bot.conf.ExtGlobal().Listen()
+	if !ok {
+		return errors.New("no listen address configured")
+	}
+
+	proto := "tcp"
+	if strings.Contains(addr, "/") {
+		proto = "unix"
+	}
+
+	lis, err := net.Listen(proto, addr)
 	if err != nil {
 		return err
 	}
 
-	a.bot.Logger.Info("API Server Listening", "addr", listen)
+	var opts []grpc.ServerOption
 
-	// TODO(aarondl): Delete
-	grpclog.SetLoggerV2(grpclog.NewLoggerV2(os.Stdout, os.Stdout, os.Stdout))
+	cert, certOk := a.bot.conf.ExtGlobal().TLSCert()
+	key, keyOk := a.bot.conf.ExtGlobal().TLSKey()
+	if certOk && keyOk {
 
-	grpcServer := grpc.NewServer()
+		creds, err := credentials.NewServerTLSFromFile(cert, key)
+		if err != nil {
+			return errors.Wrap(err, "failed to read tls key/cert files")
+		}
+
+		opts = append(opts, grpc.Creds(creds))
+	}
+
+	a.bot.Logger.Info("API Server Listening", "addr", addr)
+
+	grpcServer := grpc.NewServer(opts...)
 	api.RegisterExtServer(grpcServer, a)
 
 	// TODO(aarondl): TLS
@@ -66,38 +97,135 @@ func (a *apiServer) Start(listen string) error {
 	return grpcServer.Serve(lis)
 }
 
-// getStream is not goroutine safe, must lock the mut first
+// subscribe is not goroutine safe, must lock the mut first
 // this is so register and friends can lock a single mutex to mess with
 // the proxy
-func (a *apiServer) getStream(ext string) stream {
-	s, ok := a.streams[ext]
-	if ok {
-		return s
+func (a *apiServer) subscribe(ext string, isNormalEvent bool, ids []uint64) *sub {
+	extSubs, ok := a.subs[ext]
+	if !ok {
+		extSubs = make(map[uint64]*sub)
+		a.subs[ext] = extSubs
 	}
 
-	s = stream{
-		eventChan:   make(chan *api.IRCEventResponse),
-		commandChan: make(chan *api.CmdEventResponse),
+	s := &sub{
+		subID:    a.nextSubID,
+		eventIDs: ids,
 	}
-	a.streams[ext] = s
+	if isNormalEvent {
+		s.eventChan = make(chan *api.IRCEventResponse)
+	} else {
+		s.commandChan = make(chan *api.CmdEventResponse)
+	}
+	a.nextSubID++
+
+	extSubs[s.subID] = s
 	return s
 }
 
-func (a *apiServer) makePipeEvent(ext string, s stream) *pipeHandler {
-	return &pipeHandler{
-		logger:    a.bot.Logger.New("ext", ext),
-		cleanupFn: a.unreg,
-		ext:       ext,
-		eventChan: s.eventChan,
+// unsubscribe is not goroutine safe, must lock the mut first
+func (a *apiServer) unsubscribe(ext string, subID uint64) {
+	extSubs, ok := a.subs[ext]
+	if !ok {
+		return
+	}
+
+	delete(extSubs, subID)
+
+	if len(extSubs) == 0 {
+		delete(a.subs, ext)
 	}
 }
 
-func (a *apiServer) makePipeCmd(ext string, s stream) *pipeHandler {
+func (a *apiServer) broadcastEvent(ext string, r *api.IRCEventResponse) bool {
+	return a.broadcast(ext, r, nil)
+}
+
+func (a *apiServer) broadcastCmd(ext string, r *api.CmdEventResponse) bool {
+	return a.broadcast(ext, nil, r)
+}
+
+func (a *apiServer) broadcast(ext string, rEvent *api.IRCEventResponse, rCmd *api.CmdEventResponse) bool {
+	var subs []*sub
+	var evID uint64
+	if rEvent != nil {
+		evID = rEvent.Id
+	} else {
+		evID = rCmd.Id
+	}
+
+	a.mut.RLock()
+
+	// Create a list of subscribers we need to notify
+	if extSubs, ok := a.subs[ext]; ok {
+		for _, s := range extSubs {
+			if s.eventChan != nil && rEvent == nil {
+				continue
+			} else if s.commandChan != nil && rCmd == nil {
+				continue
+			}
+
+			has := len(s.eventIDs) == 0
+			if !has {
+				for _, i := range s.eventIDs {
+					if i == evID {
+						has = true
+						break
+					}
+				}
+			}
+
+			if has {
+				subs = append(subs, s)
+			}
+		}
+	}
+	a.mut.RUnlock()
+
+	a.bot.Logger.Debug("publishing", "ext", ext, "id", evID, "n", len(subs))
+	if len(subs) == 0 {
+		return false
+	}
+
+	timer := time.NewTimer(broadcastTimeout)
+	sent := false
+
+	for _, s := range subs {
+		if !timer.Stop() {
+			<-timer.C
+		}
+		timer.Reset(broadcastTimeout)
+
+		a.bot.Logger.Debug("publishing to", "ext", ext, "id", evID, "subid", s.subID)
+
+		if rEvent != nil {
+			select {
+			case s.eventChan <- rEvent:
+				a.bot.Logger.Debug("publish event success", "ext", ext, "id", evID, "subid", s.subID)
+				sent = true
+			case <-timer.C:
+				a.bot.Logger.Debug("timeout to subscriber", "ext", ext, "id", evID, "subid", s.subID)
+				// Timeout, do nothing
+			}
+		} else {
+			select {
+			case s.commandChan <- rCmd:
+				a.bot.Logger.Debug("publish cmd success", "ext", ext, "id", evID, "subid", s.subID)
+				sent = true
+			case <-timer.C:
+				a.bot.Logger.Debug("timeout to subscriber", "ext", ext, "id", evID, "subid", s.subID)
+				// Timeout, do nothing
+			}
+		}
+	}
+
+	return sent
+}
+
+func (a *apiServer) makePipe(ext string) *pipeHandler {
 	return &pipeHandler{
-		logger:      a.bot.Logger.New("ext", ext),
-		cleanupFn:   a.unregCmd,
-		ext:         ext,
-		commandChan: s.commandChan,
+		logger: a.bot.Logger.New("ext", ext),
+		ext:    ext,
+		helper: a,
 	}
 }
 
@@ -119,7 +247,7 @@ func (a *apiServer) getStore() (*data.Store, error) {
 	return store, nil
 }
 
-func (a *apiServer) unreg(ext string, id uint64) {
+func (a *apiServer) unregEvent(ext string, id uint64) {
 	a.bot.Logger.Debug("unregistering event", "ext", ext, "id", id)
 	a.mut.Lock()
 	proxy := a.proxy.Get(ext)
@@ -135,63 +263,81 @@ func (a *apiServer) unregCmd(ext string, id uint64) {
 	a.mut.Unlock()
 }
 
-func (a *apiServer) deleteExtension(ext string) {
-	a.bot.Logger.Debug("forcibly ejecting remote extension", "ext", ext)
+func (a *apiServer) Events(in *api.SubscriptionRequest, stream api.Ext_EventsServer) error {
 	a.mut.Lock()
-	a.proxy.Unregister(ext)
-	delete(a.streams, ext)
+	s := a.subscribe(in.Ext, true, in.Ids)
 	a.mut.Unlock()
-}
 
-func (a *apiServer) StreamEvents(in *api.EventStreamRequest, stream api.Ext_StreamEventsServer) error {
-	a.mut.RLock()
-	s := a.getStream(in.Ext)
-	a.mut.RUnlock()
-
-	a.bot.Logger.Debug("streaming events", "ext", in.Ext)
+	a.bot.Logger.Debug("event sub", "ext", in.Ext, "subid", s.subID)
 
 	for {
 		event := <-s.eventChan
 
 		err := stream.Send(event)
 		if err != nil {
-			a.bot.Logger.Error("grpc event send err", "err", err, "id", event.Id)
+			a.bot.Logger.Error("grpc event send err", "err", err, "id", event.Id, "subid", s.subID)
 			break
 		}
 	}
 
-	a.bot.Logger.Debug("event stream closed", "ext", in.Ext)
+	a.mut.Lock()
+	a.unsubscribe(in.Ext, s.subID)
+	a.mut.Unlock()
+
+	// Drain channel
+	for {
+		select {
+		case <-s.eventChan:
+		default:
+		}
+		break
+	}
+
+	a.bot.Logger.Debug("event sub closed", "ext", in.Ext, "subid", s.subID)
 	return nil
 }
 
-func (a *apiServer) StreamCommands(in *api.EventStreamRequest, stream api.Ext_StreamCommandsServer) error {
-	a.mut.RLock()
-	s := a.getStream(in.Ext)
-	a.mut.RUnlock()
+func (a *apiServer) Commands(in *api.SubscriptionRequest, stream api.Ext_CommandsServer) error {
+	a.mut.Lock()
+	s := a.subscribe(in.Ext, false, in.Ids)
+	a.mut.Unlock()
 
-	a.bot.Logger.Debug("streaming commands", "ext", in.Ext)
+	a.bot.Logger.Debug("command sub", "ext", in.Ext, "subid", s.subID)
 
 	for {
 		event := <-s.commandChan
 
 		err := stream.Send(event)
 		if err != nil {
-			a.bot.Logger.Error("grpc cmd send err", "err", err, "id", event.Id)
+			a.bot.Logger.Error("grpc cmd send err", "err", err, "id", event.Id, "subid", s.subID)
 			break
 		}
 	}
 
-	a.bot.Logger.Debug("command stream closed", "ext", in.Ext)
+	a.mut.Lock()
+	a.unsubscribe(in.Ext, s.subID)
+	a.mut.Unlock()
+
+	// Drain channel
+	for {
+		select {
+		case <-s.commandChan:
+		default:
+		}
+		break
+	}
+
+	a.bot.Logger.Debug("command sub closed", "ext", in.Ext, "subid", s.subID)
 	return nil
 }
 
 func (a *apiServer) Write(ctx context.Context, in *api.WriteRequest) (*api.Empty, error) {
-	net := a.bot.NetworkWriter(in.NetworkId)
+	net := a.bot.NetworkWriter(in.Net)
 	if net == nil {
-		return nil, status.Errorf(codes.NotFound, "network id %q not found", in.NetworkId)
+		return nil, status.Errorf(codes.NotFound, "network id %q not found", in.Net)
 	}
 
-	a.bot.Logger.Debug("ext write", "ext", in.Extension, "net", in.NetworkId, "msg", string(in.Msg.Msg))
+	a.bot.Logger.Debug("ext write", "ext", in.Ext, "net", in.Net, "msg", string(in.Msg.Msg))
 
 	_, err := net.Write(in.Msg.Msg)
 	if err != nil {
@@ -205,8 +351,7 @@ func (a *apiServer) Register(ctx context.Context, in *api.RegisterRequest) (*api
 	a.mut.Lock()
 	defer a.mut.Unlock()
 
-	s := a.getStream(in.Ext)
-	pipe := a.makePipeEvent(in.Ext, s)
+	pipe := a.makePipe(in.Ext)
 
 	proxy := a.proxy.Get(in.Ext)
 	id := proxy.Register(in.Network, in.Channel, in.Event, pipe)
@@ -221,8 +366,7 @@ func (a *apiServer) RegisterCmd(ctx context.Context, in *api.RegisterCmdRequest)
 	a.mut.Lock()
 	defer a.mut.Unlock()
 
-	s := a.getStream(in.Ext)
-	pipe := a.makePipeCmd(in.Ext, s)
+	pipe := a.makePipe(in.Ext)
 
 	var command *cmd.Command
 	var err error
@@ -289,7 +433,7 @@ func (a *apiServer) UnregisterCmd(ctx context.Context, in *api.UnregisterRequest
 func (a *apiServer) UnregisterAll(ctx context.Context, in *api.UnregisterAllRequest) (*api.Empty, error) {
 	a.mut.Lock()
 	a.proxy.Unregister(in.Ext)
-	delete(a.streams, in.Ext)
+	delete(a.subs, in.Ext)
 	a.mut.Unlock()
 
 	return nil, nil

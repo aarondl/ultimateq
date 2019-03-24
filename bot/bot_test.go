@@ -162,7 +162,7 @@ func TestBot_StartStopNetwork(t *testing.T) {
 		done <- 0
 	}()
 
-	for _ = range b.Start() {
+	for range b.Start() {
 	}
 
 	<-done
@@ -251,7 +251,7 @@ func TestBot_Dispatch_ConnectDisconnect(t *testing.T) {
 		t.Error("Expected a dispatch of connect:", d)
 	}
 
-	for _ = range end {
+	for range end {
 	}
 }
 
@@ -471,7 +471,7 @@ func TestBot_Stop(t *testing.T) {
 	<-listen
 
 	b.Stop()
-	for _ = range end {
+	for range end {
 	}
 }
 
@@ -534,6 +534,6 @@ func TestBot_GetEndpoint(t *testing.T) {
 	}
 
 	b.Stop()
-	for _ = range end {
+	for range end {
 	}
 }
