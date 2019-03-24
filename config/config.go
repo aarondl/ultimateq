@@ -73,6 +73,9 @@ An example configuration looks like this:
 		# If tls key & cert are present the remote extensions will require tls
 		tls_key      = "/path/to/a.key"
 		tls_cert     = "/path/to/a.crt"
+		# If tls_client_ca is present, it will be used to validate the client's
+		# certificate
+		tls_client_ca  = "/path/to/ca.crt"
 
 		# Define the execdir to start all executables in the path.
 		execdir = "/path/to/executables"

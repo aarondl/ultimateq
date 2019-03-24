@@ -171,6 +171,15 @@ func (e *ExtGlobalCTX) SetTLSKey(val string) *ExtGlobalCTX {
 	return e
 }
 
+func (e *ExtGlobalCTX) TLSClientCA() (string, bool) {
+	return getStr(e, "tls_client_ca", false)
+}
+
+func (e *ExtGlobalCTX) SetTLSClientCA(val string) *ExtGlobalCTX {
+	setVal(e, "tls_client_ca", val)
+	return e
+}
+
 /*
 Config returns a map of config values for the given network and channel.
 Global values are overidden by more specific ones, and all global values

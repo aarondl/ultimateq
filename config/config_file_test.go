@@ -83,6 +83,7 @@ password = "Password"
 	listen = "localhost:3333"
 	tls_cert = "/path/to/a.crt"
 	tls_key = "/path/to/a.key"
+	tls_client_ca = "/path/to/ca.crt"
 
 	execdir = "/path/to/executables"
 
@@ -309,6 +310,11 @@ func verifyFakeConfig(t *testing.T, conf *Config) {
 
 	exps = "/path/to/a.key"
 	if got, ok := globalExt.TLSKey(); !ok || exps != got {
+		t.Errorf("Expected: %v, got: %v", exps, got)
+	}
+
+	exps = "/path/to/ca.crt"
+	if got, ok := globalExt.TLSClientCA(); !ok || exps != got {
 		t.Errorf("Expected: %v, got: %v", exps, got)
 	}
 

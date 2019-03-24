@@ -48,7 +48,7 @@ var extCommonValidator = validatorRules{
 }
 
 var extGlobalValidator = validatorRules{
-	stringVals: []string{"execdir", "listen", "tls_cert", "tls_key"},
+	stringVals: []string{"execdir", "listen", "tls_cert", "tls_key", "tls_client_ca"},
 	mapVals:    []string{"config"},
 }
 
