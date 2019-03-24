@@ -2,7 +2,6 @@ package remote
 
 import (
 	"context"
-	"strconv"
 	"sync"
 	"time"
 
@@ -43,10 +42,8 @@ type Client struct {
 
 // NewClient returns a new dispatcher for extensions.
 func NewClient(extension string, client api.ExtClient) *Client {
-	id := strconv.FormatInt(time.Now().Unix(), 16)
-
 	r := &Client{
-		extension: extension + "." + id,
+		extension: extension,
 		client:    client,
 		events:    make(map[uint64]dispatch.Handler),
 		commands:  make(map[uint64]cmd.Handler),
@@ -63,9 +60,9 @@ type remoteIRCWriter struct {
 
 func (r remoteIRCWriter) Write(b []byte) (n int, err error) {
 	writeReq := &api.WriteRequest{
-		Extension: r.extID,
-		NetworkId: r.netID,
-		Msg:       &api.RawIRC{Msg: b},
+		Ext: r.extID,
+		Net: r.netID,
+		Msg: &api.RawIRC{Msg: b},
 	}
 
 	_, err = r.client.Write(context.Background(), writeReq)
@@ -84,13 +81,25 @@ func newWriter(client api.ExtClient, extID, netID string) irc.Writer {
 // Listen for events and commands and dispatch them to handlers. It blocks
 // forever on its two listening goroutines.
 func (c *Client) Listen() error {
-	req := &api.EventStreamRequest{Ext: c.extension}
-	evStream, err := c.client.StreamEvents(context.Background(), req)
+	var eventIDs, cmdIDs []uint64
+	c.mut.RLock()
+	for id := range c.events {
+		eventIDs = append(eventIDs, id)
+	}
+	for id := range c.commands {
+		cmdIDs = append(cmdIDs, id)
+	}
+	c.mut.RUnlock()
+
+	evSub := &api.SubscriptionRequest{Ext: c.extension, Ids: eventIDs}
+	cmdSub := &api.SubscriptionRequest{Ext: c.extension, Ids: cmdIDs}
+
+	evStream, err := c.client.Events(context.Background(), evSub)
 	if err != nil {
 		return err
 	}
 
-	cmdStream, err := c.client.StreamCommands(context.Background(), req)
+	cmdStream, err := c.client.Commands(context.Background(), cmdSub)
 	if err != nil {
 		return err
 	}
