@@ -1,4 +1,4 @@
-package main
+package bot
 
 import (
 	"bufio"
@@ -28,8 +28,16 @@ func Run(cb func(b *Bot)) error {
 
 	end := b.Start()
 
-	api := apiserver.NewAPIServer(b)
-	go api.start(":8080")
+	listen, ok := cfg.ExtGlobal().Listen()
+	if ok {
+		api := NewAPIServer(b)
+		go func() {
+			err := api.Start(listen)
+			if err != nil {
+				b.Logger.Error("failed to start apiserver", "err", err)
+			}
+		}()
+	}
 
 	input, quit := make(chan int), make(chan os.Signal, 2)
 

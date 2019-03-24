@@ -58,6 +58,9 @@ func NewDispatcher(core *Core) *Dispatcher {
 // channel or event to prevent filtering on that parameter. Panics if it's
 // given a type that doesn't implement any of the correct interfaces.
 func (d *Dispatcher) Register(network, channel, event string, handler Handler) uint64 {
+	if event == irc.RAW {
+		event = ""
+	}
 	d.trieMut.Lock()
 	id := d.trie.register(network, channel, event, handler)
 	d.trieMut.Unlock()

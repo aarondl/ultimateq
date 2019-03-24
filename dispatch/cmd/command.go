@@ -11,6 +11,14 @@ type Handler interface {
 	Cmd(name string, writer irc.Writer, event *Event) error
 }
 
+// HandlerFunc implements Handler
+type HandlerFunc func(name string, writer irc.Writer, event *Event) error
+
+// Cmd implements Handler
+func (h HandlerFunc) Cmd(name string, writer irc.Writer, event *Event) error {
+	return h(name, writer, event)
+}
+
 // Command holds all the information about a command.
 type Command struct {
 	// The name of the command.

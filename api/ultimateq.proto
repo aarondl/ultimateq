@@ -1,13 +1,10 @@
 syntax = "proto3";
 
-import "data.proto";
-
 package api;
 
-message SelfResponse {
-  SimpleUser   user  = 1;
-  ChannelModes modes = 2;
-}
+/*=================================
+Generic responses
+=================================*/
 
 message Empty {
 }
@@ -18,6 +15,108 @@ message Result {
 
 message Query {
   string query = 1;
+}
+
+message ListResponse {
+  repeated string list = 1;
+}
+
+message CountResponse {
+  int32 count = 1;
+}
+
+/*==================================
+Data package representations
+
+The package data works
+with state and store databases.
+The following allows us to send the
+data they use over the wire
+==================================*/
+
+message Access {
+  uint32 level = 1;
+  uint64 flags = 2;
+}
+
+message ChannelModes {
+  message AddressMode {
+    repeated string mode_addresses = 1;
+  }
+  map<string,bool>        modes         = 1;
+  map<string,string>      arg_modes     = 2;
+  map<string,AddressMode> address_modes = 3;
+  int32                   addresses     = 4;
+
+  ModeKinds kinds = 5;
+}
+
+message StateUser {
+  string host     = 1;
+  string realname = 2;
+}
+
+message StateChannel {
+  string name  = 1;
+  string topic = 2;
+
+  ChannelModes modes = 3;
+}
+
+message UserModes {
+  ModeKinds kinds = 1;
+  int32     modes = 2;
+}
+
+message ModeKinds {
+  message UserPrefix {
+    string symbol = 1;
+    string char   = 2;
+  }
+  repeated UserPrefix user_prefixes = 1;
+  map<string,int32> channel_modes   = 2;
+}
+
+message NetworkInfo {
+  string server_name  = 1;
+  string ircd_version = 2;
+  string usermodes    = 3;
+  string lchanmodes   = 4;
+
+  string rfc         = 5;
+  string ircd        = 6;
+  string casemapping = 7;
+  string prefix      = 8;
+  string chantypes   = 9;
+  string chanmodes   = 10;
+  int32 chanlimit    = 11;
+  int32 channellen   = 12;
+  int32 nicklen      = 13;
+  int32 topiclen     = 14;
+  int32 awaylen      = 15;
+  int32 kicklen      = 16;
+  int32 modes        = 17;
+
+  map<string,string> extras = 18;
+}
+
+message StoredUser {
+  string username = 1;
+  bytes  password = 2;
+  repeated string masks     = 3;
+  map<string,Access> access = 4;
+  map<string,string> data   = 5;
+}
+
+message StoredChannel {
+  string network = 1;
+  string name    = 2;
+  map<string,string> data = 3;
+}
+
+message SelfResponse {
+  StateUser    user  = 1;
+  ChannelModes modes = 2;
 }
 
 message NetworkQuery {
@@ -31,50 +130,22 @@ message ChannelQuery {
   string query   = 3;
 }
 
-message ListResponse {
-  repeated string list = 1;
-}
+/*==================================
+Data RPC request and responses,
+these wrap arguments and returns
+of the real methods.
+==================================*/
 
-message CountResponse {
-  int32 count = 1;
-}
-
-message RegisterRequest {
-  string ext     = 1;
-  string network = 2;
-  string channel = 3;
-  string event   = 4;
-}
-
-message RegisterResponse {
-  uint64 id = 1;
-}
-
-message UnregisterRequest {
-  string ext = 1;
-  uint64 id  = 2;
-}
-
-message RegisterCmdRequest {
-  string  ext     = 1;
-  string  network = 2;
-  string  channel = 3;
-  Cmd     cmd     = 4;
-}
-
-message UnregisterCmdRequest {
-  string ext     = 1;
-  string network = 2;
-  string channel = 3;
-  string command = 4;
-}
-
-message UnregisterAllRequest {
-  string ext = 1;
+message AuthUserRequest {
+  string network  = 1;
+  string host     = 2;
+  string username = 3;
+  string password = 4;
+  bool permanent  = 5;
 }
 
 message UserResponse {
-  SimpleUser self = 1;
+  StateUser self = 1;
 }
 
 message UserModesResponse {
@@ -106,62 +177,129 @@ message LogoutRequest {
   }
 }
 
-message IRCMessage {
+message NetworkInfoRequest {
+  string networkId = 1;
+}
+
+/*==================================
+Eventing is used to push events
+and commands back and forth between
+client and server
+==================================*/
+
+message Cmd {
+  string ext         = 1;
+  string name        = 2;
+  string desc        = 3;
+  int32  kind        = 4;
+  int32  scope       = 5;
+
+  repeated string args = 6;
+
+  bool   require_auth = 7;
+  int32  req_level    = 8;
+  string req_flags    = 9;
+}
+
+message CmdEvent {
+  IRCEvent ircEvent = 1;
+
+  StateUser     user          = 2;
+  StoredUser    storedUser    = 3;
+  UserModes     userChanModes = 4; 
+  StateChannel  channel       = 5;
+  StateChannel  targetChannel = 6;
+
+  map<string, StateUser>  targetUsers       = 7;
+  map<string, StoredUser> targetStoredUsers = 8;
+  
+  repeated StateUser  targetVariadicUsers       = 9;
+  repeated StoredUser targetVariadicStoredUsers = 10;
+
+  map<string, string> args = 11;
+}
+
+message CmdEventResponse {
+  uint64   id    = 1;
+  string   name  = 2;
+  CmdEvent event = 3;
+}
+
+message IRCEventResponse {
+  uint64   id    = 1;
+  IRCEvent event = 2;
+}
+
+message IRCEvent {
   string name          = 1;
   string sender        = 2;
   repeated string args = 3;
-  int64 date           = 4;
+  int64 time           = 4;
   string network_id    = 5;
 }
 
-message NetworkInfo {
-  string server_name  = 1;
-  string ircd_version = 2;
-  string usermodes    = 3;
-  string lchanmodes   = 4;
-
-  string rfc         = 5;
-  string ircd        = 6;
-  string casemapping = 7;
-  string prefix      = 8;
-  string chantypes   = 9;
-  string chanmodes   = 10;
-  int32 chanlimit    = 11;
-  int32 channellen   = 12;
-  int32 nicklen      = 13;
-  int32 topiclen     = 14;
-  int32 awaylen      = 15;
-  int32 kicklen      = 16;
-  int32 modes        = 17;
-
-  map<string,string> extras = 18;
+message EventStreamRequest {
+  string ext = 1;
 }
 
-message AuthUserRequest {
-  string network  = 1;
-  string host     = 2;
-  string username = 3;
-  string password = 4;
-  bool permanent  = 5;
+message RegisterCmdRequest {
+  string  ext     = 1;
+  string  network = 2;
+  string  channel = 3;
+  Cmd     cmd     = 4;
 }
+
+message RegisterRequest {
+  string ext     = 1;
+  string network = 2;
+  string channel = 3;
+  string event   = 4;
+}
+
+message RegisterResponse {
+  uint64 id = 1;
+}
+
+message UnregisterRequest {
+  string ext = 1;
+  uint64 id  = 2;
+}
+
+message UnregisterAllRequest {
+  string ext = 1;
+}
+
+/*==================================
+RawIRC messages allow clients to
+write directly to a network
+==================================*/
 
 message RawIRC {
   bytes msg = 1;
 }
 
-service Ext {
-  rpc Pipe(stream RawIRC) returns (stream IRCMessage);
+message WriteRequest {
+  string extension = 1;
+  string networkId = 2;
+  RawIRC msg       = 3;
+}
 
-  rpc Ping(Empty) returns (Empty);
+service Ext {
+  rpc StreamEvents(EventStreamRequest) returns (stream IRCEventResponse);
+  rpc StreamCommands(EventStreamRequest) returns (stream CmdEventResponse);
+
+  rpc Write(WriteRequest) returns (Empty);
 
   rpc Register(RegisterRequest) returns (RegisterResponse);
-  rpc RegisterCmd(RegisterCmdRequest) returns (Empty);
-  rpc Unregister(UnregisterRequest) returns (Empty);
-  rpc UnregisterCmd(UnregisterCmdRequest) returns (Empty);
+  rpc RegisterCmd(RegisterCmdRequest) returns (RegisterResponse);
+  rpc Unregister(UnregisterRequest) returns (Result);
+  rpc UnregisterCmd(UnregisterRequest) returns (Result);
   rpc UnregisterAll(UnregisterAllRequest) returns (Empty);
 
+  rpc NetworkInformation(NetworkInfoRequest) returns (NetworkInfo);
+
   rpc StateSelf(Query) returns (SelfResponse);
-  rpc StateUser(NetworkQuery) returns (SimpleUser);
+  rpc StateUsers(NetworkQuery) returns (StateUser);
   rpc StateUsersByChan(NetworkQuery) returns (ListResponse);
   rpc StateUsersByChanCount(NetworkQuery) returns (CountResponse);
   rpc StateUserModes(ChannelQuery) returns (UserModes);
@@ -191,13 +329,4 @@ service Ext {
 
   rpc StoreLogout(NetworkQuery) returns (Empty);
   rpc StoreLogoutByUser(Query) returns (Empty);
-}
-
-message ConnectionDetails {
-  string host = 1;
-  int32  port = 2;
-}
-
-service Boomerang {
-  rpc Connect(ConnectionDetails) returns (Empty);
 }

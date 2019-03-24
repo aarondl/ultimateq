@@ -304,7 +304,9 @@ func (b *Bot) dispatch(srv *Server) (disconnect bool, err error) {
 // dispatch sends a message to both the bot's dispatcher and the given servers
 func (b *Bot) dispatchMessage(s *Server, ev *irc.Event) {
 	b.dispatcher.Dispatch(s.writer, ev)
-	b.cmds.Dispatch(s.writer, ev, b)
+	if err := b.cmds.Dispatch(s.writer, ev, b); err != nil {
+		b.Logger.Error("cmd dispatch failed", "err", err)
+	}
 }
 
 // Stop shuts down all connections and exits.
