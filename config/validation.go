@@ -23,12 +23,12 @@ var globalValidator = validatorRules{
 var networkValidator = validatorRules{
 	stringVals: []string{
 		"nick", "altnick", "username", "realname", "password",
-		"tls_cert", "prefix",
+		"tls_ca_cert", "tls_cert", "tls_key", "prefix",
 	},
 	stringSliceVals: []string{"servers"},
 	boolVals: []string{
 		"nostate", "nostore", "noautojoin",
-		"noreconnect", "noverifycert",
+		"noreconnect", "tls", "tls_insecure_skip_verify",
 	},
 	floatVals:  []string{"floodtimeout", "floodstep", "keepalive"},
 	uintVals:   []string{"reconnecttimeout", "floodlenpenalty", "joindelay"},
@@ -49,12 +49,13 @@ var extCommonValidator = validatorRules{
 
 var extGlobalValidator = validatorRules{
 	stringVals: []string{"execdir", "listen", "tls_cert", "tls_key", "tls_client_ca"},
+	boolVals:   []string{"tls_insecure_skip_verify"},
 	mapVals:    []string{"config"},
 }
 
 var extNormalValidator = validatorRules{
 	stringVals: []string{"server", "exec", "tls_cert"},
-	boolVals:   []string{"noreconnect", "noverifycert"},
+	boolVals:   []string{"noreconnect", "tls_insecure_skip_verify"},
 }
 
 // errList is an array of errors.

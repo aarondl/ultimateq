@@ -26,8 +26,15 @@ An example configuration looks like this:
 		password = "Password"
 
 		# TLS Options
-		tls_cert = "/path/to/a.crt"
-		noverifycert = false
+		# If tls is on it will connect with tls.
+		# If tls_cert, tls_key are set it will send it in an attempt to perform
+		# mutual TLS with the irc server.
+		# If tls_ca_cert is present it will be used as a CA when connecting
+		tls         = true
+		tls_ca_cert = "/path/to/ca.crt"
+		tls_cert    = "/path/to/a.crt"
+		tls_key     = "/path/to/a.key"
+		tls_insecure_skip_verify = false
 
 		# Bot Internal Database Options
 		nostate = false
@@ -70,12 +77,16 @@ An example configuration looks like this:
 		# OR
 		listen = "/path/to/unix.sock"
 
-		# If tls key & cert are present the remote extensions will require tls
+		# If tls key & cert are present the remote extensions will require
+		# MUTUAL tls, meaning the client will have to present a certificate as
+		# well, you can use tls_client_ca to control which ca cert is used
+		# to verify the client (otherwise the system ca cert pool is used).
+		# If tls_insecure_skip_verify is set, the client's certificate
+		# will still be required but will not be verified
 		tls_key      = "/path/to/a.key"
 		tls_cert     = "/path/to/a.crt"
-		# If tls_client_ca is present, it will be used to validate the client's
-		# certificate
 		tls_client_ca  = "/path/to/ca.crt"
+		tls_insecure_skip_verify = false
 
 		# Define the execdir to start all executables in the path.
 		execdir = "/path/to/executables"
@@ -96,11 +107,14 @@ An example configuration looks like this:
 
 	[exts.myext]
 		# Define exec to specify a path to the executable to launch.
+		# NOTE: Currently NOT USED
 		exec = "/path/to/executable"
 
 		# Defining this means that the bot will try to connect to this extension
 		# rather than expecting it to connect to the listen server in the
 		# global configuration. Server can also be unix:/path/to/sock
+		#
+		# NOTE: Currently NOT USED
 		server       = "localhost:44"
 		tls_cert     = "/path/to/a.crt"
 		noverifycert = false

@@ -180,6 +180,15 @@ func (e *ExtGlobalCTX) SetTLSClientCA(val string) *ExtGlobalCTX {
 	return e
 }
 
+func (e *ExtGlobalCTX) TLSInsecureSkipVerify() (bool, bool) {
+	return getBool(e, "tls_insecure_skip_verify", false)
+}
+
+func (e *ExtGlobalCTX) SetTLSInsecureSkipVerify(val bool) *ExtGlobalCTX {
+	setVal(e, "tls_insecure_skip_verify", val)
+	return e
+}
+
 /*
 Config returns a map of config values for the given network and channel.
 Global values are overidden by more specific ones, and all global values
@@ -372,12 +381,12 @@ func (e *ExtNormalCTX) SetTLSCert(val string) *ExtNormalCTX {
 	return e
 }
 
-func (e *ExtNormalCTX) NoVerifyCert() (bool, bool) {
-	return getBool(e, "noverifycert", false)
+func (e *ExtNormalCTX) TLSInsecureSkipVerify() (bool, bool) {
+	return getBool(e, "tls_insecure_skip_verify", false)
 }
 
-func (e *ExtNormalCTX) SetNoVerifyCert(val bool) *ExtNormalCTX {
-	setVal(e, "noverifycert", val)
+func (e *ExtNormalCTX) SetTLSInsecureSkipVerify(val bool) *ExtNormalCTX {
+	setVal(e, "tls_insecure_skip_verify", val)
 	return e
 }
 

@@ -79,30 +79,48 @@ func (n *NetCTX) SetPassword(val string) *NetCTX {
 	return n
 }
 
-func (n *NetCTX) SSL() (bool, bool) {
-	return getBool(n, "ssl", true)
+func (n *NetCTX) TLS() (bool, bool) {
+	return getBool(n, "tls", true)
 }
 
-func (n *NetCTX) SetSSL(val bool) *NetCTX {
-	setVal(n, "ssl", val)
+func (n *NetCTX) SetTLS(val bool) *NetCTX {
+	setVal(n, "tls", val)
 	return n
 }
 
-func (n *NetCTX) SSLCert() (string, bool) {
-	return getStr(n, "sslcert", true)
+func (n *NetCTX) TLSCACert() (string, bool) {
+	return getStr(n, "tls_ca_cert", true)
 }
 
-func (n *NetCTX) SetSSLCert(val string) *NetCTX {
-	setVal(n, "sslcert", val)
+func (n *NetCTX) SetTLSCACert(val string) *NetCTX {
+	setVal(n, "tls_ca_cert", val)
 	return n
 }
 
-func (n *NetCTX) NoVerifyCert() (bool, bool) {
-	return getBool(n, "noverifycert", true)
+func (n *NetCTX) TLSCert() (string, bool) {
+	return getStr(n, "tls_cert", true)
 }
 
-func (n *NetCTX) SetNoVerifyCert(val bool) *NetCTX {
-	setVal(n, "noverifycert", val)
+func (n *NetCTX) SetTLSCert(val string) *NetCTX {
+	setVal(n, "tls_cert", val)
+	return n
+}
+
+func (n *NetCTX) TLSKey() (string, bool) {
+	return getStr(n, "tls_key", true)
+}
+
+func (n *NetCTX) SetTLSKey(val string) *NetCTX {
+	setVal(n, "tls_key", val)
+	return n
+}
+
+func (n *NetCTX) TLSInsecureSkipVerify() (bool, bool) {
+	return getBool(n, "tls_insecure_skip_verify", true)
+}
+
+func (n *NetCTX) SetTLSInsecureSkipVerify(val bool) *NetCTX {
+	setVal(n, "tls_insecure_skip_verify", val)
 	return n
 }
 

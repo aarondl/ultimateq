@@ -22,11 +22,15 @@ func TestConfig_Network_GetSet(t *testing.T) {
 
 	check("Password", "", "password1", "password2", glb, net, t)
 
-	check("SSL", false, false, true, glb, net, t)
+	check("TLS", false, false, true, glb, net, t)
 
-	check("SSLCert", "", "sslcert1", "sslcert2", glb, net, t)
+	check("TLSCACert", "", "tlscert1", "tlscert2", glb, net, t)
 
-	check("NoVerifyCert", false, false, true, glb, net, t)
+	check("TLSCert", "", "tlscert1", "tlscert2", glb, net, t)
+
+	check("TLSKey", "", "tlscert1", "tlscert2", glb, net, t)
+
+	check("TLSInsecureSkipVerify", false, false, true, glb, net, t)
 
 	check("NoState", false, false, true, glb, net, t)
 

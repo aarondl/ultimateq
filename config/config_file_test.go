@@ -48,9 +48,9 @@ password = "Password"
 [networks.ircnet]
 	servers = ["localhost:3333", "server.com:6667"]
 
-	ssl = true
-	sslcert = "/path/to/a.crt"
-	noverifycert = false
+	tls_ca_cert = "/path/to/ca.crt"
+	tls_cert    = "/path/to/a.crt"
+	tls_insecure_skip_verify = true
 
 	nostate = false
 	nostore = false
@@ -84,6 +84,7 @@ password = "Password"
 	tls_cert = "/path/to/a.crt"
 	tls_key = "/path/to/a.key"
 	tls_client_ca = "/path/to/ca.crt"
+	tls_insecure_skip_verify = true
 
 	execdir = "/path/to/executables"
 
@@ -104,7 +105,7 @@ password = "Password"
 
 	server = "localhost:44"
 	tls_cert = "/path/to/another.crt"
-	noverifycert = false
+	tls_insecure_skip_verify = true
 
 	unix = "/path/to/sock.sock"
 
@@ -169,18 +170,18 @@ func verifyFakeConfig(t *testing.T, conf *Config) {
 		t.Errorf("Expected: %s, got: %s", exps, got)
 	}
 
-	expb = true
-	if got, ok := net1.SSL(); !ok || expb != got {
-		t.Errorf("Expected: %v, got: %v", expb, got)
-	}
-
-	exps = "/path/to/a.crt"
-	if got, ok := net1.SSLCert(); !ok || exps != got {
+	exps = "/path/to/ca.crt"
+	if got, ok := net1.TLSCACert(); !ok || exps != got {
 		t.Errorf("Expected: %s, got: %s", exps, got)
 	}
 
-	expb = false
-	if got, ok := net1.NoVerifyCert(); !ok || expb != got {
+	exps = "/path/to/a.crt"
+	if got, ok := net1.TLSCert(); !ok || exps != got {
+		t.Errorf("Expected: %s, got: %s", exps, got)
+	}
+
+	expb = true
+	if got, ok := net1.TLSInsecureSkipVerify(); !ok || expb != got {
 		t.Errorf("Expected: %v, got: %v", expb, got)
 	}
 
@@ -318,6 +319,11 @@ func verifyFakeConfig(t *testing.T, conf *Config) {
 		t.Errorf("Expected: %v, got: %v", exps, got)
 	}
 
+	expb = true
+	if got, ok := globalExt.TLSInsecureSkipVerify(); !ok || expb != got {
+		t.Errorf("Expected: %v, got: %v", exps, got)
+	}
+
 	expb = false
 	if got, ok := globalExt.NoReconnect(); !ok || expb != got {
 		t.Errorf("Expected: %v, got: %v", expb, got)
@@ -355,8 +361,8 @@ func verifyFakeConfig(t *testing.T, conf *Config) {
 		t.Errorf("Expected: %v, got: %v", exps, got)
 	}
 
-	expb = false
-	if got, ok := ext.NoVerifyCert(); !ok || expb != got {
+	expb = true
+	if got, ok := ext.TLSInsecureSkipVerify(); !ok || expb != got {
 		t.Errorf("Expected: %v, got: %v", expb, got)
 	}
 

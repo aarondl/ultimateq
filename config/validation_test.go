@@ -294,8 +294,11 @@ func TestValidation_TypesLeafs(t *testing.T) {
 		[networks.ircnet]
 			servers = [10]
 
+			tls = "hello"
+			tls_ca_cert = false
 			tls_cert = false
-			noverifycert = "lol"
+			tls_key = false
+			tls_insecure_skip_verify = "lol"
 
 			nostate = 5
 			nostore = 6
@@ -352,7 +355,7 @@ func TestValidation_TypesLeafs(t *testing.T) {
 
 			server = 5
 			tls_cert = true
-			noverifycert = "what"
+			tls_insecure_skip_verify = "what"
 
 			unix = 5
 
@@ -374,8 +377,11 @@ func TestValidation_TypesLeafs(t *testing.T) {
 		{"noirc", "servers", "array", "string"},
 
 		{"ircnet", "servers 1", "string", "int64"},
+		{"ircnet", "tls", "bool", "string"},
+		{"ircnet", "tls_key", "string", "bool"},
 		{"ircnet", "tls_cert", "string", "bool"},
-		{"ircnet", "noverifycert", "bool", "string"},
+		{"ircnet", "tls_ca_cert", "string", "bool"},
+		{"ircnet", "tls_insecure_skip_verify", "bool", "string"},
 		{"ircnet", "nostate", "bool", "int64"},
 		{"ircnet", "nostore", "bool", "int64"},
 		{"ircnet", "noautojoin", "bool", "int64"},
@@ -408,7 +414,7 @@ func TestValidation_TypesLeafs(t *testing.T) {
 		{"myext", "exec", "string", "int64"},
 		{"myext", "server", "string", "int64"},
 		{"myext", "tls_cert", "string", "bool"},
-		{"myext", "noverifycert", "bool", "string"},
+		{"myext", "tls_insecure_skip_verify", "bool", "string"},
 		{"myext active ircnet", "channel 1", "string", "int64"},
 		{"myext active ircnet", "channel 2", "string", "int64"},
 	}

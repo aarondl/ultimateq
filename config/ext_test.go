@@ -22,12 +22,13 @@ func TestConfig_Ext_GetSet(t *testing.T) {
 	checkExt("Listen", "", "listen", "", gext, nil, t)
 	checkExt("TLSCert", "", "crt", "", gext, nil, t)
 	checkExt("TLSKey", "", "key", "", gext, nil, t)
+	checkExt("TLSInsecureSkipVerify", false, false, true, gext, nil, t)
 
 	// Ext Only
 	checkExt("Exec", "", "exec", "exec2", nil, ext, t)
 	checkExt("Server", "", "serv", "serv2", nil, ext, t)
 	checkExt("TLSCert", "", "cert", "cert2", nil, ext, t)
-	checkExt("NoVerifyCert", false, false, true, nil, ext, t)
+	checkExt("TLSInsecureSkipVerify", false, false, true, nil, ext, t)
 	checkExt("Unix", "", "unix", "unix2", nil, ext, t)
 }
 
