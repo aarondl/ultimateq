@@ -2,33 +2,69 @@ package remote
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"io/ioutil"
 	"sync"
 	"time"
+
+	"google.golang.org/grpc/credentials"
 
 	"github.com/aarondl/ultimateq/dispatch"
 	"github.com/aarondl/ultimateq/dispatch/cmd"
 	"github.com/aarondl/ultimateq/irc"
+	"github.com/pkg/errors"
+	"google.golang.org/grpc"
 
 	"github.com/aarondl/ultimateq/api"
 )
 
-// grpcClient.RegisterCmd(bla bla bla)
-// remote.NewClient(grpcClient) - Begins calling it
+// Dial creates a mutually authenticated grpc connection that's given
+// directly to NewClient.
 //
-// The client runs two methods constantly (blocking):
-// HandleEvents
-//  This dispatches to the things registered with Register
-// HandleCommands
-//  This dispatches to the things registered with RegisterCmd
-//
-// On the server:
-// The server's responses to HandleEvents and HandleCommands
-// is a bidirectional stream. All messages for a given event handler
-// are sent to a specific opened stream.
-//
-// Essentially when a user registers an event/cmd they are given an id
-// that links not only their irc.Writer back to the server, but their
-// bot-registered-event back to the correct grpc server stream
+// If tlsCert and tlsKey are present they will be used as the client's
+// certificates and tls is turned on. If tlsCACert is present it will use that
+// certificate instead of the system wide CA certificates. And finally if
+// insecureSkipVerify is on it will not verify the server's certificate.
+func Dial(addr, ext, tlsCert, tlsKey, tlsCACert string, insecureSkipVerify bool) (api.ExtClient, error) {
+	var opts []grpc.DialOption
+	if len(tlsCert) != 0 && len(tlsKey) != 0 {
+		tlsConfig := new(tls.Config)
+
+		clientCert, err := tls.LoadX509KeyPair(tlsCert, tlsKey)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to load client certs")
+		}
+
+		tlsConfig.Certificates = append(tlsConfig.Certificates, clientCert)
+
+		if len(tlsCACert) != 0 {
+			caCertBytes, err := ioutil.ReadFile(tlsCACert)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to read ca cert")
+			}
+
+			certPool := x509.NewCertPool()
+			certPool.AppendCertsFromPEM(caCertBytes)
+			tlsConfig.RootCAs = certPool
+		}
+
+		if insecureSkipVerify {
+			tlsConfig.InsecureSkipVerify = true
+		}
+
+		creds := credentials.NewTLS(tlsConfig)
+		opts = append(opts, grpc.WithTransportCredentials(creds))
+	}
+
+	conn, err := grpc.Dial(addr, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	grpcClient := api.NewExtClient(conn)
+	return grpcClient, nil
+}
 
 // Client helps handle event and command dispatching remotely.
 type Client struct {

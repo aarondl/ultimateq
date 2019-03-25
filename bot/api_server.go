@@ -99,14 +99,13 @@ func (a *apiServer) Start() error {
 		}
 
 		if caOk {
-			certPool := x509.NewCertPool()
-			asn1Data, err := ioutil.ReadFile(ca)
-			cert, err := x509.ParseCertificate(asn1Data)
+			clientCACert, err := ioutil.ReadFile(ca)
 			if err != nil {
-				return errors.Wrap(err, "failed to load tls client ca cert")
+				return err
 			}
 
-			certPool.AddCert(cert)
+			certPool := x509.NewCertPool()
+			certPool.AppendCertsFromPEM(clientCACert)
 			config.ClientCAs = certPool
 		} else {
 			certPool, err := x509.SystemCertPool()

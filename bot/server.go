@@ -224,13 +224,8 @@ func (s *Server) createTLSConfig() (*tls.Config, error) {
 			return nil, errors.Wrap(err, "failed to read ca cert")
 		}
 
-		caCert, err := x509.ParseCertificate(caCertBytes)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to parse ca cert")
-		}
-
 		certPool := new(x509.CertPool)
-		certPool.AddCert(caCert)
+		certPool.AppendCertsFromPEM(caCertBytes)
 		conf.RootCAs = certPool
 	}
 
