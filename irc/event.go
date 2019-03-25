@@ -14,17 +14,17 @@ import (
 // Event contains all the information about an irc event.
 type Event struct {
 	// Name of the event. Uppercase constant name or numeric.
-	Name string
+	Name string `msgpack:"name"`
 	// Sender is the server or user that sent the event, normally a fullhost.
-	Sender string
+	Sender string `msgpack:"sender"`
 	// Args split by space delimiting.
-	Args []string
+	Args []string `msgpack:"args"`
 	// Times is the time this event was received.
-	Time time.Time
+	Time time.Time `msgpack:"time"`
 	// NetworkID is the ID of the network that sent this event.
-	NetworkID string
+	NetworkID string `msgpack:"network_id"`
 	// NetworkInfo is the networks information.
-	NetworkInfo *NetworkInfo
+	NetworkInfo *NetworkInfo `msgpack:"-"`
 }
 
 // NewEvent constructs a event object that has a timestamp.

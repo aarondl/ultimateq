@@ -9,7 +9,7 @@ import (
 func TestConfig_New(t *testing.T) {
 	t.Parallel()
 
-	c := NewConfig()
+	c := New()
 	if c == nil {
 		t.Error("Expected a configuration to be created.")
 	}
@@ -18,7 +18,7 @@ func TestConfig_New(t *testing.T) {
 func TestConfig_Clear(t *testing.T) {
 	t.Parallel()
 
-	c := NewConfig()
+	c := New()
 	c.values = map[string]interface{}{"network": "something"}
 	c.errors = errList{errors.New("something")}
 	c.filename = "filename"
@@ -38,8 +38,8 @@ func TestConfig_Clear(t *testing.T) {
 func TestConfig_Replace(t *testing.T) {
 	t.Parallel()
 
-	c1 := NewConfig().FromString(`nick = "hello"`)
-	c2 := NewConfig().FromString(`nick = "there"`)
+	c1 := New().FromString(`nick = "hello"`)
+	c2 := New().FromString(`nick = "there"`)
 
 	if val, ok := c1.Network("").Nick(); !ok || val != "hello" {
 		t.Error(`Expected nick to be "hello", got:`, val)
@@ -52,7 +52,7 @@ func TestConfig_Replace(t *testing.T) {
 func TestConfig_Clone(t *testing.T) {
 	t.Parallel()
 
-	c := NewConfig().FromString(`
+	c := New().FromString(`
 	string = "str"
 	[[channels]]
 		uint = 5
@@ -62,7 +62,7 @@ func TestConfig_Clone(t *testing.T) {
 
 	c.NewNetwork("othernet").
 		SetServers([]string{"str"}).
-		SetChannels(map[string]Channel{"a": {"b", "c"}})
+		SetChannels([]Channel{{"a", "b", "c"}})
 
 	nc := c.Clone()
 
@@ -102,11 +102,11 @@ func checkMap(dest, src mp, t *testing.T) {
 func TestConfig_Networks(t *testing.T) {
 	t.Parallel()
 
-	if NewConfig().Networks() != nil {
+	if New().Networks() != nil {
 		t.Error("Expected networks to be empty.")
 	}
 
-	c := NewConfig().FromString(configuration)
+	c := New().FromString(configuration)
 
 	nets := c.Networks()
 	exps := []string{"ircnet", "noirc"}
@@ -128,11 +128,11 @@ func TestConfig_Networks(t *testing.T) {
 func TestConfig_Exts(t *testing.T) {
 	t.Parallel()
 
-	if NewConfig().Exts() != nil {
+	if New().Exts() != nil {
 		t.Error("Expected exts to be empty.")
 	}
 
-	c := NewConfig().FromString(configuration)
+	c := New().FromString(configuration)
 	exts := c.Exts()
 	exps := []string{"myext"}
 
@@ -153,7 +153,7 @@ func TestConfig_Exts(t *testing.T) {
 func TestConfig_Contexts(t *testing.T) {
 	t.Parallel()
 
-	c := NewConfig().FromString(configuration)
+	c := New().FromString(configuration)
 
 	if c.Network("") == nil {
 		t.Error("Expected to be able to get global context.")
@@ -179,7 +179,7 @@ func TestConfig_Contexts(t *testing.T) {
 func TestConfig_NewThings(t *testing.T) {
 	t.Parallel()
 
-	c := NewConfig()
+	c := New()
 	if net := c.NewNetwork("net1"); net == nil {
 		t.Error("Should have created a new network.")
 	}
@@ -205,7 +205,7 @@ func TestConfig_NewThings(t *testing.T) {
 func TestConfig_Config_GetSet(t *testing.T) {
 	t.Parallel()
 
-	c := NewConfig()
+	c := New()
 	if v, ok := c.StoreFile(); ok || v != defaultStoreFile {
 		t.Error("Expected store file not to be set, and to get default:", v)
 	}
@@ -231,10 +231,18 @@ func TestConfig_Config_GetSet(t *testing.T) {
 	}
 
 	if v, ok := c.NoCoreCmds(); ok || v != false {
-		t.Error("Expected store file not to be set, and to get default:", v)
+		t.Error("Expected no core cmds not to be set, and to get default:", v)
 	}
 	c.SetNoCoreCmds(true)
 	if v, ok := c.NoCoreCmds(); !ok || v != true {
-		t.Error("Expected store file to be set, and to get a, got:", v)
+		t.Error("Expected no core cmds to be set, and to get a, got:", v)
+	}
+
+	if v, ok := c.SecretKey(); ok || v != "" {
+		t.Error("Expected secret key not to be set, and to get default:", v)
+	}
+	c.SetSecretKey("a")
+	if v, ok := c.SecretKey(); !ok || v != "a" {
+		t.Error("Expected secret key to be set, and to get a, got:", v)
 	}
 }

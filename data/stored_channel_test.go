@@ -79,3 +79,20 @@ func TestStoredChannel_JSONify(t *testing.T) {
 		t.Error("A and B differ:", a, b)
 	}
 }
+
+func TestStoredChannel_Protofy(t *testing.T) {
+	t.Parallel()
+
+	a := &StoredChannel{
+		NetID:      "a",
+		Name:       "b",
+		JSONStorer: JSONStorer{"some": "data"},
+	}
+	var b StoredChannel
+
+	b.FromProto(a.ToProto())
+
+	if !reflect.DeepEqual(*a, b) {
+		t.Error("A and B differ:", a, b)
+	}
+}

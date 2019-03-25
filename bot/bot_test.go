@@ -20,7 +20,7 @@ type testHandler struct {
 	callback func(irc.Writer, *irc.Event)
 }
 
-func (h testHandler) HandleRaw(w irc.Writer, ev *irc.Event) {
+func (h testHandler) Handle(w irc.Writer, ev *irc.Event) {
 	if h.callback != nil {
 		h.callback(w, ev)
 	}
@@ -56,7 +56,7 @@ func init() {
 
 var netID = "test"
 
-var fakeConfig = config.NewConfig().FromString(`
+var fakeConfig = config.New().FromString(`
 nick = "nobody"
 altnick = "nobody1"
 username = "nobody"
@@ -64,8 +64,8 @@ realname = "ultimateq"
 noreconnect = true
 nostore = true
 noverifycert = true
-sslcert = "fakecert"
-ssl = true
+tls_ca_cert = "fakecert"
+tls = true
 [networks.test]
 	servers = ["irc.test.net"]
 `)
@@ -84,7 +84,7 @@ func TestBot_Create(t *testing.T) {
 	}
 
 	log15.Root().SetHandler(log15.DiscardHandler())
-	_, err = New(config.NewConfig())
+	_, err = New(config.New())
 	if err != errInvalidConfig {
 		t.Error("Expected error:", errInvalidConfig, "got", err)
 	}
@@ -162,7 +162,7 @@ func TestBot_StartStopNetwork(t *testing.T) {
 		done <- 0
 	}()
 
-	for _ = range b.Start() {
+	for range b.Start() {
 	}
 
 	<-done
@@ -189,9 +189,10 @@ func TestBot_Dispatching(t *testing.T) {
 			return nil
 		},
 	}
-	b.Register(irc.PRIVMSG, thandler)
-	if err := b.RegisterCmd(cmd.MkCmd(
-		"a", "b", "cmd", tcommand, cmd.ALLKINDS, cmd.ALLSCOPES)); err != nil {
+	b.RegisterGlobal(irc.PRIVMSG, thandler)
+	id, err := b.RegisterGlobalCmd(cmd.New(
+		"a", "cmd", "b", tcommand, cmd.AnyKind, cmd.AnyScope))
+	if err != nil {
 		t.Error("Should have registered a command successfully.")
 	}
 
@@ -212,10 +213,10 @@ func TestBot_Dispatching(t *testing.T) {
 		t.Error("Expected:", testMsg, "got:", c)
 	}
 
-	for _ = range end {
+	for range end {
 	}
 
-	if !b.UnregisterCmd("", "cmd") {
+	if !b.UnregisterCmd(id) {
 		t.Error("Should have unregistered a command.")
 	}
 }
@@ -234,8 +235,8 @@ func TestBot_Dispatch_ConnectDisconnect(t *testing.T) {
 			result <- ev
 		},
 	}
-	b.Register(irc.CONNECT, thandler)
-	b.Register(irc.DISCONNECT, thandler)
+	b.RegisterGlobal(irc.CONNECT, thandler)
+	b.RegisterGlobal(irc.DISCONNECT, thandler)
 
 	end := b.Start()
 
@@ -250,7 +251,7 @@ func TestBot_Dispatch_ConnectDisconnect(t *testing.T) {
 		t.Error("Expected a dispatch of connect:", d)
 	}
 
-	for _ = range end {
+	for range end {
 	}
 }
 
@@ -350,11 +351,11 @@ func TestBot_ReconnectKill(t *testing.T) {
 	}
 }
 
-func TestBot_Register(t *testing.T) {
+func TestBot_RegisterGlobal(t *testing.T) {
 	t.Parallel()
 	b, _ := createBot(fakeConfig, nil, nil, devNull, false, false)
-	gid := b.Register(irc.PRIVMSG, &coreHandler{})
-	id := b.RegisterFiltered(netID, "", irc.PRIVMSG, &coreHandler{})
+	gid := b.RegisterGlobal(irc.PRIVMSG, &coreHandler{})
+	id := b.Register(netID, "", irc.PRIVMSG, &coreHandler{})
 
 	if !b.Unregister(id) {
 		t.Error("Should unregister the global registration.")
@@ -364,32 +365,33 @@ func TestBot_Register(t *testing.T) {
 	}
 }
 
-func TestBot_RegisterCmd(t *testing.T) {
+func TestBot_RegisterGlobalCmd(t *testing.T) {
+	var id uint64
 	var err error
 	var success bool
 	b, _ := createBot(fakeConfig, nil, nil, devNull, false, false)
 	command := "cmd"
-	err = b.RegisterCmd(cmd.MkCmd("ext", "desc", command, &testCommand{},
-		cmd.ALLKINDS, cmd.ALLSCOPES))
+	id, err = b.RegisterGlobalCmd(cmd.New("ext", command, "desc", &testCommand{},
+		cmd.AnyKind, cmd.AnyScope))
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
 
-	err = b.RegisterCmd(cmd.MkCmd("ext", "desc", command, &testCommand{},
-		cmd.ALLKINDS, cmd.ALLSCOPES))
+	_, err = b.RegisterGlobalCmd(cmd.New("ext", command, "desc", &testCommand{},
+		cmd.AnyKind, cmd.AnyScope))
 	if err == nil {
 		t.Error("Expecting error about duplicates.")
 	}
-	if success = b.UnregisterCmd("ext", command); !success {
+	if success = b.UnregisterCmd(id); !success {
 		t.Error("It should unregister correctly.")
 	}
 
-	err = b.RegisterFilteredCmd(netID, channel, cmd.MkCmd("e", "d", command,
-		&testCommand{}, cmd.ALLKINDS, cmd.ALLSCOPES))
+	id, err = b.RegisterCmd(netID, channel, cmd.New("e", command, "d",
+		&testCommand{}, cmd.AnyKind, cmd.AnyScope))
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
-	success = b.UnregisterFilteredCmd(netID, channel, "e", command)
+	success = b.UnregisterCmd(id)
 	if !success {
 		t.Error("It should unregister correctly.")
 	}
@@ -469,7 +471,7 @@ func TestBot_Stop(t *testing.T) {
 	<-listen
 
 	b.Stop()
-	for _ = range end {
+	for range end {
 	}
 }
 
@@ -532,6 +534,6 @@ func TestBot_GetEndpoint(t *testing.T) {
 	}
 
 	b.Stop()
-	for _ = range end {
+	for range end {
 	}
 }

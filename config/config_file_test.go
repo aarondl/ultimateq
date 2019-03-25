@@ -48,9 +48,9 @@ password = "Password"
 [networks.ircnet]
 	servers = ["localhost:3333", "server.com:6667"]
 
-	ssl = true
-	sslcert = "/path/to/a.crt"
-	noverifycert = false
+	tls_ca_cert = "/path/to/ca.crt"
+	tls_cert    = "/path/to/a.crt"
+	tls_insecure_skip_verify = true
 
 	nostate = false
 	nostore = false
@@ -69,22 +69,27 @@ password = "Password"
 
 	prefix = "."
 
-	[networks.ircnet.channels."#channel1"]
+	[[networks.ircnet.channels]]
+	name = "#channel1"
 	password = "pass1"
 	prefix = "!"
 
-	[networks.ircnet.channels."#channel2"]
+	[[networks.ircnet.channels]]
+	name = "#channel2"
 	password = "pass2"
 	prefix = "@"
 
 [ext]
 	listen = "localhost:3333"
+	tls_cert = "/path/to/a.crt"
+	tls_key = "/path/to/a.key"
+	tls_client_ca = "/path/to/ca.crt"
+	tls_insecure_skip_verify = true
+
 	execdir = "/path/to/executables"
 
 	noreconnect = false
 	reconnecttimeout = 20
-
-	usejson = true
 
 	[ext.config]
 		key = "stringvalue"
@@ -99,13 +104,10 @@ password = "Password"
 	exec = "/path/to/executable"
 
 	server = "localhost:44"
-	ssl = true
-	sslcert = "/path/to/a.crt"
-	noverifycert = false
+	tls_cert = "/path/to/another.crt"
+	tls_insecure_skip_verify = true
 
 	unix = "/path/to/sock.sock"
-
-	usejson = false
 
 	[exts.myext.active]
 		ircnet = ["#channel1", "#channel2"]
@@ -168,18 +170,18 @@ func verifyFakeConfig(t *testing.T, conf *Config) {
 		t.Errorf("Expected: %s, got: %s", exps, got)
 	}
 
-	expb = true
-	if got, ok := net1.SSL(); !ok || expb != got {
-		t.Errorf("Expected: %v, got: %v", expb, got)
-	}
-
-	exps = "/path/to/a.crt"
-	if got, ok := net1.SSLCert(); !ok || exps != got {
+	exps = "/path/to/ca.crt"
+	if got, ok := net1.TLSCACert(); !ok || exps != got {
 		t.Errorf("Expected: %s, got: %s", exps, got)
 	}
 
-	expb = false
-	if got, ok := net1.NoVerifyCert(); !ok || expb != got {
+	exps = "/path/to/a.crt"
+	if got, ok := net1.TLSCert(); !ok || exps != got {
+		t.Errorf("Expected: %s, got: %s", exps, got)
+	}
+
+	expb = true
+	if got, ok := net1.TLSInsecureSkipVerify(); !ok || expb != got {
 		t.Errorf("Expected: %v, got: %v", expb, got)
 	}
 
@@ -239,11 +241,11 @@ func verifyFakeConfig(t *testing.T, conf *Config) {
 	}
 
 	if pfx, ok := net1.ChannelPrefix("#channel1"); !ok && pfx != '!' {
-		t.Error("Expected: %c, got: %c", "!", pfx)
+		t.Errorf("Expected: %s, got: %c", "!", pfx)
 	}
 
 	if pfx, ok := net1.ChannelPrefix("#"); !ok && pfx != '!' {
-		t.Error("Expected: %c, got: %c", "!", pfx)
+		t.Errorf("Expected: %s, got: %c", "!", pfx)
 	}
 
 	if chans, ok := net1.Channels(); ok {
@@ -302,6 +304,26 @@ func verifyFakeConfig(t *testing.T, conf *Config) {
 		t.Errorf("Expected: %v, got: %v", exps, got)
 	}
 
+	exps = "/path/to/a.crt"
+	if got, ok := globalExt.TLSCert(); !ok || exps != got {
+		t.Errorf("Expected: %v, got: %v", exps, got)
+	}
+
+	exps = "/path/to/a.key"
+	if got, ok := globalExt.TLSKey(); !ok || exps != got {
+		t.Errorf("Expected: %v, got: %v", exps, got)
+	}
+
+	exps = "/path/to/ca.crt"
+	if got, ok := globalExt.TLSClientCA(); !ok || exps != got {
+		t.Errorf("Expected: %v, got: %v", exps, got)
+	}
+
+	expb = true
+	if got, ok := globalExt.TLSInsecureSkipVerify(); !ok || expb != got {
+		t.Errorf("Expected: %v, got: %v", exps, got)
+	}
+
 	expb = false
 	if got, ok := globalExt.NoReconnect(); !ok || expb != got {
 		t.Errorf("Expected: %v, got: %v", expb, got)
@@ -310,11 +332,6 @@ func verifyFakeConfig(t *testing.T, conf *Config) {
 	expu = 20
 	if got, ok := globalExt.ReconnectTimeout(); !ok || expu != got {
 		t.Errorf("Expected: %v, got: %v", expu, got)
-	}
-
-	expb = true
-	if got, ok := globalExt.UseJson(); !ok || expb != got {
-		t.Errorf("Expected: %v, got: %v", expb, got)
 	}
 
 	ext := conf.Ext("myext")
@@ -339,29 +356,19 @@ func verifyFakeConfig(t *testing.T, conf *Config) {
 		t.Errorf("Expected: %v, got: %v", expu, got)
 	}
 
-	expb = true
-	if got, ok := ext.SSL(); !ok || expb != got {
-		t.Errorf("Expected: %v, got: %v", expb, got)
-	}
-
-	exps = "/path/to/a.crt"
-	if got, ok := ext.SSLCert(); !ok || exps != got {
+	exps = "/path/to/another.crt"
+	if got, ok := ext.TLSCert(); !ok || exps != got {
 		t.Errorf("Expected: %v, got: %v", exps, got)
 	}
 
-	expb = false
-	if got, ok := ext.NoVerifyCert(); !ok || expb != got {
+	expb = true
+	if got, ok := ext.TLSInsecureSkipVerify(); !ok || expb != got {
 		t.Errorf("Expected: %v, got: %v", expb, got)
 	}
 
 	exps = "/path/to/sock.sock"
 	if got, ok := ext.Unix(); !ok || exps != got {
 		t.Errorf("Expected: %v, got: %v", exps, got)
-	}
-
-	expb = false
-	if got, ok := ext.UseJson(); !ok || expb != got {
-		t.Errorf("Expected: %v, got: %v", expb, got)
 	}
 
 	if active, ok := ext.Active("ircnet"); !ok || active == nil {
@@ -378,7 +385,7 @@ func verifyFakeConfig(t *testing.T, conf *Config) {
 
 func TestConfig_FromReader(t *testing.T) {
 	t.Parallel()
-	c := NewConfig().FromString(configuration)
+	c := New().FromString(configuration)
 
 	if !c.Validate() {
 		t.Error(c.errors)
@@ -390,7 +397,7 @@ func TestConfig_FromReader(t *testing.T) {
 
 func TestConfig_FromReaderErrors(t *testing.T) {
 	t.Parallel()
-	c := NewConfig().FromReader(&dyingReader{})
+	c := New().FromReader(&dyingReader{})
 
 	ers := c.Errors()
 	if exp, got := 1, len(ers); exp != got {
@@ -404,7 +411,7 @@ func TestConfig_FromReaderErrors(t *testing.T) {
 	}
 
 	buf := bytes.NewBufferString("defaults:\n\tport: 5555")
-	c = NewConfig().FromReader(buf)
+	c = New().FromReader(buf)
 
 	ers = c.Errors()
 	if exp, got := 1, len(ers); exp != got {
@@ -422,7 +429,7 @@ func TestConfig_fromFile(t *testing.T) {
 	buf := &testBuffer{bytes.NewBufferString(configuration), false}
 
 	name := "check.yaml"
-	c := NewConfig().fromFile(name, func(f string) (io.ReadCloser, error) {
+	c := New().fromFile(name, func(f string) (io.ReadCloser, error) {
 		return buf, nil
 	})
 
@@ -437,7 +444,7 @@ func TestConfig_fromFile(t *testing.T) {
 
 	name = ""
 	buf = &testBuffer{bytes.NewBufferString(configuration), false}
-	c = NewConfig().fromFile(name, func(f string) (io.ReadCloser, error) {
+	c = New().fromFile(name, func(f string) (io.ReadCloser, error) {
 		return buf, nil
 	})
 
@@ -450,7 +457,7 @@ func TestConfig_fromFileErrors(t *testing.T) {
 	t.Parallel()
 	errMsg := errMsgFileError[:len(errMsgFileError)-4]
 
-	c := NewConfig().fromFile("", func(_ string) (io.ReadCloser, error) {
+	c := New().fromFile("", func(_ string) (io.ReadCloser, error) {
 		return nil, io.EOF
 	})
 	ers := c.Errors()
@@ -466,14 +473,14 @@ func TestConfig_fromFileErrors(t *testing.T) {
 
 func TestConfig_ToWriter(t *testing.T) {
 	t.Parallel()
-	c := NewConfig().FromString(configuration)
+	c := New().FromString(configuration)
 
 	buf := &bytes.Buffer{}
 	if err := c.ToWriter(buf); err != nil {
 		t.Error("Unexpected error:", err)
 	}
 
-	c = NewConfig().FromReader(buf)
+	c = New().FromReader(buf)
 
 	verifyFakeConfig(t, c)
 }
@@ -481,7 +488,7 @@ func TestConfig_ToWriter(t *testing.T) {
 func TestConfig_ToWriterErrors(t *testing.T) {
 	t.Parallel()
 
-	err := NewConfig().FromString(configuration).ToWriter(&dyingWriter{})
+	err := New().FromString(configuration).ToWriter(&dyingWriter{})
 	if err == nil || err == io.EOF {
 		t.Error("Expected to see an unconventional error.")
 	}
@@ -490,7 +497,7 @@ func TestConfig_ToWriterErrors(t *testing.T) {
 func TestConfig_toFile(t *testing.T) {
 	t.Parallel()
 
-	c := NewConfig()
+	c := New()
 	buf := &testBuffer{&bytes.Buffer{}, false}
 
 	filename := ""
@@ -524,7 +531,7 @@ func TestConfig_toFile(t *testing.T) {
 
 func TestConfig_toFileErrors(t *testing.T) {
 	t.Parallel()
-	err := NewConfig().toFile("", func(_ string) (io.WriteCloser, error) {
+	err := New().toFile("", func(_ string) (io.WriteCloser, error) {
 		return nil, io.EOF
 	})
 

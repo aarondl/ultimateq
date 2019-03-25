@@ -15,10 +15,10 @@ func TestChannelUser(t *testing.T) {
 	cu := newChannelUser(user, &modes)
 
 	if got, exp := cu.User, user; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := cu.UserModes, &modes; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 }
 
@@ -31,9 +31,9 @@ func TestUserChannel(t *testing.T) {
 	uc := newUserChannel(ch, &modes)
 
 	if got, exp := uc.Channel, ch; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := uc.UserModes, &modes; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 }

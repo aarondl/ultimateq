@@ -45,7 +45,7 @@ func TestCoreHandler_Ping(t *testing.T) {
 	handler := coreHandler{}
 	ev := irc.NewEvent(netID, netInfo, irc.PING, "", "123123123123")
 	endpoint := makeTestPoint(nil)
-	handler.HandleRaw(endpoint, ev)
+	handler.Handle(endpoint, ev)
 	expect := irc.PONG + " :" + ev.Args[0]
 	if got := endpoint.gets(); got != expect {
 		t.Errorf("Expected: %s, got: %s", expect, got)
@@ -56,13 +56,10 @@ func TestCoreHandler_Connect(t *testing.T) {
 	cnf := fakeConfig.Clone()
 	net := cnf.Network(netID).SetPassword("password")
 
-	ch1 := config.Channel{Password: "pass"}
-	ch2 := config.Channel{}
 	ch1Name, ch2Name := "#channel1", "#channel2"
-	net.SetChannels(map[string]config.Channel{
-		ch1Name: ch1,
-		ch2Name: ch2,
-	})
+	ch1 := config.Channel{Name: ch1Name, Password: "pass"}
+	ch2 := config.Channel{Name: ch2Name}
+	net.SetChannels([]config.Channel{ch1, ch2})
 
 	b, _ := createBot(cnf, nil, nil, devNull, false, false)
 
@@ -80,7 +77,7 @@ func TestCoreHandler_Connect(t *testing.T) {
 
 	ev := irc.NewEvent(netID, netInfo, irc.CONNECT, "")
 	endpoint := makeTestPoint(b.servers[netID])
-	handler.HandleRaw(endpoint, ev)
+	handler.Handle(endpoint, ev)
 
 	expect := msg1 + msg2 + msg3
 	if got := endpoint.gets(); !strings.HasPrefix(got, expect) {
@@ -94,7 +91,7 @@ func TestCoreHandler_Connect(t *testing.T) {
 	endpoint.resetTestWritten()
 
 	net.SetNoAutoJoin(true)
-	handler.HandleRaw(endpoint, ev)
+	handler.Handle(endpoint, ev)
 	expect = msg1 + msg2 + msg3
 	if got := endpoint.gets(); got != expect {
 		t.Errorf("Expected: %s, got: %s", expect, got)
@@ -116,17 +113,17 @@ func TestCoreHandler_Nick(t *testing.T) {
 	nick2 := nickstr + nick + "_"
 	nick3 := nickstr + nick + "__"
 
-	handler.HandleRaw(endpoint, ev)
+	handler.Handle(endpoint, ev)
 	if got := endpoint.gets(); got != nick1 {
 		t.Errorf("Expected: %s, got: %s", nick1, got)
 	}
 	endpoint.resetTestWritten()
-	handler.HandleRaw(endpoint, ev)
+	handler.Handle(endpoint, ev)
 	if got := endpoint.gets(); got != nick2 {
 		t.Errorf("Expected: %s, got: %s", nick2, got)
 	}
 	endpoint.resetTestWritten()
-	handler.HandleRaw(endpoint, ev)
+	handler.Handle(endpoint, ev)
 	if got := endpoint.gets(); got != nick3 {
 		t.Errorf("Expected: %s, got: %s", nick3, got)
 	}
@@ -138,9 +135,9 @@ func TestCoreHandler_Rejoin(t *testing.T) {
 		SetNoAutoJoin(true)
 
 	nick, _ := net.Nick()
-	ch1 := config.Channel{Password: "pass"}
-	ch2 := config.Channel{}
 	ch1Name, ch2Name := "#channel1", "#channel2"
+	ch1 := config.Channel{Name: ch1Name, Password: "pass"}
+	ch2 := config.Channel{Name: ch2Name}
 
 	b, _ := createBot(cnf, nil, nil, devNull, false, false)
 	st := b.servers[netID].state
@@ -155,15 +152,15 @@ func TestCoreHandler_Rejoin(t *testing.T) {
 		ch2Name, nick, "Kick Message")
 
 	handler := coreHandler{bot: b}
-	handler.HandleRaw(endpoint, banned)
-	handler.HandleRaw(endpoint, kicked)
+	handler.Handle(endpoint, banned)
+	handler.Handle(endpoint, kicked)
 
 	if got := endpoint.gets(); len(got) > 0 {
 		t.Error("Expected nothing to happen with noautojoin set.")
 	}
 
-	handler.HandleRaw(endpoint, banned)
-	handler.HandleRaw(endpoint, kicked)
+	handler.Handle(endpoint, banned)
+	handler.Handle(endpoint, kicked)
 
 	net.SetNoAutoJoin(false)
 
@@ -171,13 +168,10 @@ func TestCoreHandler_Rejoin(t *testing.T) {
 		t.Error("Expected nothing to happen without channels set.")
 	}
 
-	net.SetChannels(map[string]config.Channel{
-		ch1Name: ch1,
-		ch2Name: ch2,
-	})
+	net.SetChannels([]config.Channel{ch1, ch2})
 
-	handler.HandleRaw(endpoint, banned)
-	handler.HandleRaw(endpoint, kicked)
+	handler.Handle(endpoint, banned)
+	handler.Handle(endpoint, kicked)
 
 	exp1 := fmt.Sprintf("JOIN %v %v", ch1Name, ch1.Password)
 	exp2 := fmt.Sprintf("JOIN %v", ch2Name)
@@ -202,8 +196,8 @@ func TestCoreHandler_NetInfo(t *testing.T) {
 	msg2 := irc.NewEvent(netID, netInfo, irc.RPL_ISUPPORT, "",
 		"RFC8213", "CHANTYPES=&$")
 	srv := b.servers[netID]
-	srv.handler.HandleRaw(&testPoint{}, msg1)
-	srv.handler.HandleRaw(&testPoint{}, msg2)
+	srv.handler.Handle(&testPoint{}, msg1)
+	srv.handler.Handle(&testPoint{}, msg2)
 	if got, exp := srv.netInfo.ServerName(), "irc.test.net"; got != exp {
 		t.Errorf("Expected: %s, got: %s", exp, got)
 	}
@@ -237,7 +231,7 @@ func TestCoreHandler_Join(t *testing.T) {
 		"nick!user@host", "#chan")
 
 	endpoint := makeTestPoint(nil)
-	srv.handler.HandleRaw(endpoint, ev)
+	srv.handler.Handle(endpoint, ev)
 	if got, exp := endpoint.gets(), "WHO :#chanMODE :#chan"; got != exp {
 		t.Errorf("Expected: %s, got: %s", exp, got)
 	}

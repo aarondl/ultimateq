@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/aarondl/ultimateq/data"
@@ -18,8 +16,6 @@ import (
 // for further information.
 type Event struct {
 	*irc.Event
-	*data.State
-	*data.Store
 
 	// User can be nil if the bot's State is disabled.
 	User *data.User
@@ -48,84 +44,14 @@ type Event struct {
 	// argument.
 	TargetVarStoredUser []*data.StoredUser
 
-	args map[string]string
-}
-
-// Arg gets an argument that was passed in to the command by the user. The
-// name of the argument passed into Register() is required to get the argument.
-func (ev *Event) Arg(arg string) string {
-	return ev.args[arg]
+	Args map[string]string
 }
 
 // SplitArg behaves exactly like GetArg but calls strings.Fields on the
 // argument. Useful for varargs...
 func (ev *Event) SplitArg(arg string) (args []string) {
-	if str, ok := ev.args[arg]; ok && len(str) > 0 {
+	if str, ok := ev.Args[arg]; ok && len(str) > 0 {
 		args = strings.Fields(str)
-	}
-	return
-}
-
-// FindUserByNick finds a user by their nickname. An error is returned if
-// they were not found.
-func (ev *Event) FindUserByNick(nick string) (*data.User, error) {
-	if ev.State == nil {
-		return nil, errors.New(errMsgStateDisabled)
-	}
-
-	if user, ok := ev.State.User(nick); ok {
-		return &user, nil
-	}
-
-	return nil, fmt.Errorf(errFmtUserNotFound, nick)
-}
-
-// FindAccessByUser locates a user's access based on their nick or
-// username. To look up by username instead of nick use the * prefix before the
-// username in the string. The user parameter is returned when a nickname lookup
-// is done. An error occurs if the user is not found, the user is not authed,
-// the username is not registered, etc.
-func (ev *Event) FindAccessByUser(server, nickOrUser string) (
-	access *data.StoredUser, user *data.User, err error) {
-	if ev.Store == nil {
-		err = errors.New(errMsgStoreDisabled)
-		return
-	}
-
-	switch nickOrUser[0] {
-	case '*':
-		if len(nickOrUser) == 1 {
-			err = errors.New(errMsgMissingUsername)
-			return
-		}
-		uname := nickOrUser[1:]
-		access, err = ev.Store.FindUser(uname)
-		if access == nil {
-			err = fmt.Errorf(errFmtUserNotRegistered, uname)
-			return
-		}
-	default:
-		if ev.State == nil {
-			err = errors.New(errMsgStateDisabled)
-			return
-		}
-
-		if u, ok := ev.State.User(nickOrUser); !ok {
-			err = fmt.Errorf(errFmtUserNotFound, nickOrUser)
-			return
-		} else {
-			user = &u
-		}
-
-		access = ev.Store.AuthedUser(server, user.Host.String())
-		if access == nil {
-			err = fmt.Errorf(errFmtUserNotAuthed, nickOrUser)
-			return
-		}
-	}
-
-	if err != nil {
-		err = fmt.Errorf(errFmtInternal, err)
 	}
 	return
 }

@@ -126,7 +126,7 @@ func TestIrcClient_PumpFloodProtect(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			_, err := client.Write(test1)
 			if got := err; got != nil {
-				t.Error("Expected: %v to be nil.", got)
+				t.Errorf("Expected: %v to be nil.", got)
 			}
 		}
 	}()
@@ -262,7 +262,7 @@ func TestIrcClient_Close(t *testing.T) {
 	go func() {
 		err := client.Close()
 		if got := err; got != nil {
-			t.Error("Expected: %v to be nil.", got)
+			t.Errorf("Expected: %v to be nil.", got)
 		}
 	}()
 	conn.WaitForDeath()
@@ -272,7 +272,7 @@ func TestIrcClient_Close(t *testing.T) {
 
 	err := client.Close() // Double closing should do nothing
 	if got := err; got != nil {
-		t.Error("Expected: %v to be nil.", got)
+		t.Errorf("Expected: %v to be nil.", got)
 	}
 	if exp, got := client.IsClosed(), true; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
@@ -311,7 +311,7 @@ func TestIrcClient_Read(t *testing.T) {
 
 	n, err := client.Read(buf[:breakat])
 	if got := err; got != nil {
-		t.Error("Expected: %v to be nil.", got)
+		t.Errorf("Expected: %v to be nil.", got)
 	}
 	if exp, got := n, breakat; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
@@ -322,7 +322,7 @@ func TestIrcClient_Read(t *testing.T) {
 
 	n, err = client.Read(buf[breakat:])
 	if got := err; got != nil {
-		t.Error("Expected: %v to be nil.", got)
+		t.Errorf("Expected: %v to be nil.", got)
 	}
 	if exp, got := n, len(read)-breakat; exp != got {
 		t.Errorf("Expected: %v, got: %v", exp, got)
@@ -351,7 +351,7 @@ func TestIrcClient_Write(t *testing.T) {
 		client.Write(nil) //Should be Consequenceless test cov
 		n, err := client.Write(arg)
 		if got := err; got != nil {
-			t.Error("Expected: %v to be nil.", got)
+			t.Errorf("Expected: %v to be nil.", got)
 		}
 		if exp, got := n, len(arg); exp != got {
 			t.Errorf("Expected: %v, got: %v", exp, got)
@@ -506,7 +506,7 @@ func TestIrcClient_ClientError(t *testing.T) {
 		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got := e.CheckNeeded(); got != nil {
-		t.Error("Expected: %v to be nil.", got)
+		t.Errorf("Expected: %v to be nil.", got)
 	}
 	e.Siphon = io.EOF
 	if exp, got := e.Error(), "Siphon: "+io.EOF.Error(); exp != got {

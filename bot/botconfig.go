@@ -89,7 +89,7 @@ func (s *Server) rehashConfig(newConfig *config.Config) {
 func (b *Bot) Rehash() error {
 	fname, _ := b.conf.StoreFile()
 
-	conf := config.NewConfig().FromFile(fname)
+	conf := config.New().FromFile(fname)
 	if !CheckConfig(conf) {
 		return errInvalidConfig
 	}

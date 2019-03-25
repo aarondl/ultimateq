@@ -28,119 +28,119 @@ func TestModeDiff_Apply(t *testing.T) {
 	d := NewModeDiff(testKinds)
 	pos, neg := d.Apply("+ab-c 10 ")
 	if got, exp := len(pos), 0; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := len(neg), 0; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := d.IsSet("ab 10"), true; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := d.IsSet("c"), false; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := d.IsUnset("c"), false; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 
 	d = NewModeDiff(testKinds)
 	pos, neg = d.Apply("+b-b 10 10")
 	if got, exp := len(pos), 0; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := len(neg), 0; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := d.IsSet("b 10"), false; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := d.IsUnset("b 10"), true; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 
 	d = NewModeDiff(testKinds)
 	pos, neg = d.Apply("-b+b 10 10")
 	if got, exp := len(pos), 0; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := len(neg), 0; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := d.IsSet("b 10"), true; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := d.IsUnset("b 10"), false; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 
 	pos, neg = d.Apply("+x-y+z")
 	if got, exp := len(pos), 0; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := len(neg), 0; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := d.IsSet("x"), true; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := d.IsUnset("y"), true; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := d.IsSet("z"), true; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := d.IsUnset("x"), false; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := d.IsSet("y"), false; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := d.IsUnset("z"), false; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 
 	pos, neg = d.Apply("+vx-yo+vz user1 user2 user3")
 	if got, exp := len(pos), 2; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := len(neg), 1; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := pos[0].Mode, 'v'; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := pos[0].Arg, "user1"; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := pos[1].Mode, 'v'; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := pos[1].Arg, "user3"; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := neg[0].Mode, 'o'; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := neg[0].Arg, "user2"; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := d.IsSet("x"), true; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := d.IsUnset("y"), true; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := d.IsSet("z"), true; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := d.IsUnset("x"), false; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := d.IsSet("y"), false; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 	if got, exp := d.IsUnset("z"), false; exp != got {
-		t.Error("Expected: %v, got: %v", exp, got)
+		t.Errorf("Expected: %v, got: %v", exp, got)
 	}
 }
 

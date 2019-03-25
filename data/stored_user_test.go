@@ -87,7 +87,7 @@ func TestStoredUser_SerializeDeserialize(t *testing.T) {
 	} else {
 		for i := range s.Masks {
 			if s.Masks[i] != b.Masks[i] {
-				t.Errorf("Serialized mask not found:", s.Masks[i])
+				t.Error("Serialized mask not found:", s.Masks[i])
 			}
 		}
 	}
@@ -576,6 +576,25 @@ func TestStoredUser_JSONify(t *testing.T) {
 	if err = json.Unmarshal(str, &b); err != nil {
 		t.Error(err)
 	}
+
+	if !reflect.DeepEqual(*a, b) {
+		t.Error("A and B differ:", a, b)
+	}
+}
+
+func TestStoredUser_Protofy(t *testing.T) {
+	t.Parallel()
+
+	a := &StoredUser{
+		Username:   "a",
+		Password:   []byte("b"),
+		Masks:      []string{"c"},
+		Access:     map[string]Access{"net:#chan": *NewAccess(23, "abc")},
+		JSONStorer: JSONStorer{"some": "data"},
+	}
+	var b StoredUser
+
+	b.FromProto(a.ToProto())
 
 	if !reflect.DeepEqual(*a, b) {
 		t.Error("A and B differ:", a, b)

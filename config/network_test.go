@@ -8,7 +8,7 @@ import (
 func TestConfig_Network_GetSet(t *testing.T) {
 	t.Parallel()
 
-	c := NewConfig()
+	c := New()
 	glb := c.Network("")
 	net := c.NewNetwork("net")
 
@@ -22,11 +22,15 @@ func TestConfig_Network_GetSet(t *testing.T) {
 
 	check("Password", "", "password1", "password2", glb, net, t)
 
-	check("SSL", false, false, true, glb, net, t)
+	check("TLS", false, false, true, glb, net, t)
 
-	check("SSLCert", "", "sslcert1", "sslcert2", glb, net, t)
+	check("TLSCACert", "", "tlscert1", "tlscert2", glb, net, t)
 
-	check("NoVerifyCert", false, false, true, glb, net, t)
+	check("TLSCert", "", "tlscert1", "tlscert2", glb, net, t)
+
+	check("TLSKey", "", "tlscert1", "tlscert2", glb, net, t)
+
+	check("TLSInsecureSkipVerify", false, false, true, glb, net, t)
 
 	check("NoState", false, false, true, glb, net, t)
 
@@ -69,11 +73,11 @@ func TestConfig_Network_GetSet(t *testing.T) {
 func TestConfig_Network_GetSetChannels(t *testing.T) {
 	t.Parallel()
 
-	c := NewConfig()
+	c := New()
 	glb := c.Network("")
 	net := c.NewNetwork("net")
-	ch1 := Channel{"b", "c"}
-	ch2 := Channel{"b", "c"}
+	ch1 := Channel{"a", "b", "c"}
+	ch2 := Channel{"a", "b", "c"}
 
 	if chans, ok := glb.Channels(); ok || len(chans) != 0 {
 		t.Error("Expected servers to be empty.")
@@ -82,7 +86,7 @@ func TestConfig_Network_GetSetChannels(t *testing.T) {
 		t.Error("Expected servers to be empty.")
 	}
 
-	glb.SetChannels(map[string]Channel{"a": ch1})
+	glb.SetChannels([]Channel{ch1})
 
 	if chans, ok := glb.Channels(); !ok || len(chans) != 1 {
 		t.Error("Expected servers not to be empty.")
@@ -95,7 +99,7 @@ func TestConfig_Network_GetSetChannels(t *testing.T) {
 		t.Errorf("Expected the first channel to be %v, got: %v", ch1, chans["a"])
 	}
 
-	net.SetChannels(map[string]Channel{"a": ch2})
+	net.SetChannels([]Channel{ch2})
 
 	if chans, ok := glb.Channels(); !ok || len(chans) != 1 {
 		t.Error("Expected servers not to be empty.")
@@ -118,11 +122,11 @@ func TestConfig_Network_GetSetChannels(t *testing.T) {
 func TestConfig_Network_GetChannelPrefix(t *testing.T) {
 	t.Parallel()
 
-	c := NewConfig()
+	c := New()
 	glb := c.Network("")
 	net := c.NewNetwork("net")
-	ch1 := Channel{"b", "1"}
-	ch2 := Channel{"b", "1"}
+	ch1 := Channel{"a", "aa", "1"}
+	ch2 := Channel{"b", "bb", "1"}
 
 	if pfx, ok := glb.ChannelPrefix("a"); ok || pfx != defaultPrefix {
 		t.Error("Expected the prefix to not be set.")
@@ -131,7 +135,7 @@ func TestConfig_Network_GetChannelPrefix(t *testing.T) {
 		t.Error("Expected the prefix to not be set.")
 	}
 
-	glb.SetChannels(map[string]Channel{"a": ch1, "b": ch2})
+	glb.SetChannels([]Channel{ch1, ch2})
 	if pfx, ok := glb.ChannelPrefix("a"); !ok || pfx != '1' {
 		t.Error("Expected the prefix be set.")
 	}
@@ -140,7 +144,7 @@ func TestConfig_Network_GetChannelPrefix(t *testing.T) {
 	}
 
 	ch1.Prefix = "2"
-	net.SetChannels(map[string]Channel{"a": ch1, "b": ch2})
+	net.SetChannels([]Channel{ch1, ch2})
 	if pfx, ok := glb.ChannelPrefix("a"); !ok || pfx != '1' {
 		t.Error("Expected the prefix be set.")
 	}

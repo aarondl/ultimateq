@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+
+	"github.com/aarondl/ultimateq/api"
 )
 
 // The various kinds of mode-argument behavior during parsing.
@@ -122,6 +124,64 @@ func (m *modeKinds) UnmarshalJSON(b []byte) error {
 				return errors.New("channel_modes is a map of characters to integers")
 			}
 			m.channelModes[rune(k[0])] = v
+		}
+	}
+
+	return nil
+}
+
+// ToProto turns modeKinds -> API Struct
+func (m *modeKinds) ToProto() *api.ModeKinds {
+	if m == nil {
+		return nil
+	}
+
+	var proto api.ModeKinds
+
+	m.RLock()
+	defer m.RUnlock()
+
+	if m.userPrefixes != nil {
+		proto.UserPrefixes = make([]*api.ModeKinds_UserPrefix, len(m.userPrefixes))
+		for i, prefix := range m.userPrefixes {
+			proto.UserPrefixes[i] = &api.ModeKinds_UserPrefix{
+				Symbol: string(prefix[0]),
+				Char:   string(prefix[1]),
+			}
+		}
+	}
+	if m.channelModes != nil {
+		proto.ChannelModes = make(map[string]int32, len(m.channelModes))
+		for k, v := range m.channelModes {
+			proto.ChannelModes[string(k)] = int32(v)
+		}
+	}
+
+	return &proto
+}
+
+// FromProto turns API struct -> modeKinds
+func (m *modeKinds) FromProto(proto *api.ModeKinds) error {
+	if proto.UserPrefixes != nil {
+		m.userPrefixes = make([][2]rune, len(proto.UserPrefixes))
+		for i, prefix := range proto.UserPrefixes {
+			if len(prefix.Char) != 1 || len(prefix.Symbol) != 1 {
+				return errors.New("user_prefixes is an array of length 2 of 1 character strings")
+			}
+
+			m.userPrefixes[i] = [2]rune{
+				rune(prefix.Symbol[0]),
+				rune(prefix.Char[0]),
+			}
+		}
+	}
+	if proto.ChannelModes != nil {
+		m.channelModes = make(map[rune]int, len(proto.ChannelModes))
+		for k, v := range proto.ChannelModes {
+			if len(k) != 1 {
+				return errors.New("channel_modes is a map of characters to integers")
+			}
+			m.channelModes[rune(k[0])] = int(v)
 		}
 	}
 

@@ -263,7 +263,7 @@ func (c *IrcClient) writeMessage(msg []byte) error {
 			c.log.Error("Write error", "err", err, "msg", wrote)
 			return err
 		}
-		c.log.Debug(string(wrote), "sent", true)
+		c.log.Debug(string(wrote), "direction", "send")
 		c.lastwrite = time.Now()
 	}
 	return nil
@@ -310,7 +310,7 @@ func (c *IrcClient) extractMessages(buf []byte) (int, bool) {
 		copy(cpy, chunk[:len(chunk)-2])
 		select {
 		case c.siphonchan <- cpy:
-			c.log.Debug(string(cpy), "sent", false)
+			c.log.Debug(string(cpy), "direction", "recv")
 			return false
 		case c.killsiphon <- nil:
 			return true

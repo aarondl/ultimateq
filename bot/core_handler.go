@@ -26,7 +26,7 @@ type coreHandler struct {
 
 // HandleRaw implements the dispatch.EventHandler interface so the bot can
 // deal with all irc messages coming in.
-func (c *coreHandler) HandleRaw(w irc.Writer, ev *irc.Event) {
+func (c *coreHandler) Handle(w irc.Writer, ev *irc.Event) {
 	switch ev.Name {
 
 	case irc.PING:

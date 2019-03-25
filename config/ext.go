@@ -34,15 +34,6 @@ func (e *ExtCTX) set(key string, value interface{}) {
 	e.ext[key] = value
 }
 
-func (e *ExtCTX) UseJson() (bool, bool) {
-	return getBool(e, "usejson", true)
-}
-
-func (e *ExtCTX) SetUseJson(val bool) *ExtCTX {
-	setVal(e, "usejson", val)
-	return e
-}
-
 func (e *ExtCTX) NoReconnect() (bool, bool) {
 	return getBool(e, "noreconnect", true)
 }
@@ -159,6 +150,42 @@ func (e *ExtGlobalCTX) Listen() (string, bool) {
 
 func (e *ExtGlobalCTX) SetListen(val string) *ExtGlobalCTX {
 	setVal(e, "listen", val)
+	return e
+}
+
+func (e *ExtGlobalCTX) TLSCert() (string, bool) {
+	return getStr(e, "tls_cert", false)
+}
+
+func (e *ExtGlobalCTX) SetTLSCert(val string) *ExtGlobalCTX {
+	setVal(e, "tls_cert", val)
+	return e
+}
+
+func (e *ExtGlobalCTX) TLSKey() (string, bool) {
+	return getStr(e, "tls_key", false)
+}
+
+func (e *ExtGlobalCTX) SetTLSKey(val string) *ExtGlobalCTX {
+	setVal(e, "tls_key", val)
+	return e
+}
+
+func (e *ExtGlobalCTX) TLSClientCA() (string, bool) {
+	return getStr(e, "tls_client_ca", false)
+}
+
+func (e *ExtGlobalCTX) SetTLSClientCA(val string) *ExtGlobalCTX {
+	setVal(e, "tls_client_ca", val)
+	return e
+}
+
+func (e *ExtGlobalCTX) TLSInsecureSkipVerify() (bool, bool) {
+	return getBool(e, "tls_insecure_skip_verify", false)
+}
+
+func (e *ExtGlobalCTX) SetTLSInsecureSkipVerify(val bool) *ExtGlobalCTX {
+	setVal(e, "tls_insecure_skip_verify", val)
 	return e
 }
 
@@ -345,30 +372,21 @@ func (e *ExtNormalCTX) SetServer(val string) *ExtNormalCTX {
 	return e
 }
 
-func (e *ExtNormalCTX) SSL() (bool, bool) {
-	return getBool(e, "ssl", false)
+func (e *ExtNormalCTX) TLSCert() (string, bool) {
+	return getStr(e, "tls_cert", false)
 }
 
-func (e *ExtNormalCTX) SetSSL(val bool) *ExtNormalCTX {
-	setVal(e, "ssl", val)
+func (e *ExtNormalCTX) SetTLSCert(val string) *ExtNormalCTX {
+	setVal(e, "tls_cert", val)
 	return e
 }
 
-func (e *ExtNormalCTX) SSLCert() (string, bool) {
-	return getStr(e, "sslcert", false)
+func (e *ExtNormalCTX) TLSInsecureSkipVerify() (bool, bool) {
+	return getBool(e, "tls_insecure_skip_verify", false)
 }
 
-func (e *ExtNormalCTX) SetSSLCert(val string) *ExtNormalCTX {
-	setVal(e, "sslcert", val)
-	return e
-}
-
-func (e *ExtNormalCTX) NoVerifyCert() (bool, bool) {
-	return getBool(e, "noverifycert", false)
-}
-
-func (e *ExtNormalCTX) SetNoVerifyCert(val bool) *ExtNormalCTX {
-	setVal(e, "noverifycert", val)
+func (e *ExtNormalCTX) SetTLSInsecureSkipVerify(val bool) *ExtNormalCTX {
+	setVal(e, "tls_insecure_skip_verify", val)
 	return e
 }
 

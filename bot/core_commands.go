@@ -1,17 +1,17 @@
 package bot
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"runtime"
-	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/aarondl/ultimateq/data"
+	"github.com/aarondl/ultimateq/dispatch"
 	"github.com/aarondl/ultimateq/dispatch/cmd"
 	"github.com/aarondl/ultimateq/irc"
+	"github.com/pkg/errors"
 )
 
 var rgxFlags = regexp.MustCompile(`^[A-Za-z]+$`)
@@ -365,38 +365,55 @@ type coreCmds struct {
 // NewCoreCmds initializes the core commands and registers them with the
 // bot.
 func NewCoreCmds(b *Bot) (*coreCmds, error) {
-	c := &coreCmds{b}
+	c := &coreCmds{b: b}
 	for _, command := range commands {
-		privacy := cmd.PRIVATE
+		privacy := cmd.Private
 		if command.Public {
-			privacy = cmd.ALLSCOPES
+			privacy = cmd.AnyScope
 		}
-		err := b.RegisterCmd(&cmd.Cmd{
-			Cmd:         command.Name,
-			Extension:   extension,
-			Description: command.Desc,
-			Handler:     c,
-			Kind:        cmd.PRIVMSG,
-			Scope:       privacy,
-			Args:        command.Args,
-			RequireAuth: command.Authed,
-			ReqLevel:    command.Level,
-			ReqFlags:    command.Flags,
-		})
+
+		var commandObj *cmd.Command
+		if command.Authed {
+			commandObj = cmd.NewAuthed(
+				extension,
+				command.Name,
+				command.Desc,
+				c,
+				cmd.Privmsg,
+				privacy,
+				command.Level,
+				command.Flags,
+				command.Args...,
+			)
+		} else {
+			commandObj = cmd.New(
+				extension,
+				command.Name,
+				command.Desc,
+				c,
+				cmd.Privmsg,
+				privacy,
+				command.Args...,
+			)
+		}
+
+		_, err := b.RegisterGlobalCmd(commandObj)
 		if err != nil {
-			return nil, fmt.Errorf(errFmtRegister, err)
+			return nil, errors.Errorf(errFmtRegister, err)
 		}
 	}
 
-	return &coreCmds{b}, nil
+	return c, nil
 }
 
+/*
 // unregisterCoreCmds unregisters all core commands. Made for testing.
 func (c *coreCmds) unregisterCoreCmds() {
-	for _, cmd := range commands {
-		c.b.UnregisterCmd(extension, cmd.Name)
+	for _, id := range c.ids {
+		c.b.UnregisterCmd(id)
 	}
 }
+*/
 
 // Cmd is responsible for parsing all of the commands.
 func (c *coreCmds) Cmd(cmd string, w irc.Writer,
@@ -473,8 +490,8 @@ func (c *coreCmds) register(w irc.Writer,
 
 	var access *data.StoredUser
 
-	pwd := ev.Arg("password")
-	uname := ev.Arg("username")
+	pwd := ev.Args["password"]
+	uname := ev.Args["username"]
 	if len(uname) == 0 {
 		uname = strings.TrimLeft(ev.Username(), "~")
 	}
@@ -482,7 +499,10 @@ func (c *coreCmds) register(w irc.Writer,
 	host := ev.Sender
 	nick := ev.Nick()
 
-	access, internal = ev.FindUser(uname)
+	store := c.b.Store()
+	state := c.b.State(ev.NetworkID)
+
+	access, internal = store.FindUser(uname)
 	if internal != nil {
 		return
 	}
@@ -495,9 +515,7 @@ func (c *coreCmds) register(w irc.Writer,
 		return
 	}
 
-	nChans, _ := ev.NChannelsByUser(nick)
-
-	store := c.b.store
+	nChans, _ := state.NChannelsByUser(nick)
 
 	var hasAny bool
 	hasAny, internal = store.HasAny()
@@ -538,25 +556,26 @@ func (c *coreCmds) auth(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
 	var access *data.StoredUser
-	pwd := ev.Arg("password")
-	uname := ev.Arg("username")
+	pwd := ev.Args["password"]
+	uname := ev.Args["username"]
 	if len(uname) == 0 {
 		uname = strings.TrimLeft(ev.Username(), "~")
 	}
 
+	state := c.b.State(ev.NetworkID)
+	store := c.b.Store()
+
 	host, nick := ev.Sender, ev.Nick()
-	nChans, _ := ev.NChannelsByUser(nick)
+	nChans, _ := state.NChannelsByUser(nick)
 
 	access = ev.StoredUser
 	if access == nil {
-		access = ev.AuthedUser(ev.NetworkID, host)
+		access = store.AuthedUser(ev.NetworkID, host)
 	}
 	if access != nil {
 		external = errors.New(errMsgAuthed)
 		return
 	}
-
-	store := c.b.store
 
 	var err error
 	if nChans > 0 {
@@ -586,7 +605,7 @@ func (c *coreCmds) logout(w irc.Writer, ev *cmd.Event) (
 	host, nick := ev.Sender, ev.Nick()
 	if user != nil {
 		if !ev.StoredUser.HasFlags("", "", "G") {
-			external = cmd.MakeGlobalFlagsError("G")
+			external = dispatch.MakeGlobalFlagsError("G")
 			return
 		}
 		uname = user.Username
@@ -693,8 +712,8 @@ func (c *coreCmds) users(w irc.Writer, ev *cmd.Event) (
 	var ua *data.StoredUser
 	var ch string
 
-	if ev.Arg("chan") != `` {
-		ch = ev.Arg("chan")
+	if ev.Args["chan"] != `` {
+		ch = ev.Args["chan"]
 	} else if ev.Channel != nil && ev.Channel.Name != `` {
 		ch = ev.Channel.Name
 	} else {
@@ -729,9 +748,9 @@ func (c *coreCmds) users(w irc.Writer, ev *cmd.Event) (
 func (c *coreCmds) deluser(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	param := ev.Arg("user")
+	param := ev.Args["user"]
 	if !ev.StoredUser.HasFlags("", "", "G") {
-		external = cmd.MakeGlobalFlagsError("G")
+		external = dispatch.MakeGlobalFlagsError("G")
 		return
 	}
 	uname := ev.TargetStoredUser["user"].Username
@@ -782,8 +801,8 @@ func (c *coreCmds) delme(w irc.Writer, ev *cmd.Event) (
 func (c *coreCmds) passwd(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	oldpasswd := ev.Arg("oldpassword")
-	newpasswd := ev.Arg("newpassword")
+	oldpasswd := ev.Args["oldpassword"]
+	newpasswd := ev.Args["newpassword"]
 	nick := ev.Nick()
 	uname := ev.StoredUser.Username
 	if !ev.StoredUser.VerifyPassword(oldpasswd) {
@@ -823,7 +842,7 @@ func (c *coreCmds) masks(w irc.Writer, ev *cmd.Event) (
 	user := ev.TargetStoredUser["user"]
 	if user != nil {
 		if !ev.StoredUser.HasFlags("", "", "G") {
-			external = cmd.MakeGlobalFlagsError("G")
+			external = dispatch.MakeGlobalFlagsError("G")
 			return
 		}
 		access = user
@@ -843,14 +862,14 @@ func (c *coreCmds) masks(w irc.Writer, ev *cmd.Event) (
 func (c *coreCmds) addmask(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	mask := ev.Arg("mask")
+	mask := ev.Args["mask"]
 	nick := ev.Nick()
 	uname := ev.StoredUser.Username
 
 	user := ev.TargetStoredUser["user"]
 	if user != nil {
 		if !ev.StoredUser.HasFlags("", "", "G") {
-			external = cmd.MakeGlobalFlagsError("G")
+			external = dispatch.MakeGlobalFlagsError("G")
 			return
 		}
 		uname = user.Username
@@ -885,14 +904,14 @@ func (c *coreCmds) addmask(w irc.Writer, ev *cmd.Event) (
 func (c *coreCmds) delmask(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	mask := ev.Arg("mask")
+	mask := ev.Args["mask"]
 	nick := ev.Nick()
 	uname := ev.StoredUser.Username
 
 	user := ev.TargetStoredUser["user"]
 	if user != nil {
 		if !ev.StoredUser.HasFlags("", "", "G") {
-			external = cmd.MakeGlobalFlagsError("G")
+			external = dispatch.MakeGlobalFlagsError("G")
 			return
 		}
 		uname = user.Username
@@ -928,7 +947,7 @@ func (c *coreCmds) resetpasswd(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
 	uname := ev.TargetStoredUser["user"].Username
-	resetnick := ev.Arg("nick")
+	resetnick := ev.Args["nick"]
 	nick := ev.Nick()
 	newpasswd := ""
 
@@ -977,7 +996,7 @@ func (c *coreCmds) give(w irc.Writer,
 	ev *cmd.Event) (internal, external error) {
 
 	network := ev.NetworkID
-	channel := ev.Arg("chan")
+	channel := ev.Args["chan"]
 	return c.giveHelper(w, ev, network, channel)
 }
 
@@ -999,7 +1018,7 @@ func (c *coreCmds) stake(w irc.Writer, ev *cmd.Event) (
 func (c *coreCmds) take(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 	network := ev.NetworkID
-	channel := ev.Arg("chan")
+	channel := ev.Args["chan"]
 	return c.takeHelper(w, ev, network, channel)
 }
 
@@ -1098,7 +1117,7 @@ func (c *coreCmds) takeHelper(w irc.Writer, ev *cmd.Event,
 	network, channel string) (internal, external error) {
 
 	uname := ev.TargetStoredUser["user"].Username
-	arg := ev.Arg("allOrFlags")
+	arg := ev.Args["allOrFlags"]
 	nick := ev.Nick()
 
 	store := c.b.store
@@ -1164,71 +1183,76 @@ func (c *coreCmds) takeHelper(w irc.Writer, ev *cmd.Event,
 func (c *coreCmds) help(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	search := strings.ToLower(ev.Arg("command"))
+	//search := strings.ToLower(ev.Args["command"])
 	nick := ev.Nick()
 
-	var extSorted = make(map[string][]string)
-	var fqMatches []cmd.Cmd
-	var exactMatches []cmd.Cmd
-	var fuzzyMatches []cmd.Cmd
+	/*var extSorted = make(map[string][]string)
+	var fqMatches []cmd.Command
+	var exactMatches []cmd.Command
+	var fuzzyMatches []cmd.Command
 	var extMatches []string
+	*/
 
-	c.b.cmds.EachCmd("", "", func(command cmd.Cmd) bool {
-		full := command.Extension + "." + command.Cmd
+	/*
+		c.b.cmds.EachCmd("", "", func(command cmd.Command) bool {
+			full := command.Extension + "." + command.Cmd
 
-		if search == full {
-			fqMatches = append(fqMatches, command)
-			return false
-		}
-
-		shouldOutput := false
-
-		if search == command.Cmd {
-			exactMatches = append(exactMatches, command)
-			shouldOutput = true
-		} else if strings.Contains(command.Cmd, search) {
-			fuzzyMatches = append(fuzzyMatches, command)
-			shouldOutput = true
-		}
-
-		if strings.Contains(command.Extension, search) {
-			extMatches = append(extMatches, command.Extension)
-			shouldOutput = true
-		}
-
-		if shouldOutput {
-			arr := extSorted[command.Extension]
-			extSorted[command.Extension] = append(arr, command.Cmd)
-		}
-
-		return false
-	})
-
-	if len(exactMatches) > 0 && len(fqMatches) == 0 &&
-		len(fuzzyMatches) == 0 && len(extMatches) == 0 {
-
-		fqMatches = exactMatches
-	}
-
-	switch {
-	case len(fqMatches) >= 1:
-		for _, i := range fqMatches {
-			w.Notice(nick, helpSuccess, " ", i.Extension, ".", i.Cmd)
-			w.Notice(nick, i.Description)
-			if len(i.Args) == 0 {
-				continue
+			if search == full {
+				fqMatches = append(fqMatches, command)
+				return false
 			}
-			w.Noticef(nick, helpSuccessUsage, i.Cmd, strings.Join(i.Args, " "))
+
+			shouldOutput := false
+
+			if search == command.Cmd {
+				exactMatches = append(exactMatches, command)
+				shouldOutput = true
+			} else if strings.Contains(command.Cmd, search) {
+				fuzzyMatches = append(fuzzyMatches, command)
+				shouldOutput = true
+			}
+
+			if strings.Contains(command.Extension, search) {
+				extMatches = append(extMatches, command.Extension)
+				shouldOutput = true
+			}
+
+			if shouldOutput {
+				arr := extSorted[command.Extension]
+				extSorted[command.Extension] = append(arr, command.Cmd)
+			}
+
+			return false
+		})
+
+		if len(exactMatches) > 0 && len(fqMatches) == 0 &&
+			len(fuzzyMatches) == 0 && len(extMatches) == 0 {
+
+			fqMatches = exactMatches
 		}
-	case len(exactMatches) > 0 || len(fuzzyMatches) > 0 || len(extMatches) > 0:
-		for extension, commands := range extSorted {
-			sort.Strings(commands)
-			w.Notice(nick, extension, ":")
-			w.Notice(nick, " ", strings.Join(commands, " "))
+
+		switch {
+		case len(fqMatches) >= 1:
+			for _, i := range fqMatches {
+				w.Notice(nick, helpSuccess, " ", i.Extension, ".", i.Cmd)
+				w.Notice(nick, i.Description)
+				if len(i.Args) == 0 {
+					continue
+				}
+				w.Noticef(nick, helpSuccessUsage, i.Cmd, strings.Join(i.Args, " "))
+			}
+		case len(exactMatches) > 0 || len(fuzzyMatches) > 0 || len(extMatches) > 0:
+			for extension, commands := range extSorted {
+				sort.Strings(commands)
+				w.Notice(nick, extension, ":")
+				w.Notice(nick, " ", strings.Join(commands, " "))
+			}
+		default:
+			w.Noticef(nick, helpFailure, search)
 		}
-	default:
-		w.Noticef(nick, helpFailure, search)
-	}
+	*/
+
+	w.Notice(nick, "help is broken atm sorry")
 
 	return
 }

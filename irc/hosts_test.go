@@ -91,7 +91,7 @@ func TestHost_IsValid(t *testing.T) {
 
 	for _, test := range tests {
 		if result := test.Host.IsValid(); result != test.IsValid {
-			t.Errorf("Expected '%v'.IsValid() to be %v.", test.IsValid)
+			t.Errorf("Expected '%v'.IsValid() to be %v.", test.Host, test.IsValid)
 		}
 	}
 }

@@ -1,6 +1,10 @@
 package data
 
-import "strconv"
+import (
+	"strconv"
+
+	"github.com/aarondl/ultimateq/api"
+)
 
 const (
 	ascA               = 65
@@ -155,4 +159,16 @@ func getFlagString(bits uint64) (flags string) {
 		}
 	}
 	return
+}
+
+func (a Access) ToProto() *api.Access {
+	return &api.Access{
+		Level: uint32(a.Level),
+		Flags: uint64(a.Flags),
+	}
+}
+
+func (a *Access) FromProto(proto *api.Access) {
+	a.Level = uint8(proto.Level)
+	a.Flags = proto.Flags
 }

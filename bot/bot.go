@@ -5,12 +5,10 @@ will use to start a bot instance.
 package bot
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"net"
 	"os"
-	"os/signal"
 	"sync"
 	"time"
 
@@ -97,9 +95,9 @@ type Bot struct {
 	serverEnd     chan serverOp
 
 	// Dispatching
-	dispatchCore *dispatch.DispatchCore
+	dispatchCore *dispatch.Core
 	dispatcher   *dispatch.Dispatcher
-	cmds         *cmd.Cmds
+	cmds         *dispatch.CommandDispatcher
 	coreCommands *coreCmds
 
 	// IoC and DI components mostly for testing.
@@ -307,7 +305,9 @@ func (b *Bot) dispatch(srv *Server) (disconnect bool, err error) {
 // dispatch sends a message to both the bot's dispatcher and the given servers
 func (b *Bot) dispatchMessage(s *Server, ev *irc.Event) {
 	b.dispatcher.Dispatch(s.writer, ev)
-	b.cmds.Dispatch(s.writer, ev, b)
+	if err := b.cmds.Dispatch(s.writer, ev, b); err != nil {
+		b.Logger.Error("cmd dispatch failed", "err", err)
+	}
 }
 
 // Stop shuts down all connections and exits.
@@ -347,17 +347,17 @@ func (b *Bot) Close() error {
 	return nil
 }
 
-// Register an event handler to the bot in global space. Returns an identifier
+// RegisterGlobal event handler to the bot. Returns an identifier
 // that can be used to unregister the event.
-func (b *Bot) Register(event string, handler interface{}) uint64 {
-	return b.RegisterFiltered("", "", event, handler)
+func (b *Bot) RegisterGlobal(event string, handler dispatch.Handler) uint64 {
+	return b.Register("", "", event, handler)
 }
 
-// RegisterFiltered event handlers to the specified network and channel.
+// Register event handlers to the specified network and channel.
 // Leave either blank to create a filter based on that field alone. Returns
 // an identifier that can be used to unregister the event.
-func (b *Bot) RegisterFiltered(network, channel, event string,
-	handler interface{}) uint64 {
+func (b *Bot) Register(network, channel, event string,
+	handler dispatch.Handler) uint64 {
 
 	return b.dispatcher.Register(network, channel, event, handler)
 }
@@ -367,32 +367,25 @@ func (b *Bot) Unregister(id uint64) bool {
 	return b.dispatcher.Unregister(id)
 }
 
-// RegisterCmd registers a command with the bot.
-// See Cmder.Register for in-depth documentation.
-func (b *Bot) RegisterCmd(command *cmd.Cmd) error {
-	return b.RegisterFilteredCmd("", "", command)
+// RegisterGlobalCmd registers a command with the bot.
+// See cmds.Cmds.Register for in-depth documentation.
+func (b *Bot) RegisterGlobalCmd(command *cmd.Command) (uint64, error) {
+	return b.RegisterCmd("", "", command)
 }
 
-// RegisterFilteredCmd registers a command with the bot filtered based on the
+// RegisterCmd registers a command with the bot filtered based on the
 // network and channel. Leave either field blank to create a filter based on
 // that field alone.
-func (b *Bot) RegisterFilteredCmd(network, channel string,
-	command *cmd.Cmd) error {
-
+// See cmds.Cmds.Register for in-depth documentation.
+func (b *Bot) RegisterCmd(network, channel string, command *cmd.Command) (uint64, error) {
 	return b.cmds.Register(network, channel, command)
 }
 
-// UnregisterCmd from the bot. Leaving ext blank will cause all commands with
-// this name from all extensions to be unregistered.
-func (b *Bot) UnregisterCmd(ext, command string) bool {
-	return b.UnregisterFilteredCmd("", "", ext, command)
-}
-
-// UnregisterFilteredCmd from the bot. All parameters can be blank except for
+// UnregisterCmd from the bot. All parameters can be blank except for
 // cmd. Leaving ext blank wipes out other extension's commands with the same
 // name.
-func (b *Bot) UnregisterFilteredCmd(network, channel, ext, cmd string) bool {
-	return b.cmds.Unregister(network, channel, ext, cmd)
+func (b *Bot) UnregisterCmd(id uint64) bool {
+	return b.cmds.Unregister(id)
 }
 
 // State returns the state db for that network id. If the server doesn't exist
@@ -453,7 +446,7 @@ func createBot(conf *config.Config, connProv ConnProvider,
 				return nil, err
 			}
 		} else {
-			logHandler = log15.StdoutHandler
+			logHandler = log15.StreamHandler(os.Stdout, log15.JsonFormat())
 		}
 		if level, ok := conf.LogLevel(); ok {
 			lvl, _ := log15.LvlFromString(level)
@@ -540,11 +533,11 @@ func (b *Bot) createServer(netID string, conf *config.Config) (*Server, error) {
 	return s, nil
 }
 
-// createDispatcher uses the bot's current ProtoCaps to create a dispatcher.
+// createDispatching for the bot
 func (b *Bot) createDispatching(channels ...string) {
-	b.dispatchCore = dispatch.NewDispatchCore(b.Logger, channels...)
+	b.dispatchCore = dispatch.NewCore(b.Logger)
 	b.dispatcher = dispatch.NewDispatcher(b.dispatchCore)
-	b.cmds = cmd.NewCmds(b.mkPrefixFetcher(), b.dispatchCore)
+	b.cmds = dispatch.NewCommandDispatcher(b.mkPrefixFetcher(), b.dispatchCore)
 }
 
 // createStore creates a store from a filename.
@@ -637,57 +630,4 @@ func (b *Bot) mkPrefixFetcher() func(network, channel string) rune {
 		pfx, _ = prefixii[":"]
 		return pfx
 	}
-}
-
-// Run makes a very typical bot. It will call the cb function passed in
-// before starting to allow registration of extensions etc. Returns error
-// if the bot could not be created. Does NOT return until dead.
-// The following are featured behaviors:
-// Reads configuration file from ./config.toml
-// Watches for Keyboard Input OR SIGTERM OR SIGKILL and shuts down normally.
-// Pauses after death to allow all goroutines to come to a graceful shutdown.
-func Run(cb func(b *Bot)) error {
-	cfg := config.NewConfig().FromFile("config.toml")
-	b, err := New(cfg)
-	if err != nil {
-		return err
-	}
-	defer b.Close()
-
-	cb(b)
-
-	end := b.Start()
-
-	input, quit := make(chan int), make(chan os.Signal, 2)
-
-	go func() {
-		scanner := bufio.NewScanner(os.Stdin)
-		scanner.Scan()
-		input <- 0
-	}()
-
-	signal.Notify(quit, os.Interrupt, os.Kill)
-
-	stop := false
-	for !stop {
-		select {
-		case <-input:
-			b.Stop()
-			stop = true
-		case <-quit:
-			b.Stop()
-			stop = true
-		case err, ok := <-end:
-			if ok {
-				b.Info("Server death", "err", err)
-			}
-			stop = !ok
-		}
-	}
-
-	b.Cleanup()
-	b.Info("Shutting down...")
-	<-time.After(1 * time.Second)
-
-	return nil
 }

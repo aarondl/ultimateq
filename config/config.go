@@ -11,6 +11,7 @@ An example configuration looks like this:
 	nocorecmds = false
 	loglevel = "debug"
 	logfile = "/path/to/file.log"
+	secret_key = "myunbelievablylongandsecrettoken"
 
 	# Most of the configuration values below have healthy defaults which means
 	# you don't have to set any of them. servers, nick, username, realname is
@@ -24,10 +25,16 @@ An example configuration looks like this:
 		realname = "Realname"
 		password = "Password"
 
-		# SSL Options
-		ssl = true
-		sslcert = "/path/to/a.crt"
-		noverifycert = false
+		# TLS Options
+		# If tls is on it will connect with tls.
+		# If tls_cert, tls_key are set it will send it in an attempt to perform
+		# mutual TLS with the irc server.
+		# If tls_ca_cert is present it will be used as a CA when connecting
+		tls         = true
+		tls_ca_cert = "/path/to/ca.crt"
+		tls_cert    = "/path/to/a.crt"
+		tls_key     = "/path/to/a.key"
+		tls_insecure_skip_verify = false
 
 		# Bot Internal Database Options
 		nostate = false
@@ -53,12 +60,14 @@ An example configuration looks like this:
 		# For fallback of channels below.
 		prefix = "."
 
-		[networks.ircnet.channels."#channel1"]
+		[[networks.ircnet.channels]]
+			name     = "#channel1"
 			password = "pass1"
-			prefix = "!"
-		[networks.ircnet.channels."&channel2"]
+			prefix   = "!"
+		[[networks.ircnet.channels]]
+			name     = "&channel2"
 			password = "pass2"
-			prefix = "@"
+			prefix   = "@"
 
 	# Ext provides defaults for all exts, much as the global definitions provide
 	# defaults for all networks.
@@ -68,44 +77,51 @@ An example configuration looks like this:
 		# OR
 		listen = "/path/to/unix.sock"
 
+		# If tls key & cert are present the remote extensions will require
+		# MUTUAL tls, meaning the client will have to present a certificate as
+		# well, you can use tls_client_ca to control which ca cert is used
+		# to verify the client (otherwise the system ca cert pool is used).
+		# If tls_insecure_skip_verify is set, the client's certificate
+		# will still be required but will not be verified
+		tls_key      = "/path/to/a.key"
+		tls_cert     = "/path/to/a.crt"
+		tls_client_ca  = "/path/to/ca.crt"
+		tls_insecure_skip_verify = false
+
 		# Define the execdir to start all executables in the path.
 		execdir = "/path/to/executables"
-
-		# Control reconnection for remote extensions.
-		noreconnect = false
-		reconnecttimeout = 20
 
 		# Ext configuration is deeply nested so we can configure it globally
 		# based on the network, or based on the channel on that network, or even
 		# on all channels on that network.
 		[ext.config] # Global config value
 			key = "stringvalue"
-		[ext.config.channels."#channel"] # All networks for #channel
-			key = "stringvalue"
+		[[ext.config.channels]] # All networks for #channel
+			name = "#channel"
+			key  = "stringvalue"
 		[ext.config.networks.ircnet] # All channels on ircnet network
 			key = "stringvalue"
-		[ext.config.networks.ircnet.channels."#channel"] # Freenode's #channel
-			key = "stringvalue"
+		[[ext.config.networks.ircnet.channels]] # Freenode's #channel
+			name = "#channel1"
+			key  = "stringvalue"
 
 	[exts.myext]
 		# Define exec to specify a path to the executable to launch.
+		# NOTE: Currently NOT USED
 		exec = "/path/to/executable"
 
 		# Defining this means that the bot will try to connect to this extension
-		# rather than expecting it to connect to the listen server above.
-		server = "localhost:44"
-		ssl = true
-		sslcert = "/path/to/a.crt"
+		# rather than expecting it to connect to the listen server in the
+		# global configuration. Server can also be unix:/path/to/sock
+		#
+		# NOTE: Currently NOT USED
+		server       = "localhost:44"
+		tls_cert     = "/path/to/a.crt"
 		noverifycert = false
-
-		# Define the above connection properties, or simply this one property.
-		unix = "/path/to/sock.sock"
-
-		# Use json not gob.
-		usejson = false
 
 		[exts.myext.active]
 			ircnet = ["#channel1", "#channel2"]
+
 
 Once again note the fallback mechanisms between network and the "global scope"
 as well as the exts and ext. This can save you lots of repetitive typing.
@@ -166,8 +182,8 @@ type Config struct {
 	protect  sync.RWMutex
 }
 
-// NewConfig initializes a Config object.
-func NewConfig() *Config {
+// New initializes a Config object.
+func New() *Config {
 	c := &Config{}
 	c.clear()
 
@@ -194,7 +210,7 @@ func (c *Config) Clone() *Config {
 	c.protect.RLock()
 	defer c.protect.RUnlock()
 
-	nc := NewConfig()
+	nc := New()
 	copyMap(nc.values, c.values)
 
 	return nc
@@ -275,11 +291,11 @@ func (c *Config) ExtGlobal() *ExtGlobalCTX {
 
 	if ext := c.values.get("ext"); ext != nil {
 		return &ExtGlobalCTX{&ExtCTX{&c.protect, nil, ext}}
-	} else {
-		ext := make(map[string]interface{})
-		c.values["ext"] = ext
-		return &ExtGlobalCTX{&ExtCTX{&c.protect, nil, ext}}
 	}
+
+	ext := make(map[string]interface{})
+	c.values["ext"] = ext
+	return &ExtGlobalCTX{&ExtCTX{&c.protect, nil, ext}}
 }
 
 // Exts returns a list of configured extensions.
@@ -293,7 +309,7 @@ func (c *Config) Exts() []string {
 	}
 
 	rets := make([]string, 0)
-	for key, _ := range exts {
+	for key := range exts {
 		rets = append(rets, key)
 	}
 
@@ -408,6 +424,29 @@ func (c *Config) SetNoCoreCmds(val bool) *Config {
 	defer c.protect.Unlock()
 
 	c.values["nocorecmds"] = interface{}(val)
+	return c
+}
+
+// SecretKey gets the value of the secretKey variable
+func (c *Config) SecretKey() (string, bool) {
+	c.protect.RLock()
+	defer c.protect.RUnlock()
+
+	if val, ok := c.values["secret_key"]; ok {
+		if skey, ok := val.(string); ok {
+			return skey, true
+		}
+	}
+
+	return "", false
+}
+
+// SetSecretKey value in the config.
+func (c *Config) SetSecretKey(key string) *Config {
+	c.protect.Lock()
+	defer c.protect.Unlock()
+
+	c.values["secret_key"] = interface{}(key)
 	return c
 }
 

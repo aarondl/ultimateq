@@ -8,12 +8,11 @@ import (
 func TestConfig_Ext_GetSet(t *testing.T) {
 	t.Parallel()
 
-	c := NewConfig()
+	c := New()
 	gext := c.ExtGlobal()
 	ext := c.NewExt("ext1")
 
 	// Common
-	checkExt("UseJson", false, false, true, gext, ext, t)
 	checkExt("NoReconnect", false, false, true, gext, ext, t)
 	checkExt("ReconnectTimeout", defaultReconnectTimeout, uint(20), uint(40),
 		gext, ext, t)
@@ -21,20 +20,22 @@ func TestConfig_Ext_GetSet(t *testing.T) {
 	// Global Only
 	checkExt("ExecDir", "", "execdir", "execdir2", gext, nil, t)
 	checkExt("Listen", "", "listen", "", gext, nil, t)
+	checkExt("TLSCert", "", "crt", "", gext, nil, t)
+	checkExt("TLSKey", "", "key", "", gext, nil, t)
+	checkExt("TLSInsecureSkipVerify", false, false, true, gext, nil, t)
 
 	// Ext Only
 	checkExt("Exec", "", "exec", "exec2", nil, ext, t)
 	checkExt("Server", "", "serv", "serv2", nil, ext, t)
-	checkExt("SSL", false, false, true, nil, ext, t)
-	checkExt("SSLCert", "", "cert", "cert2", nil, ext, t)
-	checkExt("NoVerifyCert", false, false, true, nil, ext, t)
+	checkExt("TLSCert", "", "cert", "cert2", nil, ext, t)
+	checkExt("TLSInsecureSkipVerify", false, false, true, nil, ext, t)
 	checkExt("Unix", "", "unix", "unix2", nil, ext, t)
 }
 
 func TestConfig_Ext_GetSetActive(t *testing.T) {
 	t.Parallel()
 
-	c := NewConfig()
+	c := New()
 	gext := c.ExtGlobal()
 	ext := c.NewExt("ext1")
 
@@ -86,7 +87,7 @@ func TestConfig_Ext_GetSetActive(t *testing.T) {
 func TestExt_Config(t *testing.T) {
 	t.Parallel()
 
-	c := NewConfig()
+	c := New()
 	glb := c.ExtGlobal()
 
 	if exp, got := 0, glb.Config("", ""); len(got) != exp {
@@ -193,7 +194,7 @@ func TestExt_Config(t *testing.T) {
 func TestExt_ConfigOverride(t *testing.T) {
 	t.Parallel()
 
-	c := NewConfig()
+	c := New()
 	glb := c.ExtGlobal()
 
 	glb.SetConfig("", "", "k", "v1")
@@ -223,7 +224,7 @@ func TestExt_ConfigOverride(t *testing.T) {
 func TestExt_ConfigVal(t *testing.T) {
 	t.Parallel()
 
-	c := NewConfig()
+	c := New()
 	glb := c.ExtGlobal()
 
 	if _, ok := glb.ConfigVal("", "", "k"); ok {
