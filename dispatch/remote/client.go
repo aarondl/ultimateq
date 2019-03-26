@@ -26,7 +26,7 @@ import (
 // certificates and tls is turned on. If tlsCACert is present it will use that
 // certificate instead of the system wide CA certificates. And finally if
 // insecureSkipVerify is on it will not verify the server's certificate.
-func Dial(addr, ext, tlsCert, tlsKey, tlsCACert string, insecureSkipVerify bool) (api.ExtClient, error) {
+func Dial(addr, tlsCert, tlsKey, tlsCACert string, insecureSkipVerify bool) (api.ExtClient, error) {
 	var opts []grpc.DialOption
 	if len(tlsCert) != 0 && len(tlsKey) != 0 {
 		tlsConfig := new(tls.Config)
