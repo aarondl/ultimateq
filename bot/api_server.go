@@ -3,6 +3,7 @@ package bot
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"io/ioutil"
 	"net"
 	"strings"
@@ -80,6 +81,7 @@ func (a *apiServer) Start() error {
 	cert, certOk := a.bot.conf.ExtGlobal().TLSCert()
 	key, keyOk := a.bot.conf.ExtGlobal().TLSKey()
 	ca, caOk := a.bot.conf.ExtGlobal().TLSClientCA()
+	revs, revsOk := a.bot.conf.ExtGlobal().TLSClientRevs()
 	insecure, _ := a.bot.conf.ExtGlobal().TLSInsecureSkipVerify()
 
 	var config *tls.Config
@@ -98,14 +100,26 @@ func (a *apiServer) Start() error {
 			config.ClientAuth = tls.RequireAnyClientCert
 		}
 
+		var clientCACert *x509.Certificate
 		if caOk {
-			clientCACert, err := ioutil.ReadFile(ca)
+			clientCACertBytes, err := ioutil.ReadFile(ca)
 			if err != nil {
 				return err
 			}
 
+			// if a pem decode fails then we assume clientCACertBytes is
+			// already in asn1 format
+			if p, _ := pem.Decode(clientCACertBytes); p != nil {
+				clientCACertBytes = p.Bytes
+			}
+
+			clientCACert, err = x509.ParseCertificate(clientCACertBytes)
+			if err != nil {
+				return errors.Wrap(err, "failed to parse client ca cert")
+			}
+
 			certPool := x509.NewCertPool()
-			certPool.AppendCertsFromPEM(clientCACert)
+			certPool.AddCert(clientCACert)
 			config.ClientCAs = certPool
 		} else {
 			certPool, err := x509.SystemCertPool()
@@ -113,6 +127,38 @@ func (a *apiServer) Start() error {
 				return errors.Wrap(err, "failed to load system ca cert pool")
 			}
 			config.ClientCAs = certPool
+		}
+
+		if caOk && revsOk {
+			revBytes, err := ioutil.ReadFile(revs)
+			if err != nil {
+				return errors.Wrap(err, "failed to read client revocation list")
+			}
+
+			crl, err := x509.ParseCRL(revBytes)
+			if err != nil {
+				return errors.Wrap(err, "failed to parse client revocation list")
+			}
+
+			if err := clientCACert.CheckCRLSignature(crl); err != nil {
+				return errors.Wrap(err, "failed to verify the client crl was signed by the client ca")
+			}
+
+			config.VerifyPeerCertificate = func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+				for _, chain := range verifiedChains {
+					for _, cert := range chain {
+
+						for _, revoked := range crl.TBSCertList.RevokedCertificates {
+							if revoked.SerialNumber.Cmp(cert.SerialNumber) == 0 {
+								return errors.Errorf("client certificate is revoked (%d : %s)", cert.SerialNumber, cert.Subject.String())
+							}
+						}
+
+					}
+				}
+
+				return nil
+			}
 		}
 	}
 

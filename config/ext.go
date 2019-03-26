@@ -180,6 +180,15 @@ func (e *ExtGlobalCTX) SetTLSClientCA(val string) *ExtGlobalCTX {
 	return e
 }
 
+func (e *ExtGlobalCTX) TLSClientRevs() (string, bool) {
+	return getStr(e, "tls_client_revs", false)
+}
+
+func (e *ExtGlobalCTX) SetTLSClientRevs(val string) *ExtGlobalCTX {
+	setVal(e, "tls_client_revs", val)
+	return e
+}
+
 func (e *ExtGlobalCTX) TLSInsecureSkipVerify() (bool, bool) {
 	return getBool(e, "tls_insecure_skip_verify", false)
 }

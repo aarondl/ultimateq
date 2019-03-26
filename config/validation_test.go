@@ -337,6 +337,7 @@ func TestValidation_TypesLeafs(t *testing.T) {
 			tls_cert = true
 			tls_key  = true
 			tls_client_ca = true
+			tls_client_revs = true
 
 			[ext.config]
 				key = 5
@@ -401,6 +402,7 @@ func TestValidation_TypesLeafs(t *testing.T) {
 		{"ext", "tls_cert", "string", "bool"},
 		{"ext", "tls_key", "string", "bool"},
 		{"ext", "tls_client_ca", "string", "bool"},
+		{"ext", "tls_client_revs", "string", "bool"},
 		{"ext", "execdir", "string", "int64"},
 		{"ext", "noreconnect", "bool", "string"},
 		{"ext", "reconnecttimeout", "int", "float64"},

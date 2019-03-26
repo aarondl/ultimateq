@@ -86,6 +86,9 @@ An example configuration looks like this:
 		tls_key      = "/path/to/a.key"
 		tls_cert     = "/path/to/a.crt"
 		tls_client_ca  = "/path/to/ca.crt"
+		# A CRL (revocation list) can be passed in, client certificates
+		# can be revoked by adding them to the crl
+		tls_client_revs = "/path/to/ca.crl"
 		tls_insecure_skip_verify = false
 
 		# Define the execdir to start all executables in the path.

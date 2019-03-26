@@ -1,9 +1,15 @@
 package cmd
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/aarondl/ultimateq/irc"
+	"github.com/pkg/errors"
+)
+
+var (
+	rgxCmd = regexp.MustCompile(`^[a-z][a-z0-9]*$`)
 )
 
 // Handler for command types
@@ -105,6 +111,11 @@ func NewErr(
 	kind Kind,
 	scope Scope,
 	args ...string) (*Command, error) {
+
+	cmd = strings.ToLower(cmd)
+	if !rgxCmd.MatchString(cmd) {
+		return nil, errors.Errorf("command name must start with a letter, and can be followed only be letters and numbers: %s", cmd)
+	}
 
 	command := &Command{
 		Name:        strings.ToLower(cmd),
