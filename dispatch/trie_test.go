@@ -259,3 +259,79 @@ func BenchmarkTrie(b *testing.B) {
 		}
 	}
 }
+
+func TestAllHandlers(t *testing.T) {
+	t.Parallel()
+
+	net := "n1"
+	ch := "c1"
+	event := "e1"
+
+	tr := newTrie(false)
+
+	tr.register("", "", "", 1)
+	tr.register(net, "", "", 2)
+	tr.register(net, ch, "", 3)
+	tr.register("", ch, "", 4)
+	tr.register(net, ch, event, 5)
+	tr.register(net, "", event, 6)
+	tr.register("", ch, event, 7)
+	tr.register("", "", event, 8)
+
+	got := make(map[int]bool)
+	for _, h := range tr.allHandlers("", "") {
+		got[h.(int)] = true
+	}
+
+	if len(got) != 8 {
+		t.Error("want 8 handlers, got:", len(got))
+	}
+	for i := 1; i <= 8; i++ {
+		if !got[i] {
+			t.Error("missing handler:", i)
+		}
+	}
+
+	got = make(map[int]bool)
+	for _, h := range tr.allHandlers(net, "") {
+		got[h.(int)] = true
+	}
+
+	expect := []int{2, 3, 5, 6}
+	if len(got) != len(expect) {
+		t.Errorf("want %d handlers, got: %d", len(expect), len(got))
+	}
+	for _, v := range expect {
+		if !got[v] {
+			t.Error("missing handler:", v)
+		}
+	}
+
+	got = make(map[int]bool)
+	for _, h := range tr.allHandlers(net, ch) {
+		got[h.(int)] = true
+	}
+	expect = []int{3, 5}
+	if len(got) != len(expect) {
+		t.Errorf("want %d handlers, got: %d", len(expect), len(got))
+	}
+	for _, v := range expect {
+		if !got[v] {
+			t.Error("missing handler:", v)
+		}
+	}
+
+	got = make(map[int]bool)
+	for _, h := range tr.allHandlers("", ch) {
+		got[h.(int)] = true
+	}
+	expect = []int{3, 4, 5, 7}
+	if len(got) != len(expect) {
+		t.Errorf("want %d handlers, got: %d", len(expect), len(got))
+	}
+	for _, v := range expect {
+		if !got[v] {
+			t.Error("missing handler:", v)
+		}
+	}
+}

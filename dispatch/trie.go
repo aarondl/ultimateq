@@ -150,3 +150,42 @@ func (t *trie) unregisterHelper(node *trieNode, toFind uint64) (found, empty boo
 
 	return false, false
 }
+
+func (t *trie) allHandlers(network, channel string) []interface{} {
+	list := getHandlerList()
+
+	network = strings.ToLower(network)
+	channel = strings.ToLower(channel)
+
+	findAll(t.root, []string{network, channel, ""}, &list)
+
+	retList := make([]interface{}, len(list))
+	copy(retList, list)
+	putHandlerList(list)
+
+	return list
+}
+
+func findAll(node *trieNode, toFind []string, list *[]interface{}) {
+	for _, h := range node.handlers {
+		*list = append(*list, h)
+	}
+	if len(toFind) == 0 {
+		return
+	}
+
+	find := toFind[0]
+
+	// This can happen if "channel" is nil, and in which case we don't want
+	// to look ourselves up twice.
+	if len(find) == 0 {
+		for _, subtree := range node.subtrees {
+			findAll(subtree, toFind[1:], list)
+		}
+		return
+	}
+
+	if nextNode, ok := node.subtrees[find]; ok {
+		findAll(nextNode, toFind[1:], list)
+	}
+}

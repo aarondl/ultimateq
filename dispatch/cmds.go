@@ -326,8 +326,6 @@ func filterAccess(store *data.Store, command *cmd.Command, server, channel strin
 	return access, nil
 }
 
-/*
-TODO: Fix this
 // EachCmd iterates through the commands and passes each one to a callback
 // function for consumption. These should be considered read-only. Optionally
 // the results can be filtered by network and channel.
@@ -336,9 +334,7 @@ func (c *CommandDispatcher) EachCmd(network, channel string, cb func(*cmd.Comman
 	c.mutTrie.RLock()
 	defer c.mutTrie.RUnlock()
 
-	spew.Dump(c.trie)
-
-	commands := c.trie.handlers(network, channel, "")
+	commands := c.trie.allHandlers(network, channel)
 	for _, command := range commands {
 		realCmd := command.(*cmd.Command)
 		if cb(realCmd) {
@@ -346,7 +342,6 @@ func (c *CommandDispatcher) EachCmd(network, channel string, cb func(*cmd.Comman
 		}
 	}
 }
-*/
 
 // makeIdentifier creates an identifier from a server and a command for
 // registration.

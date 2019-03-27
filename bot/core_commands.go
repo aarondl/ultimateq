@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -1183,76 +1184,71 @@ func (c *coreCmds) takeHelper(w irc.Writer, ev *cmd.Event,
 func (c *coreCmds) help(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	//search := strings.ToLower(ev.Args["command"])
+	search := strings.ToLower(ev.Args["command"])
 	nick := ev.Nick()
 
-	/*var extSorted = make(map[string][]string)
-	var fqMatches []cmd.Command
-	var exactMatches []cmd.Command
-	var fuzzyMatches []cmd.Command
+	var extSorted = make(map[string][]string)
+	var fqMatches []*cmd.Command
+	var exactMatches []*cmd.Command
+	var fuzzyMatches []*cmd.Command
 	var extMatches []string
-	*/
 
-	/*
-		c.b.cmds.EachCmd("", "", func(command cmd.Command) bool {
-			full := command.Extension + "." + command.Cmd
+	c.b.cmds.EachCmd("", "", func(command *cmd.Command) bool {
+		full := command.Extension + "." + command.Name
 
-			if search == full {
-				fqMatches = append(fqMatches, command)
-				return false
-			}
-
-			shouldOutput := false
-
-			if search == command.Cmd {
-				exactMatches = append(exactMatches, command)
-				shouldOutput = true
-			} else if strings.Contains(command.Cmd, search) {
-				fuzzyMatches = append(fuzzyMatches, command)
-				shouldOutput = true
-			}
-
-			if strings.Contains(command.Extension, search) {
-				extMatches = append(extMatches, command.Extension)
-				shouldOutput = true
-			}
-
-			if shouldOutput {
-				arr := extSorted[command.Extension]
-				extSorted[command.Extension] = append(arr, command.Cmd)
-			}
-
+		if search == full {
+			fqMatches = append(fqMatches, command)
 			return false
-		})
-
-		if len(exactMatches) > 0 && len(fqMatches) == 0 &&
-			len(fuzzyMatches) == 0 && len(extMatches) == 0 {
-
-			fqMatches = exactMatches
 		}
 
-		switch {
-		case len(fqMatches) >= 1:
-			for _, i := range fqMatches {
-				w.Notice(nick, helpSuccess, " ", i.Extension, ".", i.Cmd)
-				w.Notice(nick, i.Description)
-				if len(i.Args) == 0 {
-					continue
-				}
-				w.Noticef(nick, helpSuccessUsage, i.Cmd, strings.Join(i.Args, " "))
-			}
-		case len(exactMatches) > 0 || len(fuzzyMatches) > 0 || len(extMatches) > 0:
-			for extension, commands := range extSorted {
-				sort.Strings(commands)
-				w.Notice(nick, extension, ":")
-				w.Notice(nick, " ", strings.Join(commands, " "))
-			}
-		default:
-			w.Noticef(nick, helpFailure, search)
-		}
-	*/
+		shouldOutput := false
 
-	w.Notice(nick, "help is broken atm sorry")
+		if search == command.Name {
+			exactMatches = append(exactMatches, command)
+			shouldOutput = true
+		} else if strings.Contains(command.Name, search) {
+			fuzzyMatches = append(fuzzyMatches, command)
+			shouldOutput = true
+		}
+
+		if strings.Contains(command.Extension, search) {
+			extMatches = append(extMatches, command.Extension)
+			shouldOutput = true
+		}
+
+		if shouldOutput {
+			arr := extSorted[command.Extension]
+			extSorted[command.Extension] = append(arr, command.Name)
+		}
+
+		return false
+	})
+
+	if len(exactMatches) > 0 && len(fqMatches) == 0 &&
+		len(fuzzyMatches) == 0 && len(extMatches) == 0 {
+
+		fqMatches = exactMatches
+	}
+
+	switch {
+	case len(fqMatches) >= 1:
+		for _, i := range fqMatches {
+			w.Notice(nick, helpSuccess, " ", i.Extension, ".", i.Name)
+			w.Notice(nick, i.Description)
+			if len(i.Args) == 0 {
+				continue
+			}
+			w.Noticef(nick, helpSuccessUsage, i.Name, strings.Join(i.Args, " "))
+		}
+	case len(exactMatches) > 0 || len(fuzzyMatches) > 0 || len(extMatches) > 0:
+		for extension, commands := range extSorted {
+			sort.Strings(commands)
+			w.Notice(nick, extension, ":")
+			w.Notice(nick, " ", strings.Join(commands, " "))
+		}
+	default:
+		w.Noticef(nick, helpFailure, search)
+	}
 
 	return
 }
