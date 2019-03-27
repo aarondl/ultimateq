@@ -325,7 +325,7 @@ service Ext {
 
   rpc StateIsOn(ChannelQuery) returns (Result);
 
-  rpc StoreAuthUser(AuthUserRequest) returns (Empty);
+  rpc StoreAuthUser(AuthUserRequest) returns (Result);
   rpc StoreAuthedUser(NetworkQuery) returns (StoredUser);
   rpc StoreUser(Query) returns (StoredUser);
 

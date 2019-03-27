@@ -54,9 +54,9 @@ func TestState(t *testing.T) {
 	}
 
 	// Should die on creating kinds
-	fakeCaps := &irc.NetworkInfo{}
+	fakeCaps := irc.NewNetworkInfo()
 	fakeCaps.ParseISupport(&irc.Event{Args: []string{
-		"NICK", "CHANTYPES=#&", "PREFIX=(ov)@+",
+		"NICK", "CHANTYPES=#&", "PREFIX=a",
 	}})
 	st, err = NewState(fakeCaps)
 	if got := st; got != nil {
@@ -67,9 +67,9 @@ func TestState(t *testing.T) {
 	}
 
 	// Should die on creating user modes
-	fakeCaps = &irc.NetworkInfo{}
+	fakeCaps = irc.NewNetworkInfo()
 	fakeCaps.ParseISupport(&irc.Event{Args: []string{
-		"NICK", "CHANTYPES=#&", "CHANMODES=a,b,c,d",
+		"NICK", "CHANTYPES=#&", "CHANMODES=!",
 	}})
 	st, err = NewState(fakeCaps)
 	if got := st; got != nil {
@@ -85,7 +85,7 @@ func TestState_UpdateProtoCaps(t *testing.T) {
 
 	st := setupNewState()
 
-	fakeNetInfo := &irc.NetworkInfo{}
+	fakeNetInfo := irc.NewNetworkInfo()
 	fakeNetInfo.ParseISupport(&irc.Event{Args: []string{
 		"NICK", "CHANTYPES=!", "PREFIX=(q)@", "CHANMODES=,,,q",
 	}})

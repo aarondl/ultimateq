@@ -94,7 +94,7 @@ type NetworkInfo struct {
 	// The other flags sent in.
 	extras map[string]string
 
-	protect sync.RWMutex
+	protect *sync.RWMutex
 }
 
 // NewNetworkInfo initializes a networkinfo struct.
@@ -118,17 +118,22 @@ func NewNetworkInfo() *NetworkInfo {
 		kicklen:     INFO_DEFAULT_KICKLEN,
 		modes:       INFO_DEFAULT_MODES,
 		extras:      make(map[string]string),
+
+		protect: new(sync.RWMutex),
 	}
 	return p
 }
 
 // Clone safely clones this networkinfo instance.
 func (p *NetworkInfo) Clone() *NetworkInfo {
+	p.protect.RLock()
+	defer p.protect.RUnlock()
 	clone := *p
 	clone.extras = make(map[string]string)
 	for k, v := range p.extras {
 		clone.extras[k] = v
 	}
+	clone.protect = new(sync.RWMutex)
 	return &clone
 }
 
@@ -256,6 +261,19 @@ func (p *NetworkInfo) Extra(key string) string {
 	p.protect.RLock()
 	defer p.protect.RUnlock()
 	return p.extras[key]
+}
+
+// Extras clones the internal map and returns it
+func (p *NetworkInfo) Extras() map[string]string {
+	p.protect.RLock()
+	defer p.protect.RUnlock()
+
+	cloned := make(map[string]string, len(p.extras))
+	for k, v := range p.extras {
+		cloned[k] = v
+	}
+
+	return cloned
 }
 
 // ParseISupport adds all values in a 005 to the current networkinfo object.

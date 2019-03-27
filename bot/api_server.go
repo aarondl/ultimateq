@@ -657,19 +657,20 @@ func (a *apiServer) StateIsOn(ctx context.Context, in *api.ChannelQuery) (*api.R
 	return &api.Result{Ok: is}, nil
 }
 
-func (a *apiServer) StoreAuthUser(ctx context.Context, in *api.AuthUserRequest) (*api.Empty, error) {
+func (a *apiServer) StoreAuthUser(ctx context.Context, in *api.AuthUserRequest) (*api.Result, error) {
 	store, err := a.getStore()
 	if err != nil {
 		return nil, err
 	}
 
+	var su *data.StoredUser
 	if in.Permanent {
-		_, err = store.AuthUserPerma(in.Network, in.Host, in.Username, in.Password)
+		su, err = store.AuthUserPerma(in.Network, in.Host, in.Username, in.Password)
 	} else {
-		_, err = store.AuthUserTmp(in.Network, in.Host, in.Username, in.Password)
+		su, err = store.AuthUserTmp(in.Network, in.Host, in.Username, in.Password)
 	}
 
-	return nil, err
+	return &api.Result{Ok: su != nil}, err
 }
 
 func (a *apiServer) StoreAuthedUser(ctx context.Context, in *api.NetworkQuery) (*api.StoredUser, error) {
@@ -805,6 +806,8 @@ func (a *apiServer) StoreChannels(ctx context.Context, in *api.Empty) (*api.Stor
 }
 
 func (a *apiServer) StorePutUser(ctx context.Context, in *api.StoredUser) (*api.Empty, error) {
+	return nil, status.Error(codes.PermissionDenied, "this endpoint is currently unavailable pending authentication implementation")
+
 	store, err := a.getStore()
 	if err != nil {
 		return nil, err
@@ -817,6 +820,8 @@ func (a *apiServer) StorePutUser(ctx context.Context, in *api.StoredUser) (*api.
 }
 
 func (a *apiServer) StorePutChannel(ctx context.Context, in *api.StoredChannel) (*api.Empty, error) {
+	return nil, status.Error(codes.PermissionDenied, "this endpoint is currently unavailable pending authentication implementation")
+
 	store, err := a.getStore()
 	if err != nil {
 		return nil, err
@@ -829,6 +834,8 @@ func (a *apiServer) StorePutChannel(ctx context.Context, in *api.StoredChannel) 
 }
 
 func (a *apiServer) StoreDeleteUser(ctx context.Context, in *api.Query) (*api.Empty, error) {
+	return nil, status.Error(codes.PermissionDenied, "this endpoint is currently unavailable pending authentication implementation")
+
 	store, err := a.getStore()
 	if err != nil {
 		return nil, err
@@ -845,6 +852,8 @@ func (a *apiServer) StoreDeleteUser(ctx context.Context, in *api.Query) (*api.Em
 }
 
 func (a *apiServer) StoreDeleteChannel(ctx context.Context, in *api.NetworkQuery) (*api.Empty, error) {
+	return nil, status.Error(codes.PermissionDenied, "this endpoint is currently unavailable pending authentication implementation")
+
 	store, err := a.getStore()
 	if err != nil {
 		return nil, err
@@ -881,5 +890,34 @@ func (a *apiServer) StoreLogoutByUser(ctx context.Context, in *api.Query) (*api.
 }
 
 func (a *apiServer) NetworkInformation(ctx context.Context, in *api.NetworkInfoRequest) (*api.NetworkInfo, error) {
-	return nil, status.Error(codes.Unimplemented, "not yet implemented")
+	server := a.bot.getServer(in.NetworkId)
+	if server == nil {
+		return nil, status.Errorf(codes.NotFound, "network id (%s) not found", in.NetworkId)
+	}
+
+	// The amount of mutex lock/unlocks in this is hilarious. But there doesn't
+	// appear to be a sane way to transform this without the irc package
+	// depending on NetworkInfo, which would be bad.
+	netInfo := &api.NetworkInfo{
+		ServerName:  server.netInfo.ServerName(),
+		IrcdVersion: server.netInfo.IrcdVersion(),
+		Usermodes:   server.netInfo.Usermodes(),
+		Lchanmodes:  server.netInfo.LegacyChanmodes(),
+		Rfc:         server.netInfo.RFC(),
+		Ircd:        server.netInfo.IRCD(),
+		Casemapping: server.netInfo.Casemapping(),
+		Prefix:      server.netInfo.Prefix(),
+		Chantypes:   server.netInfo.Chantypes(),
+		Chanmodes:   server.netInfo.Chanmodes(),
+		Chanlimit:   int32(server.netInfo.Chanlimit()),
+		Channellen:  int32(server.netInfo.Channellen()),
+		Nicklen:     int32(server.netInfo.Nicklen()),
+		Topiclen:    int32(server.netInfo.Topiclen()),
+		Awaylen:     int32(server.netInfo.Awaylen()),
+		Kicklen:     int32(server.netInfo.Kicklen()),
+		Modes:       int32(server.netInfo.Modes()),
+		Extras:      server.netInfo.Extras(),
+	}
+
+	return netInfo, nil
 }
