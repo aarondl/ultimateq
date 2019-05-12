@@ -66,11 +66,11 @@ func (p *pipeHandler) Handle(w irc.Writer, ev *irc.Event) {
 	event := &api.IRCEventResponse{
 		Id: evID,
 		Event: &api.IRCEvent{
-			Name:      ev.Name,
-			Sender:    ev.Sender,
-			Args:      ev.Args,
-			Time:      ev.Time.Unix(),
-			NetworkId: ev.NetworkID,
+			Name:   ev.Name,
+			Sender: ev.Sender,
+			Args:   ev.Args,
+			Time:   ev.Time.Unix(),
+			Net:    ev.NetworkID,
 		},
 	}
 
@@ -104,11 +104,11 @@ func (p *pipeHandler) Cmd(name string, w irc.Writer, ev *cmd.Event) error {
 	p.logger.Debug("remote cmd dispatch", "id", evID)
 
 	iev := &api.IRCEvent{
-		Name:      ev.Event.Name,
-		Sender:    ev.Event.Sender,
-		Args:      ev.Event.Args,
-		Time:      ev.Event.Time.Unix(),
-		NetworkId: ev.Event.NetworkID,
+		Name:   ev.Event.Name,
+		Sender: ev.Event.Sender,
+		Args:   ev.Event.Args,
+		Time:   ev.Event.Time.Unix(),
+		Net:    ev.Event.NetworkID,
 	}
 
 	command := &api.CmdEventResponse{

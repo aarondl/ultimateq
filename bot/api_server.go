@@ -414,9 +414,9 @@ func (a *apiServer) Write(ctx context.Context, in *api.WriteRequest) (*api.Empty
 		return nil, status.Errorf(codes.NotFound, "network id %q not found", in.Net)
 	}
 
-	a.bot.Logger.Debug("ext write", "ext", in.Ext, "net", in.Net, "msg", string(in.Msg.Msg))
+	a.bot.Logger.Debug("ext write", "ext", in.Ext, "net", in.Net, "msg", string(in.Msg))
 
-	_, err := net.Write(in.Msg.Msg)
+	_, err := net.Write(in.Msg)
 	if err != nil {
 		return nil, err
 	}
@@ -453,8 +453,8 @@ func (a *apiServer) RegisterCmd(ctx context.Context, in *api.RegisterCmdRequest)
 			in.Cmd.Name,
 			in.Cmd.Desc,
 			pipe,
-			cmd.Kind(in.Cmd.Kind),
-			cmd.Scope(in.Cmd.Scope),
+			cmd.Kind(in.Cmd.Kind+1),
+			cmd.Scope(in.Cmd.Scope+1),
 		)
 	} else {
 		command, err = cmd.NewAuthedErr(
@@ -462,8 +462,8 @@ func (a *apiServer) RegisterCmd(ctx context.Context, in *api.RegisterCmdRequest)
 			in.Cmd.Name,
 			in.Cmd.Desc,
 			pipe,
-			cmd.Kind(in.Cmd.Kind),
-			cmd.Scope(in.Cmd.Scope),
+			cmd.Kind(in.Cmd.Kind+1),
+			cmd.Scope(in.Cmd.Scope+1),
 			uint8(in.Cmd.ReqLevel),
 			in.Cmd.ReqFlags,
 		)
@@ -534,7 +534,7 @@ func (a *apiServer) StateSelf(ctx context.Context, in *api.Query) (*api.SelfResp
 }
 
 func (a *apiServer) StateUsers(ctx context.Context, in *api.NetworkQuery) (*api.StateUser, error) {
-	state, err := a.getState(in.Network)
+	state, err := a.getState(in.Net)
 	if err != nil {
 		return nil, err
 	}
@@ -551,7 +551,7 @@ func (a *apiServer) StateUsers(ctx context.Context, in *api.NetworkQuery) (*api.
 }
 
 func (a *apiServer) StateUsersByChan(ctx context.Context, in *api.NetworkQuery) (*api.ListResponse, error) {
-	state, err := a.getState(in.Network)
+	state, err := a.getState(in.Net)
 	if err != nil {
 		return nil, err
 	}
@@ -567,7 +567,7 @@ func (a *apiServer) StateUsersByChan(ctx context.Context, in *api.NetworkQuery) 
 }
 
 func (a *apiServer) StateUsersByChanCount(ctx context.Context, in *api.NetworkQuery) (*api.CountResponse, error) {
-	state, err := a.getState(in.Network)
+	state, err := a.getState(in.Net)
 	if err != nil {
 		return nil, err
 	}
@@ -587,7 +587,7 @@ func (a *apiServer) StateUsersByChanCount(ctx context.Context, in *api.NetworkQu
 }
 
 func (a *apiServer) StateUserModes(ctx context.Context, in *api.ChannelQuery) (*api.UserModes, error) {
-	state, err := a.getState(in.Network)
+	state, err := a.getState(in.Net)
 	if err != nil {
 		return nil, err
 	}
@@ -604,7 +604,7 @@ func (a *apiServer) StateUserModes(ctx context.Context, in *api.ChannelQuery) (*
 }
 
 func (a *apiServer) StateChannel(ctx context.Context, in *api.NetworkQuery) (*api.ChannelResponse, error) {
-	state, err := a.getState(in.Network)
+	state, err := a.getState(in.Net)
 	if err != nil {
 		return nil, err
 	}
@@ -665,9 +665,9 @@ func (a *apiServer) StoreAuthUser(ctx context.Context, in *api.AuthUserRequest) 
 
 	var su *data.StoredUser
 	if in.Permanent {
-		su, err = store.AuthUserPerma(in.Network, in.Host, in.Username, in.Password)
+		su, err = store.AuthUserPerma(in.Net, in.Host, in.Username, in.Password)
 	} else {
-		su, err = store.AuthUserTmp(in.Network, in.Host, in.Username, in.Password)
+		su, err = store.AuthUserTmp(in.Net, in.Host, in.Username, in.Password)
 	}
 
 	return &api.Result{Ok: su != nil}, err
@@ -679,7 +679,7 @@ func (a *apiServer) StoreAuthedUser(ctx context.Context, in *api.NetworkQuery) (
 		return nil, err
 	}
 
-	user := store.AuthedUser(in.Network, in.Query)
+	user := store.AuthedUser(in.Net, in.Query)
 	if user == nil {
 		return nil, nil
 	}
@@ -739,7 +739,7 @@ func (a *apiServer) StoreUsersByChannel(ctx context.Context, in *api.NetworkQuer
 		return nil, err
 	}
 
-	users, err := store.ChanUsers(in.Network, in.Query)
+	users, err := store.ChanUsers(in.Net, in.Query)
 	if err != nil {
 		return nil, err
 	}
@@ -768,7 +768,7 @@ func (a *apiServer) StoreChannel(ctx context.Context, in *api.NetworkQuery) (*ap
 		return nil, err
 	}
 
-	channel, err := store.FindChannel(in.Network, in.Query)
+	channel, err := store.FindChannel(in.Net, in.Query)
 	if err != nil {
 		return nil, err
 	}
@@ -859,7 +859,7 @@ func (a *apiServer) StoreDeleteChannel(ctx context.Context, in *api.NetworkQuery
 		return nil, err
 	}
 
-	ok, err := store.RemoveChannel(in.Network, in.Query)
+	ok, err := store.RemoveChannel(in.Net, in.Query)
 	if err != nil {
 		return nil, err
 	} else if !ok {
@@ -875,7 +875,7 @@ func (a *apiServer) StoreLogout(ctx context.Context, in *api.NetworkQuery) (*api
 		return nil, err
 	}
 
-	store.Logout(in.Network, in.Query)
+	store.Logout(in.Net, in.Query)
 	return nil, nil
 }
 
@@ -890,9 +890,9 @@ func (a *apiServer) StoreLogoutByUser(ctx context.Context, in *api.Query) (*api.
 }
 
 func (a *apiServer) NetworkInformation(ctx context.Context, in *api.NetworkInfoRequest) (*api.NetworkInfo, error) {
-	server := a.bot.getServer(in.NetworkId)
+	server := a.bot.getServer(in.Net)
 	if server == nil {
-		return nil, status.Errorf(codes.NotFound, "network id (%s) not found", in.NetworkId)
+		return nil, status.Errorf(codes.NotFound, "network id (%s) not found", in.Net)
 	}
 
 	// The amount of mutex lock/unlocks in this is hilarious. But there doesn't

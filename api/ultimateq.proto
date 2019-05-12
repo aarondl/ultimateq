@@ -109,8 +109,8 @@ message StoredUser {
 }
 
 message StoredChannel {
-  string network = 1;
-  string name    = 2;
+  string net  = 1;
+  string name = 2;
   map<string,string> data = 3;
 }
 
@@ -120,12 +120,12 @@ message SelfResponse {
 }
 
 message NetworkQuery {
-  string network = 1;
-  string query   = 2;
+  string net   = 1;
+  string query = 2;
 }
 
 message ChannelQuery {
-  string network = 1;
+  string net     = 1;
   string channel = 2;
   string query   = 3;
 }
@@ -137,7 +137,7 @@ of the real methods.
 ==================================*/
 
 message AuthUserRequest {
-  string network  = 1;
+  string net      = 1;
   string host     = 2;
   string username = 3;
   string password = 4;
@@ -168,8 +168,8 @@ message StoredChannelsResponse {
 
 message LogoutRequest {
   message HostUser {
-    string network = 1;
-    string host    = 2;
+    string net  = 1;
+    string host = 2;
   }
   oneof query {
     HostUser host_user = 1;
@@ -178,7 +178,7 @@ message LogoutRequest {
 }
 
 message NetworkInfoRequest {
-  string networkId = 1;
+  string net = 1;
 }
 
 /*==================================
@@ -191,8 +191,21 @@ message Cmd {
   string ext         = 1;
   string name        = 2;
   string desc        = 3;
-  int32  kind        = 4;
-  int32  scope       = 5;
+
+  enum Kind {
+    Privmsg = 0;
+    Notice  = 1;
+    AnyKind = 2;
+  };
+
+  enum Scope {
+    Private  = 0;
+    Public   = 1;
+    AnyScope = 2;
+  };
+
+  Kind  kind  = 4;
+  Scope scope = 5;
 
   repeated string args = 6;
 
@@ -234,9 +247,10 @@ message IRCEvent {
   string name          = 1;
   string sender        = 2;
   repeated string args = 3;
-  int64 time           = 4;
-  string network_id    = 5;
+  int64  time          = 4;
+  string net           = 5;
 }
+
 message RegisterCmdRequest {
   string  ext     = 1;
   string  network = 2;
@@ -277,15 +291,11 @@ RawIRC messages allow clients to
 write directly to a network
 ==================================*/
 
-message RawIRC {
-  bytes msg = 1;
-}
-
 // Write raw irc data directly to a network
 message WriteRequest {
   string ext = 1;
   string net = 2;
-  RawIRC msg = 3;
+  bytes  msg = 3;
 }
 
 service Ext {

@@ -59,7 +59,7 @@ func deserializeChannel(serialized []byte) (*StoredChannel, error) {
 func (s *StoredChannel) ToProto() *api.StoredChannel {
 	var proto api.StoredChannel
 
-	proto.Network = s.NetID
+	proto.Net = s.NetID
 	proto.Name = s.Name
 
 	if len(s.JSONStorer) != 0 {
@@ -73,7 +73,7 @@ func (s *StoredChannel) ToProto() *api.StoredChannel {
 }
 
 func (s *StoredChannel) FromProto(proto *api.StoredChannel) {
-	s.NetID = proto.Network
+	s.NetID = proto.Net
 	s.Name = proto.Name
 
 	if len(proto.Data) != 0 {
