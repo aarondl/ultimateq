@@ -457,7 +457,7 @@ func (a *apiServer) RegisterCmd(ctx context.Context, in *api.RegisterCmdRequest)
 			cmd.Scope(in.Cmd.Scope+1),
 			uint8(in.Cmd.ReqLevel),
 			in.Cmd.ReqFlags,
-			command.Args...,
+			in.Cmd.Args...,
 		)
 	} else {
 		command, err = cmd.NewErr(
@@ -467,7 +467,7 @@ func (a *apiServer) RegisterCmd(ctx context.Context, in *api.RegisterCmdRequest)
 			pipe,
 			cmd.Kind(in.Cmd.Kind+1),
 			cmd.Scope(in.Cmd.Scope+1),
-			command.Args...,
+			in.Cmd.Args...,
 		)
 	}
 
