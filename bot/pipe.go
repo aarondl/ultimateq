@@ -113,7 +113,7 @@ func (p *pipeHandler) Cmd(name string, w irc.Writer, ev *cmd.Event) error {
 
 	command := &api.CmdEventResponse{
 		Id:   evID,
-		Name: ev.Name,
+		Name: name,
 		Event: &api.CmdEvent{
 			IrcEvent: iev,
 			Args:     ev.Args,
