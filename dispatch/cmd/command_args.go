@@ -291,9 +291,9 @@ func parseUserArg(ev *Event, state *data.State,
 	addData := func(index int) {
 		if access != nil {
 			if vargs {
-				ev.TargetVarStoredUser[index] = access
+				ev.TargetVarStoredUsers[index] = access
 			} else {
-				ev.TargetStoredUser[name] = access
+				ev.TargetStoredUsers[name] = access
 			}
 		}
 		if user != nil {
@@ -316,10 +316,10 @@ func parseUserArg(ev *Event, state *data.State,
 	switch t & argTypeUSERMASK {
 	case argTypeUser:
 		if vargs {
-			ev.TargetVarStoredUser = make([]*data.StoredUser, nUsers)
+			ev.TargetVarStoredUsers = make([]*data.StoredUser, nUsers)
 		} else {
-			if ev.TargetStoredUser == nil {
-				ev.TargetStoredUser = make(map[string]*data.StoredUser)
+			if ev.TargetStoredUsers == nil {
+				ev.TargetStoredUsers = make(map[string]*data.StoredUser)
 			}
 		}
 		for i, u := range users {

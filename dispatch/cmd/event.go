@@ -35,14 +35,14 @@ type Event struct {
 	TargetUsers map[string]*data.User
 	// TargetStoredUser is populated when the arguments contain a *user
 	// argument.
-	TargetStoredUser map[string]*data.StoredUser
+	TargetStoredUsers map[string]*data.StoredUser
 	// TargetVarUsers is populated when the arguments contain a ~nick...
 	// argument. When a *user... parameter is used, it will be sparsely filled
 	// whenever a user is requested by nickname not *username.
 	TargetVarUsers []*data.User
 	// TargetVarUsers is populated when the arguments contain a *user...
 	// argument.
-	TargetVarStoredUser []*data.StoredUser
+	TargetVarStoredUsers []*data.StoredUser
 
 	Args map[string]string
 }

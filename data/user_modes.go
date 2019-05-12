@@ -1,5 +1,9 @@
 package data
 
+import (
+	"github.com/aarondl/ultimateq/api"
+)
+
 // UserModes provides basic modes for users.
 type UserModes struct {
 	Modes     byte       `json:"modes"`
@@ -50,4 +54,13 @@ func (u *UserModes) StringSymbols() string {
 		}
 	}
 	return ret
+}
+
+// ToProto converts user modes into an api object
+func (u *UserModes) ToProto() *api.UserModes {
+	um := new(api.UserModes)
+	um.Modes = int32(u.Modes)
+	um.Kinds = u.ModeKinds.ToProto()
+
+	return um
 }

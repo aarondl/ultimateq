@@ -3,6 +3,7 @@ package data
 import (
 	"strings"
 
+	"github.com/aarondl/ultimateq/api"
 	"github.com/aarondl/ultimateq/irc"
 )
 
@@ -110,4 +111,15 @@ func (c *Channel) DeleteBans(mask irc.Host) {
 	for i := 0; i < len(toRemove); i++ {
 		c.Modes.unsetAddress(banMode, toRemove[i])
 	}
+}
+
+// ToProto converts to a protocol buffer
+func (c *Channel) ToProto() *api.StateChannel {
+	ch := new(api.StateChannel)
+
+	ch.Name = c.Name
+	ch.Topic = c.Topic
+	ch.Modes = c.Modes.ToProto()
+
+	return ch
 }

@@ -601,7 +601,7 @@ func (c *coreCmds) auth(w irc.Writer, ev *cmd.Event) (
 func (c *coreCmds) logout(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	user := ev.TargetStoredUser["user"]
+	user := ev.TargetStoredUsers["user"]
 	uname := ""
 	host, nick := ev.Sender, ev.Nick()
 	if user != nil {
@@ -628,7 +628,7 @@ func (c *coreCmds) logout(w irc.Writer, ev *cmd.Event) (
 func (c *coreCmds) access(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	access := ev.TargetStoredUser["user"]
+	access := ev.TargetStoredUsers["user"]
 	if access == nil {
 		access = ev.StoredUser
 	}
@@ -754,7 +754,7 @@ func (c *coreCmds) deluser(w irc.Writer, ev *cmd.Event) (
 		external = dispatch.MakeGlobalFlagsError("G")
 		return
 	}
-	uname := ev.TargetStoredUser["user"].Username
+	uname := ev.TargetStoredUsers["user"].Username
 
 	nick := ev.Nick()
 	store := c.b.store
@@ -840,7 +840,7 @@ func (c *coreCmds) masks(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
 	access := ev.StoredUser
-	user := ev.TargetStoredUser["user"]
+	user := ev.TargetStoredUsers["user"]
 	if user != nil {
 		if !ev.StoredUser.HasFlags("", "", "G") {
 			external = dispatch.MakeGlobalFlagsError("G")
@@ -867,7 +867,7 @@ func (c *coreCmds) addmask(w irc.Writer, ev *cmd.Event) (
 	nick := ev.Nick()
 	uname := ev.StoredUser.Username
 
-	user := ev.TargetStoredUser["user"]
+	user := ev.TargetStoredUsers["user"]
 	if user != nil {
 		if !ev.StoredUser.HasFlags("", "", "G") {
 			external = dispatch.MakeGlobalFlagsError("G")
@@ -909,7 +909,7 @@ func (c *coreCmds) delmask(w irc.Writer, ev *cmd.Event) (
 	nick := ev.Nick()
 	uname := ev.StoredUser.Username
 
-	user := ev.TargetStoredUser["user"]
+	user := ev.TargetStoredUsers["user"]
 	if user != nil {
 		if !ev.StoredUser.HasFlags("", "", "G") {
 			external = dispatch.MakeGlobalFlagsError("G")
@@ -947,7 +947,7 @@ func (c *coreCmds) delmask(w irc.Writer, ev *cmd.Event) (
 func (c *coreCmds) resetpasswd(w irc.Writer, ev *cmd.Event) (
 	internal, external error) {
 
-	uname := ev.TargetStoredUser["user"].Username
+	uname := ev.TargetStoredUsers["user"].Username
 	resetnick := ev.Args["nick"]
 	nick := ev.Nick()
 	newpasswd := ""
@@ -1027,7 +1027,7 @@ func (c *coreCmds) take(w irc.Writer, ev *cmd.Event) (
 func (c *coreCmds) giveHelper(w irc.Writer, ev *cmd.Event,
 	network, channel string) (internal, external error) {
 
-	uname := ev.TargetStoredUser["user"].Username
+	uname := ev.TargetStoredUsers["user"].Username
 	args := ev.SplitArg("levelOrFlags")
 	nick := ev.Nick()
 
@@ -1117,7 +1117,7 @@ func (c *coreCmds) giveHelper(w irc.Writer, ev *cmd.Event,
 func (c *coreCmds) takeHelper(w irc.Writer, ev *cmd.Event,
 	network, channel string) (internal, external error) {
 
-	uname := ev.TargetStoredUser["user"].Username
+	uname := ev.TargetStoredUsers["user"].Username
 	arg := ev.Args["allOrFlags"]
 	nick := ev.Nick()
 

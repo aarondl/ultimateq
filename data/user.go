@@ -1,6 +1,7 @@
 package data
 
 import (
+	"github.com/aarondl/ultimateq/api"
 	"github.com/aarondl/ultimateq/irc"
 )
 
@@ -32,4 +33,13 @@ func (u *User) String() string {
 	}
 
 	return str
+}
+
+// ToProto converts stateuser to a protocol buffer
+func (u *User) ToProto() *api.StateUser {
+	user := new(api.StateUser)
+	user.Host = string(u.Host)
+	user.Realname = u.Realname
+
+	return user
 }

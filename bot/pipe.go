@@ -112,11 +112,56 @@ func (p *pipeHandler) Cmd(name string, w irc.Writer, ev *cmd.Event) error {
 	}
 
 	command := &api.CmdEventResponse{
-		Id: evID,
+		Id:   evID,
+		Name: ev.Name,
 		Event: &api.CmdEvent{
 			IrcEvent: iev,
 			Args:     ev.Args,
 		},
+	}
+
+	if ev.User != nil {
+		command.Event.User = ev.User.ToProto()
+	}
+	if ev.StoredUser != nil {
+		command.Event.StoredUser = ev.StoredUser.ToProto()
+	}
+	if ev.UserChannelModes != nil {
+		command.Event.UserChanModes = ev.UserChannelModes.ToProto()
+	}
+	if ev.Channel != nil {
+		command.Event.Channel = ev.Channel.ToProto()
+	}
+	if ev.TargetChannel != nil {
+		command.Event.TargetChannel = ev.TargetChannel.ToProto()
+	}
+	if ev.TargetUsers != nil {
+		targs := make(map[string]*api.StateUser, len(ev.TargetUsers))
+		for k, v := range ev.TargetUsers {
+			targs[k] = v.ToProto()
+		}
+		command.Event.TargetUsers = targs
+	}
+	if ev.TargetStoredUsers != nil {
+		targs := make(map[string]*api.StoredUser, len(ev.TargetStoredUsers))
+		for k, v := range ev.TargetStoredUsers {
+			targs[k] = v.ToProto()
+		}
+		command.Event.TargetStoredUsers = targs
+	}
+	if ev.TargetVarUsers != nil {
+		targs := make([]*api.StateUser, len(ev.TargetVarUsers))
+		for i, v := range ev.TargetVarUsers {
+			targs[i] = v.ToProto()
+		}
+		command.Event.TargetVariadicUsers = targs
+	}
+	if ev.TargetVarStoredUsers != nil {
+		targs := make([]*api.StoredUser, len(ev.TargetVarStoredUsers))
+		for i, v := range ev.TargetVarStoredUsers {
+			targs[i] = v.ToProto()
+		}
+		command.Event.TargetVariadicStoredUsers = targs
 	}
 
 	sent := p.helper.broadcastCmd(p.ext, command)
