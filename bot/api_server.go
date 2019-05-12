@@ -448,15 +448,6 @@ func (a *apiServer) RegisterCmd(ctx context.Context, in *api.RegisterCmdRequest)
 	var command *cmd.Command
 	var err error
 	if in.Cmd.RequireAuth {
-		command, err = cmd.NewErr(
-			in.Cmd.Ext,
-			in.Cmd.Name,
-			in.Cmd.Desc,
-			pipe,
-			cmd.Kind(in.Cmd.Kind+1),
-			cmd.Scope(in.Cmd.Scope+1),
-		)
-	} else {
 		command, err = cmd.NewAuthedErr(
 			in.Cmd.Ext,
 			in.Cmd.Name,
@@ -466,6 +457,17 @@ func (a *apiServer) RegisterCmd(ctx context.Context, in *api.RegisterCmdRequest)
 			cmd.Scope(in.Cmd.Scope+1),
 			uint8(in.Cmd.ReqLevel),
 			in.Cmd.ReqFlags,
+			command.Args...,
+		)
+	} else {
+		command, err = cmd.NewErr(
+			in.Cmd.Ext,
+			in.Cmd.Name,
+			in.Cmd.Desc,
+			pipe,
+			cmd.Kind(in.Cmd.Kind+1),
+			cmd.Scope(in.Cmd.Scope+1),
+			command.Args...,
 		)
 	}
 

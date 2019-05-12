@@ -148,7 +148,7 @@ func NewAuthed(
 	reqFlags string,
 	args ...string) *Command {
 
-	command, err := NewAuthedErr(ext, desc, cmd, handler, kind, scope, reqLevel, reqFlags, args...)
+	command, err := NewAuthedErr(ext, cmd, desc, handler, kind, scope, reqLevel, reqFlags, args...)
 	if err != nil {
 		panic(err)
 	}
@@ -168,7 +168,7 @@ func NewAuthedErr(
 	reqFlags string,
 	args ...string) (*Command, error) {
 
-	command, err := NewErr(ext, desc, cmd, handler, kind, scope, args...)
+	command, err := NewErr(ext, cmd, desc, handler, kind, scope, args...)
 	if err != nil {
 		return nil, err
 	}
