@@ -26,6 +26,8 @@ import (
 
 const (
 	broadcastTimeout = 500 * time.Millisecond
+
+	grpcClientPingMinTime = 2 * time.Minute
 )
 
 // apiServer provides a grpc api around a bot
@@ -169,7 +171,7 @@ func (a *apiServer) Start() error {
 	}
 
 	opts = append(opts,
-		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{MinTime: time.Minute * 10, PermitWithoutStream: true}),
+		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{MinTime: grpcClientPingMinTime, PermitWithoutStream: true}),
 	)
 
 	grpcServer := grpc.NewServer(opts...)
