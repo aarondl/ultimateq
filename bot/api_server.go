@@ -10,17 +10,18 @@ import (
 	"sync"
 	"time"
 
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/status"
-
 	"github.com/aarondl/ultimateq/api"
 	"github.com/aarondl/ultimateq/data"
 	"github.com/aarondl/ultimateq/dispatch/cmd"
 	"github.com/aarondl/ultimateq/registrar"
+
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/status"
 )
 
 const (
@@ -75,8 +76,6 @@ func (a *apiServer) Start() error {
 	if err != nil {
 		return err
 	}
-
-	var opts []grpc.ServerOption
 
 	cert, certOk := a.bot.conf.ExtGlobal().TLSCert()
 	key, keyOk := a.bot.conf.ExtGlobal().TLSKey()
@@ -164,9 +163,14 @@ func (a *apiServer) Start() error {
 
 	a.bot.Logger.Info("API Server Listening", "addr", addr)
 
+	var opts []grpc.ServerOption
 	if config != nil {
 		opts = append(opts, grpc.Creds(credentials.NewTLS(config)))
 	}
+
+	opts = append(opts,
+		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{MinTime: time.Minute * 10, PermitWithoutStream: true}),
+	)
 
 	grpcServer := grpc.NewServer(opts...)
 	api.RegisterExtServer(grpcServer, a)
