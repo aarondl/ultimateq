@@ -361,12 +361,21 @@ var commands = []struct {
 // the cmds to implement user management.
 type coreCmds struct {
 	b *Bot
+
+	core     *dispatch.Core
+	commands *dispatch.CommandDispatcher
 }
 
 // NewCoreCmds initializes the core commands and registers them with the
 // bot.
 func NewCoreCmds(b *Bot) (*coreCmds, error) {
-	c := &coreCmds{b: b}
+	dispatchCore := dispatch.NewCore(b.Logger)
+	c := &coreCmds{
+		b:        b,
+		core:     dispatchCore,
+		commands: dispatch.NewCommandDispatcher(b.mkPrefixFetcher(), dispatchCore),
+	}
+
 	for _, command := range commands {
 		privacy := cmd.Private
 		if command.Public {
@@ -398,7 +407,7 @@ func NewCoreCmds(b *Bot) (*coreCmds, error) {
 			)
 		}
 
-		_, err := b.RegisterGlobalCmd(commandObj)
+		_, err := c.commands.Register("", "", commandObj)
 		if err != nil {
 			return nil, errors.Errorf(errFmtRegister, err)
 		}
@@ -1193,7 +1202,7 @@ func (c *coreCmds) help(w irc.Writer, ev *cmd.Event) (
 	var fuzzyMatches []*cmd.Command
 	var extMatches []string
 
-	c.b.cmds.EachCmd("", "", func(command *cmd.Command) bool {
+	searchFn := func(command *cmd.Command) bool {
 		full := command.Extension + "." + command.Name
 
 		if search == full {
@@ -1222,7 +1231,10 @@ func (c *coreCmds) help(w irc.Writer, ev *cmd.Event) (
 		}
 
 		return false
-	})
+	}
+
+	c.commands.EachCmd("", "", searchFn)
+	c.b.cmds.EachCmd("", "", searchFn)
 
 	if len(exactMatches) > 0 && len(fqMatches) == 0 &&
 		len(fuzzyMatches) == 0 && len(extMatches) == 0 {

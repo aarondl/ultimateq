@@ -304,8 +304,18 @@ func (b *Bot) dispatch(srv *Server) (disconnect bool, err error) {
 
 // dispatch sends a message to both the bot's dispatcher and the given servers
 func (b *Bot) dispatchMessage(s *Server, ev *irc.Event) {
+	if b.coreCommands != nil {
+		// Handle core commands first and stop execution if a core command handled
+		// the request
+		if handled, err := b.coreCommands.commands.Dispatch(s.writer, ev, b); err != nil {
+			b.Logger.Error("cmd dispatch failed", "err", err)
+		} else if handled {
+			return
+		}
+	}
+
 	b.dispatcher.Dispatch(s.writer, ev)
-	if err := b.cmds.Dispatch(s.writer, ev, b); err != nil {
+	if _, err := b.cmds.Dispatch(s.writer, ev, b); err != nil {
 		b.Logger.Error("cmd dispatch failed", "err", err)
 	}
 }

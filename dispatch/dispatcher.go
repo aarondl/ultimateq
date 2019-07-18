@@ -33,7 +33,7 @@ type EventDispatcher interface {
 type CmdDispatcher interface {
 	Register(network, channel string, command *cmd.Command) (uint64, error)
 	Unregister(id uint64) bool
-	Dispatch(irc.Writer, *irc.Event, data.Provider) error
+	Dispatch(irc.Writer, *irc.Event, data.Provider) (bool, error)
 }
 
 // Dispatcher is made for handling dispatching of raw-ish irc events.

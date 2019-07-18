@@ -113,7 +113,7 @@ func (c *CommandDispatcher) Unregister(id uint64) (found bool) {
 
 // Dispatch dispatches an IrcEvent into the cmds event handlers.
 func (c *CommandDispatcher) Dispatch(writer irc.Writer, ev *irc.Event,
-	provider data.Provider) (err error) {
+	provider data.Provider) (handled bool, err error) {
 
 	// Filter non privmsg/notice
 	var kind cmd.Kind
@@ -125,13 +125,13 @@ func (c *CommandDispatcher) Dispatch(writer irc.Writer, ev *irc.Event,
 	}
 
 	if kind == 0 {
-		return nil
+		return false, nil
 	}
 
 	// Get command name or die trying
 	fields := strings.Fields(ev.Args[1])
 	if len(fields) == 0 {
-		return nil
+		return false, nil
 	}
 	commandName := strings.ToLower(fields[0])
 
@@ -148,7 +148,7 @@ func (c *CommandDispatcher) Dispatch(writer irc.Writer, ev *irc.Event,
 
 		firstChar := rune(commandName[0])
 		if firstChar != prefix {
-			return nil
+			return false, nil
 		}
 
 		commandName = commandName[1:]
@@ -159,7 +159,7 @@ func (c *CommandDispatcher) Dispatch(writer irc.Writer, ev *irc.Event,
 	var ext string
 	if ln, dot := len(commandName), strings.IndexRune(commandName, '.'); ln >= 3 && dot > 0 {
 		if ln-dot-1 == 0 {
-			return nil
+			return false, nil
 		}
 		ext = commandName[:dot]
 		commandName = commandName[dot+1:]
@@ -173,7 +173,7 @@ func (c *CommandDispatcher) Dispatch(writer irc.Writer, ev *irc.Event,
 	switch len(handlers) {
 	case 0:
 		// Do nothing, we found nothing to handle this
-		return nil
+		return false, nil
 	case 1:
 		command = handlers[0].(*cmd.Command)
 	default:
@@ -195,12 +195,12 @@ func (c *CommandDispatcher) Dispatch(writer irc.Writer, ev *irc.Event,
 		} else {
 			err := errors.Errorf(errFmtAmbiguousCmd, commandName, strings.Join(collisions, ","))
 			writer.Notice(nick, err.Error())
-			return err
+			return true, err
 		}
 	}
 
 	if 0 == (kind&command.Kind) || 0 == (scope&command.Scope) {
-		return nil
+		return false, nil
 	}
 
 	// Start building up the event.
@@ -221,7 +221,7 @@ func (c *CommandDispatcher) Dispatch(writer irc.Writer, ev *irc.Event,
 			ch, ev); err != nil {
 
 			writer.Notice(nick, err.Error())
-			return err
+			return true, err
 		}
 	}
 
@@ -229,7 +229,7 @@ func (c *CommandDispatcher) Dispatch(writer irc.Writer, ev *irc.Event,
 		state, store); err != nil {
 
 		writer.Notice(nick, err.Error())
-		return err
+		return true, err
 	}
 
 	if state != nil {
@@ -259,7 +259,7 @@ func (c *CommandDispatcher) Dispatch(writer irc.Writer, ev *irc.Event,
 		}
 	}()
 
-	return nil
+	return true, nil
 }
 
 // cmdNameDispatch attempts to dispatch an event to a function named the same
