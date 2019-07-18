@@ -98,7 +98,7 @@ func (r remoteIRCWriter) Write(b []byte) (n int, err error) {
 	writeReq := &api.WriteRequest{
 		Ext: r.extID,
 		Net: r.netID,
-		Msg: &api.RawIRC{Msg: b},
+		Msg: b,
 	}
 
 	_, err = r.client.Write(context.Background(), writeReq)
@@ -153,7 +153,7 @@ func (c *Client) Listen() error {
 				break
 			}
 
-			writer := newWriter(c.client, c.extension, ircEventResp.Event.NetworkId)
+			writer := newWriter(c.client, c.extension, ircEventResp.Event.Net)
 
 			c.mut.RLock()
 			handler := c.events[ircEventResp.Id]
@@ -169,7 +169,7 @@ func (c *Client) Listen() error {
 				Sender:    ircEventResp.Event.Sender,
 				Args:      ircEventResp.Event.Args,
 				Time:      time.Unix(ircEventResp.Event.Time, 0),
-				NetworkID: ircEventResp.Event.NetworkId,
+				NetworkID: ircEventResp.Event.Net,
 			}
 
 			go handler.Handle(writer, ev)
@@ -186,7 +186,7 @@ func (c *Client) Listen() error {
 				break
 			}
 
-			writer := newWriter(c.client, c.extension, cmdEventResp.Event.IrcEvent.NetworkId)
+			writer := newWriter(c.client, c.extension, cmdEventResp.Event.IrcEvent.Net)
 
 			c.mut.RLock()
 			handler := c.commands[cmdEventResp.Id]
@@ -203,7 +203,7 @@ func (c *Client) Listen() error {
 				Sender:    ircEvent.Sender,
 				Args:      ircEvent.Args,
 				Time:      time.Unix(ircEvent.Time, 0),
-				NetworkID: ircEvent.NetworkId,
+				NetworkID: ircEvent.Net,
 			}
 
 			ev := &cmd.Event{
@@ -261,8 +261,8 @@ func (c *Client) RegisterCmd(network string, channel string, command *cmd.Comman
 			Name:        command.Name,
 			Ext:         command.Extension,
 			Desc:        command.Description,
-			Kind:        int32(command.Kind),
-			Scope:       int32(command.Scope),
+			Kind:        api.Cmd_Kind(command.Kind),
+			Scope:       api.Cmd_Scope(command.Scope),
 			Args:        command.Args,
 			RequireAuth: command.RequireAuth,
 			ReqLevel:    int32(command.ReqLevel),
