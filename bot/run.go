@@ -1,7 +1,6 @@
 package bot
 
 import (
-	"bufio"
 	"os"
 	"os/signal"
 	"time"
@@ -41,11 +40,11 @@ func Run(cb func(b *Bot)) error {
 
 	input, quit := make(chan int), make(chan os.Signal, 2)
 
-	go func() {
+	/*go func() {
 		scanner := bufio.NewScanner(os.Stdin)
 		scanner.Scan()
 		input <- 0
-	}()
+	}()*/
 
 	signal.Notify(quit, os.Interrupt, os.Kill)
 
