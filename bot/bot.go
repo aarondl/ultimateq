@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -284,12 +285,18 @@ func (b *Bot) dispatch(srv *Server) (disconnect bool, err error) {
 				b.Warn(errParsingIrcMessage, "err", parseErr, "ev", ev)
 				break
 			}
+
 			ircMsg.NetworkID = srv.networkID
 			ircMsg.NetworkInfo = srv.netInfo
 
 			if srv.state != nil {
 				srv.state.Update(ircMsg)
 			}
+
+			if b.checkIgnored(ircMsg.Sender) {
+				continue
+			}
+
 			b.dispatchMessage(srv, ircMsg)
 		case <-srv.killable:
 			err = errServerKilled
@@ -590,6 +597,23 @@ func (b *Bot) getServer(networkID string) *Server {
 		return srv
 	}
 	return nil
+}
+
+var ignoreSync sync.Once
+var ignoreList []string
+
+func (b *Bot) checkIgnored(sender string) bool {
+	ignoreSync.Do(func() {
+		ignoreList, _ = b.conf.Ignores()
+	})
+
+	for _, v := range ignoreList {
+		if strings.HasSuffix(sender, v) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // mkPrefixFetcher creates a function that can fetch the prefix for a given

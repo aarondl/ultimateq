@@ -12,6 +12,7 @@ An example configuration looks like this:
 	loglevel = "debug"
 	logfile = "/path/to/file.log"
 	secret_key = "myunbelievablylongandsecrettoken"
+	ignores = ["hostsuffix"]
 
 	# Most of the configuration values below have healthy defaults which means
 	# you don't have to set any of them. servers, nick, username, realname is
@@ -450,6 +451,34 @@ func (c *Config) SetSecretKey(key string) *Config {
 	defer c.protect.Unlock()
 
 	c.values["secret_key"] = interface{}(key)
+	return c
+}
+
+// Ignores returns the global set ignores
+func (c *Config) Ignores() ([]string, bool) {
+	c.protect.RLock()
+	defer c.protect.RUnlock()
+
+	var ignores []string
+	if val, ok := c.values["ignores"]; ok {
+		if islice, ok := val.([]interface{}); ok {
+			for _, i := range islice {
+				if s, ok := i.(string); ok {
+					ignores = append(ignores, s)
+				}
+			}
+		}
+	}
+
+	return ignores, false
+}
+
+// SetIgnores sets the ignores array
+func (c *Config) SetIgnores(ignores []string) *Config {
+	c.protect.Lock()
+	defer c.protect.Unlock()
+
+	c.values["ignores"] = interface{}(ignores)
 	return c
 }
 

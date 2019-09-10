@@ -245,4 +245,11 @@ func TestConfig_Config_GetSet(t *testing.T) {
 	if v, ok := c.SecretKey(); !ok || v != "a" {
 		t.Error("Expected secret key to be set, and to get a, got:", v)
 	}
+	if v, ok := c.Ignores(); ok || v != nil {
+		t.Error("Expected ignores not to be set, and to get default:", v)
+	}
+	c.SetIgnores([]string{"a", "b"})
+	if v, ok := c.Ignores(); !ok || v[0] != "a" || v[1] != "b" {
+		t.Error("Expected ignores to be set, and to get a, got:", v)
+	}
 }
