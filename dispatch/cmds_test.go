@@ -74,9 +74,9 @@ func (b *commandHandler) Cmd(command string,
 	b.channel = ev.Channel
 	b.targChan = ev.TargetChannel
 	b.targUsers = ev.TargetUsers
-	b.targUserAccs = ev.TargetStoredUser
+	b.targUserAccs = ev.TargetStoredUsers
 	b.targVarUsers = ev.TargetVarUsers
-	b.targVarUserAccs = ev.TargetVarStoredUser
+	b.targVarUserAccs = ev.TargetVarStoredUsers
 	b.args = ev.Args
 
 	// Test Coverage obviously will work.
@@ -465,7 +465,7 @@ func TestCmds_Dispatch(t *testing.T) {
 			NetworkID:   netID,
 			NetworkInfo: netInfo,
 		}
-		err = c.Dispatch(writer, ev, provider)
+		_, err = c.Dispatch(writer, ev, provider)
 		c.WaitForHandlers()
 		if handler.called != test.Called {
 			if handler.called {
@@ -588,7 +588,7 @@ func TestCmds_DispatchAuthed(t *testing.T) {
 			NetworkInfo: netInfo,
 		}
 
-		err = c.Dispatch(writer, ev, provider)
+		_, err = c.Dispatch(writer, ev, provider)
 		c.WaitForHandlers()
 		if handler.called != test.Called {
 			if handler.called {
@@ -667,7 +667,7 @@ func TestCmds_DispatchNils(t *testing.T) {
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
-	err = c.Dispatch(writer, ev, provider)
+	_, err = c.Dispatch(writer, ev, provider)
 	c.WaitForHandlers()
 	err = chkErr(err, errMsgStoreDisabled)
 	if err != nil {
@@ -681,7 +681,7 @@ func TestCmds_DispatchNils(t *testing.T) {
 	if err != nil {
 		t.Error("Unexpected error:", err)
 	}
-	err = c.Dispatch(writer, ev, provider)
+	_, err = c.Dispatch(writer, ev, provider)
 	c.WaitForHandlers()
 	if handler.channel != nil {
 		t.Error("Channel should just be nil when state is disabled.")
@@ -738,7 +738,7 @@ func TestCmds_DispatchReturns(t *testing.T) {
 	for _, test := range errors {
 		buffer.Reset()
 		handler.Error = test.Error
-		err = c.Dispatch(writer, ev, provider)
+		_, err = c.Dispatch(writer, ev, provider)
 		c.WaitForHandlers()
 		err = chkStr(string(buffer.Bytes()), `NOTICE nick :`+test.ErrorMsg)
 		if err != nil {
@@ -776,7 +776,7 @@ func TestCmds_DispatchChannel(t *testing.T) {
 	}
 
 	ev.Args = []string{channel, string(prefix) + command}
-	err = c.Dispatch(writer, ev, provider)
+	_, err = c.Dispatch(writer, ev, provider)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -791,7 +791,7 @@ func TestCmds_DispatchChannel(t *testing.T) {
 	handler.targChan = nil
 	handler.args = nil
 	ev.Args = []string{channel, string(prefix) + command + " " + channel}
-	err = c.Dispatch(writer, ev, provider)
+	_, err = c.Dispatch(writer, ev, provider)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -806,14 +806,14 @@ func TestCmds_DispatchChannel(t *testing.T) {
 	handler.targChan = nil
 	handler.args = nil
 	ev.Args = []string{nick, command}
-	err = c.Dispatch(writer, ev, provider)
+	_, err = c.Dispatch(writer, ev, provider)
 	c.WaitForHandlers()
 	if err == nil {
 		t.Error("should have been an argument error")
 	}
 
 	ev.Args = []string{nick, command + " " + channel}
-	err = c.Dispatch(writer, ev, testProvider{nil, store})
+	_, err = c.Dispatch(writer, ev, testProvider{nil, store})
 	c.WaitForHandlers()
 	err = chkErr(err, errMsgStateDisabled)
 	if err != nil {
@@ -823,7 +823,7 @@ func TestCmds_DispatchChannel(t *testing.T) {
 	handler.targChan = nil
 	handler.args = nil
 	ev.Args = []string{nick, command + " " + channel}
-	err = c.Dispatch(writer, ev, provider)
+	_, err = c.Dispatch(writer, ev, provider)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -836,14 +836,14 @@ func TestCmds_DispatchChannel(t *testing.T) {
 	}
 
 	ev.Args = []string{channel, string(prefix) + command + " " + channel + " arg"}
-	err = c.Dispatch(writer, ev, provider)
+	_, err = c.Dispatch(writer, ev, provider)
 	c.WaitForHandlers()
 	if err == nil {
 		t.Error("should have been an argument error")
 	}
 
 	ev.Args = []string{nick, command}
-	err = c.Dispatch(writer, ev, provider)
+	_, err = c.Dispatch(writer, ev, provider)
 	c.WaitForHandlers()
 	if err == nil {
 		t.Error("should have been an argument error")
@@ -880,7 +880,7 @@ func TestCmds_DispatchUsers(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, command + " nick nick"}
-	err = c.Dispatch(writer, ev, provider)
+	_, err = c.Dispatch(writer, ev, provider)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -897,7 +897,7 @@ func TestCmds_DispatchUsers(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, command + " *user nick"}
-	err = c.Dispatch(writer, ev, provider)
+	_, err = c.Dispatch(writer, ev, provider)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -911,7 +911,7 @@ func TestCmds_DispatchUsers(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, command + " *user nick *user"}
-	err = c.Dispatch(writer, ev, provider)
+	_, err = c.Dispatch(writer, ev, provider)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -928,7 +928,7 @@ func TestCmds_DispatchUsers(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, command + " *user nick *user nick nick"}
-	err = c.Dispatch(writer, ev, provider)
+	_, err = c.Dispatch(writer, ev, provider)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -979,7 +979,7 @@ func TestCmds_DispatchErrors(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, command + " *baduser nick"}
-	err = c.Dispatch(writer, ev, provider)
+	_, err = c.Dispatch(writer, ev, provider)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtUserNotRegistered, "baduser"))
 	if err != nil {
@@ -987,14 +987,14 @@ func TestCmds_DispatchErrors(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, command + " * nick"}
-	err = c.Dispatch(writer, ev, provider)
+	_, err = c.Dispatch(writer, ev, provider)
 	c.WaitForHandlers()
 	if err == nil {
 		t.Error("should have had an error about a username")
 	}
 
 	ev.Args = []string{nick, command + " self nick"}
-	err = c.Dispatch(writer, ev, provider)
+	_, err = c.Dispatch(writer, ev, provider)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtUserNotAuthed, "self"))
 	if err != nil {
@@ -1002,7 +1002,7 @@ func TestCmds_DispatchErrors(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, command + " nick badnick"}
-	err = c.Dispatch(writer, ev, provider)
+	_, err = c.Dispatch(writer, ev, provider)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtUserNotFound, "badnick"))
 	if err != nil {
@@ -1010,7 +1010,7 @@ func TestCmds_DispatchErrors(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, command + " nick nick nick badnick"}
-	err = c.Dispatch(writer, ev, provider)
+	_, err = c.Dispatch(writer, ev, provider)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtUserNotFound, "badnick"))
 	if err != nil {
@@ -1018,7 +1018,7 @@ func TestCmds_DispatchErrors(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, command + " *user nick"}
-	err = c.Dispatch(writer, ev, testProvider{state, nil})
+	_, err = c.Dispatch(writer, ev, testProvider{state, nil})
 	c.WaitForHandlers()
 	err = chkErr(err, errMsgStoreDisabled)
 	if err != nil {
@@ -1026,7 +1026,7 @@ func TestCmds_DispatchErrors(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, command + " nick nick"}
-	err = c.Dispatch(writer, ev, testProvider{nil, store})
+	_, err = c.Dispatch(writer, ev, testProvider{nil, store})
 	c.WaitForHandlers()
 	err = chkErr(err, errMsgStateDisabled)
 	if err != nil {
@@ -1044,7 +1044,7 @@ func TestCmds_DispatchErrors(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, command + " nick"}
-	err = c.Dispatch(writer, ev, testProvider{nil, store})
+	_, err = c.Dispatch(writer, ev, testProvider{nil, store})
 	c.WaitForHandlers()
 	err = chkErr(err, errMsgStateDisabled)
 	if err != nil {
@@ -1081,7 +1081,7 @@ func TestCmds_DispatchVariadicUsers(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, command + " *user nick"}
-	err = c.Dispatch(writer, ev, provider)
+	_, err = c.Dispatch(writer, ev, provider)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error("There was an unexpected error:", err)
@@ -1114,7 +1114,7 @@ func TestCmds_DispatchVariadicUsers(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, command + " nick nick badnick"}
-	err = c.Dispatch(writer, ev, provider)
+	_, err = c.Dispatch(writer, ev, provider)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtUserNotFound, "badnick"))
 	if err != nil {
@@ -1122,7 +1122,7 @@ func TestCmds_DispatchVariadicUsers(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, command + " nick nick self"}
-	err = c.Dispatch(writer, ev, provider)
+	_, err = c.Dispatch(writer, ev, provider)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtUserNotAuthed, "self"))
 	if err != nil {
@@ -1130,7 +1130,7 @@ func TestCmds_DispatchVariadicUsers(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, command + " nick nick *badusername"}
-	err = c.Dispatch(writer, ev, provider)
+	_, err = c.Dispatch(writer, ev, provider)
 	c.WaitForHandlers()
 	err = chkErr(err, fmt.Sprintf(errFmtUserNotRegistered, "badusername"))
 	if err != nil {
@@ -1167,7 +1167,7 @@ func TestCmds_DispatchMixUserAndChan(t *testing.T) {
 	}
 
 	ev.Args = []string{nick, command + " " + channel + " nick"}
-	err = c.Dispatch(writer, ev, provider)
+	_, err = c.Dispatch(writer, ev, provider)
 	c.WaitForHandlers()
 	if err != nil {
 		t.Error(err)
@@ -1211,7 +1211,7 @@ func TestCmds_DispatchReflection(t *testing.T) {
 		NetworkID:   netID,
 		NetworkInfo: netInfo,
 	}
-	err := c.Dispatch(writer, ev, provider)
+	_, err := c.Dispatch(writer, ev, provider)
 	if err != nil {
 		t.Error(err)
 	}
@@ -1229,7 +1229,7 @@ func TestCmds_DispatchReflection(t *testing.T) {
 
 	handler.Called, handler.CalledBad = false, false
 	ev.Args = []string{"a", "badargnum"}
-	err = c.Dispatch(writer, ev, provider)
+	_, err = c.Dispatch(writer, ev, provider)
 	if err != nil {
 		t.Error(err)
 	}
@@ -1244,7 +1244,7 @@ func TestCmds_DispatchReflection(t *testing.T) {
 
 	handler.Called, handler.CalledBad = false, false
 	ev.Args = []string{"a", "noreturn"}
-	err = c.Dispatch(writer, ev, provider)
+	_, err = c.Dispatch(writer, ev, provider)
 	if err != nil {
 		t.Error(err)
 	}
@@ -1259,7 +1259,7 @@ func TestCmds_DispatchReflection(t *testing.T) {
 
 	handler.Called, handler.CalledBad = false, false
 	ev.Args = []string{"a", "badargs"}
-	err = c.Dispatch(writer, ev, provider)
+	_, err = c.Dispatch(writer, ev, provider)
 	if err != nil {
 		t.Error(err)
 	}
@@ -1421,7 +1421,7 @@ func TestCmds_Panic(t *testing.T) {
 	c.Register("", "", tmpCmd)
 
 	ev := irc.NewEvent("", netInfo, irc.PRIVMSG, host, self, "panic")
-	err := c.Dispatch(nil, ev, provider)
+	_, err := c.Dispatch(nil, ev, provider)
 	if err != nil {
 		t.Error(err)
 	}
