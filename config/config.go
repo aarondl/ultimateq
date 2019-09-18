@@ -460,17 +460,23 @@ func (c *Config) Ignores() ([]string, bool) {
 	defer c.protect.RUnlock()
 
 	var ignores []string
-	if val, ok := c.values["ignores"]; ok {
-		if islice, ok := val.([]interface{}); ok {
-			for _, i := range islice {
-				if s, ok := i.(string); ok {
-					ignores = append(ignores, s)
-				}
-			}
+	val, ok := c.values["ignores"]
+	if !ok {
+		return nil, false
+	}
+
+	islice, ok := val.([]interface{})
+	if !ok {
+		return nil, false
+	}
+
+	for _, i := range islice {
+		if s, ok := i.(string); ok {
+			ignores = append(ignores, s)
 		}
 	}
 
-	return ignores, false
+	return ignores, true
 }
 
 // SetIgnores sets the ignores array
@@ -478,7 +484,12 @@ func (c *Config) SetIgnores(ignores []string) *Config {
 	c.protect.Lock()
 	defer c.protect.Unlock()
 
-	c.values["ignores"] = interface{}(ignores)
+	intfIgnores := make([]interface{}, len(ignores))
+	for i, s := range ignores {
+		intfIgnores[i] = s
+	}
+
+	c.values["ignores"] = intfIgnores
 	return c
 }
 

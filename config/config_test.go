@@ -250,6 +250,6 @@ func TestConfig_Config_GetSet(t *testing.T) {
 	}
 	c.SetIgnores([]string{"a", "b"})
 	if v, ok := c.Ignores(); !ok || v[0] != "a" || v[1] != "b" {
-		t.Error("Expected ignores to be set, and to get a, got:", v)
+		t.Error("Expected ignores to be set, and to get [a, b], got:", v)
 	}
 }
